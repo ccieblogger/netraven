@@ -1,0 +1,15 @@
+backup:
+  directory: "~/network_backups"  # Default to user's home directory
+  format: "{host}_config.txt"
+  git:
+    enabled: false
+    repo_url: null  # Set to your repository URL to enable
+    branch: main
+    commit_message: "Updated configuration for {host}"
+    author_name: "Netbox Updater"
+    author_email: "netbox@example.com"
+
+logging:
+  level: INFO
+  directory: logs
+  filename: netraven.log 

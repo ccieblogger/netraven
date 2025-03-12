@@ -1,0 +1,732 @@
+Building configuration...
+
+
+Current configuration : 18918 bytes
+!
+! Last configuration change at 15:46:26 PDT Tue May 31 2022 by blarson
+! NVRAM config last updated at 17:40:49 PDT Wed Mar 23 2022 by blarson
+!
+version 16.3
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+no service dhcp
+no platform punt-keepalive disable-kernel-core
+platform hardware throughput level 300000
+!
+hostname TAI-URP-DMVPN-SPOKE2
+!
+boot-start-marker
+boot system flash isr4300-universalk9.16.03.07.SPA.bin
+boot-end-marker
+!
+shell processing full
+!
+vrf definition INET1
+ !
+ address-family ipv4
+ exit-address-family
+!
+vrf definition Mgmt-intf
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+!
+logging userinfo
+logging buffered 16384
+no logging console
+!
+aaa new-model
+!
+!
+aaa group server tacacs+ TAI_SERVERS
+ server-private 10.92.42.20 key 7 143A1B0C1E053E2E207A1F202C171E
+ server-private 10.92.42.21 key 7 080C45491B18111216592011242F3D
+ ip tacacs source-interface Loopback0
+!
+aaa group server tacacs+ TAI_TACACS-HOSTS
+ server-private 10.92.42.199 key 7 0253015D18471C244A0B2948574316
+ server-private 10.92.42.198 key 7 124C0011014A1F012C6E0479616126
+ server-private 10.90.12.112 key 7 055E0309320D5D0C1F403743595800
+ ip tacacs source-interface Loopback0
+!
+aaa authentication login default group TAI_TACACS-HOSTS local
+aaa authorization exec default group TAI_TACACS-HOSTS local 
+aaa authorization network default local 
+!
+!
+!
+!
+!
+!
+aaa session-id common
+clock timezone PST -8 0
+clock summer-time PDT recurring
+!
+!
+!
+!
+!
+!
+!
+!
+!
+no ip bootp server
+no ip domain lookup
+ip domain name toshiba.com
+ip dhcp bootp ignore
+!
+!
+!
+login on-failure log
+login on-success log
+!
+!
+!
+!
+!
+!
+!
+subscriber templating
+!
+!
+!
+multilink bundle-name authenticated
+!
+flow record TAINF
+ description config for TAINF
+ match ipv4 tos
+ match ipv4 protocol
+ match ipv4 source address
+ match ipv4 destination address
+ match transport source-port
+ match transport destination-port
+ collect transport tcp flags
+ collect interface input
+ collect interface output
+ collect counter bytes long
+ collect counter packets long
+!
+!
+flow record TAI_NFRec
+ match ipv4 protocol
+ match ipv4 source address
+ match ipv4 destination address
+ match transport source-port
+ match transport destination-port
+ collect counter bytes long
+ collect counter packets long
+!
+!
+flow exporter TAINF
+ description Exporter for TAINF
+ destination 133.165.64.111
+ source Loopback0
+ transport udp 2055
+ template data timeout 60
+!
+!
+flow exporter TAI_NFExp
+ destination 10.92.42.200
+ source Loopback0
+ transport udp 9991
+ option exporter-stats timeout 20
+!
+!
+flow monitor TAINF
+ exporter TAINF
+ cache timeout active 60
+ record TAINF
+!
+!
+flow monitor TAI_NFMon
+ exporter TAI_NFExp
+ record TAI_NFRec
+!
+!
+!
+!
+!
+!
+license udi pid ISR4331/K9 sn FDO22023BX1
+license boot level appxk9
+license boot level securityk9
+archive
+ log config
+  logging enable
+  logging size 200
+  notify syslog contenttype plaintext
+  hidekeys
+!
+!
+!
+!
+!
+object-group service DMVPN_CRYPTO 
+ esp
+ udp eq isakmp
+ udp eq non500-isakmp
+ tcp eq domain
+ icmp
+!
+diagnostic bootup level minimal
+spanning-tree extend system-id
+!
+!
+username admin privilege 15 password 7 12375503461E5E0A7A6A
+username taiadmin privilege 15 password 7 072F05411F074C55191E124D
+!
+redundancy
+ mode none
+!
+!
+!
+crypto ikev2 keyring flexvpn_keyring
+ peer flexvpn_spokes
+  address 0.0.0.0 0.0.0.0
+  pre-shared-key local S3m3try_F1dler-2021
+  pre-shared-key remote S3m3try_F1dler-2021
+ !
+!
+!
+crypto ikev2 profile ikev2_profile_flexvpn
+ description *** IKEv2 Flexvpn for Remote Offices ****
+ match fvrf INET1
+ match identity remote address 0.0.0.0 
+ authentication remote pre-share
+ authentication local pre-share
+ keyring local flexvpn_keyring
+ aaa authorization group psk list default default
+ virtual-template 1
+!
+crypto ikev2 dpd 10 2 on-demand
+crypto ikev2 client flexvpn flexvpn_client_profile
+  peer 10 209.243.190.54 track 101
+  peer 15 209.243.190.55 track 102
+  client connect Tunnel100
+!
+!
+!
+!
+track 101 ip sla 101 reachability
+!
+track 102 ip sla 102 reachability
+!
+!
+! 
+crypto keyring DMVPNKEY1 vrf INET1 
+  pre-shared-key address 0.0.0.0 0.0.0.0 key N0t4u2n0!
+crypto logging session
+!
+crypto isakmp policy 10
+ encr aes 256
+ authentication pre-share
+ group 5
+crypto isakmp invalid-spi-recovery
+crypto isakmp keepalive 10
+crypto isakmp profile IKEPROF1
+   keyring DMVPNKEY1
+   match identity address 0.0.0.0 INET1
+!
+crypto ipsec security-association replay window-size 512
+!
+crypto ipsec transform-set NAWANSTS esp-aes 256 esp-sha-hmac 
+ mode transport
+!
+crypto ipsec profile NAWAN_IPSEC_PROFILE
+ set transform-set NAWANSTS 
+!
+crypto ipsec profile default
+ set ikev2-profile ikev2_profile_flexvpn
+!
+!
+!
+!
+!
+global-address-family ipv4
+ route-replicate from vrf INET1 unicast static route-map INET1_LEAKED_ROUTES
+!
+!
+! 
+! 
+! 
+! 
+! 
+! 
+!
+!
+interface Loopback0
+ ip address 172.17.255.15 255.255.255.255
+!
+interface Port-channel10
+ no ip address
+ no negotiation auto
+!
+interface Port-channel10.124
+ encapsulation dot1Q 124
+ ip address 10.90.88.38 255.255.255.252
+ ip nat inside
+ ip ospf 1 area 0
+ ip ospf cost 1000
+!
+interface Port-channel10.211
+ encapsulation dot1Q 211
+ vrf forwarding INET1
+ ip address 10.90.192.46 255.255.255.240
+ ip nat inside
+ shutdown
+!
+interface Port-channel10.212
+ encapsulation dot1Q 212
+ vrf forwarding INET1
+ ip address 10.90.192.81 255.255.255.240
+ ip nat inside
+!
+interface Port-channel10.315
+ encapsulation dot1Q 315
+ ip address 10.90.15.254 255.255.255.0
+ ip nat inside
+ shutdown
+!
+interface Port-channel10.323
+ encapsulation dot1Q 323
+ ip address 10.90.23.254 255.255.255.0
+ ip nat inside
+!
+interface Tunnel0
+ ip flow monitor TAINF input
+ ip flow monitor TAI_NFMon input
+ ip flow monitor TAINF output
+ ip flow monitor TAI_NFMon output
+ ip address 10.90.201.5 255.255.255.0
+ no ip redirects
+ ip mtu 1400
+ ip nhrp authentication 1T0$h18@
+ ip nhrp map multicast 209.243.190.71
+ ip nhrp map 10.90.201.1 209.243.190.71
+ ip nhrp network-id 100
+ ip nhrp holdtime 300
+ ip nhrp nhs 10.90.201.1
+ ip nhrp redirect
+ ip tcp adjust-mss 1360
+ delay 6000
+ shutdown
+ tunnel source GigabitEthernet0/0/0
+ tunnel mode gre multipoint
+ tunnel key 100
+ tunnel vrf INET1
+ tunnel protection ipsec profile NAWAN_IPSEC_PROFILE
+!
+interface Tunnel100
+ description *** FlexVPN Tunnel Interface ***
+ ip address negotiated
+ ip mtu 1400
+ ip nhrp network-id 205
+ ip nhrp shortcut virtual-template 1
+ ip nhrp redirect
+ ip tcp adjust-mss 1360
+ tunnel source GigabitEthernet0/0/0
+ tunnel destination 209.243.190.54
+ tunnel vrf INET1
+ tunnel protection ipsec profile default
+!
+interface GigabitEthernet0/0/0
+ vrf forwarding INET1
+ ip address 12.245.0.110 255.255.255.252
+ ip nat outside
+ negotiation auto
+ no cdp enable
+ no lldp transmit
+ no lldp receive
+!
+interface GigabitEthernet0/0/1
+ no ip address
+ negotiation auto
+ channel-group 10 mode active
+!
+interface GigabitEthernet0/0/2
+ no ip address
+ negotiation auto
+ channel-group 10 mode active
+!
+interface GigabitEthernet0
+ vrf forwarding Mgmt-intf
+ no ip address
+ shutdown
+ negotiation auto
+!
+interface Virtual-Template1 type tunnel
+ ip unnumbered Tunnel100
+ ip mtu 1400
+ ip nhrp network-id 205
+ ip nhrp shortcut virtual-template 1
+ ip nhrp redirect
+ ip tcp adjust-mss 1360
+ tunnel vrf INET1
+ tunnel protection ipsec profile default
+!
+!
+router eigrp TAIDMVPN
+ !
+ address-family ipv4 unicast autonomous-system 101
+  !
+  topology base
+   redistribute eigrp 1 metric 1000000 1000 1 255 1500
+   redistribute bgp 64601 metric 1000000 1000 1 255 1500
+  exit-af-topology
+  network 10.90.201.5 0.0.0.0
+  network 172.17.255.15 0.0.0.0
+ exit-address-family
+!
+!
+router eigrp TAIURP
+ !
+ address-family ipv4 unicast autonomous-system 1
+  !
+  topology base
+   distribute-list route-map DMVPN_TO_URP_TAI out Port-channel10.315
+   distribute-list route-map URP_TAI_TO_DMVPN in Port-channel10.315
+   distribute-list route-map DMVPN_TO_URP_TLGA out Port-channel10.323
+   distribute-list route-map URP_TLGA_TO_DMVPN in Port-channel10.323
+   redistribute eigrp 101 metric 1000000 1000 1 255 1500
+  exit-af-topology
+  network 10.90.15.254 0.0.0.0
+  network 10.90.23.254 0.0.0.0
+ exit-address-family
+!
+router ospf 1
+ passive-interface default
+ no passive-interface Port-channel10.124
+ network 10.90.88.36 0.0.0.3 area 0
+ default-information originate metric 100 metric-type 1
+!
+router bgp 64601
+ bgp router-id 172.17.255.15
+ bgp log-neighbor-changes
+ bgp redistribute-internal
+ network 10.90.8.0 mask 255.255.255.0
+ aggregate-address 10.90.16.0 255.255.248.0
+ aggregate-address 10.90.8.0 255.255.248.0
+ aggregate-address 10.90.0.0 255.255.248.0
+ timers bgp 15 30
+ redistribute connected metric 999
+ neighbor 10.90.205.1 remote-as 64601
+ neighbor 10.90.205.1 fall-over
+!
+no ip nat service sip tcp port 5060
+no ip nat service sip udp port 5060
+ip nat inside source static 10.90.192.82 12.159.97.82 vrf INET1
+ip nat inside source list INET1_NAT_POOL interface GigabitEthernet0/0/0 vrf INET1 overload
+ip forward-protocol nd
+ip ftp source-interface Loopback0
+ip ftp username netftp
+ip ftp password 7 0228574F0D321F7014
+no ip http server
+no ip http secure-server
+ip tftp source-interface GigabitEthernet0
+ip route vrf INET1 0.0.0.0 0.0.0.0 70.168.253.17
+ip route vrf INET1 0.0.0.0 0.0.0.0 24.103.42.81
+ip route vrf INET1 0.0.0.0 0.0.0.0 70.169.247.113
+ip route vrf INET1 0.0.0.0 0.0.0.0 12.10.45.129
+ip route vrf INET1 0.0.0.0 0.0.0.0 12.245.0.109
+ip route vrf INET1 12.203.52.16 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.203.52.22 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.203.52.30 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.203.52.31 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.203.52.32 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.203.52.76 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.203.52.84 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.203.52.85 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.203.52.86 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.203.52.87 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.16 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.23 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.28 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.30 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.31 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.32 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.68 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.69 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.86 255.255.255.255 12.10.45.129
+ip route vrf INET1 12.226.222.87 255.255.255.255 12.10.45.129
+ip route vrf INET1 13.70.151.216 255.255.255.255 12.10.45.129
+ip route vrf INET1 13.71.127.197 255.255.255.255 12.10.45.129
+ip route vrf INET1 13.72.245.115 255.255.255.255 12.10.45.129
+ip route vrf INET1 13.73.1.120 255.255.255.255 12.10.45.129
+ip route vrf INET1 13.75.126.169 255.255.255.255 12.10.45.129
+ip route vrf INET1 13.89.240.113 255.255.255.255 12.10.45.129
+ip route vrf INET1 13.107.3.0 255.255.255.0 12.10.45.129
+ip route vrf INET1 13.107.64.0 255.255.192.0 12.10.45.129
+ip route vrf INET1 51.140.155.234 255.255.255.255 12.10.45.129
+ip route vrf INET1 51.140.203.190 255.255.255.255 12.10.45.129
+ip route vrf INET1 51.141.51.76 255.255.255.255 12.10.45.129
+ip route vrf INET1 52.112.0.0 255.252.0.0 12.10.45.129
+ip route vrf INET1 52.163.126.215 255.255.255.255 12.10.45.129
+ip route vrf INET1 52.170.21.67 255.255.255.255 12.10.45.129
+ip route vrf INET1 52.172.185.18 255.255.255.255 12.10.45.129
+ip route vrf INET1 52.178.94.2 255.255.255.255 12.10.45.129
+ip route vrf INET1 52.178.161.139 255.255.255.255 12.10.45.129
+ip route vrf INET1 52.228.25.96 255.255.255.255 12.10.45.129
+ip route vrf INET1 52.238.119.141 255.255.255.255 12.10.45.129
+ip route vrf INET1 52.242.23.189 255.255.255.255 12.10.45.129
+ip route vrf INET1 52.244.160.207 255.255.255.255 12.10.45.129
+ip route vrf INET1 104.215.11.144 255.255.255.255 12.10.45.129
+ip route vrf INET1 104.215.62.195 255.255.255.255 12.10.45.129
+ip route vrf INET1 138.91.237.237 255.255.255.255 12.10.45.129
+!
+ip bgp-community new-format
+!
+ip access-list standard HVS_PUBLIC_IPS_ACL
+ deny   0.0.0.0
+ permit 13.70.151.216
+ permit 52.238.119.141
+ permit 104.215.11.144
+ permit 52.172.185.18
+ permit 13.73.1.120
+ permit 52.163.126.215
+ permit 104.215.62.195
+ permit 52.242.23.189
+ permit 13.75.126.169
+ permit 52.228.25.96
+ permit 52.178.161.139
+ permit 52.244.160.207
+ permit 51.141.51.76
+ permit 13.72.245.115
+ permit 52.170.21.67
+ permit 51.140.203.190
+ permit 51.140.155.234
+ permit 138.91.237.237
+ permit 13.89.240.113
+ permit 52.178.94.2
+ permit 13.71.127.197
+ permit 0.0.0.0 255.255.255.0
+ permit 0.0.0.0 255.255.192.0
+ permit 0.0.0.0 255.252.0.0
+ip access-list standard INET1_NAT_POOL
+ permit 10.90.192.34
+ permit 10.90.8.0 0.0.7.255
+ permit 10.90.16.0 0.0.7.255
+ip access-list standard ROUTE_REPLICATE_ACL
+ deny   0.0.0.0
+ permit 12.226.222.32
+ permit 12.226.222.16
+ permit 12.226.222.23
+ permit 12.226.222.28
+ permit 12.226.222.30
+ permit 12.226.222.31
+ permit 12.226.222.86
+ permit 12.226.222.87
+ permit 12.226.222.68
+ permit 12.226.222.69
+ permit 12.203.52.87
+ permit 12.203.52.86
+ permit 12.203.52.85
+ permit 12.203.52.84
+ permit 12.203.52.76
+ permit 12.203.52.32
+ permit 12.203.52.16
+ permit 12.203.52.22
+ permit 12.203.52.31
+ permit 12.203.52.30
+ip access-list standard SKYPE_PUBLIC_IPS_ACL
+ deny   0.0.0.0
+ permit 12.226.222.32
+ permit 12.226.222.16
+ permit 12.226.222.23
+ permit 12.226.222.28
+ permit 12.226.222.30
+ permit 12.226.222.31
+ permit 12.226.222.86
+ permit 12.226.222.87
+ permit 12.226.222.68
+ permit 12.226.222.69
+ permit 12.203.52.87
+ permit 12.203.52.86
+ permit 12.203.52.85
+ permit 12.203.52.84
+ permit 12.203.52.76
+ permit 12.203.52.32
+ permit 12.203.52.16
+ permit 12.203.52.22
+ permit 12.203.52.31
+ permit 12.203.52.30
+ip access-list standard TAI_SNMP_SERVERS
+ permit 133.165.64.111
+ permit 10.92.42.200
+!
+ip access-list extended OUTSIDEACL
+ permit object-group DMVPN_CRYPTO any any
+ permit ip host 12.226.222.30 any
+ permit ip host 12.226.222.31 any
+ permit ip host 12.203.52.30 any
+ permit ip host 12.203.52.31 any
+ permit ip host 12.226.222.69 any
+ permit ip host 12.203.52.84 any
+ permit ip host 12.226.222.87 any
+ permit ip host 12.203.52.85 any
+ permit ip host 12.203.52.86 any
+ permit ip host 12.226.222.86 any
+ permit ip host 12.203.52.87 any
+ permit ip host 12.226.222.28 any
+ permit ip host 12.203.52.76 any
+ permit ip host 12.226.222.23 any
+ permit ip host 12.203.52.22 any
+ permit ip host 12.226.222.32 any
+ permit ip host 12.203.52.32 any
+ permit ip host 12.226.222.16 any
+ permit ip host 12.203.52.16 any
+ permit ip host 12.226.222.68 any
+ permit ip host 13.70.151.216 any
+ permit ip host 13.71.127.197 any
+ permit ip host 13.72.245.115 any
+ permit ip host 13.73.1.120 any
+ permit ip host 13.75.126.169 any
+ permit ip host 13.89.240.113 any
+ permit ip 13.107.3.0 0.0.0.255 any
+ permit ip 13.107.64.0 0.0.63.255 any
+ permit ip host 51.140.155.234 any
+ permit ip host 51.140.203.190 any
+ permit ip host 51.141.51.76 any
+ permit ip 52.112.0.0 0.3.255.255 any
+ permit ip host 52.163.126.215 any
+ permit ip host 52.170.21.67 any
+ permit ip host 52.172.185.18 any
+ permit ip host 52.178.94.2 any
+ permit ip host 52.178.161.139 any
+ permit ip host 52.228.25.96 any
+ permit ip host 52.238.119.141 any
+ permit ip host 52.242.23.189 any
+ permit ip host 52.244.160.207 any
+ permit ip host 104.215.11.144 any
+ permit ip host 104.215.62.195 any
+ permit ip host 138.91.237.237 any
+ permit ip host 8.8.8.8 any
+ permit ip host 12.226.222.17 any
+ permit ip host 12.203.52.17 any
+ permit ip 12.226.222.0 0.0.0.255 any
+ permit ip 12.203.52.0 0.0.0.255 any
+ deny   ip host 61.177.173.32 any
+ permit tcp 209.243.190.0 0.0.0.255 any eq 22
+ permit tcp host 162.196.81.230 any eq 22
+ permit udp any any range 33434 33464
+!
+!
+ip prefix-list CORE_TO_DMVPN_LEAK_PFL seq 5 permit 10.0.0.0/9 le 32
+!
+ip prefix-list DF_ROUTE seq 5 permit 0.0.0.0/0
+!
+ip prefix-list ROUTES_FROM_LANOC seq 999 deny 0.0.0.0/0
+!
+ip prefix-list ROUTES_FROM_TAI seq 5 permit 10.90.8.0/21 le 32
+ip prefix-list ROUTES_FROM_TAI seq 10 permit 10.90.8.0/21
+ip prefix-list ROUTES_FROM_TAI seq 15 permit 10.90.161.0/24
+!
+ip prefix-list ROUTES_FROM_TLGA seq 5 permit 10.90.16.0/21 le 32
+ip prefix-list ROUTES_FROM_TLGA seq 10 permit 10.90.16.0/21
+!
+ip prefix-list ROUTES_TO_LANOC seq 999 deny 0.0.0.0/0
+!
+ip prefix-list ROUTES_TO_TAI seq 10 permit 10.90.167.0/24 le 32
+ip prefix-list ROUTES_TO_TAI seq 999 permit 0.0.0.0/0
+!
+ip prefix-list ROUTES_TO_TLGA seq 999 permit 0.0.0.0/0
+ip sla 101
+ icmp-echo 209.243.190.54 source-interface GigabitEthernet0/0/0
+ vrf INET1
+ip sla schedule 101 life forever start-time now
+ip sla 102
+ icmp-echo 209.243.190.55 source-interface GigabitEthernet0/0/0
+ vrf INET1
+ip sla schedule 102 life forever start-time now
+logging history informational
+logging origin-id hostname
+logging source-interface Loopback0
+logging host 133.165.64.111
+logging host 133.165.64.106
+logging host 10.92.42.200
+!
+!
+route-map EIGRP_TO_BGP permit 10
+ match ip address prefix-list ROUTES_FROM_LANOC
+!
+route-map BGP_TO_EIGRP permit 10
+ match ip address prefix-list ROUTES_TO_LANOC
+!
+route-map DMVPN_TO_URP_TAI permit 10
+ match ip address prefix-list ROUTES_TO_TAI
+!
+route-map URP_TAI_TO_DMVPN permit 10
+ match ip address prefix-list ROUTES_FROM_TAI
+!
+route-map ROUTE_REPLICATE_RM permit 10
+ match ip address ROUTE_REPLICATE_ACL
+!
+route-map BGP_FILTER_OUT permit 99
+ set community 65:103
+!
+route-map CORE_TO_DMVPN_LEAK_MAP permit 10
+ match ip address prefix-list CORE_TO_DMVPN_LEAK_PFL
+!
+route-map INET1_LEAKED_ROUTES permit 10
+ match ip address SKYPE_PUBLIC_IPS_ACL
+!
+route-map INET1_LEAKED_ROUTES permit 20
+ match ip address HVS_PUBLIC_IPS_ACL
+!
+route-map DMVPN_TO_URP_TLGA permit 10
+ match ip address prefix-list ROUTES_TO_TLGA
+!
+route-map URP_TLGA_TO_DMVPN permit 10
+ match ip address prefix-list ROUTES_FROM_TLGA
+!
+route-map BGP_FILTER_IN deny 10
+ match ip address prefix-list DF_ROUTE
+!
+route-map BGP_FILTER_IN permit 999
+!
+snmp-server community M0nst3rs RO TAI_SNMP_SERVERS
+snmp-server community 1nCorp0rated RW TAI_SNMP_SERVERS
+!
+!
+!
+!
+control-plane
+!
+banner login ^CCCC
+*********************************************************************
+Access to this computer system and associated network, computer
+resources, or data is restricted to those whom are authorized.
+Use by unauthorized individual or for an unauthorized purpose is a
+violation of Federal and/or State law.  Violators will be prosecuted.
+*********************************************************************
+^C
+!
+line con 0
+ exec-timeout 0 0
+ logging synchronous
+ stopbits 1
+line aux 0
+ stopbits 1
+line vty 0 4
+ logging synchronous
+ transport input ssh
+line vty 5 15
+ logging synchronous
+!
+ntp server 216.239.35.0
+ntp server 172.17.255.1 source Loopback0
+ntp server 133.165.67.242 prefer source Loopback0
+wsma agent exec
+!
+wsma agent config
+!
+wsma agent filesys
+!
+wsma agent notify
+!
+!
+end

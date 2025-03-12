@@ -1,0 +1,46 @@
+# Netbox Configuration
+netbox:
+  url: "https://netbox.example.com"  # Replace with your Netbox instance URL
+  verify_ssl: true
+  timeout: 30
+
+# Git Configuration
+git:
+  enabled: false  # Set to true to enable git integration
+  repo_url: ""    # Git repository URL for device configs
+  branch: "main"
+  local_path: ""  # Local path for device configurations
+
+# Device Configuration
+devices:
+  config_source: "local"  # Options: "local" or "git"
+  local_path: "mock_data/configs"  # Path to local device configurations
+
+# Logging Configuration
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "json"  # Options: json, standard
+  console:
+    enabled: true
+    level: "INFO"
+  file:
+    enabled: true
+    path: "logs/netraven.log"
+    max_size_mb: 10
+    backup_count: 5
+    level: "DEBUG"
+  async_logging: true
+  sensitive_patterns:
+    api_token: 'token[\s:=]+([^&\s]+)'
+    password: 'password[\s:=]+([^&\s]+)'
+    secret: 'secret[\s:=]+([^&\s]+)'
+  cloudwatch:
+    enabled: false
+    aws_region: "us-west-2"
+    log_group: "netbox-updater"
+    log_stream: "app-logs"
+
+# Parser Configuration
+parser:
+  templates_path: "templates"
+  default_platform: "cisco_ios"
