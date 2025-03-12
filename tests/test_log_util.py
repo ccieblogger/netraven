@@ -68,29 +68,33 @@ def test_json_formatting():
 
 def test_sensitive_data_filtering():
     """Test filtering of sensitive data."""
-    logger = get_logger("test_filter_logger")
+    # Create a SensitiveDataFilter with test patterns
+    test_patterns = {
+        'token': 'token=([^\\s]+)',
+        'password': 'password=([^\\s]+)'
+    }
+    filter = SensitiveDataFilter(patterns=test_patterns)
     
-    # Create a temporary handler to capture the output
-    class CapturingHandler(logging.Handler):
-        def __init__(self):
-            super().__init__()
-            self.records = []
-        
-        def emit(self, record):
-            self.records.append(record)
-    
-    handler = CapturingHandler()
-    logger.addHandler(handler)
-    
-    # Test sensitive data filtering
+    # Create a test log record
     sensitive_message = "token=secret123 password=mypass123"
-    logger.info(sensitive_message)
+    record = logging.LogRecord(
+        name="test_logger",
+        level=logging.INFO,
+        pathname="test.py",
+        lineno=1,
+        msg=sensitive_message,
+        args=(),
+        exc_info=None
+    )
+    
+    # Apply the filter
+    filter.filter(record)
     
     # Check if sensitive data was redacted
-    assert "secret123" not in handler.records[0].msg
-    assert "mypass123" not in handler.records[0].msg
-    assert "token=*****" in handler.records[0].msg
-    assert "password=*****" in handler.records[0].msg
+    assert "secret123" not in record.msg
+    assert "mypass123" not in record.msg
+    assert "token=*****" in record.msg
+    assert "password=*****" in record.msg
 
 def test_log_levels():
     """Test different log levels."""

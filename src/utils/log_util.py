@@ -50,7 +50,7 @@ class SensitiveDataFilter(logging.Filter):
 
     Example:
         >>> filter = SensitiveDataFilter()
-        >>> filter.patterns['api_key'] = r'api_key=([^&\s]+)'
+        >>> filter.patterns['api_key'] = r'api_key=([^&\\s]+)'
         >>> logger.addFilter(filter)
     """
     
@@ -63,15 +63,19 @@ class SensitiveDataFilter(logging.Filter):
                                      Defaults to None, which uses built-in patterns.
         """
         super().__init__()
-        self.patterns = patterns or {
-            'api_token': r'token=([^\s&]+)',
-            'password': r'password=([^\s&]+)',
-            'secret': r'secret=([^\s&]+)'
+        # Predefined patterns if none provided
+        default_patterns = {
+            'token': r'token=([^\s]+)',
+            'password': r'password=([^\s]+)',
+            'secret': r'secret=([^\s]+)'
         }
+        self.patterns = patterns or default_patterns
+        
         # Compile patterns for better performance
-        self.compiled_patterns = {
-            key: re.compile(pattern) for key, pattern in self.patterns.items()
-        }
+        self.compiled_patterns = {}
+        for key, pattern in self.patterns.items():
+            # Ensure we're using the right pattern format
+            self.compiled_patterns[key] = re.compile(pattern)
 
     def filter(self, record: logging.LogRecord) -> bool:
         """
@@ -85,8 +89,21 @@ class SensitiveDataFilter(logging.Filter):
         """
         if isinstance(record.msg, str):
             msg = record.msg
-            for key, pattern in self.compiled_patterns.items():
-                msg = pattern.sub(f"{key}=*****", msg)
+            # For each pattern, replace any match with field_name=*****
+            for key, compiled_pattern in self.compiled_patterns.items():
+                # Extract field name from pattern (assumes pattern format like "field_name=...")
+                field_name = key.split('_')[-1]  # Use last part of key as field name
+                
+                # For the specific token=value pattern format we're using
+                if "=" in self.patterns[key]:
+                    field_prefix = self.patterns[key].split('=')[0]
+                    if '(' in field_prefix:
+                        # If using capture groups like (token)=...
+                        field_prefix = field_prefix.replace('(', '').replace(')', '')
+                    
+                    # Replace with field_name=*****
+                    msg = compiled_pattern.sub(f"{field_prefix}=*****", msg)
+            
             record.msg = msg
         return True
 

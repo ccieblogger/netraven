@@ -31,14 +31,11 @@ logging:
     level: "DEBUG"
   async_logging: true
   sensitive_patterns:
-    api_token: 'token[\s:=]+([^&\s]+)'
-    password: 'password[\s:=]+([^&\s]+)'
-    secret: 'secret[\s:=]+([^&\s]+)'
+    token: 'token=([^\\s]+)'
+    password: 'password=([^\\s]+)'
+    secret: 'secret=([^\\s]+)'
   cloudwatch:
     enabled: false
-    aws_region: "us-west-2"
-    log_group: "netbox-updater"
-    log_stream: "app-logs"
 
 # Parser Configuration
 parser:
