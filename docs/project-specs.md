@@ -67,7 +67,7 @@
 
 ## Testing and Quality Assurance
 - minimal testing is needed as this is a single person project
-- the mock_data folder will contain nework device data that can be use to test the parser
+- test data will be stored in the tests directory
 
 Network Device Communication Utility:
 - Uses the Netmiko library to communicate to network devices though other methods may be added later as needed.
@@ -155,15 +155,12 @@ Additional Notes:
 Project Structure
     project_root/
     ├── src/           # Source code
-    ├── tests/         # Test files
-    ├── templates/     # TextFSM templates
+    ├── tests/         # Test files and test data
     ├── logs/         # Application logs
     ├── config/       # Configuration files
     │   ├── settings.yaml
     │   └── credentials.yaml
-    ├── docs/         # Documentation
-    ├── documents/    # Project specifications and planning
-    └── mock_data/    # Test data and sample configurations
+    └── docs/         # Documentation and project specifications
 
 ## Documentation
 - Include documentation of what the systems does and how to use and deploy it.
