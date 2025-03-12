@@ -89,7 +89,41 @@ def init_git_repo(config: Dict[str, Any]) -> None:
             gitignore_path = backup_dir / '.gitignore'
             if not gitignore_path.exists():
                 with open(gitignore_path, 'w') as f:
-                    f.write("# Ignore nested Git repositories\n.git/\n")
+                    f.write("""# NetRaven - Network Configuration Backup
+# Ignore nested Git repositories
+.git/
+
+# Ignore temporary files
+*.tmp
+*.bak
+*~
+
+# Ignore sensitive data that might be accidentally saved
+*.key
+*.pem
+credentials.yml
+secrets.yml
+
+# Ignore logs
+*.log
+""")
+                
+                # Add and commit .gitignore
+                try:
+                    repo.git.add('.gitignore')
+                    repo.index.commit('Add initial .gitignore file')
+                    print("Created and committed .gitignore file")
+                    
+                    # Push if remote is configured
+                    if config['backup']['git']['repo_url']:
+                        try:
+                            origin = repo.remote('origin')
+                            origin.push(config['backup']['git']['branch'])
+                            print(f"Successfully pushed .gitignore to remote: {config['backup']['git']['repo_url']}")
+                        except git.GitCommandError as e:
+                            print(f"Error pushing .gitignore to remote: {e}")
+                except Exception as e:
+                    print(f"Error committing .gitignore file: {e}")
                     
     except ImportError:
         print("GitPython package not installed. Git functionality disabled.")
@@ -102,7 +136,7 @@ def commit_backup(host: str, filepath: str, config: Dict[str, Any]) -> None:
     
     Args:
         host: Device hostname or IP address
-        filepath: Path to the backup file
+        filepath: Path to the backup file (relative to the backup directory)
         config: Configuration dictionary
     """
     if not config['backup']['git']['enabled']:
@@ -118,18 +152,23 @@ def commit_backup(host: str, filepath: str, config: Dict[str, Any]) -> None:
         backup_dir = Path(config['backup']['storage']['local']['directory']).expanduser().resolve()
         repo = git.Repo(backup_dir)
         
-        # Stage the file
-        repo.index.add([filepath])
+        # Log the git commit attempt
+        print(f"Committing file {filepath} to git repository at {backup_dir}")
+        
+        # Stage the file - using just the filename since we're already in the backup directory's repo
+        repo.git.add(filepath)
         
         # Create commit
         commit_message = config['backup']['git']['commit_message'].format(host=host)
         repo.index.commit(commit_message)
+        print(f"Successfully committed with message: {commit_message}")
         
         # Push if remote is configured
         if config['backup']['git']['repo_url']:
             try:
                 origin = repo.remote('origin')
                 origin.push(config['backup']['git']['branch'])
+                print(f"Successfully pushed to remote: {config['backup']['git']['repo_url']}")
             except git.GitCommandError as e:
                 print(f"Error pushing to remote: {e}")
                 
@@ -137,6 +176,8 @@ def commit_backup(host: str, filepath: str, config: Dict[str, Any]) -> None:
         print("GitPython package not installed. Git functionality disabled.")
     except Exception as e:
         print(f"Error committing backup: {e}")
+        import traceback
+        traceback.print_exc()
 
 def load_config(config_file: str = None) -> Tuple[Dict[str, Any], StorageBackend]:
     """
