@@ -5,8 +5,9 @@ This module provides a modern web interface for managing network device
 backups, configuration management, and automation tasks.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import os
 import logging
 from pathlib import Path
@@ -33,8 +34,8 @@ except Exception as e:
 
 # Create FastAPI app
 app = FastAPI(
-    title="NetRaven API",
-    description="API for network device configuration management",
+    title="NetRaven",
+    description="API for network device configuration management and backup.",
     version="0.1.0",
 )
 
@@ -57,39 +58,34 @@ app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
 
 @app.get("/api")
-async def api_root() -> Dict[str, Any]:
+async def api_root(request: Request) -> JSONResponse:
     """Root API endpoint that provides information about available endpoints."""
-    return {
-        "name": "NetRaven API",
-        "version": "0.1.0",
-        "description": "API for network device configuration management",
-        "endpoints": {
-            "health": "/api/health",
-            "authentication": {
-                "login": "/api/auth/token",
-                "current_user": "/api/auth/users/me"
-            },
-            "devices": {
-                "list": "/api/devices",
-                "detail": "/api/devices/{device_id}",
-                "backup": "/api/devices/{device_id}/backup"
-            },
-            "backups": {
-                "list": "/api/backups",
-                "detail": "/api/backups/{backup_id}",
-                "content": "/api/backups/{backup_id}/content",
-                "compare": "/api/backups/compare",
-                "restore": "/api/backups/{backup_id}/restore"
-            }
-        },
-        "documentation": {
-            "swagger_ui": "/docs",
-            "redoc": "/redoc"
-        }
+    base_url = str(request.base_url).rstrip('/')
+    
+    # Create a response that resembles the example in the screenshot
+    response_body = {
+        "auth": f"{base_url}/api/auth",
+        "devices": f"{base_url}/api/devices",
+        "backups": f"{base_url}/api/backups",
+        "health": f"{base_url}/api/health",
+        "docs": f"{base_url}/docs"
     }
+    
+    return JSONResponse(
+        content=response_body,
+        headers={
+            "Content-Type": "application/json",
+            "Vary": "Accept"
+        }
+    )
+
+@app.get("/")
+async def redirect_to_api():
+    """Redirect root to API root."""
+    return {"message": "Welcome to NetRaven. API available at /api"}
 
 @app.get("/api/health")
-async def health_check() -> Dict[str, Any]:
+async def health_check() -> Dict[str, str]:
     """Health check endpoint."""
     return {
         "status": "ok",
