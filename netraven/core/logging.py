@@ -208,7 +208,7 @@ class ComponentFilter(logging.Filter):
             return True
         elif self.component_name == "backend" and any(x in record.name for x in ["backend", "api", "web"]) and "auth" not in record.name:
             return True
-        elif self.component_name == "jobs" and "jobs" in record.name:
+        elif self.component_name == "jobs" and any(x in record.name for x in ["jobs", "device_comm", "backup"]):
             return True
         elif self.component_name == "auth" and "auth" in record.name:
             return True

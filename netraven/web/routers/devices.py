@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
+import logging
 
 # Import authentication dependencies
 from netraven.web.routers.auth import User, get_current_active_user
@@ -22,8 +23,13 @@ from netraven.web.crud import (
     get_device, 
     create_device, 
     update_device, 
-    delete_device
+    delete_device,
+    update_device_backup_status
 )
+
+# Create logger
+from netraven.core.logging import get_logger
+logger = get_logger(__name__)
 
 # Create router
 router = APIRouter()
@@ -191,11 +197,56 @@ async def backup_device(
             detail=f"Device with ID {device_id} not found"
         )
     
-    # In a real application, we would queue a backup job here
-    # For now, we'll just return a response
+    # Generate a job ID
+    job_id = str(uuid.uuid4())
+    
+    # Import here to avoid circular imports
+    from netraven.jobs.device_logging import start_job_session, log_backup_failure
+    
+    try:
+        # Start a job session
+        session_id = start_job_session(f"Backup job for device {device.hostname}")
+        
+        # Log the backup request
+        logger.info(f"Backup requested for device {device.hostname} (ID: {device_id})")
+        
+        # In a real application, we would use background tasks or a job queue
+        # For example with FastAPI background tasks:
+        # 
+        # def run_backup_task(device_id, device_hostname, device_username, 
+        #                    device_password, device_type, device_port):
+        #     # This would run in the background
+        #     try:
+        #         from netraven.jobs.device_connector import backup_device_config
+        #         success = backup_device_config(
+        #             device_id=device_id,
+        #             host=device_hostname,
+        #             username=device_username,
+        #             password=device_password,
+        #             device_type=device_type,
+        #             port=device_port
+        #         )
+        #         # Update database with result
+        #     except Exception as e:
+        #         logger.exception(f"Error in backup job: {e}")
+        # 
+        # background_tasks.add_task(
+        #     run_backup_task,
+        #     device_id,
+        #     device.hostname,
+        #     device.username,
+        #     device.password,
+        #     device.device_type,
+        #     device.port
+        # )
+        
+    except Exception as e:
+        logger.exception(f"Error setting up backup job for {device.hostname}: {e}")
+    
+    # Return a response with the job ID
     return {
         "message": f"Backup job initiated for device {device.hostname}",
-        "job_id": str(uuid.uuid4()),
+        "job_id": job_id,
         "device_id": device_id,
         "status": "pending"
     } 
