@@ -28,6 +28,16 @@ logging:
     filename: netraven.json.log
   sensitive_data:
     redact_enabled: true
+  components:
+    enabled: true
+    level: DEBUG
+    max_size_mb: 10
+    backup_count: 5
+    files:
+      frontend: frontend.log
+      backend: backend.log
+      jobs: jobs.log
+      auth: auth.log
 web:
   host: 127.0.0.1
   port: 8080

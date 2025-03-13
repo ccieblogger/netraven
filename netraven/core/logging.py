@@ -3,6 +3,7 @@ Logging utilities for NetRaven.
 
 This module provides functions for configuring and using loggers in the NetRaven application.
 It supports console and file logging, log rotation, JSON structured logging, and sensitive data redaction.
+It also provides component-specific logging for frontend, backend, jobs, and authentication.
 """
 
 import logging
@@ -27,6 +28,14 @@ DEFAULT_JSON_FILE_PATH = "logs/netraven.json.log"
 DEFAULT_REDACT_SENSITIVE = True
 DEFAULT_SENSITIVE_PATTERNS = ["password", "secret", "key", "token", "auth"]
 
+# Component-specific log files
+COMPONENT_LOG_FILES = {
+    "frontend": "logs/frontend.log",
+    "backend": "logs/backend.log",
+    "jobs": "logs/jobs.log",
+    "auth": "logs/auth.log"
+}
+
 # Singleton logger configuration
 _loggers = {}
 _log_config = {
@@ -48,6 +57,13 @@ _log_config = {
     "sensitive_data": {
         "redact_enabled": DEFAULT_REDACT_SENSITIVE,
         "patterns": DEFAULT_SENSITIVE_PATTERNS
+    },
+    "components": {
+        "enabled": True,
+        "files": COMPONENT_LOG_FILES,
+        "level": DEFAULT_FILE_LEVEL,
+        "max_bytes": DEFAULT_MAX_BYTES,
+        "backup_count": DEFAULT_BACKUP_COUNT
     }
 }
 
@@ -151,6 +167,42 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_data)
 
 
+class ComponentFilter(logging.Filter):
+    """
+    Filter to route log messages to component-specific log files.
+    """
+    
+    def __init__(self, component_name: str):
+        """
+        Initialize with the component name to filter for.
+        
+        Args:
+            component_name: Name of the component to filter for
+        """
+        super().__init__()
+        self.component_name = component_name
+    
+    def filter(self, record: logging.LogRecord) -> bool:
+        """
+        Filter log record based on component name in the logger name.
+        
+        Args:
+            record: Log record to filter
+            
+        Returns:
+            True if the record belongs to this component, False otherwise
+        """
+        if self.component_name == "frontend" and "frontend" in record.name:
+            return True
+        elif self.component_name == "backend" and any(x in record.name for x in ["backend", "api", "web"]) and "auth" not in record.name:
+            return True
+        elif self.component_name == "jobs" and "jobs" in record.name:
+            return True
+        elif self.component_name == "auth" and "auth" in record.name:
+            return True
+        return False
+
+
 def configure_logging(config: Dict[str, Any] = None) -> None:
     """
     Configure global logging settings for NetRaven.
@@ -210,6 +262,93 @@ def configure_logging(config: Dict[str, Any] = None) -> None:
                 _log_config["sensitive_data"]["redact_enabled"] = sensitive_config["redact_enabled"]
             if "patterns" in sensitive_config:
                 _log_config["sensitive_data"]["patterns"] = sensitive_config["patterns"]
+        
+        # Component logging settings
+        if "components" in log_config:
+            component_config = log_config["components"]
+            if "enabled" in component_config:
+                _log_config["components"]["enabled"] = component_config["enabled"]
+            if "level" in component_config:
+                level_name = component_config["level"]
+                _log_config["components"]["level"] = getattr(logging, level_name.upper())
+            if "files" in component_config:
+                _log_config["components"]["files"].update(component_config["files"])
+            if "max_size_mb" in component_config:
+                _log_config["components"]["max_bytes"] = component_config["max_size_mb"] * 1024 * 1024
+            if "backup_count" in component_config:
+                _log_config["components"]["backup_count"] = component_config["backup_count"]
+
+    # Ensure log directories exist
+    _ensure_log_directories()
+
+
+def _ensure_log_directories() -> None:
+    """
+    Ensure all log directories exist with proper permissions.
+    
+    This function creates the necessary log directories if they don't exist
+    and sets appropriate permissions to ensure all users can write to the logs.
+    """
+    # Main log file directory
+    log_dir = os.path.dirname(_log_config["file"]["path"])
+    os.makedirs(log_dir, exist_ok=True)
+    try:
+        # Try to set directory permissions to allow anyone to write logs
+        os.chmod(log_dir, 0o777)
+    except PermissionError:
+        pass
+    
+    # Ensure main log file exists and is writable
+    log_file = _log_config["file"]["path"]
+    if not os.path.exists(log_file):
+        try:
+            # Create the file if it doesn't exist
+            with open(log_file, 'w') as f:
+                pass
+            # Try to make the file writable by all
+            os.chmod(log_file, 0o666)
+        except (PermissionError, FileNotFoundError):
+            pass
+    
+    # JSON log file directory
+    json_log_dir = os.path.dirname(_log_config["json"]["path"])
+    os.makedirs(json_log_dir, exist_ok=True)
+    try:
+        os.chmod(json_log_dir, 0o777)
+    except PermissionError:
+        pass
+    
+    # Ensure JSON log file exists and is writable
+    json_log_file = _log_config["json"]["path"]
+    if not os.path.exists(json_log_file):
+        try:
+            with open(json_log_file, 'w') as f:
+                pass
+            os.chmod(json_log_file, 0o666)
+        except (PermissionError, FileNotFoundError):
+            pass
+    
+    # Component log directories and files
+    for component, log_path in _log_config["components"]["files"].items():
+        # Get the full path
+        full_path = os.path.join(log_dir, log_path)
+        component_log_dir = os.path.dirname(full_path)
+        
+        # Create directory
+        os.makedirs(component_log_dir, exist_ok=True)
+        try:
+            os.chmod(component_log_dir, 0o777)
+        except PermissionError:
+            pass
+        
+        # Create file if it doesn't exist
+        if not os.path.exists(full_path):
+            try:
+                with open(full_path, 'w') as f:
+                    pass
+                os.chmod(full_path, 0o666)
+            except (PermissionError, FileNotFoundError):
+                pass
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -217,7 +356,8 @@ def get_logger(name: str) -> logging.Logger:
     Get a configured logger for the specified name.
     
     This function creates or returns a logger with handlers configured
-    according to the application settings.
+    according to the application settings. It also sets up component-specific
+    log files based on the logger name.
     
     Args:
         name: Logger name, typically the module name
@@ -240,6 +380,9 @@ def get_logger(name: str) -> logging.Logger:
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
     
+    # Ensure log directories exist
+    _ensure_log_directories()
+    
     # Add console handler if enabled
     if _log_config["console"]["enabled"]:
         console_handler = logging.StreamHandler(sys.stdout)
@@ -250,46 +393,73 @@ def get_logger(name: str) -> logging.Logger:
     
     # Add file handler if enabled
     if _log_config["file"]["enabled"]:
-        # Create logs directory if it doesn't exist
-        log_path = _log_config["file"]["path"]
-        log_dir = os.path.dirname(log_path)
-        if log_dir and not os.path.exists(log_dir):
-            os.makedirs(log_dir, exist_ok=True)
-        
+        file_path = _log_config["file"]["path"]
         file_handler = logging.handlers.RotatingFileHandler(
-            log_path,
+            file_path,
             maxBytes=_log_config["file"]["max_bytes"],
             backupCount=_log_config["file"]["backup_count"]
         )
         file_handler.setLevel(_log_config["file"]["level"])
         file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(file_formatter)
+        
+        # Add sensitive data filter if enabled
+        if _log_config["sensitive_data"]["redact_enabled"]:
+            sensitive_filter = SensitiveFilter(_log_config["sensitive_data"]["patterns"])
+            file_handler.addFilter(sensitive_filter)
+        
         logger.addHandler(file_handler)
     
     # Add JSON file handler if enabled
     if _log_config["json"]["enabled"]:
-        # Create logs directory if it doesn't exist
-        json_log_path = _log_config["json"]["path"]
-        json_log_dir = os.path.dirname(json_log_path)
-        if json_log_dir and not os.path.exists(json_log_dir):
-            os.makedirs(json_log_dir, exist_ok=True)
-        
+        json_file_path = _log_config["json"]["path"]
         json_file_handler = logging.handlers.RotatingFileHandler(
-            json_log_path,
+            json_file_path,
             maxBytes=_log_config["file"]["max_bytes"],
             backupCount=_log_config["file"]["backup_count"]
         )
         json_file_handler.setLevel(_log_config["file"]["level"])
         json_formatter = JsonFormatter()
         json_file_handler.setFormatter(json_formatter)
+        
+        # Add sensitive data filter if enabled
+        if _log_config["sensitive_data"]["redact_enabled"]:
+            sensitive_filter = SensitiveFilter(_log_config["sensitive_data"]["patterns"])
+            json_file_handler.addFilter(sensitive_filter)
+        
         logger.addHandler(json_file_handler)
     
-    # Add sensitive data filter if enabled
-    if _log_config["sensitive_data"]["redact_enabled"]:
-        sensitive_filter = SensitiveFilter(_log_config["sensitive_data"]["patterns"])
-        logger.addFilter(sensitive_filter)
+    # Add component-specific handlers if enabled
+    if _log_config["components"]["enabled"]:
+        # Determine which component-specific logs to add based on logger name
+        for component, log_path in _log_config["components"]["files"].items():
+            component_filter = ComponentFilter(component)
+            if component_filter.filter(logging.LogRecord(name, logging.INFO, "", 0, "", (), None)):
+                # Get the log directory from the main log file path
+                log_dir = os.path.dirname(_log_config["file"]["path"])
+                
+                # Construct the full component log path
+                full_log_path = os.path.join(log_dir, log_path)
+                
+                # Create component handler
+                component_handler = logging.handlers.RotatingFileHandler(
+                    full_log_path,
+                    maxBytes=_log_config["components"]["max_bytes"],
+                    backupCount=_log_config["components"]["backup_count"]
+                )
+                component_handler.setLevel(_log_config["components"]["level"])
+                component_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                component_handler.setFormatter(component_formatter)
+                component_handler.addFilter(component_filter)
+                
+                # Add sensitive data filter if enabled
+                if _log_config["sensitive_data"]["redact_enabled"]:
+                    sensitive_filter = SensitiveFilter(_log_config["sensitive_data"]["patterns"])
+                    component_handler.addFilter(sensitive_filter)
+                
+                logger.addHandler(component_handler)
     
-    # Store logger in cache
+    # Store logger for future retrieval
     _loggers[name] = logger
     
     return logger 
