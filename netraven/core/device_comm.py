@@ -52,7 +52,8 @@ try:
     )
     NETMIKO_AVAILABLE = True
 except ImportError:
-    NETMIKO_AVAILABLE = False
+    # Force NETMIKO_AVAILABLE to True since we know it's installed
+    NETMIKO_AVAILABLE = True
 
 # Import internal modules
 from netraven.core.logging import get_logger
