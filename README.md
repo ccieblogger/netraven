@@ -243,6 +243,16 @@ Before deploying NetRaven to production, ensure you complete the following check
 
 For more detailed frontend deployment instructions, see the [Frontend README](netraven/web/frontend/README.md#linting-and-production-preparation).
 
+## Documentation
+
+NetRaven includes comprehensive documentation to help you get started, understand the system architecture, and troubleshoot issues:
+
+- [Project Specifications](docs/project-specs.md): Detailed project goals and requirements
+- [Device Communication](docs/device_communication.md): How NetRaven communicates with network devices
+- [Logging System](docs/logging.md): Information about the logging infrastructure
+- [Web Frontend Design](docs/web-frontend-design.md): Frontend architecture and component design
+- [Troubleshooting Guide](docs/troubleshooting.md): Solutions for common issues, authentication setup, and verification steps
+
 ## License
 
 MIT
