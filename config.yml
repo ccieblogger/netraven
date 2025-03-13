@@ -1,0 +1,59 @@
+backup:
+  storage:
+    type: local
+    local:
+      directory: data/backups
+    s3:
+      bucket: ''
+      prefix: backups/
+  format: '{host}_config.txt'
+  git:
+    enabled: false
+    author_name: NetRaven
+    author_email: netraven@example.com
+logging:
+  level: INFO
+  directory: logs
+  filename: netraven.log
+  console:
+    enabled: true
+    level: INFO
+  file:
+    enabled: true
+    level: DEBUG
+    max_size_mb: 10
+    backup_count: 5
+  json:
+    enabled: false
+    filename: netraven.json.log
+  sensitive_data:
+    redact_enabled: true
+web:
+  host: 127.0.0.1
+  port: 8080
+  debug: false
+  allowed_origins:
+  - http://localhost:3000
+  - http://localhost:8080
+  database:
+    type: sqlite
+    sqlite:
+      path: data/netraven.db
+    postgres:
+      host: localhost
+      port: 5432
+      database: netraven
+      user: netraven
+      password: netraven
+    mysql:
+      host: localhost
+      port: 3306
+      database: netraven
+      user: netraven
+      password: netraven
+  authentication:
+    token_expiration: 86400
+    jwt_algorithm: HS256
+    require_https: false
+    cookie_secure: false
+    password_min_length: 8

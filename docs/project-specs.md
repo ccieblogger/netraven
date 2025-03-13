@@ -1,43 +1,32 @@
-# Project Specification: Netbox Updater
+# Project Specification: NetRaven
 
 ## Project Overview
-- **Project Name**: Netbox Updater
-- **Description**: Python project to backup network device running configurations to a local git repo and then parse the configs into structured data 
-                   which is then used to either create, update, or remove network devices and related device configuration in a Netbox instance.
+- **Project Name**: NetRaven
+- **Description**: Python project to backup network device running configurations to multiple storage destinations, including local Git repositories 
+                   and AWS S3 storage, with comprehensive version control and logging capabilities.
 - **Author(s)**: Brian Larson
 - **Date**: 03/10/2025
 
 ## Objectives
 - Develop a Python application that does the following:
   1. Network device backup service:
-      1. Retrieves cisco network device running configurations and stores them in a local git repo which can then be pushed to a remote repo
-        a. Additional vendor support may be added later
-        b. repo configuration like name and remote origin should be configuration via setings.
-  2. Parse network device running configuration files and perform CRUD operations based on the parsed information to update Netbox data.
-     a. structured data parsed from the configuraiton files should be 
-  2. optionally update co
-  2. Store them in a local git rep and then commit and push these changes to use git as a backup repository
-  3. Then parse the 
-- Convert the parsed data into a format compatible with Netbox's API.
-- Implement functionality to create, update, or remove devices and related data in a Netbox instance based on the parsed data.
-- Ensure error handling and logging for better troubleshooting and maintenance.
-- Implment git integration to retrieve device configuration files from a git repo or local folder depending on configuration settings.
-- implement best practice approach to store project settings including credential and other necessary settings.
-- except list of devices to iterate over. List should be from netbox instance but can also be file
-
+     - Securely retrieves Cisco network device running configurations
+     - Supports multiple storage destinations:
+       a. Local Git repository with remote repository integration
+       b. AWS S3 storage for cloud backup
+     - Implements version control for configuration tracking
+     - Provides comprehensive logging and error handling
+     - Supports flexible configuration of backup schedules and storage options
 
 ## Requirements
-### Functional RequirementsThey 
-- Ensure the tool is performant and can handle large configuration files.
-- Maintain compatibility with Python 3.8+.
-- Securely handle sensitive information such as Netbox API tokens.
-- Provide clear and comprehensive documentation for users and developers.
-- Employ best practice coding principles like DRY.
-- Keep the code base as simple and organized as possible
-- Netbox API should be queried to determine which devices need to be updated by using tags
-  or custom field depending which is best suited for the situation.
-- cli parameters accepted should be netbox connection information initially.
-
+### Functional Requirements
+- Support secure retrieval of device configurations using industry-standard protocols
+- Implement multiple storage backends (Git and AWS S3)
+- Provide flexible configuration options for storage destinations
+- Support scheduled and on-demand backups
+- Implement robust error handling and retry mechanisms
+- Maintain comprehensive logging of all operations
+- Support configuration of device lists and credentials
 
 ### Non-Functional Requirements
 - Ensure the tool is performant and can handle large configuration files.
