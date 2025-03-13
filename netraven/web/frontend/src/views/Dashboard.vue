@@ -66,37 +66,38 @@
       <div v-else-if="recentBackups.length === 0" class="text-center py-4 text-gray-500">
         <p>No recent activity to display</p>
       </div>
-      <div v-else class="overflow-hidden">
-        <DataTable
-          :columns="columns"
-          :data="recentBackups"
-          default-sort="created_at"
-          default-order="desc"
-        >
-          <template #device_hostname="{ item }">
-            <router-link 
-              :to="`/devices/${item.device_id}`" 
-              class="text-blue-600 hover:text-blue-900 inline-flex items-center space-x-1"
-            >
-              <span>{{ item.device_hostname }}</span>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </router-link>
-          </template>
-          <template #activity>
-            Configuration Backup
-          </template>
-          <template #status="{ item }">
-            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                  :class="item.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
-              {{ item.status }}
-            </span>
-          </template>
-          <template #created_at="{ item }">
-            {{ formatDate(item.created_at) }}
-          </template>
-        </DataTable>
+      <div v-else class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr v-for="backup in recentBackups" :key="backup.id">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <router-link :to="`/devices/${backup.device_id}`" class="text-blue-600 hover:text-blue-900">
+                  {{ backup.device_hostname }}
+                </router-link>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                Configuration Backup
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                  :class="backup.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
+                  {{ backup.status }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ formatDate(backup.created_at) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
     
@@ -115,21 +116,49 @@
         </router-link>
       </div>
     </div>
+    
+    <!-- Debug Tools (hidden by default) -->
+    <div v-if="showDebugInfo" class="mt-8 bg-yellow-50 rounded-lg shadow p-6 border border-yellow-200">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-medium text-yellow-800">Development Tools</h2>
+        <button @click="toggleDebugInfo" class="text-sm bg-yellow-200 text-yellow-800 px-3 py-1 rounded hover:bg-yellow-300">
+          Hide Debug Tools
+        </button>
+      </div>
+      
+      <pre class="text-xs bg-white p-4 rounded border border-yellow-200 overflow-auto max-h-80">{{ debugInfo }}</pre>
+      
+      <div class="flex gap-2 mt-4">
+        <button @click="testClick" class="bg-blue-600 text-white px-4 py-2 rounded">
+          Test Button
+        </button>
+        <button @click="goToDebugPage" class="bg-gray-600 text-white px-4 py-2 rounded">
+          Debug Page
+        </button>
+        <button @click="testLocalStorage" class="bg-green-600 text-white px-4 py-2 rounded">
+          Test Storage
+        </button>
+      </div>
+    </div>
+    
+    <div v-else class="mt-8 text-center">
+      <button @click="toggleDebugInfo" class="text-sm bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300">
+        Show Debug Tools
+      </button>
+    </div>
   </MainLayout>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '../components/MainLayout.vue'
-import DataTable from '../components/DataTable.vue'
 import { useDeviceStore } from '../store/devices'
 import { useBackupStore } from '../store/backups'
 
 export default {
   name: 'Dashboard',
   components: {
-    MainLayout,
-    DataTable
+    MainLayout
   },
   
   setup() {
@@ -139,12 +168,10 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     
-    const columns = [
-      { key: 'device_hostname', label: 'Device' },
-      { key: 'activity', label: 'Activity' },
-      { key: 'status', label: 'Status' },
-      { key: 'created_at', label: 'Time' }
-    ]
+    // Debug state
+    const testResult = ref(null)
+    const storageTest = ref(null)
+    const showDebugInfo = ref(false)
     
     const deviceCount = computed(() => deviceStore.devices.length)
     const onlineDeviceCount = computed(() => {
@@ -194,6 +221,12 @@ export default {
       } finally {
         loading.value = false
       }
+      
+      // Check URL parameters for debug mode
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('debug') === 'true') {
+        showDebugInfo.value = true
+      }
     })
     
     const formatDate = (dateString) => {
@@ -202,16 +235,74 @@ export default {
       return date.toLocaleString()
     }
     
+    const debugInfo = computed(() => {
+      return {
+        currentUrl: window.location.href,
+        pathName: window.location.pathname,
+        hasToken: !!localStorage.getItem('access_token'),
+        deviceCount: deviceCount.value,
+        onlineDeviceCount: onlineDeviceCount.value,
+        backupCount: backupCount.value,
+        recentBackupCount: recentBackupCount.value,
+        testResult: testResult.value,
+        storageTest: storageTest.value,
+        browser: {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform
+        }
+      }
+    })
+    
+    const toggleDebugInfo = () => {
+      showDebugInfo.value = !showDebugInfo.value
+    }
+    
+    const testClick = () => {
+      testResult.value = 'Button clicked at ' + new Date().toLocaleTimeString()
+    }
+    
+    const testLocalStorage = () => {
+      try {
+        const testKey = 'dashboard_test_' + Date.now()
+        localStorage.setItem(testKey, 'Test value')
+        const readValue = localStorage.getItem(testKey)
+        localStorage.removeItem(testKey)
+        
+        storageTest.value = {
+          success: readValue === 'Test value',
+          value: readValue,
+          timestamp: new Date().toISOString()
+        }
+      } catch (error) {
+        storageTest.value = {
+          success: false,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        }
+      }
+    }
+    
+    const goToDebugPage = () => {
+      window.location.href = '/debug.html'
+    }
+    
     return {
       loading,
       error,
-      columns,
       deviceCount,
       onlineDeviceCount,
       backupCount,
       recentBackupCount,
       recentBackups,
-      formatDate
+      showDebugInfo,
+      debugInfo,
+      testResult,
+      storageTest,
+      formatDate,
+      toggleDebugInfo,
+      testClick,
+      testLocalStorage,
+      goToDebugPage
     }
   }
 }

@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetRaven - Admin Debug Tools</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.5;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .card {
+      background-color: #fff;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #2563eb;
+    }
+    .admin-notice {
+      background-color: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+    }
+    pre {
+      background-color: #f1f5f9;
+      padding: 15px;
+      border-radius: 5px;
+      overflow: auto;
+      font-size: 14px;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    button:hover {
+      background-color: #1d4ed8;
+    }
+    .success {
+      background-color: #dcfce7;
+      border: 1px solid #22c55e;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .error {
+      background-color: #fee2e2;
+      border: 1px solid #ef4444;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .warning {
+      background-color: #fef3c7;
+      border: 1px solid #f59e0b;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .feature-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    .feature-table th, .feature-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    .feature-table th {
+      background-color: #f1f5f9;
+    }
+    .feature-supported {
+      color: #22c55e;
+    }
+    .feature-unsupported {
+      color: #ef4444;
+    }
+    .return-link {
+      margin-top: 30px;
+      display: block;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>NetRaven - Admin Debug Tools</h1>
+    
+    <div class="admin-notice">
+      <strong>⚠️ ADMIN USE ONLY:</strong> This page contains diagnostic tools for troubleshooting the NetRaven application. 
+      It is not intended for regular users. To return to the main application, 
+      <a href="/">click here</a>.
+    </div>
+    
+    <p>This diagnostic page bypasses the Vue router and provides direct access to system information and testing tools.</p>
+    
+    <div id="system-info" class="card">
+      <h2>System Information</h2>
+      <pre id="system-info-output">Loading system information...</pre>
+    </div>
+    
+    <div id="browser-compat" class="card">
+      <h2>Browser Compatibility Check</h2>
+      <p>This section tests JavaScript features that may cause compatibility issues between browsers.</p>
+      <table class="feature-table" id="compat-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Will be filled by JavaScript -->
+        </tbody>
+      </table>
+      <div class="mt-4">
+        <button id="run-compat-check">Run Compatibility Check</button>
+      </div>
+    </div>
+    
+    <div id="tests" class="card">
+      <h2>Diagnostic Tests</h2>
+      <div>
+        <button id="test-localstorage">Test localStorage</button>
+        <button id="test-api">Test API Connection</button>
+        <button id="check-token">Check Authentication Token</button>
+        <button id="test-cors">Test CORS</button>
+        <button id="test-token-flow">Test Token Flow</button>
+        <button id="go-dashboard">Go to Dashboard</button>
+        <button id="go-login">Go to Login</button>
+        <button id="go-route-test">Go to Route Test</button>
+      </div>
+      <div id="test-results"></div>
+    </div>
+    
+    <a href="/" class="return-link">Return to NetRaven Dashboard</a>
+  </div>
+
+  <script>
+    // Display system information
+    function updateSystemInfo() {
+      const browserInfo = detectBrowser();
+      
+      const sysInfo = {
+        url: window.location.href,
+        browser: {
+          name: browserInfo.name,
+          version: browserInfo.version,
+          engine: browserInfo.engine
+        },
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+        screen: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        },
+        localStorage: typeof localStorage !== 'undefined',
+        sessionStorage: typeof sessionStorage !== 'undefined',
+        cookies: document.cookie ? 'Available' : 'None or blocked',
+        cookiesEnabled: navigator.cookieEnabled,
+        doNotTrack: navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack
+      };
+      
+      document.getElementById('system-info-output').textContent = JSON.stringify(sysInfo, null, 2);
+    }
+    
+    // Detect browser type and version
+    function detectBrowser() {
+      const userAgent = navigator.userAgent;
+      let browserName = "Unknown";
+      let browserVersion = "Unknown";
+      let engineName = "Unknown";
+      
+      // Detect Chrome
+      if (userAgent.match(/chrome|chromium|crios/i)) {
+        browserName = "Chrome";
+        // Edge (Chromium-based)
+        if (userAgent.match(/edg/i)) {
+          browserName = "Edge";
+          const edgMatch = userAgent.match(/edg\/([\d.]+)/i);
+          browserVersion = edgMatch ? edgMatch[1] : "";
+          engineName = "Chromium (Blink)";
+        } else {
+          const chromeMatch = userAgent.match(/chrome\/([\d.]+)/i);
+          browserVersion = chromeMatch ? chromeMatch[1] : "";
+          engineName = "Chromium (Blink)";
+        }
+      } 
+      // Safari
+      else if (userAgent.match(/safari/i) && !userAgent.match(/chrome|chromium|crios/i)) {
+        browserName = "Safari";
+        const safariMatch = userAgent.match(/version\/([\d.]+)/i);
+        browserVersion = safariMatch ? safariMatch[1] : "";
+        engineName = "WebKit";
+      } 
+      // Firefox
+      else if (userAgent.match(/firefox|fxios/i)) {
+        browserName = "Firefox";
+        const ffMatch = userAgent.match(/firefox\/([\d.]+)/i);
+        browserVersion = ffMatch ? ffMatch[1] : "";
+        engineName = "Gecko";
+      }
+      
+      return {
+        name: browserName,
+        version: browserVersion,
+        engine: engineName
+      };
+    }
+    
+    // Browser compatibility check
+    function runCompatibilityCheck() {
+      const compatTable = document.getElementById('compat-table').getElementsByTagName('tbody')[0];
+      compatTable.innerHTML = ''; // Clear previous results
+      
+      // List of features to test
+      const featuresToTest = [
+        {
+          name: "ES6 Arrow Functions",
+          test: () => {
+            try {
+              eval("() => {}");
+              return { supported: true };
+            } catch (e) {
+              return { supported: false, error: e.message };
+            }
+          }
+        },
+        {
+          name: "ES6 Object Spread",
+          test: () => {
+            try {
+              eval("const obj = {...{a: 1}}");
+              return { supported: true };
+            } catch (e) {
+              return { supported: false, error: e.message };
+            }
+          }
+        },
+        {
+          name: "ES6 Modules",
+          test: () => {
+            try {
+              const supported = 'noModule' in document.createElement('script');
+              return { supported };
+            } catch (e) {
+              return { supported: false, error: e.message };
+            }
+          }
+        },
+        {
+          name: "Fetch API",
+          test: () => ({ supported: typeof fetch !== 'undefined' })
+        },
+        {
+          name: "Promises",
+          test: () => ({ supported: typeof Promise !== 'undefined' })
+        },
+        {
+          name: "Async/Await",
+          test: () => {
+            try {
+              eval("async function test() { await Promise.resolve(); }");
+              return { supported: true };
+            } catch (e) {
+              return { supported: false, error: e.message };
+            }
+          }
+        },
+        {
+          name: "localStorage",
+          test: () => ({ supported: typeof localStorage !== 'undefined' })
+        },
+        {
+          name: "sessionStorage",
+          test: () => ({ supported: typeof sessionStorage !== 'undefined' })
+        },
+        {
+          name: "History API",
+          test: () => ({ supported: typeof history !== 'undefined' && typeof history.pushState === 'function' })
+        },
+        {
+          name: "CORS Support",
+          test: () => ({ supported: typeof XMLHttpRequest !== 'undefined' && 'withCredentials' in new XMLHttpRequest() })
+        },
+        {
+          name: "WebCrypto API",
+          test: () => ({ supported: typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined' })
+        }
+      ];
+      
+      // Run tests and add results to table
+      featuresToTest.forEach(feature => {
+        const result = feature.test();
+        const row = compatTable.insertRow();
+        
+        const nameCell = row.insertCell(0);
+        nameCell.textContent = feature.name;
+        
+        const statusCell = row.insertCell(1);
+        statusCell.textContent = result.supported ? "Supported" : "Not Supported";
+        statusCell.className = result.supported ? "feature-supported" : "feature-unsupported";
+        
+        const notesCell = row.insertCell(2);
+        notesCell.textContent = result.error || (result.supported ? "Working correctly" : "Not available");
+      });
+    }
+    
+    // Test localStorage
+    document.getElementById('test-localstorage').addEventListener('click', function() {
+      const resultDiv = document.getElementById('test-results');
+      
+      try {
+        const testKey = 'debug_test_' + Date.now();
+        localStorage.setItem(testKey, 'Test value');
+        const readValue = localStorage.getItem(testKey);
+        localStorage.removeItem(testKey);
+        
+        if (readValue === 'Test value') {
+          resultDiv.innerHTML = '<div class="success">localStorage test passed! Value written and read successfully.</div>';
+        } else {
+          resultDiv.innerHTML = '<div class="error">localStorage test failed! Values don\'t match.</div>';
+        }
+      } catch (error) {
+        resultDiv.innerHTML = '<div class="error">localStorage test error: ' + error.message + '</div>';
+      }
+    });
+    
+    // Test API connection
+    document.getElementById('test-api').addEventListener('click', function() {
+      const resultDiv = document.getElementById('test-results');
+      resultDiv.innerHTML = '<div>Testing API connection...</div>';
+      
+      // Try different API URLs
+      const apiUrls = [
+        'http://localhost:8000/api/health',
+        window.location.origin.replace(':8080', ':8000') + '/api/health',
+        'http://' + window.location.hostname + ':8000/api/health'
+      ];
+      
+      let results = '';
+      
+      Promise.all(apiUrls.map(url => 
+        fetch(url, { method: 'GET', mode: 'cors' })
+          .then(response => ({ url, status: response.status, ok: response.ok }))
+          .catch(error => ({ url, error: error.message }))
+      ))
+      .then(apiResults => {
+        apiResults.forEach(result => {
+          if (result.ok) {
+            results += `<div class="success">✓ ${result.url}: Status ${result.status}</div>`;
+          } else {
+            results += `<div class="error">✗ ${result.url}: ${result.error || 'Status ' + result.status}</div>`;
+          }
+        });
+        
+        resultDiv.innerHTML = results;
+      });
+    });
+    
+    // Test CORS
+    document.getElementById('test-cors').addEventListener('click', function() {
+      const resultDiv = document.getElementById('test-results');
+      resultDiv.innerHTML = '<div>Testing CORS configuration...</div>';
+      
+      const apiUrl = window.location.origin.replace(':8080', ':8000') + '/api/health';
+      
+      // Test with different CORS configurations
+      const corsTests = [
+        { 
+          name: 'Simple request', 
+          config: { method: 'GET', mode: 'cors' } 
+        },
+        { 
+          name: 'With credentials', 
+          config: { method: 'GET', mode: 'cors', credentials: 'include' } 
+        },
+        { 
+          name: 'With headers', 
+          config: { 
+            method: 'GET', 
+            mode: 'cors', 
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Custom-Header': 'test'
+            } 
+          } 
+        }
+      ];
+      
+      let results = '';
+      
+      Promise.all(corsTests.map(test => 
+        fetch(apiUrl, test.config)
+          .then(response => ({ 
+            name: test.name, 
+            status: response.status, 
+            ok: response.ok,
+            headers: Array.from(response.headers.entries())
+          }))
+          .catch(error => ({ name: test.name, error: error.message }))
+      ))
+      .then(corsResults => {
+        corsResults.forEach(result => {
+          if (result.ok) {
+            results += `<div class="success">✓ ${result.name}: Status ${result.status}</div>`;
+            
+            // Show CORS headers if available
+            const corsHeaders = result.headers.filter(h => h[0].toLowerCase().includes('cors'));
+            if (corsHeaders.length > 0) {
+              results += '<pre>' + JSON.stringify(corsHeaders, null, 2) + '</pre>';
+            }
+          } else {
+            results += `<div class="error">✗ ${result.name}: ${result.error || 'Status ' + result.status}</div>`;
+          }
+        });
+        
+        resultDiv.innerHTML = results;
+      });
+    });
+    
+    // Test token flow
+    document.getElementById('test-token-flow').addEventListener('click', function() {
+      const resultDiv = document.getElementById('test-results');
+      resultDiv.innerHTML = '<div>Testing authentication token flow...</div>';
+      
+      // Try to get a token
+      const loginUrl = window.location.origin.replace(':8080', ':8000') + '/api/auth/token';
+      const testCredentials = {
+        username: 'admin',
+        password: 'NetRaven'
+      };
+      
+      let results = '<h3>Token Flow Test</h3>';
+      
+      fetch(loginUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          username: testCredentials.username,
+          password: testCredentials.password
+        })
+      })
+      .then(response => {
+        results += `<div class="${response.ok ? 'success' : 'error'}">
+          Login attempt: ${response.ok ? 'Success' : 'Failed'} (Status: ${response.status})
+        </div>`;
+        
+        if (response.ok) {
+          return response.json();
+        } else {
+          throw new Error(`Login failed with status: ${response.status}`);
+        }
+      })
+      .then(data => {
+        if (data && data.access_token) {
+          results += `<div class="success">
+            Token received successfully. First 10 chars: ${data.access_token.substring(0, 10)}...
+          </div>`;
+          
+          // Test token storage
+          try {
+            localStorage.setItem('debug_access_token', data.access_token);
+            const readToken = localStorage.getItem('debug_access_token');
+            
+            if (readToken === data.access_token) {
+              results += `<div class="success">Token storage test: Passed</div>`;
+            } else {
+              results += `<div class="error">Token storage test: Failed - token mismatch</div>`;
+            }
+            
+            // Test protected endpoint with token
+            return fetch(window.location.origin.replace(':8080', ':8000') + '/api/users/me', {
+              headers: {
+                'Authorization': `Bearer ${data.access_token}`
+              }
+            });
+          } catch (error) {
+            results += `<div class="error">Token storage error: ${error.message}</div>`;
+            throw error;
+          }
+        } else {
+          results += `<div class="error">No token in response</div>`;
+          throw new Error('No token in response');
+        }
+      })
+      .then(response => {
+        results += `<div class="${response.ok ? 'success' : 'error'}">
+          Protected API call: ${response.ok ? 'Success' : 'Failed'} (Status: ${response.status})
+        </div>`;
+        
+        if (response.ok) {
+          return response.json();
+        } else {
+          throw new Error(`Protected API call failed with status: ${response.status}`);
+        }
+      })
+      .then(userData => {
+        results += `<div class="success">
+          User data retrieved: ${JSON.stringify(userData)}
+        </div>`;
+        
+        // Clean up test token
+        localStorage.removeItem('debug_access_token');
+        
+        results += `<div class="success">Test completed successfully</div>`;
+        resultDiv.innerHTML = results;
+      })
+      .catch(error => {
+        results += `<div class="error">Error during token flow test: ${error.message}</div>`;
+        resultDiv.innerHTML = results;
+      });
+    });
+    
+    // Check authentication token
+    document.getElementById('check-token').addEventListener('click', function() {
+      const resultDiv = document.getElementById('test-results');
+      const token = localStorage.getItem('access_token');
+      
+      if (token) {
+        const tokenStart = token.substring(0, 10);
+        const tokenLength = token.length;
+        resultDiv.innerHTML = `<div class="success">Token found: ${tokenStart}... (${tokenLength} characters)</div>`;
+        
+        // Check token expiration
+        try {
+          // Just try to decode the token - this doesn't validate signature
+          const tokenParts = token.split('.');
+          if (tokenParts.length === 3) {
+            const tokenPayload = JSON.parse(atob(tokenParts[1]));
+            const expTime = tokenPayload.exp ? new Date(tokenPayload.exp * 1000) : null;
+            const issuedTime = tokenPayload.iat ? new Date(tokenPayload.iat * 1000) : null;
+            const currentTime = new Date();
+            
+            let tokenDetails = `<pre>Token payload: ${JSON.stringify(tokenPayload, null, 2)}</pre>`;
+            
+            if (expTime) {
+              const isExpired = currentTime > expTime;
+              tokenDetails += `<div class="${isExpired ? 'error' : 'success'}">
+                Expiration: ${expTime.toLocaleString()} (${isExpired ? 'EXPIRED' : 'Valid'})
+              </div>`;
+            }
+            
+            if (issuedTime) {
+              tokenDetails += `<div class="success">
+                Issued: ${issuedTime.toLocaleString()}
+              </div>`;
+            }
+            
+            resultDiv.innerHTML += tokenDetails;
+          }
+        } catch (e) {
+          resultDiv.innerHTML += `<div class="warning">Could not decode token: ${e.message}</div>`;
+        }
+      } else {
+        resultDiv.innerHTML = '<div class="error">No authentication token found in localStorage.</div>';
+      }
+    });
+    
+    // Navigation buttons
+    document.getElementById('go-dashboard').addEventListener('click', function() {
+      window.location.href = '/';
+    });
+    
+    document.getElementById('go-login').addEventListener('click', function() {
+      window.location.href = '/login';
+    });
+    
+    document.getElementById('go-route-test').addEventListener('click', function() {
+      window.location.href = '/route-test';
+    });
+    
+    // Register compatibility check button
+    document.getElementById('run-compat-check').addEventListener('click', runCompatibilityCheck);
+    
+    // Initialize the page
+    updateSystemInfo();
+    setInterval(updateSystemInfo, 5000); // Update every 5 seconds
+  </script>
+</body>
+</html> 

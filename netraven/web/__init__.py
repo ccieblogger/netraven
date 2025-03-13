@@ -61,12 +61,14 @@ app.add_middleware(
 
 # Import and include routers
 # These imports are placed here to avoid circular imports
-from netraven.web.routers import auth, devices, backups
+from netraven.web.routers import auth, devices, backups, tags, tag_rules
 
 # Mount routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
+app.include_router(tags.router, prefix="/api/tags", tags=["Tags"])
+app.include_router(tag_rules.router, prefix="/api/tag-rules", tags=["Tag Rules"])
 
 @app.get("/api")
 async def api_root(request: Request) -> JSONResponse:
@@ -78,6 +80,8 @@ async def api_root(request: Request) -> JSONResponse:
         "auth": f"{base_url}/api/auth",
         "devices": f"{base_url}/api/devices",
         "backups": f"{base_url}/api/backups",
+        "tags": f"{base_url}/api/tags",
+        "tag_rules": f"{base_url}/api/tag-rules",
         "health": f"{base_url}/api/health",
         "docs": f"{base_url}/docs"
     }

@@ -12,7 +12,6 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import os
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel
 
 # Import database and models
@@ -20,6 +19,7 @@ from netraven.web.database import get_db
 from netraven.web.models.user import User as UserModel
 from netraven.web.schemas.user import User, UserCreate, UserInDB
 from netraven.web.crud import get_user_by_username, create_user, update_user_last_login
+from netraven.web.auth import get_password_hash, verify_password
 from netraven.core.config import load_config, get_default_config_path
 from netraven.core.logging import get_logger
 
@@ -28,9 +28,6 @@ logger = get_logger("netraven.web.routers.auth")
 
 # Create router
 router = APIRouter()
-
-# Setup password context for hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Setup OAuth2 scheme for token-based authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
@@ -74,14 +71,6 @@ class User(BaseModel):
 class UserInDB(User):
     """User model with password hash."""
     hashed_password: str
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    """Generate password hash."""
-    return pwd_context.hash(password)
 
 def get_user(username: str) -> Optional[UserInDB]:
     """Get user by username."""

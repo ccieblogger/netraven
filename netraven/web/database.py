@@ -84,7 +84,7 @@ def init_db() -> None:
     
     This creates all tables if they don't exist.
     """
-    from netraven.web.models import user, device, backup  # Import models to register them with Base
+    from netraven.web.models import user, device, backup, tag  # Import models to register them with Base
     
     logger.info(f"Initializing database at {DATABASE_URL}")
     try:

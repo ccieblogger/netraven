@@ -54,6 +54,12 @@ if (envApiBaseUrl) {
   console.log('Using dynamic API URL based on frontend origin');
 }
 
+// Ensure we always have a fallback URL if nothing else worked
+if (!browserApiUrl) {
+  browserApiUrl = 'http://localhost:8000';
+  console.log('Falling back to default API URL: http://localhost:8000');
+}
+
 console.log('Final API URL:', browserApiUrl)
 
 // For direct container-to-container communication within Docker
@@ -126,71 +132,52 @@ export const authService = {
     formData.append('username', username)
     formData.append('password', password)
     
-    try {
-      // Try multiple API URLs if needed for troubleshooting
-      let loginUrl = browserApiUrl + '/api/auth/token';
-      console.log('Making login request to:', loginUrl);
-      
-      const response = await fetch(loginUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: formData,
-        mode: 'cors'
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Auth Service: Login response not OK', response.status, errorData);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.detail || 'Unknown error'}`);
-      }
-      
-      const data = await response.json();
-      console.log('Auth Service: Login successful, token received', data);
-      
-      // Store the token
-      localStorage.setItem('access_token', data.access_token);
-      return data;
-    } catch (error) {
-      console.error('Auth Service: Login failed', error);
-      
-      // If the first attempt failed, try with a fallback URL directly
-      if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-        try {
-          console.log('Auth Service: First login attempt failed, trying fallback URL');
-          const fallbackUrl = 'http://localhost:8000/api/auth/token';
-          console.log('Making fallback login request to:', fallbackUrl);
-          
-          const fallbackResponse = await fetch(fallbackUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: formData,
-            mode: 'cors'
-          });
-          
-          if (!fallbackResponse.ok) {
-            const errorData = await fallbackResponse.json().catch(() => ({}));
-            console.error('Auth Service: Fallback login response not OK', fallbackResponse.status, errorData);
-            throw new Error(`HTTP error! status: ${fallbackResponse.status}, message: ${errorData.detail || 'Unknown error'}`);
-          }
-          
-          const data = await fallbackResponse.json();
-          console.log('Auth Service: Fallback login successful, token received', data);
-          
-          // Store the token
-          localStorage.setItem('access_token', data.access_token);
-          return data;
-        } catch (fallbackError) {
-          console.error('Auth Service: Fallback login failed', fallbackError);
-          throw fallbackError;
+    // Try multiple login approaches in sequence for better reliability
+    const loginUrlOptions = [
+      browserApiUrl + '/api/auth/token',
+      'http://localhost:8000/api/auth/token', 
+      window.location.hostname + ':8000/api/auth/token',
+      'http://' + window.location.hostname + ':8000/api/auth/token'
+    ];
+    
+    let lastError = null;
+    
+    // Try each URL in sequence until one works
+    for (const loginUrl of loginUrlOptions) {
+      try {
+        console.log('Auth Service: Attempting login with URL:', loginUrl);
+        
+        const response = await fetch(loginUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: formData,
+          mode: 'cors'
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Auth Service: Login response not OK', response.status, errorData);
+          throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.detail || 'Unknown error'}`);
         }
+        
+        const data = await response.json();
+        console.log('Auth Service: Login successful, token received', data);
+        
+        // Store the token
+        localStorage.setItem('access_token', data.access_token);
+        return data;
+      } catch (error) {
+        console.error(`Auth Service: Login attempt failed for URL ${loginUrl}:`, error);
+        lastError = error;
+        // Continue to the next URL option
       }
-      
-      throw error;
     }
+    
+    // If we get here, all login attempts failed
+    console.error('Auth Service: All login attempts failed');
+    throw lastError || new Error('Failed to connect to the API server. Please check your network connection.');
   },
   
   async getCurrentUser() {
@@ -280,6 +267,110 @@ export const backupService = {
   
   async deleteBackup(id) {
     const response = await api.delete(`/api/backups/${id}`)
+    return response.data
+  }
+}
+
+// Tag service
+export const tagService = {
+  async getTags(params = {}) {
+    console.log('Tag Service: Fetching all tags', params)
+    const response = await api.get('/api/tags', { params })
+    return response.data
+  },
+  
+  async getTag(id) {
+    console.log('Tag Service: Fetching tag', id)
+    const response = await api.get(`/api/tags/${id}`)
+    return response.data
+  },
+  
+  async createTag(tagData) {
+    console.log('Tag Service: Creating tag', tagData)
+    const response = await api.post('/api/tags', tagData)
+    return response.data
+  },
+  
+  async updateTag(id, tagData) {
+    console.log('Tag Service: Updating tag', id, tagData)
+    const response = await api.put(`/api/tags/${id}`, tagData)
+    return response.data
+  },
+  
+  async deleteTag(id) {
+    console.log('Tag Service: Deleting tag', id)
+    await api.delete(`/api/tags/${id}`)
+    return true
+  },
+  
+  async getDevicesForTag(id, params = {}) {
+    console.log('Tag Service: Fetching devices for tag', id, params)
+    const response = await api.get(`/api/tags/${id}/devices`, { params })
+    return response.data
+  },
+  
+  async assignTagsToDevices(deviceIds, tagIds) {
+    console.log('Tag Service: Assigning tags to devices', { deviceIds, tagIds })
+    const response = await api.post('/api/tags/assign', {
+      device_ids: deviceIds,
+      tag_ids: tagIds
+    })
+    return response.data
+  },
+  
+  async removeTagsFromDevices(deviceIds, tagIds) {
+    console.log('Tag Service: Removing tags from devices', { deviceIds, tagIds })
+    const response = await api.post('/api/tags/unassign', {
+      device_ids: deviceIds,
+      tag_ids: tagIds
+    })
+    return response.data
+  }
+}
+
+// Tag Rules service
+export const tagRuleService = {
+  async getTagRules(params = {}) {
+    console.log('Tag Rule Service: Fetching all tag rules', params)
+    const response = await api.get('/api/tag-rules', { params })
+    return response.data
+  },
+  
+  async getTagRule(id) {
+    console.log('Tag Rule Service: Fetching tag rule', id)
+    const response = await api.get(`/api/tag-rules/${id}`)
+    return response.data
+  },
+  
+  async createTagRule(ruleData) {
+    console.log('Tag Rule Service: Creating tag rule', ruleData)
+    const response = await api.post('/api/tag-rules', ruleData)
+    return response.data
+  },
+  
+  async updateTagRule(id, ruleData) {
+    console.log('Tag Rule Service: Updating tag rule', id, ruleData)
+    const response = await api.put(`/api/tag-rules/${id}`, ruleData)
+    return response.data
+  },
+  
+  async deleteTagRule(id) {
+    console.log('Tag Rule Service: Deleting tag rule', id)
+    await api.delete(`/api/tag-rules/${id}`)
+    return true
+  },
+  
+  async applyTagRule(id) {
+    console.log('Tag Rule Service: Applying tag rule', id)
+    const response = await api.post(`/api/tag-rules/${id}/apply`)
+    return response.data
+  },
+  
+  async testRule(ruleCriteria) {
+    console.log('Tag Rule Service: Testing rule criteria', ruleCriteria)
+    const response = await api.post('/api/tag-rules/test', {
+      rule_criteria: ruleCriteria
+    })
     return response.data
   }
 }

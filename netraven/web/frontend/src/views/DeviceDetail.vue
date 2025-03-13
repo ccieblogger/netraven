@@ -87,6 +87,34 @@
               <h3 class="text-md font-semibold mb-2">Description</h3>
               <p class="text-gray-700">{{ device.description || 'No description provided.' }}</p>
             </div>
+            
+            <!-- Tags -->
+            <div class="mt-4">
+              <h3 class="text-md font-semibold mb-2">Tags</h3>
+              <div v-if="loadingTags" class="text-sm text-gray-500">
+                Loading tags...
+              </div>
+              <div v-else-if="deviceTags.length === 0" class="text-sm text-gray-500">
+                No tags assigned to this device.
+              </div>
+              <div v-else class="flex flex-wrap gap-2">
+                <TagBadge 
+                  v-for="tag in deviceTags" 
+                  :key="tag.id" 
+                  :tag="tag" 
+                  :removable="true"
+                  @remove="removeTagFromDevice(tag)"
+                />
+              </div>
+              <div class="mt-2">
+                <button 
+                  @click="showTagModal = true" 
+                  class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  Manage Tags
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -272,33 +300,103 @@
         </div>
       </div>
     </div>
+    
+    <!-- Tag Management Modal -->
+    <div v-if="showTagModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+        <h2 class="text-xl font-bold mb-4">Manage Device Tags</h2>
+        
+        <div v-if="loadingTags || loadingAllTags" class="text-center py-4">
+          <p>Loading tags...</p>
+        </div>
+        <div v-else>
+          <div class="mb-4">
+            <h3 class="text-md font-semibold mb-2">Current Tags</h3>
+            <div v-if="deviceTags.length === 0" class="text-sm text-gray-500 mb-2">
+              No tags assigned to this device.
+            </div>
+            <div v-else class="flex flex-wrap gap-2 mb-2">
+              <TagBadge 
+                v-for="tag in deviceTags" 
+                :key="tag.id" 
+                :tag="tag" 
+                :removable="true"
+                @remove="removeTagFromDevice(tag)"
+              />
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <h3 class="text-md font-semibold mb-2">Available Tags</h3>
+            <div v-if="availableTags.length === 0" class="text-sm text-gray-500 mb-2">
+              No more tags available.
+            </div>
+            <div v-else>
+              <select
+                v-model="selectedTagId"
+                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              >
+                <option value="" disabled selected>Select a tag to add</option>
+                <option 
+                  v-for="tag in availableTags" 
+                  :key="tag.id" 
+                  :value="tag.id"
+                >
+                  {{ tag.name }}
+                </option>
+              </select>
+              
+              <button
+                @click="addTagToDevice"
+                class="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
+                :disabled="!selectedTagId"
+                :class="{'opacity-50 cursor-not-allowed': !selectedTagId}"
+              >
+                Add Tag
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex justify-end mt-4">
+          <button
+            @click="showTagModal = false"
+            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   </MainLayout>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import MainLayout from '../components/MainLayout.vue'
-import { useDeviceStore } from '../store/devices'
-import { useBackupStore } from '../store/backups'
+import MainLayout from '@/components/MainLayout.vue'
+import TagBadge from '@/components/TagBadge.vue'
+import { useDeviceStore } from '@/store/devices'
+import { useBackupStore } from '@/store/backups'
+import { useTagStore } from '@/store/tags'
 
 export default {
   name: 'DeviceDetail',
   components: {
-    MainLayout
+    MainLayout,
+    TagBadge
   },
-  
   props: {
     id: {
       type: String,
-      required: true
+      required: false
     }
   },
-  
   setup(props) {
     const route = useRoute()
     const deviceStore = useDeviceStore()
     const backupStore = useBackupStore()
+    const tagStore = useTagStore()
     
     const loading = ref(true)
     const loadingBackups = ref(true)
@@ -325,6 +423,12 @@ export default {
       username: '',
       password: ''
     })
+    
+    const deviceTags = computed(() => tagStore.deviceTags)
+    const allTags = computed(() => tagStore.tags)
+    const loadingTags = computed(() => tagStore.loading)
+    const showTagModal = ref(false)
+    const selectedTagId = ref('')
     
     onMounted(async () => {
       loading.value = true
@@ -357,6 +461,11 @@ export default {
       } finally {
         loadingBackups.value = false
       }
+      
+      // Fetch tags for the device
+      await tagStore.fetchTagsForDevice(deviceId.value)
+      // Fetch all tags
+      await tagStore.fetchTags()
     })
     
     const saveDevice = async () => {
@@ -437,6 +546,46 @@ export default {
       }
     }
     
+    const availableTags = computed(() => {
+      if (!deviceTags.value || !allTags.value) return []
+      
+      // Filter out tags that are already assigned to the device
+      return allTags.value.filter(tag => !deviceTags.value.some(dt => dt.id === tag.id))
+    })
+    
+    const addTagToDevice = async () => {
+      if (!selectedTagId.value) return
+      
+      try {
+        await tagStore.assignTagToDevice(deviceId.value, selectedTagId.value)
+        
+        // Reset selection
+        selectedTagId.value = ''
+        
+        // Refresh device tags
+        await tagStore.fetchTagsForDevice(deviceId.value)
+        // Refresh device data
+        await deviceStore.fetchDevice(deviceId.value)
+      } catch (error) {
+        console.error('Error adding tag to device:', error)
+        alert(`Failed to add tag: ${error.response?.data?.detail || error.message}`)
+      }
+    }
+    
+    const removeTagFromDevice = async (tag) => {
+      try {
+        await tagStore.removeTagFromDevice(deviceId.value, tag.id)
+        
+        // Refresh device tags
+        await tagStore.fetchTagsForDevice(deviceId.value)
+        // Refresh device data
+        await deviceStore.fetchDevice(deviceId.value)
+      } catch (error) {
+        console.error('Error removing tag from device:', error)
+        alert(`Failed to remove tag: ${error.response?.data?.detail || error.message}`)
+      }
+    }
+    
     return {
       loading,
       loadingBackups,
@@ -451,7 +600,14 @@ export default {
       formatDate,
       backupDevice,
       restoreBackup,
-      saveDevice
+      saveDevice,
+      deviceTags,
+      loadingTags,
+      showTagModal,
+      selectedTagId,
+      availableTags,
+      addTagToDevice,
+      removeTagFromDevice
     }
   }
 }

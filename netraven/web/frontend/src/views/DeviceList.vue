@@ -9,31 +9,95 @@
     
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow p-4 mb-6">
-      <div class="flex flex-wrap items-center gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
           <input 
             type="text" 
-            id="search" 
-            v-model="searchQuery" 
-            placeholder="Search devices..."
-            class="border rounded px-3 py-2 w-64"
-          >
+            v-model="filters.search" 
+            placeholder="Search devices..." 
+            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
+          />
         </div>
         
         <div>
-          <label for="deviceType" class="block text-sm font-medium text-gray-700 mb-1">Device Type</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Device Type</label>
           <select 
-            id="deviceType" 
-            v-model="deviceTypeFilter"
-            class="border rounded px-3 py-2 w-40"
+            v-model="filters.deviceType" 
+            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
           >
             <option value="">All Types</option>
-            <option value="cisco_ios">Cisco IOS</option>
-            <option value="juniper_junos">Juniper JunOS</option>
-            <option value="arista_eos">Arista EOS</option>
+            <option value="router">Router</option>
+            <option value="switch">Switch</option>
+            <option value="firewall">Firewall</option>
+            <option value="server">Server</option>
           </select>
         </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select 
+            v-model="filters.status" 
+            class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
+          >
+            <option value="">All Statuses</option>
+            <option value="enabled">Enabled</option>
+            <option value="disabled">Disabled</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- Tag Filters -->
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Filter by Tags</label>
+        <div v-if="loadingTags" class="text-sm text-gray-500">
+          Loading tags...
+        </div>
+        <div v-else>
+          <div class="flex flex-wrap gap-2 mb-2">
+            <div 
+              v-for="tag in allTags" 
+              :key="tag.id" 
+              @click="toggleTagFilter(tag.id)"
+              class="cursor-pointer"
+            >
+              <TagBadge 
+                :tag="tag" 
+                :class="{'opacity-40': !filters.tags.includes(tag.id)}"
+              />
+            </div>
+          </div>
+          <div v-if="filters.tags.length > 0" class="text-sm mt-1">
+            <span class="text-gray-700 mr-2">Tag filter mode:</span>
+            <label class="inline-flex items-center mr-4">
+              <input 
+                type="radio" 
+                v-model="filters.tagFilterMode" 
+                value="any" 
+                class="form-radio h-4 w-4 text-blue-600"
+              >
+              <span class="ml-1 text-gray-700">Any tag (OR)</span>
+            </label>
+            <label class="inline-flex items-center">
+              <input 
+                type="radio" 
+                v-model="filters.tagFilterMode" 
+                value="all" 
+                class="form-radio h-4 w-4 text-blue-600"
+              >
+              <span class="ml-1 text-gray-700">All tags (AND)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex justify-end mt-4">
+        <button 
+          @click="clearFilters" 
+          class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+        >
+          Clear Filters
+        </button>
       </div>
     </div>
     
@@ -44,7 +108,7 @@
       </div>
       
       <div v-else-if="filteredDevices.length === 0" class="p-8 text-center">
-        <p v-if="searchQuery || deviceTypeFilter" class="text-gray-600">
+        <p v-if="filters.search || filters.deviceType || filters.status" class="text-gray-600">
           No devices match the current filters.
         </p>
         <p v-else class="text-gray-600">
@@ -61,6 +125,7 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device Type</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Backup</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
@@ -101,6 +166,16 @@
                 </div>
               </span>
               <span v-else class="text-gray-500">Never</span>
+            </td>
+            <td class="px-6 py-4">
+              <div v-if="device.tags && device.tags.length > 0" class="flex flex-wrap gap-1">
+                <TagBadge 
+                  v-for="tag in device.tags" 
+                  :key="tag.id" 
+                  :tag="tag" 
+                />
+              </div>
+              <span v-else class="text-gray-500 text-sm">No tags</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="flex space-x-2">
@@ -293,14 +368,17 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import MainLayout from '../components/MainLayout.vue'
 import { useDeviceStore } from '../store/devices'
+import { tagService } from '@/api/api'
+import TagBadge from '@/components/TagBadge.vue'
 
 export default {
   name: 'DeviceList',
   components: {
-    MainLayout
+    MainLayout,
+    TagBadge
   },
   
   setup() {
@@ -329,6 +407,17 @@ export default {
       password: ''
     })
     
+    const allTags = ref([])
+    const loadingTags = ref(false)
+    
+    const filters = reactive({
+      search: '',
+      deviceType: '',
+      status: '',
+      tags: [],
+      tagFilterMode: 'any' // 'any' or 'all'
+    })
+    
     const resetForm = () => {
       deviceForm.value = {
         hostname: '',
@@ -346,8 +435,8 @@ export default {
     const filteredDevices = computed(() => {
       let devices = deviceStore.devices
       
-      if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase()
+      if (filters.search) {
+        const query = filters.search.toLowerCase()
         devices = devices.filter(device => 
           device.hostname.toLowerCase().includes(query) ||
           device.ip_address.toLowerCase().includes(query) ||
@@ -355,8 +444,28 @@ export default {
         )
       }
       
-      if (deviceTypeFilter.value) {
-        devices = devices.filter(device => device.device_type === deviceTypeFilter.value)
+      if (filters.deviceType) {
+        devices = devices.filter(device => device.device_type === filters.deviceType)
+      }
+      
+      if (filters.status === 'enabled') {
+        devices = devices.filter(device => device.enabled)
+      } else if (filters.status === 'disabled') {
+        devices = devices.filter(device => !device.enabled)
+      }
+      
+      if (filters.tags.length > 0) {
+        devices = devices.filter(device => {
+          if (!device.tags || !Array.isArray(device.tags)) return false
+          
+          const deviceTagIds = device.tags.map(tag => tag.id)
+          
+          if (filters.tagFilterMode === 'any') {
+            return filters.tags.some(tagId => deviceTagIds.includes(tagId))
+          } else {
+            return filters.tags.every(tagId => deviceTagIds.includes(tagId))
+          }
+        })
       }
       
       return devices
@@ -365,6 +474,7 @@ export default {
     onMounted(async () => {
       loading.value = true
       await deviceStore.fetchDevices()
+      await fetchTags()
       loading.value = false
     })
     
@@ -466,6 +576,36 @@ export default {
       }
     }
     
+    const fetchTags = async () => {
+      loadingTags.value = true
+      try {
+        allTags.value = await tagService.getTags()
+      } catch (error) {
+        console.error('Error fetching tags:', error)
+      } finally {
+        loadingTags.value = false
+      }
+    }
+    
+    const toggleTagFilter = (tagId) => {
+      const index = filters.tags.indexOf(tagId)
+      if (index === -1) {
+        // Tag not in filter, add it
+        filters.tags.push(tagId)
+      } else {
+        // Tag in filter, remove it
+        filters.tags.splice(index, 1)
+      }
+    }
+    
+    const clearFilters = () => {
+      filters.search = ''
+      filters.deviceType = ''
+      filters.status = ''
+      filters.tags = []
+      filters.tagFilterMode = 'any'
+    }
+    
     return {
       loading,
       saving,
@@ -486,7 +626,12 @@ export default {
       editDevice,
       saveDevice,
       confirmDelete,
-      deleteDevice
+      deleteDevice,
+      allTags,
+      loadingTags,
+      filters,
+      toggleTagFilter,
+      clearFilters
     }
   }
 }
