@@ -68,12 +68,15 @@ export const useDeviceStore = defineStore('devices', {
       this.error = null
       
       try {
+        console.log('Creating device with data:', deviceData)
         const newDevice = await deviceService.createDevice(deviceData)
+        console.log('Device created:', newDevice)
         this.devices.push(newDevice)
         return newDevice
       } catch (error) {
-        this.error = error.response?.data?.detail || 'Failed to create device'
         console.error('Error creating device:', error)
+        console.error('Error response:', error.response?.data)
+        this.error = error.response?.data?.detail || 'Failed to create device'
         return null
       } finally {
         this.loading = false

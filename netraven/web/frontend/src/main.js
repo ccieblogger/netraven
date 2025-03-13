@@ -3,6 +3,9 @@ import App from './App.vue'
 import router from './router'
 import pinia from './store'
 
+// Import Tailwind CSS
+import './assets/main.css'
+
 const app = createApp(App)
 
 // Use Pinia store and Vue Router

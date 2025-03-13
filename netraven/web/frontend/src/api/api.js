@@ -76,12 +76,16 @@ export const deviceService = {
   },
   
   async createDevice(deviceData) {
+    console.log('API: Creating device with data:', deviceData)
     const response = await api.post('/api/devices', deviceData)
+    console.log('API: Device creation response:', response.data)
     return response.data
   },
   
   async updateDevice(id, deviceData) {
+    console.log('API: Updating device with data:', deviceData)
     const response = await api.put(`/api/devices/${id}`, deviceData)
+    console.log('API: Device update response:', response.data)
     return response.data
   },
   

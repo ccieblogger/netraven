@@ -256,3 +256,24 @@ NetRaven includes comprehensive documentation to help you get started, understan
 ## License
 
 MIT
+
+## Default Admin Credentials
+
+When NetRaven is first installed, a default admin user is created with the following credentials:
+
+- **Username**: admin
+- **Password**: NetRaven
+
+For security reasons, we strongly recommend changing this password after your first login.
+
+## Emergency Password Reset
+
+If you lose access to the admin account, an emergency password reset script is provided:
+
+```bash
+python scripts/reset_admin_password.py
+```
+
+This will reset the admin password back to the default "NetRaven". This script should only be used as an emergency measure to regain access to the system.
+
+**Security Note**: This script should be kept secure and only accessible to authorized personnel. After using it, immediately change the admin password.

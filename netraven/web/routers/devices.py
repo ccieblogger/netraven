@@ -12,6 +12,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
 import logging
+import os
 
 # Import authentication dependencies
 from netraven.web.routers.auth import User, get_current_active_user
@@ -50,8 +51,9 @@ class DeviceCreate(DeviceBase):
 class Device(DeviceBase):
     """Model for device data returned to clients."""
     id: str
-    last_backup: Optional[datetime] = None
-    backup_status: Optional[str] = None
+    owner_id: str
+    last_backup_at: Optional[datetime] = None
+    last_backup_status: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -99,6 +101,9 @@ async def create_device_endpoint(
     
     This endpoint creates a new network device.
     """
+    # Log the received data
+    logger.info(f"Creating device with data: {device.dict()}")
+    
     # Convert our API schema to the CRUD schema
     device_data = DeviceCreateSchema(
         hostname=device.hostname,
@@ -111,12 +116,21 @@ async def create_device_endpoint(
         enabled=True
     )
     
-    return create_device(db, device_data, current_user.id)
+    try:
+        new_device = create_device(db, device_data, current_user.id)
+        logger.info(f"Device created successfully: {new_device.hostname}")
+        return new_device
+    except Exception as e:
+        logger.error(f"Error creating device: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating device: {str(e)}"
+        )
 
 @router.put("/{device_id}", response_model=Device)
 async def update_device_endpoint(
     device_id: str,
-    device: DeviceBase,
+    device: DeviceUpdate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> DeviceModel:
@@ -133,22 +147,18 @@ async def update_device_endpoint(
             detail=f"Device with ID {device_id} not found"
         )
     
-    # Update the device
-    device_update = DeviceUpdate(
-        hostname=device.hostname,
-        device_type=device.device_type,
-        ip_address=device.ip_address,
-        description=device.description,
-        port=device.port
-    )
+    # Log the received data
+    logger.info(f"Updating device with data: {device.dict(exclude_unset=True)}")
     
-    updated_device = update_device(db, device_id, device_update)
+    # Update the device directly with the DeviceUpdate model
+    updated_device = update_device(db, device_id, device)
     if not updated_device:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error updating device"
         )
     
+    logger.info(f"Device updated successfully: {updated_device.hostname}")
     return updated_device
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -202,6 +212,9 @@ async def backup_device(
     
     # Import here to avoid circular imports
     from netraven.jobs.device_logging import start_job_session, log_backup_failure
+    from netraven.jobs.device_connector import backup_device_config
+    from netraven.web.schemas.backup import BackupCreate
+    from netraven.web.crud import create_backup
     
     try:
         # Start a job session
@@ -210,43 +223,108 @@ async def backup_device(
         # Log the backup request
         logger.info(f"Backup requested for device {device.hostname} (ID: {device_id})")
         
-        # In a real application, we would use background tasks or a job queue
-        # For example with FastAPI background tasks:
-        # 
-        # def run_backup_task(device_id, device_hostname, device_username, 
-        #                    device_password, device_type, device_port):
-        #     # This would run in the background
-        #     try:
-        #         from netraven.jobs.device_connector import backup_device_config
-        #         success = backup_device_config(
-        #             device_id=device_id,
-        #             host=device_hostname,
-        #             username=device_username,
-        #             password=device_password,
-        #             device_type=device_type,
-        #             port=device_port
-        #         )
-        #         # Update database with result
-        #     except Exception as e:
-        #         logger.exception(f"Error in backup job: {e}")
-        # 
-        # background_tasks.add_task(
-        #     run_backup_task,
-        #     device_id,
-        #     device.hostname,
-        #     device.username,
-        #     device.password,
-        #     device.device_type,
-        #     device.port
-        # )
+        # Execute the backup directly for now (in a real app, this would be async)
+        success = backup_device_config(
+            device_id=device_id,
+            host=device.hostname,
+            username=device.username,
+            password=device.password,
+            device_type=device.device_type,
+            port=device.port
+        )
+        
+        # If backup was successful, create a backup record in the database
+        if success:
+            # Load config to get the proper paths
+            from netraven.core.config import load_config, get_default_config_path
+            config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
+            config, _ = load_config(config_path)
+            
+            # Generate the path where the backup should be stored (this should match what backup_device_config used)
+            from netraven.core.config import get_backup_filename_format, get_storage_path
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename_format = get_backup_filename_format(config)
+            
+            # The format is likely just '{host}_config.txt' without timestamp
+            # Let's check if the file exists with just the hostname
+            filename = filename_format.format(
+                host=device.hostname,
+                timestamp=timestamp,
+                serial="unknown",
+                version="unknown"
+            )
+            
+            # Get the expected file path
+            filepath = get_storage_path(config, filename)
+            
+            # If the file doesn't exist, try looking in the data/backups directory directly
+            if not os.path.exists(filepath):
+                # Try alternative paths
+                alt_paths = [
+                    f"/app/data/backups/{device.hostname}_config.txt",
+                    f"/app/data/backups/{device.hostname.lower()}_config.txt",
+                    f"/app/data/backups/{device.hostname}.cfg",
+                    f"/app/data/backups/{device.hostname.lower()}.cfg",
+                    f"/tmp/backups/{device.hostname}.cfg",
+                    f"/tmp/backups/{device.hostname.lower()}.cfg",
+                    f"/tmp/backups/{device.hostname}.example.com.cfg"
+                ]
+                
+                for alt_path in alt_paths:
+                    if os.path.exists(alt_path):
+                        filepath = alt_path
+                        logger.info(f"Found backup file at alternative path: {filepath}")
+                        break
+            
+            # Check if file exists and get its size
+            if os.path.exists(filepath):
+                file_size = os.path.getsize(filepath)
+                
+                # Create a backup record in the database
+                backup_data = BackupCreate(
+                    device_id=device_id,
+                    version=timestamp,
+                    file_path=filepath,
+                    file_size=file_size,
+                    status="complete",
+                    is_automatic=False
+                )
+                
+                # Add to database
+                backup = create_backup(db, backup_data)
+                logger.info(f"Created backup record for device {device.hostname} (ID: {device_id})")
+                
+                # Update response with success
+                return {
+                    "message": f"Backup completed for device {device.hostname}",
+                    "job_id": job_id,
+                    "device_id": device_id,
+                    "status": "complete",
+                    "backup_id": backup.id
+                }
+            else:
+                logger.error(f"Backup file not found at expected path: {filepath}")
+                return {
+                    "message": f"Backup job for device {device.hostname} completed but file not found",
+                    "job_id": job_id,
+                    "device_id": device_id,
+                    "status": "error"
+                }
+        else:
+            return {
+                "message": f"Backup job for device {device.hostname} failed",
+                "job_id": job_id,
+                "device_id": device_id,
+                "status": "error"
+            }
         
     except Exception as e:
-        logger.exception(f"Error setting up backup job for {device.hostname}: {e}")
-    
-    # Return a response with the job ID
-    return {
-        "message": f"Backup job initiated for device {device.hostname}",
-        "job_id": job_id,
-        "device_id": device_id,
-        "status": "pending"
-    } 
+        logger.exception(f"Error executing backup job for {device.hostname}: {e}")
+        
+        # Return a response with the job ID
+        return {
+            "message": f"Backup job for device {device.hostname} failed with error: {str(e)}",
+            "job_id": job_id,
+            "device_id": device_id,
+            "status": "error"
+        } 

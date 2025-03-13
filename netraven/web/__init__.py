@@ -16,7 +16,7 @@ from typing import Dict, Any
 # Import internal modules
 from netraven.core.config import load_config, get_default_config_path
 from netraven.core.logging import get_logger
-from netraven.web.database import init_db
+from netraven.web.database import init_db, SessionLocal
 
 # Create logger
 logger = get_logger("netraven.web")
@@ -29,6 +29,17 @@ config, storage = load_config(config_path)
 try:
     init_db()
     logger.info("Database initialized successfully")
+    
+    # Ensure default admin user exists
+    from netraven.web.startup import ensure_default_admin
+    
+    # Create a database session
+    db = SessionLocal()
+    try:
+        ensure_default_admin(db)
+    finally:
+        db.close()
+        
 except Exception as e:
     logger.error(f"Error initializing database: {e}")
 

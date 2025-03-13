@@ -61,43 +61,42 @@
     <div class="mt-8 bg-white rounded-lg shadow p-6">
       <h2 class="text-xl font-semibold mb-4">Recent Activity</h2>
       <div v-if="loading" class="text-center py-4">
-        <p>Loading...</p>
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
       </div>
       <div v-else-if="recentBackups.length === 0" class="text-center py-4 text-gray-500">
         <p>No recent activity to display</p>
       </div>
-      <div v-else class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead>
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="backup in recentBackups" :key="backup.id">
-              <td class="px-6 py-4 whitespace-nowrap">
-                <router-link :to="`/devices/${backup.device_id}`" class="text-blue-600 hover:text-blue-900">
-                  {{ backup.device_hostname }}
-                </router-link>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                Configuration Backup
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                  :class="backup.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
-                  {{ backup.status }}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ formatDate(backup.created_at) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-else class="overflow-hidden">
+        <DataTable
+          :columns="columns"
+          :data="recentBackups"
+          default-sort="created_at"
+          default-order="desc"
+        >
+          <template #device_hostname="{ item }">
+            <router-link 
+              :to="`/devices/${item.device_id}`" 
+              class="text-blue-600 hover:text-blue-900 inline-flex items-center space-x-1"
+            >
+              <span>{{ item.device_hostname }}</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </router-link>
+          </template>
+          <template #activity>
+            Configuration Backup
+          </template>
+          <template #status="{ item }">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                  :class="item.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
+              {{ item.status }}
+            </span>
+          </template>
+          <template #created_at="{ item }">
+            {{ formatDate(item.created_at) }}
+          </template>
+        </DataTable>
       </div>
     </div>
     
@@ -122,13 +121,15 @@
 <script>
 import { ref, computed, onMounted } from 'vue'
 import MainLayout from '../components/MainLayout.vue'
+import DataTable from '../components/DataTable.vue'
 import { useDeviceStore } from '../store/devices'
 import { useBackupStore } from '../store/backups'
 
 export default {
   name: 'Dashboard',
   components: {
-    MainLayout
+    MainLayout,
+    DataTable
   },
   
   setup() {
@@ -136,11 +137,19 @@ export default {
     const backupStore = useBackupStore()
     
     const loading = ref(true)
+    const error = ref(null)
+    
+    const columns = [
+      { key: 'device_hostname', label: 'Device' },
+      { key: 'activity', label: 'Activity' },
+      { key: 'status', label: 'Status' },
+      { key: 'created_at', label: 'Time' }
+    ]
     
     const deviceCount = computed(() => deviceStore.devices.length)
     const onlineDeviceCount = computed(() => {
-      // For demo purposes, we'll consider all devices online
-      return deviceStore.devices.length
+      // Only count devices that are both enabled and online
+      return deviceStore.devices.filter(d => d.enabled && d.status === 'online').length
     })
     
     const backupCount = computed(() => backupStore.backups.length)
@@ -155,34 +164,48 @@ export default {
     })
     
     const recentBackups = computed(() => {
-      // Sort backups by date (newest first) and take the first 5
-      return [...backupStore.backups]
+      // Map backups to include device information
+      return backupStore.backups
+        .map(backup => {
+          const device = deviceStore.devices.find(d => d.id === backup.device_id)
+          // If device exists, use its hostname, otherwise show device ID
+          return {
+            ...backup,
+            device_hostname: device ? device.hostname : `Device ${backup.device_id.slice(0, 8)}...`
+          }
+        })
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 5)
     })
     
     onMounted(async () => {
       loading.value = true
+      error.value = null
       
       try {
+        // Fetch devices and backups in parallel for better performance
         await Promise.all([
           deviceStore.fetchDevices(),
           backupStore.fetchBackups()
         ])
-      } catch (error) {
-        console.error('Failed to load dashboard data:', error)
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err)
+        error.value = 'Failed to load dashboard data. Please try refreshing the page.'
       } finally {
         loading.value = false
       }
     })
     
     const formatDate = (dateString) => {
+      if (!dateString) return 'N/A'
       const date = new Date(dateString)
       return date.toLocaleString()
     }
     
     return {
       loading,
+      error,
+      columns,
       deviceCount,
       onlineDeviceCount,
       backupCount,

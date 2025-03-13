@@ -6,6 +6,7 @@ including listing, viewing, comparing, and restoring backups.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
@@ -13,6 +14,10 @@ import uuid
 
 # Import authentication dependencies
 from netraven.web.routers.auth import User, get_current_active_user
+from netraven.web.database import get_db
+from netraven.web.models.device import Device as DeviceModel
+from netraven.web.models.backup import Backup as BackupModel
+from netraven.web.crud import get_backups, get_backup, create_backup, delete_backup, get_device
 
 # Create router
 router = APIRouter()
@@ -24,11 +29,14 @@ class BackupBase(BaseModel):
     file_path: str
     file_size: int
     status: str
+    comment: Optional[str] = None
+    content_hash: Optional[str] = None
+    is_automatic: Optional[bool] = False
 
 class Backup(BackupBase):
     """Model for backup data returned to clients."""
     id: str
-    device_hostname: str
+    device_hostname: Optional[str] = None
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
@@ -37,280 +45,278 @@ class BackupContent(BaseModel):
     """Model for backup content."""
     id: str
     device_id: str
-    device_hostname: str
+    device_hostname: Optional[str] = None
     content: str
     created_at: datetime
-
-# Demo backups for initial testing - to be replaced with database storage
-DEMO_BACKUPS = [
-    {
-        "id": "9c8b7a65-6d5e-4f3g-2h1i-0j9k8l7m6n5o",
-        "device_id": "1c39a8c9-4e77-4954-9e8d-19c7d82b3b34",
-        "device_hostname": "router1",
-        "version": "1.0",
-        "file_path": "/backups/router1_config_20230401.txt",
-        "file_size": 2048,
-        "status": "complete",
-        "created_at": datetime(2023, 4, 1, 12, 0, 0)
-    },
-    {
-        "id": "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6",
-        "device_id": "1c39a8c9-4e77-4954-9e8d-19c7d82b3b34",
-        "device_hostname": "router1",
-        "version": "1.1",
-        "file_path": "/backups/router1_config_20230501.txt",
-        "file_size": 2112,
-        "status": "complete",
-        "created_at": datetime(2023, 5, 1, 12, 0, 0)
-    },
-    {
-        "id": "q7r8s9t0-u1v2-w3x4-y5z6-a7b8c9d0e1f2",
-        "device_id": "6a0e9f7a-8b4c-4d5e-9f7a-8b4c6a0e9f7a",
-        "device_hostname": "switch1",
-        "version": "1.0",
-        "file_path": "/backups/switch1_config_20230401.txt",
-        "file_size": 1536,
-        "status": "complete",
-        "created_at": datetime(2023, 4, 1, 12, 30, 0)
-    }
-]
-
-# Demo backup content
-DEMO_BACKUP_CONTENT = {
-    "9c8b7a65-6d5e-4f3g-2h1i-0j9k8l7m6n5o": """
-hostname Router1
-!
-interface GigabitEthernet0/0
- description WAN
- ip address dhcp
- no shutdown
-!
-interface GigabitEthernet0/1
- description LAN
- ip address 192.168.1.1 255.255.255.0
- no shutdown
-!
-ip route 0.0.0.0 0.0.0.0 GigabitEthernet0/0
-!
-end
-""",
-    "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6": """
-hostname Router1
-!
-interface GigabitEthernet0/0
- description WAN Connection
- ip address dhcp
- no shutdown
-!
-interface GigabitEthernet0/1
- description Internal LAN
- ip address 192.168.1.1 255.255.255.0
- no shutdown
-!
-interface GigabitEthernet0/2
- description DMZ
- ip address 192.168.2.1 255.255.255.0
- no shutdown
-!
-ip route 0.0.0.0 0.0.0.0 GigabitEthernet0/0
-!
-end
-""",
-    "q7r8s9t0-u1v2-w3x4-y5z6-a7b8c9d0e1f2": """
-hostname Switch1
-!
-vlan 10
- name Users
-!
-vlan 20
- name Voice
-!
-interface GigabitEthernet0/1
- description Uplink to Router
- switchport mode trunk
- switchport trunk allowed vlan 10,20
- no shutdown
-!
-interface range GigabitEthernet1/0/1-24
- description Access Ports
- switchport mode access
- switchport access vlan 10
- switchport voice vlan 20
- spanning-tree portfast
- no shutdown
-!
-end
-"""
-}
 
 @router.get("", response_model=List[Backup])
 async def list_backups(
     device_id: Optional[str] = None,
     limit: int = Query(10, gt=0, le=100),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> List[Dict[str, Any]]:
     """
     List backups.
     
     This endpoint returns a list of backups, optionally filtered by device.
     """
-    # In a real app, this would query the database
-    if device_id:
-        filtered_backups = [b for b in DEMO_BACKUPS if b["device_id"] == device_id]
-    else:
-        filtered_backups = DEMO_BACKUPS
-        
-    # Apply pagination
-    paginated_backups = filtered_backups[offset:offset + limit]
+    # Get backups from database
+    backups = get_backups(db, device_id=device_id, skip=offset, limit=limit)
     
-    return paginated_backups
+    # Convert to response model and include device hostnames
+    response_backups = []
+    for backup in backups:
+        backup_dict = {
+            "id": backup.id,
+            "device_id": backup.device_id,
+            "version": backup.version,
+            "file_path": backup.file_path,
+            "file_size": backup.file_size,
+            "status": backup.status,
+            "comment": backup.comment,
+            "content_hash": backup.content_hash,
+            "is_automatic": backup.is_automatic,
+            "created_at": backup.created_at,
+            "device_hostname": None
+        }
+        
+        # Get device hostname if device exists
+        device = get_device(db, backup.device_id)
+        if device:
+            backup_dict["device_hostname"] = device.hostname
+            
+        response_backups.append(backup_dict)
+    
+    return response_backups
 
 @router.get("/{backup_id}", response_model=Backup)
-async def get_backup(
+async def get_backup_details(
     backup_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Get backup details.
     
     This endpoint returns details for a specific backup.
     """
-    # In a real app, this would query the database
-    for backup in DEMO_BACKUPS:
-        if backup["id"] == backup_id:
-            return backup
+    backup = get_backup(db, backup_id)
+    if not backup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Backup with ID {backup_id} not found"
+        )
     
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Backup with ID {backup_id} not found"
-    )
+    # Convert to response model
+    backup_dict = {
+        "id": backup.id,
+        "device_id": backup.device_id,
+        "version": backup.version,
+        "file_path": backup.file_path,
+        "file_size": backup.file_size,
+        "status": backup.status,
+        "comment": backup.comment,
+        "content_hash": backup.content_hash,
+        "is_automatic": backup.is_automatic,
+        "created_at": backup.created_at,
+        "device_hostname": None
+    }
+    
+    # Get device hostname if device exists
+    device = get_device(db, backup.device_id)
+    if device:
+        backup_dict["device_hostname"] = device.hostname
+    
+    return backup_dict
 
 @router.get("/{backup_id}/content", response_model=BackupContent)
 async def get_backup_content(
     backup_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Get backup content.
     
     This endpoint returns the content of a specific backup.
     """
-    # In a real app, this would read the backup file
-    if backup_id not in DEMO_BACKUP_CONTENT:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Content for backup ID {backup_id} not found"
-        )
-    
-    # Find the backup metadata
-    backup_metadata = None
-    for backup in DEMO_BACKUPS:
-        if backup["id"] == backup_id:
-            backup_metadata = backup
-            break
-    
-    if not backup_metadata:
+    backup = get_backup(db, backup_id)
+    if not backup:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Backup with ID {backup_id} not found"
         )
     
+    # Read backup content from file
+    try:
+        with open(backup.file_path, 'r') as f:
+            content = f.read()
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Backup file not found for backup ID {backup_id}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error reading backup content: {str(e)}"
+        )
+    
+    # Get device hostname if device exists
+    device_hostname = None
+    device = get_device(db, backup.device_id)
+    if device:
+        device_hostname = device.hostname
+    
     return {
         "id": backup_id,
-        "device_id": backup_metadata["device_id"],
-        "device_hostname": backup_metadata["device_hostname"],
-        "content": DEMO_BACKUP_CONTENT[backup_id],
-        "created_at": backup_metadata["created_at"]
+        "device_id": backup.device_id,
+        "device_hostname": device_hostname,
+        "content": content,
+        "created_at": backup.created_at
     }
 
 @router.post("/compare", status_code=status.HTTP_200_OK)
 async def compare_backups(
     backup1_id: str,
     backup2_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Compare two backups.
     
     This endpoint compares the content of two backups and returns the differences.
     """
-    # Check if both backups exist
-    if backup1_id not in DEMO_BACKUP_CONTENT:
+    # Get both backups
+    backup1 = get_backup(db, backup1_id)
+    if not backup1:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Content for backup ID {backup1_id} not found"
+            detail=f"Backup with ID {backup1_id} not found"
         )
     
-    if backup2_id not in DEMO_BACKUP_CONTENT:
+    backup2 = get_backup(db, backup2_id)
+    if not backup2:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Content for backup ID {backup2_id} not found"
+            detail=f"Backup with ID {backup2_id} not found"
         )
     
-    # In a real app, this would use a proper diff algorithm
-    # For now, just return a simple object with both contents
+    # Read backup contents
+    try:
+        with open(backup1.file_path, 'r') as f:
+            content1 = f.read().splitlines()
+        with open(backup2.file_path, 'r') as f:
+            content2 = f.read().splitlines()
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="One or both backup files not found"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error reading backup content: {str(e)}"
+        )
+    
+    # Compare lines and find differences
+    differences = []
+    for i, (line1, line2) in enumerate(zip(content1, content2)):
+        if line1 != line2:
+            differences.append({
+                "line": i + 1,
+                "backup1": line1,
+                "backup2": line2
+            })
+    
+    # Add any remaining lines if files are different lengths
+    for i, line in enumerate(content1[len(content2):], start=len(content2)):
+        differences.append({
+            "line": i + 1,
+            "backup1": line,
+            "backup2": None
+        })
+    
+    for i, line in enumerate(content2[len(content1):], start=len(content1)):
+        differences.append({
+            "line": i + 1,
+            "backup1": None,
+            "backup2": line
+        })
+    
     return {
         "backup1_id": backup1_id,
         "backup2_id": backup2_id,
-        "differences": [
-            {
-                "line": 5,
-                "backup1": "description WAN",
-                "backup2": "description WAN Connection"
-            },
-            {
-                "line": 10,
-                "backup1": "description LAN",
-                "backup2": "description Internal LAN"
-            }
-        ]
+        "differences": differences
     }
 
 @router.post("/{backup_id}/restore", status_code=status.HTTP_202_ACCEPTED)
 async def restore_backup(
     backup_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Restore a backup to a device.
     
     This endpoint initiates a restore job for a specific backup.
     """
-    # In a real app, this would trigger an actual restore job
-    for backup in DEMO_BACKUPS:
-        if backup["id"] == backup_id:
-            return {
-                "message": f"Restore job initiated for device {backup['device_hostname']}",
-                "job_id": str(uuid.uuid4()),
-                "backup_id": backup_id,
-                "device_id": backup["device_id"],
-                "status": "pending"
-            }
+    # Get the backup
+    backup = get_backup(db, backup_id)
+    if not backup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Backup with ID {backup_id} not found"
+        )
     
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Backup with ID {backup_id} not found"
-    )
+    # Get the device
+    device = get_device(db, backup.device_id)
+    if not device:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Device not found for backup {backup_id}"
+        )
+    
+    # Generate a job ID
+    job_id = str(uuid.uuid4())
+    
+    # In a real application, this would initiate a background task to restore the backup
+    # For now, just return a success response
+    return {
+        "message": f"Restore job initiated for device {device.hostname}",
+        "job_id": job_id,
+        "backup_id": backup_id,
+        "device_id": device.id,
+        "status": "pending"
+    }
 
 @router.delete("/{backup_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_backup(
+async def delete_backup_endpoint(
     backup_id: str,
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> None:
     """
     Delete a backup.
     
     This endpoint deletes a specific backup.
     """
-    # In a real app, this would delete from the database and storage
-    for i, backup in enumerate(DEMO_BACKUPS):
-        if backup["id"] == backup_id:
-            # In a real app, we would actually delete the item
-            # For now, we'll just return
-            return
+    # Get the backup
+    backup = get_backup(db, backup_id)
+    if not backup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Backup with ID {backup_id} not found"
+        )
     
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Backup with ID {backup_id} not found"
-    ) 
+    # Delete the backup
+    try:
+        delete_backup(db, backup_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting backup: {str(e)}"
+        ) 

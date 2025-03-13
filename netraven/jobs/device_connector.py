@@ -309,6 +309,13 @@ def backup_device_config(
     Returns:
         bool: True if backup was successful, False otherwise
     """
+    # Load config if not provided
+    if config is None:
+        from netraven.core.config import load_config, get_default_config_path
+        import os
+        config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
+        config, _ = load_config(config_path)
+    
     # Start a new job session for this backup
     session_id = start_job_session(f"Backup job for device {host}")
     
