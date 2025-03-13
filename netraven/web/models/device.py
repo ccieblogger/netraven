@@ -34,6 +34,7 @@ class Device(Base):
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    serial_number = Column(String(100), nullable=True)  # Serial number of the device
     
     # Foreign keys
     owner_id = Column(String(36), ForeignKey("users.id"), nullable=False)
