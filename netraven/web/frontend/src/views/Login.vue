@@ -37,10 +37,12 @@
                 v-model="username"
                 type="text"
                 required
+                autofocus
                 class="block w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md
                        focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500
                        placeholder:text-gray-400"
                 placeholder="Enter your username"
+                :disabled="loading"
               />
             </div>
           </div>
@@ -63,6 +65,7 @@
                        focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500
                        placeholder:text-gray-400"
                 placeholder="Enter your password"
+                :disabled="loading"
               />
             </div>
           </div>
@@ -89,6 +92,18 @@
               <span v-else>Sign In</span>
             </button>
           </div>
+          
+          <!-- Debug Toggle -->
+          <div class="text-center">
+            <button type="button" @click="toggleDebugInfo" class="text-xs text-gray-500 hover:text-gray-700">
+              {{ showDebugInfo ? 'Hide Debug Info' : 'Show Debug Info' }}
+            </button>
+          </div>
+          
+          <!-- Debug Info -->
+          <div v-if="showDebugInfo" class="bg-gray-50 p-3 rounded text-xs text-gray-700 overflow-auto">
+            <pre>{{ JSON.stringify(debugInfo, null, 2) }}</pre>
+          </div>
         </form>
       </div>
 
@@ -103,40 +118,178 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 
-export default {
+export default defineComponent({
   name: 'Login',
   
   setup() {
-    const authStore = useAuthStore()
     const router = useRouter()
     const route = useRoute()
+    const authStore = useAuthStore()
     
-    const username = ref('')
-    const password = ref('')
+    // Reactive state
+    const username = ref('admin')
+    const password = ref('NetRaven')
+    const showDebugInfo = ref(false)
+    const debugInfo = ref({})
+    
+    // Computed properties
     const loading = computed(() => authStore.loading)
     const error = computed(() => authStore.error)
     
-    const handleLogin = async () => {
-      const success = await authStore.login(username.value, password.value)
-      
-      if (success) {
-        // Redirect to the requested page or dashboard
-        const redirectPath = route.query.redirect || '/'
-        router.push(redirectPath)
+    // Methods
+    function updateDebugInfo() {
+      try {
+        const envInfo = import.meta.env ? 'Available' : 'Not available'
+        const apiUrl = import.meta.env?.VITE_API_BASE_URL || 'Not set'
+        
+        debugInfo.value = {
+          time: new Date().toISOString(),
+          origin: window.location.origin,
+          hostname: window.location.hostname,
+          envInfo: envInfo,
+          apiUrl: apiUrl,
+          tokenStatus: localStorage.getItem('access_token') ? 'Present' : 'None',
+          browserInfo: navigator.userAgent
+        }
+      } catch (e) {
+        debugInfo.value = {
+          error: 'Error generating debug info: ' + e.message
+        }
       }
     }
+    
+    function toggleDebugInfo() {
+      showDebugInfo.value = !showDebugInfo.value
+      if (showDebugInfo.value) {
+        updateDebugInfo()
+      }
+    }
+    
+    async function handleLogin() {
+      try {
+        console.log('Login: Attempting login with username', username.value)
+        
+        // Try direct fetch for debugging
+        if (showDebugInfo.value) {
+          try {
+            const formData = new URLSearchParams()
+            formData.append('username', username.value)
+            formData.append('password', password.value)
+            
+            const directUrl = 'http://localhost:8000/api/auth/token'
+            console.log('Login: Trying direct fetch to', directUrl)
+            
+            const directResponse = await fetch(directUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+              },
+              body: formData,
+              mode: 'cors'
+            })
+            
+            const directData = await directResponse.json()
+            console.log('Login: Direct fetch response', directResponse.status, directData)
+            debugInfo.value.directFetch = {
+              status: directResponse.status,
+              success: directResponse.ok,
+              data: directData
+            }
+          } catch (directError) {
+            console.error('Login: Direct fetch failed', directError)
+            debugInfo.value.directFetch = {
+              error: directError.message
+            }
+          }
+        }
+        
+        // Use the auth store for actual login
+        const success = await authStore.login(username.value, password.value)
+        
+        if (success) {
+          const redirectPath = route.query.redirect || '/dashboard'
+          console.log('Login: Redirecting to', redirectPath)
+          router.push(redirectPath)
+        } else {
+          console.error('Login: Failed', authStore.error)
+          updateDebugInfo()
+        }
+      } catch (err) {
+        console.error('Login: Exception occurred', err)
+        updateDebugInfo()
+      }
+    }
+    
+    // Lifecycle hooks
+    onMounted(() => {
+      console.log('Login: Component mounted')
+      authStore.error = null
+      updateDebugInfo()
+    })
     
     return {
       username,
       password,
       loading,
       error,
-      handleLogin
+      showDebugInfo,
+      debugInfo,
+      handleLogin,
+      toggleDebugInfo
     }
   }
+})
+</script>
+
+<style scoped>
+.error-message {
+  color: #e53935;
+  margin: 15px 0;
+  text-align: center;
+  background-color: rgba(229, 57, 53, 0.1);
+  padding: 10px;
+  border-radius: 4px;
+  font-weight: 500;
 }
-</script> 
+
+.debug-info {
+  margin-top: 10px;
+  text-align: left;
+  font-size: 12px;
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 150px;
+}
+
+.debug-toggle {
+  margin-top: 15px;
+  text-align: center;
+  color: #666;
+  cursor: pointer;
+}
+
+.debug-toggle:hover {
+  text-decoration: underline;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style> 
