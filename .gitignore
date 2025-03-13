@@ -156,3 +156,6 @@ network_backups/
 # Database migrations (except __init__.py)
 netraven/web/migrations/versions/*.py
 !netraven/web/migrations/versions/__init__.py
+
+# Trash can
+_archive/
