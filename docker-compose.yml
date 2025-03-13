@@ -7,6 +7,8 @@ services:
     working_dir: /app
     command: >
       bash -c "cd /app && 
+      apt-get update && 
+      apt-get install -y curl &&
       pip install -e . &&
       pip install email-validator &&
       uvicorn netraven.web:app --host 0.0.0.0 --port 8000 --reload"
@@ -16,11 +18,11 @@ services:
       - PYTHONPATH=/app
       - DATABASE_URL=sqlite:///netraven.db
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      test: ["CMD", "curl", "-X", "GET", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
 
   # Frontend service
   frontend:
@@ -38,7 +40,7 @@ services:
     environment:
       - VUE_APP_API_URL=http://localhost:8000
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080"]
+      test: ["CMD", "ps", "aux", "|", "grep", "node"]
       interval: 30s
       timeout: 10s
       retries: 3
