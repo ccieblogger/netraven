@@ -23,9 +23,18 @@ logging:
     level: DEBUG
     max_size_mb: 10
     backup_count: 5
+    # Time-based rotation settings (optional)
+    # Uncomment to enable time-based rotation instead of size-based
+    # rotation_when: midnight  # Options: S, M, H, D, midnight, W0-W6
+    # rotation_interval: 1     # Interval multiplier for the rotation_when value
   json:
     enabled: false
     filename: netraven.json.log
+    max_size_mb: 10
+    backup_count: 5
+    # Time-based rotation settings (same as file)
+    # rotation_when: midnight
+    # rotation_interval: 1
   sensitive_data:
     redact_enabled: true
   components:
@@ -33,6 +42,9 @@ logging:
     level: DEBUG
     max_size_mb: 10
     backup_count: 5
+    # Time-based rotation settings (same as file)
+    # rotation_when: midnight
+    # rotation_interval: 1
     files:
       frontend: frontend.log
       backend: backend.log

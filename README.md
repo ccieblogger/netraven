@@ -163,6 +163,48 @@ The web interface provides:
 - Configurable backup schedules
 - Secure credential management
 
+## Logging System
+
+NetRaven includes a sophisticated logging system with the following features:
+
+### Component-Specific Logging
+- **Frontend Logs**: Dedicated log files for frontend-related events (`logs/frontend.log`)
+- **Backend Logs**: API and backend server logs (`logs/backend.log`)
+- **Authentication Logs**: Security-related authentication events (`logs/auth.log`)
+- **Jobs Logs**: Scheduled backup tasks and operations (`logs/jobs.log`)
+- **Main Application Log**: Comprehensive log of all activities (`logs/netraven.log`)
+
+### Log Rotation
+NetRaven supports two types of log rotation:
+
+1. **Size-based Rotation** (Default)
+   - Logs rotate when they reach a specified size (default: 10MB)
+   - Configurable number of backup files to keep (default: 5)
+
+2. **Time-based Rotation**
+   - Rotate logs based on time intervals (hourly, daily, midnight, weekly)
+   - Configurable in `config.yml` by setting `rotation_when` and `rotation_interval`
+   - Example for daily rotation at midnight:
+     ```yaml
+     logging:
+       file:
+         rotation_when: midnight
+         rotation_interval: 1
+     ```
+
+### Advanced Features
+- **JSON Structured Logging**: Optional JSON-formatted logs for integration with log analysis tools
+- **Sensitive Data Redaction**: Automatic redaction of passwords and other sensitive information
+- **Configurable Log Levels**: Different verbosity levels for console and file outputs
+
+### Testing Log Rotation
+
+To test and demonstrate log rotation, you can use the included script:
+```bash
+# Test time-based rotation (rotates logs every minute)
+python scripts/test_time_rotation.py
+```
+
 ## Requirements
 
 - Python 3.10+

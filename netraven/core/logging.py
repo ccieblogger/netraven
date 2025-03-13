@@ -25,8 +25,12 @@ DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 DEFAULT_BACKUP_COUNT = 5
 DEFAULT_JSON_LOGGING = False
 DEFAULT_JSON_FILE_PATH = "logs/netraven.json.log"
+DEFAULT_JSON_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+DEFAULT_JSON_BACKUP_COUNT = 5
 DEFAULT_REDACT_SENSITIVE = True
 DEFAULT_SENSITIVE_PATTERNS = ["password", "secret", "key", "token", "auth"]
+DEFAULT_ROTATION_WHEN = None  # No time-based rotation by default
+DEFAULT_ROTATION_INTERVAL = 1  # Default interval for time-based rotation
 
 # Component-specific log files
 COMPONENT_LOG_FILES = {
@@ -48,11 +52,17 @@ _log_config = {
         "level": DEFAULT_FILE_LEVEL,
         "path": DEFAULT_FILE_PATH,
         "max_bytes": DEFAULT_MAX_BYTES,
-        "backup_count": DEFAULT_BACKUP_COUNT
+        "backup_count": DEFAULT_BACKUP_COUNT,
+        "rotation_when": DEFAULT_ROTATION_WHEN,
+        "rotation_interval": DEFAULT_ROTATION_INTERVAL
     },
     "json": {
         "enabled": DEFAULT_JSON_LOGGING,
-        "path": DEFAULT_JSON_FILE_PATH
+        "path": DEFAULT_JSON_FILE_PATH,
+        "max_bytes": DEFAULT_JSON_MAX_BYTES,
+        "backup_count": DEFAULT_JSON_BACKUP_COUNT,
+        "rotation_when": DEFAULT_ROTATION_WHEN,
+        "rotation_interval": DEFAULT_ROTATION_INTERVAL
     },
     "sensitive_data": {
         "redact_enabled": DEFAULT_REDACT_SENSITIVE,
@@ -63,7 +73,9 @@ _log_config = {
         "files": COMPONENT_LOG_FILES,
         "level": DEFAULT_FILE_LEVEL,
         "max_bytes": DEFAULT_MAX_BYTES,
-        "backup_count": DEFAULT_BACKUP_COUNT
+        "backup_count": DEFAULT_BACKUP_COUNT,
+        "rotation_when": DEFAULT_ROTATION_WHEN,
+        "rotation_interval": DEFAULT_ROTATION_INTERVAL
     }
 }
 
@@ -244,6 +256,10 @@ def configure_logging(config: Dict[str, Any] = None) -> None:
                 _log_config["file"]["max_bytes"] = file_config["max_size_mb"] * 1024 * 1024
             if "backup_count" in file_config:
                 _log_config["file"]["backup_count"] = file_config["backup_count"]
+            if "rotation_when" in file_config:
+                _log_config["file"]["rotation_when"] = file_config["rotation_when"]
+            if "rotation_interval" in file_config:
+                _log_config["file"]["rotation_interval"] = file_config["rotation_interval"]
         
         # JSON logging settings
         if "json" in log_config:
@@ -254,6 +270,14 @@ def configure_logging(config: Dict[str, Any] = None) -> None:
                 directory = log_config["directory"]
                 filename = json_config["filename"]
                 _log_config["json"]["path"] = os.path.join(directory, filename)
+            if "max_size_mb" in json_config:
+                _log_config["json"]["max_bytes"] = json_config["max_size_mb"] * 1024 * 1024
+            if "backup_count" in json_config:
+                _log_config["json"]["backup_count"] = json_config["backup_count"]
+            if "rotation_when" in json_config:
+                _log_config["json"]["rotation_when"] = json_config["rotation_when"]
+            if "rotation_interval" in json_config:
+                _log_config["json"]["rotation_interval"] = json_config["rotation_interval"]
         
         # Sensitive data settings
         if "sensitive_data" in log_config:
@@ -277,6 +301,10 @@ def configure_logging(config: Dict[str, Any] = None) -> None:
                 _log_config["components"]["max_bytes"] = component_config["max_size_mb"] * 1024 * 1024
             if "backup_count" in component_config:
                 _log_config["components"]["backup_count"] = component_config["backup_count"]
+            if "rotation_when" in component_config:
+                _log_config["components"]["rotation_when"] = component_config["rotation_when"]
+            if "rotation_interval" in component_config:
+                _log_config["components"]["rotation_interval"] = component_config["rotation_interval"]
 
     # Ensure log directories exist
     _ensure_log_directories()
@@ -394,11 +422,24 @@ def get_logger(name: str) -> logging.Logger:
     # Add file handler if enabled
     if _log_config["file"]["enabled"]:
         file_path = _log_config["file"]["path"]
-        file_handler = logging.handlers.RotatingFileHandler(
-            file_path,
-            maxBytes=_log_config["file"]["max_bytes"],
-            backupCount=_log_config["file"]["backup_count"]
-        )
+        
+        # Choose between time-based or size-based rotation
+        if _log_config["file"]["rotation_when"]:
+            # Time-based rotation
+            file_handler = logging.handlers.TimedRotatingFileHandler(
+                file_path,
+                when=_log_config["file"]["rotation_when"],
+                interval=_log_config["file"]["rotation_interval"],
+                backupCount=_log_config["file"]["backup_count"]
+            )
+        else:
+            # Size-based rotation
+            file_handler = logging.handlers.RotatingFileHandler(
+                file_path,
+                maxBytes=_log_config["file"]["max_bytes"],
+                backupCount=_log_config["file"]["backup_count"]
+            )
+            
         file_handler.setLevel(_log_config["file"]["level"])
         file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(file_formatter)
@@ -413,11 +454,24 @@ def get_logger(name: str) -> logging.Logger:
     # Add JSON file handler if enabled
     if _log_config["json"]["enabled"]:
         json_file_path = _log_config["json"]["path"]
-        json_file_handler = logging.handlers.RotatingFileHandler(
-            json_file_path,
-            maxBytes=_log_config["file"]["max_bytes"],
-            backupCount=_log_config["file"]["backup_count"]
-        )
+        
+        # Choose between time-based or size-based rotation for JSON logs
+        if _log_config["json"]["rotation_when"]:
+            # Time-based rotation
+            json_file_handler = logging.handlers.TimedRotatingFileHandler(
+                json_file_path,
+                when=_log_config["json"]["rotation_when"],
+                interval=_log_config["json"]["rotation_interval"],
+                backupCount=_log_config["json"]["backup_count"]
+            )
+        else:
+            # Size-based rotation
+            json_file_handler = logging.handlers.RotatingFileHandler(
+                json_file_path,
+                maxBytes=_log_config["json"]["max_bytes"],
+                backupCount=_log_config["json"]["backup_count"]
+            )
+            
         json_file_handler.setLevel(_log_config["file"]["level"])
         json_formatter = JsonFormatter()
         json_file_handler.setFormatter(json_formatter)
@@ -441,12 +495,23 @@ def get_logger(name: str) -> logging.Logger:
                 # Construct the full component log path
                 full_log_path = os.path.join(log_dir, log_path)
                 
-                # Create component handler
-                component_handler = logging.handlers.RotatingFileHandler(
-                    full_log_path,
-                    maxBytes=_log_config["components"]["max_bytes"],
-                    backupCount=_log_config["components"]["backup_count"]
-                )
+                # Choose between time-based or size-based rotation for component logs
+                if _log_config["components"]["rotation_when"]:
+                    # Time-based rotation
+                    component_handler = logging.handlers.TimedRotatingFileHandler(
+                        full_log_path,
+                        when=_log_config["components"]["rotation_when"],
+                        interval=_log_config["components"]["rotation_interval"],
+                        backupCount=_log_config["components"]["backup_count"]
+                    )
+                else:
+                    # Size-based rotation
+                    component_handler = logging.handlers.RotatingFileHandler(
+                        full_log_path,
+                        maxBytes=_log_config["components"]["max_bytes"],
+                        backupCount=_log_config["components"]["backup_count"]
+                    )
+                
                 component_handler.setLevel(_log_config["components"]["level"])
                 component_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
                 component_handler.setFormatter(component_formatter)
