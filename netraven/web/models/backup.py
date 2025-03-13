@@ -29,6 +29,7 @@ class Backup(Base):
     content_hash = Column(String(128), nullable=True)  # For detecting changes
     is_automatic = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    serial_number = Column(String(50), nullable=True)  # Serial number of the device
     
     # Foreign keys
     device_id = Column(String(36), ForeignKey("devices.id"), nullable=False)

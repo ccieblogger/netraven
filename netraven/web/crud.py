@@ -372,7 +372,8 @@ def update_device_backup_status(
 def create_backup(
     db: Session, 
     backup: backup_schemas.BackupCreate, 
-    file_content: Optional[str] = None
+    file_content: Optional[str] = None,
+    serial_number: Optional[str] = None
 ) -> Backup:
     """
     Create a new backup.
@@ -381,6 +382,7 @@ def create_backup(
         db: Database session
         backup: Backup creation data
         file_content: Optional backup content for generating hash
+        serial_number: Serial number of the device
         
     Returns:
         Created backup
@@ -393,13 +395,14 @@ def create_backup(
     db_backup = Backup(
         id=str(uuid.uuid4()),
         device_id=backup.device_id,
-        version=backup.version,
-        file_path=backup.file_path,
-        file_size=backup.file_size,
+        serial_number=serial_number,
         status=backup.status,
         comment=backup.comment,
         content_hash=content_hash,
-        is_automatic=backup.is_automatic
+        is_automatic=backup.is_automatic,
+        version=backup.version,
+        file_path=backup.file_path,
+        file_size=backup.file_size
     )
     
     db.add(db_backup)
@@ -409,7 +412,7 @@ def create_backup(
     # Update the device's backup status
     update_device_backup_status(db, backup.device_id, backup.status)
     
-    logger.info(f"Created backup for device ID: {backup.device_id}")
+    logger.info(f"Created backup for device: {backup.device_id} with status: {backup.status}")
     return db_backup
 
 def get_backup(db: Session, backup_id: str) -> Optional[Backup]:

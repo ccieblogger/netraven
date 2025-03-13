@@ -56,6 +56,7 @@ class Device(DeviceBase):
     last_backup_status: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    serial_number: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -226,7 +227,7 @@ async def backup_device(
         # Execute the backup directly for now (in a real app, this would be async)
         success = backup_device_config(
             device_id=device_id,
-            host=device.hostname,
+            host=device.ip_address,
             username=device.username,
             password=device.password,
             device_type=device.device_type,
@@ -248,7 +249,7 @@ async def backup_device(
             # The format is likely just '{host}_config.txt' without timestamp
             # Let's check if the file exists with just the hostname
             filename = filename_format.format(
-                host=device.hostname,
+                host=device.ip_address,
                 timestamp=timestamp,
                 serial="unknown",
                 version="unknown"
@@ -261,11 +262,12 @@ async def backup_device(
             if not os.path.exists(filepath):
                 # Try alternative paths
                 alt_paths = [
+                    f"/app/data/backups/{device.ip_address}_config.txt",
+                    f"/app/data/backups/{device.ip_address.lower()}_config.txt",
+                    f"/app/data/backups/{device.ip_address}.cfg",
                     f"/app/data/backups/{device.hostname}_config.txt",
                     f"/app/data/backups/{device.hostname.lower()}_config.txt",
                     f"/app/data/backups/{device.hostname}.cfg",
-                    f"/app/data/backups/{device.hostname.lower()}.cfg",
-                    f"/tmp/backups/{device.hostname}.cfg",
                     f"/tmp/backups/{device.hostname.lower()}.cfg",
                     f"/tmp/backups/{device.hostname}.example.com.cfg"
                 ]
@@ -280,6 +282,19 @@ async def backup_device(
             if os.path.exists(filepath):
                 file_size = os.path.getsize(filepath)
                 
+                # Try to read the metadata file to get the serial number
+                serial_number = "unknown"
+                metadata_path = f"{filepath}.meta"
+                if os.path.exists(metadata_path):
+                    try:
+                        with open(metadata_path, "r") as f:
+                            for line in f:
+                                if line.startswith("serial:"):
+                                    serial_number = line.split(":", 1)[1].strip()
+                                    break
+                    except Exception as e:
+                        logger.error(f"Error reading metadata file: {e}")
+                
                 # Create a backup record in the database
                 backup_data = BackupCreate(
                     device_id=device_id,
@@ -291,8 +306,15 @@ async def backup_device(
                 )
                 
                 # Add to database
-                backup = create_backup(db, backup_data)
+                backup = create_backup(db, backup_data, serial_number=serial_number)
                 logger.info(f"Created backup record for device {device.hostname} (ID: {device_id})")
+                
+                # Update the device's serial number in the database if it was retrieved
+                if serial_number and serial_number != "unknown":
+                    # Update the device record with the serial number
+                    device.serial_number = serial_number
+                    db.commit()
+                    logger.info(f"Updated device {device.hostname} with serial number: {serial_number}")
                 
                 # Update response with success
                 return {

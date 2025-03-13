@@ -57,6 +57,7 @@
           <tr>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hostname</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial Number</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device Type</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Backup</th>
@@ -74,6 +75,9 @@
             <td class="px-6 py-4 whitespace-nowrap">
               {{ device.ip_address }}
               <span v-if="device.port !== 22" class="text-gray-500 text-sm">:{{ device.port }}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              {{ device.serial_number || 'Unknown' }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               {{ formatDeviceType(device.device_type) }}

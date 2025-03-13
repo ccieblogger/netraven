@@ -16,6 +16,7 @@ class BackupBase(BaseModel):
     file_size: int = Field(..., ge=0)
     comment: Optional[str] = None
     is_automatic: Optional[bool] = True
+    serial_number: Optional[str] = None
 
 class BackupCreate(BackupBase):
     """Schema for creating a new backup."""

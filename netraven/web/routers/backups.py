@@ -38,6 +38,7 @@ class Backup(BackupBase):
     id: str
     device_hostname: Optional[str] = None
     created_at: datetime
+    serial_number: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -79,7 +80,8 @@ async def list_backups(
             "content_hash": backup.content_hash,
             "is_automatic": backup.is_automatic,
             "created_at": backup.created_at,
-            "device_hostname": None
+            "device_hostname": None,
+            "serial_number": backup.serial_number
         }
         
         # Get device hostname if device exists
@@ -121,7 +123,8 @@ async def get_backup_details(
         "content_hash": backup.content_hash,
         "is_automatic": backup.is_automatic,
         "created_at": backup.created_at,
-        "device_hostname": None
+        "device_hostname": None,
+        "serial_number": backup.serial_number
     }
     
     # Get device hostname if device exists

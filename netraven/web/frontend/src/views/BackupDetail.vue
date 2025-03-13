@@ -39,7 +39,11 @@
             <dl class="space-y-3">
               <div class="flex justify-between">
                 <dt class="text-gray-600">Device:</dt>
-                <dd class="font-medium">{{ backup.device_name || backup.device_id }}</dd>
+                <dd class="font-medium">{{ backup.device_hostname || backup.device_id }}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-600">Serial Number:</dt>
+                <dd class="font-medium">{{ backup.serial_number || 'Unknown' }}</dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-gray-600">Created:</dt>
@@ -124,8 +128,28 @@ export default {
       
       loading.value = true
       try {
+        // Fetch basic backup details
         await backupStore.fetchBackup(backupId.value)
         backup.value = backupStore.currentBackup
+        
+        // Fetch backup content
+        if (backup.value) {
+          console.log('Fetching backup content for', backupId.value)
+          try {
+            const content = await backupStore.fetchBackupContent(backupId.value)
+            if (content) {
+              // Update the backup with the content
+              backup.value.content = content.content
+              
+              // Set file size from the details if available
+              if (backup.value.file_size) {
+                backup.value.size = backup.value.file_size
+              }
+            }
+          } catch (contentError) {
+            console.error('Error fetching backup content:', contentError)
+          }
+        }
       } catch (error) {
         console.error('Failed to fetch backup:', error)
       } finally {

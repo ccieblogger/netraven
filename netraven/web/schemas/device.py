@@ -62,6 +62,7 @@ class Device(DeviceBase):
     last_backup_status: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    serial_number: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
