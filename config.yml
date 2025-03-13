@@ -58,11 +58,11 @@ web:
   - http://localhost:3000
   - http://localhost:8080
   database:
-    type: sqlite
+    type: postgres
     sqlite:
       path: data/netraven.db
     postgres:
-      host: localhost
+      host: postgres
       port: 5432
       database: netraven
       user: netraven

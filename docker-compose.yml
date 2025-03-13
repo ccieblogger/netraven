@@ -1,4 +1,23 @@
 services:
+  # PostgreSQL database service
+  postgres:
+    image: postgres:14-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    environment:
+      - POSTGRES_USER=netraven
+      - POSTGRES_PASSWORD=netraven
+      - POSTGRES_DB=netraven
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netraven"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   # Backend API service
   api:
     image: python:3.10-slim
@@ -10,13 +29,22 @@ services:
       apt-get update && 
       apt-get install -y curl &&
       pip install -e . &&
-      pip install email-validator &&
+      pip install email-validator psycopg2-binary &&
       uvicorn netraven.web:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "8000:8000"
     environment:
       - PYTHONPATH=/app
-      - DATABASE_URL=sqlite:///netraven.db
+      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
+      - NETRAVEN_WEB_DB_TYPE=postgres
+      - NETRAVEN_WEB_DB_HOST=postgres
+      - NETRAVEN_WEB_DB_PORT=5432
+      - NETRAVEN_WEB_DB_NAME=netraven
+      - NETRAVEN_WEB_DB_USER=netraven
+      - NETRAVEN_WEB_DB_PASSWORD=netraven
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-X", "GET", "-f", "http://localhost:8000/api/health"]
       interval: 30s
@@ -49,4 +77,5 @@ services:
     user: "1001:1001"
 
 volumes:
-  frontend_node_modules: 
+  frontend_node_modules:
+  postgres_data: 

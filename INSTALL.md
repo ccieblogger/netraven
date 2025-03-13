@@ -28,6 +28,61 @@ The easiest way to get NetRaven up and running is using Docker Compose:
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
 
+The Docker Compose setup includes:
+- Frontend: Vue.js application
+- Backend API: FastAPI application
+- PostgreSQL: Production-ready database
+
+## Database Configuration
+
+NetRaven uses PostgreSQL as its default database for production readiness:
+
+### Using the Bundled PostgreSQL (Default)
+
+The Docker Compose configuration includes a PostgreSQL database with:
+- Database name: netraven
+- Username: netraven
+- Password: netraven
+- Port: 5432 (mapped to host)
+- Persistent data stored in a Docker volume
+
+No additional configuration is needed when using Docker Compose.
+
+### Using External PostgreSQL
+
+To connect to an external PostgreSQL database:
+
+1. Update the `config.yml` file:
+   ```yaml
+   web:
+     database:
+       type: postgres
+       postgres:
+         host: your_postgres_host
+         port: 5432
+         database: your_database_name
+         user: your_username
+         password: your_password
+   ```
+
+2. If using Docker, update the environment variables in `docker-compose.yml`:
+   ```yaml
+   environment:
+     - DATABASE_URL=postgresql://your_username:your_password@your_postgres_host:5432/your_database_name
+   ```
+
+### Database Migrations
+
+The application automatically creates necessary tables on startup. To manually initialize or check the database:
+
+```bash
+# Check database connection and view schema
+python3 scripts/db_check.py
+
+# Initialize database tables if needed
+python3 scripts/db_check.py --init
+```
+
 ## Creating an Admin User
 
 To test authentication, create an admin user:
