@@ -306,86 +306,89 @@
       :device-id="deviceId"
       @close="closeTagModal"
       @update:tags="updateDeviceTags"
-      @open-create-tag="showCreateTagModal = true"
+      @open-create-tag="handleOpenCreateTag"
     />
     
     <!-- Create Tag Modal -->
-    <div v-if="showCreateTagModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 mx-4 overflow-hidden" @click.stop>
-        <button 
-          class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" 
-          @click="showCreateTagModal = false"
-        >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-        
-        <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Create New Tag</h2>
-        
-        <form @submit.prevent="createTag">
-          <div class="space-y-4">
-            <div>
-              <label for="tagName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tag Name</label>
-              <input
-                type="text"
-                id="tagName"
-                v-model="newTag.name"
-                required
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
-              />
-            </div>
-            
-            <div>
-              <label for="tagColor" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Color</label>
-              <div class="flex items-center mt-1">
+    <teleport to="body">
+      <div v-if="showCreateTagModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 mx-4 overflow-hidden" @click.stop>
+          <button 
+            type="button"
+            class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" 
+            @click="showCreateTagModal = false"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+          
+          <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Create New Tag</h2>
+          
+          <form @submit.prevent="createTag">
+            <div class="space-y-4">
+              <div>
+                <label for="tagName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tag Name</label>
                 <input
-                  type="color"
-                  id="tagColor"
-                  v-model="newTag.color"
-                  class="w-10 h-10 rounded border border-gray-300 dark:border-gray-600"
+                  type="text"
+                  id="tagName"
+                  v-model="newTag.name"
+                  required
+                  class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
                 />
-                <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">{{ newTag.color }}</span>
+              </div>
+              
+              <div>
+                <label for="tagColor" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Color</label>
+                <div class="flex items-center mt-1">
+                  <input
+                    type="color"
+                    id="tagColor"
+                    v-model="newTag.color"
+                    class="w-10 h-10 rounded border border-gray-300 dark:border-gray-600"
+                  />
+                  <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">{{ newTag.color }}</span>
+                </div>
+              </div>
+              
+              <div>
+                <label for="tagDescription" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description (optional)</label>
+                <textarea
+                  id="tagDescription"
+                  v-model="newTag.description"
+                  rows="2"
+                  class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
+                ></textarea>
               </div>
             </div>
             
-            <div>
-              <label for="tagDescription" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description (optional)</label>
-              <textarea
-                id="tagDescription"
-                v-model="newTag.description"
-                rows="2"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
-              ></textarea>
+            <div class="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                @click="showCreateTagModal = false"
+                class="py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                :disabled="creatingTag"
+                class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                {{ creatingTag ? 'Creating...' : 'Create Tag' }}
+              </button>
             </div>
-          </div>
-          
-          <div class="mt-6 flex justify-end space-x-3">
-            <button
-              type="button"
-              @click="showCreateTagModal = false"
-              class="py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+            
+            <div 
+              v-if="createTagError" 
+              class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              :disabled="creatingTag"
-              class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {{ creatingTag ? 'Creating...' : 'Create Tag' }}
-            </button>
-          </div>
-          
-          <div 
-            v-if="createTagError" 
-            class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md"
-          >
-            {{ createTagError }}
-          </div>
-        </form>
+              {{ createTagError }}
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </teleport>
   </MainLayout>
 </template>
 
@@ -701,6 +704,14 @@ export default {
       }
     }
     
+    const handleOpenCreateTag = () => {
+      // Add a small delay before showing the create tag modal
+      // This ensures the TagModal is fully closed before opening the new modal
+      setTimeout(() => {
+        showCreateTagModal.value = true
+      }, 50)
+    }
+    
     return {
       device,
       loading,
@@ -731,7 +742,8 @@ export default {
       createTagError,
       newTag,
       createTag,
-      deviceId
+      deviceId,
+      handleOpenCreateTag
     }
   }
 }
