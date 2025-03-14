@@ -42,10 +42,14 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
-        // For our mock implementation, just return the default tag
-        console.log('Fetching all tags (mock implementation)')
+        // Call the API to get all tags
+        console.log('Fetching all tags')
+        const tags = await tagService.getTags()
         
-        // Ensure we have at least the default tag
+        // Update the store with the tags from the API
+        this.tags = tags
+        
+        // Ensure we have at least the default tag if the API returns no tags
         if (this.tags.length === 0) {
           this.tags = [...DEFAULT_TAGS]
         }
@@ -65,6 +69,7 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
+        console.log(`Fetching tag with ID: ${id}`)
         const tag = await tagService.getTag(id)
         this.currentTag = tag
         
@@ -78,8 +83,14 @@ export const useTagStore = defineStore('tags', {
         
         return tag
       } catch (error) {
-        this.error = error.response?.data?.detail || `Failed to fetch tag ${id}`
-        console.error(`Error fetching tag ${id}:`, error)
+        // Check if it's a 404 not found error
+        if (error.response && error.response.status === 404) {
+          console.error(`Tag with ID ${id} was not found in the database`)
+          this.error = `Tag with ID ${id} not found`
+        } else {
+          this.error = error.response?.data?.detail || `Failed to fetch tag ${id}`
+          console.error(`Error fetching tag ${id}:`, error)
+        }
         return null
       } finally {
         this.loading = false
@@ -107,20 +118,31 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
+        console.log(`Fetching tags for device ${deviceId}`)
+        
         // Make sure we have all available tags loaded first
         if (this.tags.length === 0) {
           await this.fetchTags()
         }
         
-        // In a production app, we would make an API call to get device-specific tags
-        console.log(`Fetching tags for device ${deviceId} (mock implementation)`)
+        // Get the device-specific tags from the API
+        const deviceTags = await tagService.getDevicesForTag(deviceId)
         
-        // Check if we already have tags for this device
+        // Update our local cache
+        this.deviceTags[deviceId] = deviceTags
+        
+        return deviceTags
+      } catch (error) {
+        this.error = error.response?.data?.detail || `Failed to fetch tags for device ${deviceId}`
+        console.error(`Error fetching tags for device ${deviceId}:`, error)
+        
+        // If API call fails, use cached data if available
         if (this.deviceTags[deviceId] && this.deviceTags[deviceId].length > 0) {
+          console.log(`Using cached tags for device ${deviceId}`)
           return this.deviceTags[deviceId]
         }
         
-        // Otherwise, assign a default tag (first in our list)
+        // If no cache, use default tag
         if (this.tags.length > 0) {
           const defaultTag = this.tags[0]
           this.deviceTags[deviceId] = [defaultTag]
@@ -128,11 +150,6 @@ export const useTagStore = defineStore('tags', {
           return [defaultTag]
         }
         
-        // Fallback to empty array if no tags exist
-        return []
-      } catch (error) {
-        this.error = error.message || `Failed to fetch tags for device ${deviceId}`
-        console.error(`Error fetching tags for device ${deviceId}:`, error)
         return []
       } finally {
         this.loading = false
@@ -144,26 +161,18 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
-        // For our mock implementation, we simulate API behavior
         console.log('Creating new tag with data:', tagData)
         
-        // Create a new tag with a unique ID
-        const newTag = {
-          id: `tag-${Date.now()}`,
-          name: tagData.name,
-          color: tagData.color || '#6366F1',
-          description: tagData.description || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
+        // Call the API to create the tag
+        const newTag = await tagService.createTag(tagData)
         
-        // Add to our tags array
+        // Add the server-created tag to our local state
         this.tags.push(newTag)
         
         console.log('Created new tag:', newTag)
         return newTag
       } catch (error) {
-        this.error = error.message || 'Failed to create tag'
+        this.error = error.response?.data?.detail || error.message || 'Failed to create tag'
         console.error('Error creating tag:', error)
         return null
       } finally {
@@ -176,6 +185,9 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
+        console.log(`Updating tag ${id} with data:`, tagData)
+        
+        // Call the API to update the tag
         const updatedTag = await tagService.updateTag(id, tagData)
         
         // Update the tag in the tags array
@@ -191,8 +203,14 @@ export const useTagStore = defineStore('tags', {
         
         return updatedTag
       } catch (error) {
-        this.error = error.response?.data?.detail || `Failed to update tag ${id}`
-        console.error(`Error updating tag ${id}:`, error)
+        // Check if it's a 404 not found error
+        if (error.response && error.response.status === 404) {
+          console.error(`Tag with ID ${id} was not found in the database`)
+          this.error = `Tag with ID ${id} not found`
+        } else {
+          this.error = error.response?.data?.detail || `Failed to update tag ${id}`
+          console.error(`Error updating tag ${id}:`, error)
+        }
         return null
       } finally {
         this.loading = false
@@ -204,6 +222,7 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
+        // Call the API to delete the tag
         await tagService.deleteTag(id)
         
         // Remove the tag from the tags array
@@ -219,8 +238,24 @@ export const useTagStore = defineStore('tags', {
           this.deviceTags[deviceId] = this.deviceTags[deviceId].filter(t => t.id !== id)
         }
         
+        console.log(`Successfully deleted tag ${id}`)
         return true
       } catch (error) {
+        // Check if it's a 404 not found error
+        if (error.response && error.response.status === 404) {
+          console.error(`Tag with ID ${id} was not found in the database`)
+          
+          // Still remove from local state if it doesn't exist on the server
+          this.tags = this.tags.filter(t => t.id !== id)
+          
+          if (this.currentTag && this.currentTag.id === id) {
+            this.currentTag = null
+          }
+          
+          // Return success since we've removed it locally
+          return true
+        }
+        
         this.error = error.response?.data?.detail || `Failed to delete tag ${id}`
         console.error(`Error deleting tag ${id}:`, error)
         return false

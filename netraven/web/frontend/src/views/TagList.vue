@@ -238,7 +238,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, onActivated } from 'vue'
 import MainLayout from '@/components/MainLayout.vue'
 import TagBadge from '@/components/TagBadge.vue'
 import { useTagStore } from '@/store/tags'
@@ -280,6 +280,7 @@ export default {
     const fetchTags = async () => {
       loading.value = true
       try {
+        console.log('TagList: Fetching tags from API')
         await tagStore.fetchTags()
       } catch (error) {
         console.error('Error fetching tags:', error)
@@ -290,7 +291,8 @@ export default {
     
     const createTag = async () => {
       try {
-        await tagStore.createTag({
+        console.log('TagList: Creating new tag:', newTag.name)
+        const result = await tagStore.createTag({
           name: newTag.name,
           description: newTag.description || null,
           color: newTag.color
@@ -304,7 +306,12 @@ export default {
         // Close modal
         showCreateModal.value = false
         
-        // Refresh tags
+        if (!result) {
+          alert('Failed to create tag. Please try again.')
+          return
+        }
+        
+        // Refresh tags from API to ensure we have the latest data
         await fetchTags()
       } catch (error) {
         console.error('Error creating tag:', error)
@@ -374,7 +381,15 @@ export default {
       }).format(date)
     }
     
+    // Ensure we fetch tags when the component is first mounted
     onMounted(() => {
+      console.log('TagList: Component mounted, fetching tags')
+      fetchTags()
+    })
+    
+    // Also fetch tags when navigating back to this page
+    onActivated(() => {
+      console.log('TagList: Component activated, fetching fresh tag data')
       fetchTags()
     })
     
