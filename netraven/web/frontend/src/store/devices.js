@@ -68,6 +68,14 @@ export const useDeviceStore = defineStore('devices', {
       try {
         // First attempt to get real data
         const devices = await deviceService.getDevices()
+        
+        // Ensure each device has a tags array
+        devices.forEach(device => {
+          if (!device.tags) {
+            device.tags = []
+          }
+        })
+        
         this.devices = devices
         this.useMockData = false
         console.log('Device Store: Successfully loaded real device data')
@@ -92,6 +100,12 @@ export const useDeviceStore = defineStore('devices', {
       
       try {
         const device = await deviceService.getDevice(id)
+        
+        // Ensure device has a tags array
+        if (!device.tags) {
+          device.tags = []
+        }
+        
         this.currentDevice = device
         
         // Update the device in the devices array if it exists

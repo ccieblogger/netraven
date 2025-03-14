@@ -59,11 +59,14 @@
               v-for="tag in allTags" 
               :key="tag.id" 
               @click="toggleTagFilter(tag.id)"
-              class="cursor-pointer"
+              class="cursor-pointer transition-all duration-200 transform hover:scale-105"
+              :class="{
+                'ring-2 ring-offset-2 ring-blue-500': filters.tags.includes(tag.id),
+                'opacity-60': !filters.tags.includes(tag.id)
+              }"
             >
               <TagBadge 
                 :tag="tag" 
-                :class="{'opacity-40': !filters.tags.includes(tag.id)}"
               />
             </div>
           </div>
@@ -450,15 +453,42 @@ export default {
       }
       
       if (filters.tags.length > 0) {
+        console.log('Filtering by tags:', filters.tags)
+        console.log('Tag filter mode:', filters.tagFilterMode)
+        
         devices = devices.filter(device => {
-          if (!device.tags || !Array.isArray(device.tags)) return false
+          // Ensure device has tags array
+          if (!device.tags) {
+            console.log(`Device ${device.hostname} has no tags array`)
+            return false
+          }
           
+          if (!Array.isArray(device.tags)) {
+            console.log(`Device ${device.hostname} tags is not an array:`, device.tags)
+            return false
+          }
+          
+          if (device.tags.length === 0) {
+            console.log(`Device ${device.hostname} has empty tags array`)
+            return false
+          }
+          
+          console.log(`Device ${device.hostname} has tags:`, device.tags)
+          
+          // Extract tag IDs from device tags
           const deviceTagIds = device.tags.map(tag => tag.id)
+          console.log(`Device ${device.hostname} tag IDs:`, deviceTagIds)
           
           if (filters.tagFilterMode === 'any') {
-            return filters.tags.some(tagId => deviceTagIds.includes(tagId))
+            // ANY mode: device has at least one of the selected tags
+            const hasAnyTag = filters.tags.some(tagId => deviceTagIds.includes(tagId))
+            console.log(`Device ${device.hostname} has any selected tag: ${hasAnyTag}`)
+            return hasAnyTag
           } else {
-            return filters.tags.every(tagId => deviceTagIds.includes(tagId))
+            // ALL mode: device has all of the selected tags
+            const hasAllTags = filters.tags.every(tagId => deviceTagIds.includes(tagId))
+            console.log(`Device ${device.hostname} has all selected tags: ${hasAllTags}`)
+            return hasAllTags
           }
         })
       }
@@ -574,9 +604,11 @@ export default {
     const fetchTags = async () => {
       loadingTags.value = true
       try {
+        console.log('DeviceList: Fetching all tags')
         allTags.value = await tagService.getTags()
+        console.log('DeviceList: Fetched tags:', allTags.value)
       } catch (error) {
-        console.error('Error fetching tags:', error)
+        console.error('DeviceList: Error fetching tags:', error)
       } finally {
         loadingTags.value = false
       }
@@ -586,11 +618,14 @@ export default {
       const index = filters.tags.indexOf(tagId)
       if (index === -1) {
         // Tag not in filter, add it
+        console.log(`DeviceList: Adding tag ${tagId} to filters`)
         filters.tags.push(tagId)
       } else {
         // Tag in filter, remove it
+        console.log(`DeviceList: Removing tag ${tagId} from filters`)
         filters.tags.splice(index, 1)
       }
+      console.log('DeviceList: Current tag filters:', filters.tags)
     }
     
     const clearFilters = () => {

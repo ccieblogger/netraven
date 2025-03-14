@@ -318,21 +318,64 @@ export const tagService = {
   },
   
   async assignTagsToDevices(deviceIds, tagIds) {
-    console.log('Tag Service: Assigning tags to devices', { deviceIds, tagIds })
-    const response = await api.post('/api/tags/assign', {
+    console.log('=== API DEBUG: assignTagsToDevices ===');
+    console.log('Method called with params:', { deviceIds, tagIds });
+    console.log('deviceIds type:', Array.isArray(deviceIds) ? 'array' : typeof deviceIds);
+    console.log('tagIds type:', Array.isArray(tagIds) ? 'array' : typeof tagIds);
+    console.log('API URL:', `/api/tags/assign`);
+    console.log('Request body:', {
       device_ids: deviceIds,
       tag_ids: tagIds
-    })
-    return response.data
+    });
+    
+    try {
+      console.log('Making API request...');
+      const response = await api.post('/api/tags/assign', {
+        device_ids: deviceIds,
+        tag_ids: tagIds
+      });
+      
+      console.log('API response status:', response.status);
+      console.log('API response data:', response.data);
+      console.log('=== END API DEBUG ===');
+      
+      return response.data;
+    } catch (error) {
+      console.error('=== API ERROR ===');
+      console.error('Error in assignTagsToDevices:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      console.error('=== END API ERROR ===');
+      throw error;
+    }
   },
   
   async removeTagsFromDevices(deviceIds, tagIds) {
-    console.log('Tag Service: Removing tags from devices', { deviceIds, tagIds })
-    const response = await api.post('/api/tags/unassign', {
-      device_ids: deviceIds,
-      tag_ids: tagIds
-    })
-    return response.data
+    console.log('=== API DEBUG: removeTagsFromDevices ===');
+    console.log('Method called with params:', { deviceIds, tagIds });
+    console.log('deviceIds type:', Array.isArray(deviceIds) ? 'array' : typeof deviceIds);
+    console.log('tagIds type:', Array.isArray(tagIds) ? 'array' : typeof tagIds);
+    
+    try {
+      console.log('Making API request...');
+      const response = await api.post('/api/tags/unassign', {
+        device_ids: deviceIds,
+        tag_ids: tagIds
+      });
+      
+      console.log('API response status:', response.status);
+      console.log('API response data:', response.data);
+      console.log('=== END API DEBUG ===');
+      
+      return response.data;
+    } catch (error) {
+      console.error('=== API ERROR ===');
+      console.error('Error in removeTagsFromDevices:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      console.error('=== END API ERROR ===');
+      throw error;
+    }
   }
 }
 

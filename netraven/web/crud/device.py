@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 
@@ -31,7 +31,7 @@ def get_device(db: Session, device_id: str) -> Optional[Device]:
         Device object if found, None otherwise
     """
     logger.debug(f"Getting device with id: {device_id}")
-    return db.query(Device).filter(Device.id == device_id).first()
+    return db.query(Device).options(joinedload(Device.tags)).filter(Device.id == device_id).first()
 
 def get_devices(
     db: Session, 
@@ -57,7 +57,7 @@ def get_devices(
     """
     logger.debug(f"Getting devices with skip={skip}, limit={limit}, search={search}, device_type={device_type}, enabled={enabled}")
     
-    query = db.query(Device)
+    query = db.query(Device).options(joinedload(Device.tags))
     
     # Apply filters if provided
     if search:

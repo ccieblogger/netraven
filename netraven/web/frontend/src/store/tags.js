@@ -117,37 +117,86 @@ export const useTagStore = defineStore('tags', {
       this.loading = true
       this.error = null
       
+      console.log(`=== STORE DEBUG: fetchTagsForDevice ===`)
+      console.log(`Method called with deviceId:`, deviceId)
+      console.log(`deviceId type:`, typeof deviceId)
+      
       try {
         console.log(`Fetching tags for device ${deviceId}`)
         
         // Make sure we have all available tags loaded first
         if (this.tags.length === 0) {
+          console.log('No tags loaded yet, fetching all tags first')
           await this.fetchTags()
+          console.log('Tags after fetchTags:', this.tags)
         }
         
-        // Get the device-specific tags from the API
-        const deviceTags = await tagService.getDevicesForTag(deviceId)
+        // Get all tags
+        const allTags = this.tags
+        console.log('All available tags:', allTags)
+        console.log('Number of tags:', allTags.length)
+        
+        // Create a batch of promises to check each tag in parallel
+        const deviceTags = []
+        const deviceTagPromises = []
+        
+        console.log('Creating promises to check each tag...')
+        for (const tag of allTags) {
+          console.log(`Creating promise for tag ${tag.id} (${tag.name})`)
+          deviceTagPromises.push(
+            tagService.getDevicesForTag(tag.id)
+              .then(devices => {
+                console.log(`Got devices for tag ${tag.id}:`, devices)
+                if (devices && devices.devices) {
+                  console.log(`Checking if device ${deviceId} is in the list of devices for tag ${tag.id}`)
+                  const deviceFound = devices.devices.some(device => {
+                    console.log(`Comparing device.id (${device.id}) with deviceId (${deviceId})`)
+                    return device.id === deviceId
+                  })
+                  
+                  if (deviceFound) {
+                    console.log(`Tag ${tag.id} (${tag.name}) is assigned to device ${deviceId}`)
+                    deviceTags.push(tag)
+                  } else {
+                    console.log(`Tag ${tag.id} (${tag.name}) is NOT assigned to device ${deviceId}`)
+                  }
+                } else {
+                  console.log(`No devices property found in response for tag ${tag.id}`)
+                }
+              })
+              .catch(error => {
+                console.error(`Error checking if device ${deviceId} has tag ${tag.id}:`, error)
+              })
+          )
+        }
+        
+        console.log(`Created ${deviceTagPromises.length} promises, waiting for all to resolve...`)
+        // Wait for all promises to resolve
+        await Promise.all(deviceTagPromises)
+        
+        console.log(`All promises resolved`)
+        console.log(`Final deviceTags for device ${deviceId}:`, deviceTags)
+        console.log(`Number of device tags found: ${deviceTags.length}`)
         
         // Update our local cache
         this.deviceTags[deviceId] = deviceTags
+        console.log(`Updated deviceTags in store:`, this.deviceTags)
+        console.log(`=== END STORE DEBUG ===`)
         
         return deviceTags
       } catch (error) {
         this.error = error.response?.data?.detail || `Failed to fetch tags for device ${deviceId}`
         console.error(`Error fetching tags for device ${deviceId}:`, error)
+        console.error('Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        })
         
         // If API call fails, use cached data if available
         if (this.deviceTags[deviceId] && this.deviceTags[deviceId].length > 0) {
           console.log(`Using cached tags for device ${deviceId}`)
           return this.deviceTags[deviceId]
-        }
-        
-        // If no cache, use default tag
-        if (this.tags.length > 0) {
-          const defaultTag = this.tags[0]
-          this.deviceTags[deviceId] = [defaultTag]
-          console.log(`Assigned default tag ${defaultTag.id} to device ${deviceId}`)
-          return [defaultTag]
         }
         
         return []
@@ -316,65 +365,94 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
-        // In a real app, this would make an API call to update the backend
-        // For our mock implementation, we'll just update the store
+        console.log(`Assigning tag ${tagId} to device ${deviceId}`)
         
-        // Get current device tags or initialize empty array
-        const currentTags = this.deviceTags[deviceId] || []
+        // Add more detailed logging
+        console.log('API call parameters:', {
+          deviceIds: [deviceId],
+          tagIds: [tagId]
+        })
         
-        // Find the tag object from available tags
-        const tagToAdd = this.tags.find(tag => tag.id === tagId)
+        // Call the API to assign the tag to the device
+        const result = await tagService.assignTagsToDevices([deviceId], [tagId])
         
-        if (!tagToAdd) {
-          throw new Error(`Tag with ID ${tagId} not found`)
+        console.log('API response:', result)
+        
+        if (!result) {
+          throw new Error(`Failed to assign tag ${tagId} to device ${deviceId}: No response from API`)
         }
         
-        // Check if tag is already assigned
-        if (currentTags.some(tag => tag.id === tagId)) {
-          console.log(`Tag ${tagId} already assigned to device ${deviceId}`)
-          return currentTags
+        if (!result.success) {
+          console.error('Assignment failed with result:', result)
+          throw new Error(result.message || `Failed to assign tag ${tagId} to device ${deviceId}`)
         }
         
-        // Add the tag to the device
-        const updatedTags = [...currentTags, tagToAdd]
+        console.log('Tag assignment successful, refreshing device tags')
         
-        // Update the store
-        this.deviceTags[deviceId] = updatedTags
+        // Refresh the device tags from the server to ensure we have the latest data
+        await this.fetchTagsForDevice(deviceId)
         
-        console.log(`Assigned tag ${tagId} to device ${deviceId}`)
-        return updatedTags
+        // Return the updated tags
+        return this.deviceTags[deviceId] || []
       } catch (error) {
-        this.error = error.message || `Failed to assign tag ${tagId} to device ${deviceId}`
-        console.error(this.error, error)
+        const errorMessage = error.response?.data?.detail || error.message || `Failed to assign tag ${tagId} to device ${deviceId}`
+        this.error = errorMessage
+        console.error(`Error assigning tag ${tagId} to device ${deviceId}:`, error)
+        console.error('Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        })
         throw error
       } finally {
         this.loading = false
       }
     },
     
-    // Remove single tag from a single device
+    // Remove a tag from a device
     async removeTagFromDevice(deviceId, tagId) {
       this.loading = true
       this.error = null
       
       try {
-        // In a real app, this would make an API call to update the backend
-        // For our mock implementation, we'll just update the store
+        console.log(`Removing tag ${tagId} from device ${deviceId}`)
         
-        // Get current device tags or initialize empty array
-        const currentTags = this.deviceTags[deviceId] || []
+        // Add more detailed logging
+        console.log('API call parameters:', {
+          deviceIds: [deviceId],
+          tagIds: [tagId]
+        })
         
-        // Remove the tag from the device
-        const updatedTags = currentTags.filter(tag => tag.id !== tagId)
+        // Call the API to remove the tag from the device
+        const result = await tagService.removeTagsFromDevices([deviceId], [tagId])
         
-        // Update the store
-        this.deviceTags[deviceId] = updatedTags
+        console.log('API response:', result)
         
-        console.log(`Removed tag ${tagId} from device ${deviceId}`)
-        return updatedTags
+        if (!result) {
+          throw new Error(`Failed to remove tag ${tagId} from device ${deviceId}: No response from API`)
+        }
+        
+        if (!result.success) {
+          console.error('Removal failed with result:', result)
+          throw new Error(result.message || `Failed to remove tag ${tagId} from device ${deviceId}`)
+        }
+        
+        console.log('Tag removal successful, refreshing device tags')
+        
+        // Refresh the device tags from the server to ensure we have the latest data
+        await this.fetchTagsForDevice(deviceId)
+        
+        // Return the updated tags
+        return this.deviceTags[deviceId] || []
       } catch (error) {
-        this.error = error.message || `Failed to remove tag ${tagId} from device ${deviceId}`
-        console.error(this.error, error)
+        const errorMessage = error.response?.data?.detail || error.message || `Failed to remove tag ${tagId} from device ${deviceId}`
+        this.error = errorMessage
+        console.error(`Error removing tag ${tagId} from device ${deviceId}:`, error)
+        console.error('Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        })
         throw error
       } finally {
         this.loading = false

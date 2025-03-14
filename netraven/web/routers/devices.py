@@ -19,6 +19,7 @@ from netraven.web.routers.auth import User, get_current_active_user
 from netraven.web.database import get_db
 from netraven.web.models.device import Device as DeviceModel
 from netraven.web.schemas.device import DeviceCreate as DeviceCreateSchema, DeviceUpdate
+from netraven.web.schemas.tag import Tag
 from netraven.web.crud import (
     get_devices, 
     get_device, 
@@ -57,6 +58,7 @@ class Device(DeviceBase):
     created_at: datetime
     updated_at: datetime
     serial_number: Optional[str] = None
+    tags: Optional[List[Tag]] = []
 
     model_config = ConfigDict(from_attributes=True)
 
