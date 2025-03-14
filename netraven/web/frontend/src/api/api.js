@@ -116,9 +116,17 @@ api.interceptors.response.use(
       message: error.message
     })
     if (error.response && error.response.status === 401) {
-      // Token expired or invalid, redirect to login
+      // Token expired or invalid - clear the token but don't redirect
+      // This prevents automatic redirects that might interfere with Vue Router
+      console.log('API: Token invalid (401), clearing token but not redirecting')
       localStorage.removeItem('access_token')
-      window.location.href = '/login'
+      
+      // Only redirect to login if not already on login page
+      // This prevents redirect loops
+      if (!window.location.pathname.includes('/login')) {
+        console.log('API: Not on login page, router will handle redirection')
+        // We'll let the Vue Router handle this redirection now
+      }
     }
     return Promise.reject(error)
   }

@@ -92,18 +92,6 @@
               <span v-else>Sign In</span>
             </button>
           </div>
-          
-          <!-- Debug Toggle -->
-          <div class="text-center">
-            <button type="button" @click="toggleDebugInfo" class="text-xs text-gray-500 hover:text-gray-700">
-              {{ showDebugInfo ? 'Hide Debug Info' : 'Show Debug Info' }}
-            </button>
-          </div>
-          
-          <!-- Debug Info -->
-          <div v-if="showDebugInfo" class="bg-gray-50 p-3 rounded text-xs text-gray-700 overflow-auto">
-            <pre>{{ JSON.stringify(debugInfo, null, 2) }}</pre>
-          </div>
         </form>
       </div>
 
@@ -113,304 +101,53 @@
           © {{ new Date().getFullYear() }} NetRaven. All rights reserved.
         </p>
       </div>
-
-      <div v-if="showDebugInfo" class="mt-8 p-4 bg-gray-100 rounded-md text-xs">
-        <h3 class="font-bold mb-2">Login Debug Info</h3>
-        <pre class="overflow-auto max-h-40">
-Current Time: {{ new Date().toISOString() }}
-Origin: {{ window.location.origin }}
-Hostname: {{ window.location.hostname }}
-API URL: {{ apiInfo }}
-Access Token: {{ hasToken ? 'Present (' + tokenFirstChars + '...)' : 'Not present' }}
-Last Login Error: {{ error }}
-User Agent: {{ navigator.userAgent }}
-        </pre>
-        <div class="mt-2">
-          <button @click="testAuth" class="px-2 py-1 bg-blue-500 text-white rounded text-xs">
-            Test Auth Store
-          </button>
-          <button @click="testLocalStorage" class="ml-2 px-2 py-1 bg-green-500 text-white rounded text-xs">
-            Test localStorage
-          </button>
-          <button @click="testRedirect" class="ml-2 px-2 py-1 bg-purple-500 text-white rounded text-xs">
-            Test Redirect
-          </button>
-        </div>
-        <div v-if="testResult" class="mt-2 p-2 bg-yellow-100 rounded">
-          {{ testResult }}
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script>
 import { defineComponent, ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 
 export default defineComponent({
   name: 'Login',
   
   setup() {
-    const router = useRouter()
-    const route = useRoute()
     const authStore = useAuthStore()
     
-    // Reactive state
+    // Simple state management
     const username = ref('admin')
     const password = ref('NetRaven')
-    const showDebugInfo = ref(false)
-    const debugInfo = ref({})
-    const testResult = ref(null)
     
     // Computed properties
     const loading = computed(() => authStore.loading)
     const error = computed(() => authStore.error)
-    const apiInfo = computed(() => {
-      try {
-        return JSON.stringify({
-          envUrl: import.meta.env?.VITE_API_BASE_URL || 'Not set',
-          localhostUrl: 'http://localhost:8000',
-          dynamicUrl: window.location.origin.replace(':8080', ':8000')
-        })
-      } catch (err) {
-        return 'Error: ' + err.message
-      }
-    })
-    const hasToken = computed(() => !!localStorage.getItem('access_token'))
-    const tokenFirstChars = computed(() => {
-      const token = localStorage.getItem('access_token')
-      return token ? token.substring(0, 10) : ''
-    })
     
-    // Methods
-    function updateDebugInfo() {
-      try {
-        // Get info from the window and environment
-        const envInfo = import.meta.env ? 'Available' : 'Not available'
-        const apiUrl = import.meta.env?.VITE_API_BASE_URL || 'Not set'
-        
-        // Construct potential login URLs for debugging
-        const loginUrlOptions = [
-          apiUrl ? apiUrl + '/api/auth/token' : 'Not available',
-          'http://localhost:8000/api/auth/token', 
-          window.location.hostname + ':8000/api/auth/token',
-          'http://' + window.location.hostname + ':8000/api/auth/token'
-        ];
-        
-        debugInfo.value = {
-          time: new Date().toISOString(),
-          origin: window.location.origin,
-          hostname: window.location.hostname,
-          envInfo: envInfo,
-          apiUrl: apiUrl,
-          fallbackUrls: {
-            localhost: 'http://localhost:8000',
-            hostname: 'http://' + window.location.hostname + ':8000',
-            dynamic: window.location.origin.replace(':8080', ':8000')
-          },
-          loginUrlOptions: loginUrlOptions,
-          tokenStatus: localStorage.getItem('access_token') ? 'Present' : 'None',
-          browserInfo: navigator.userAgent
-        }
-        
-        // Try to ping the API URL to check connection
-        debugInfo.value.connectionTest = {
-          status: 'Testing connection...',
-          timestamp: new Date().toISOString()
-        }
-        
-        // Test connection to the first fallback URL
-        testConnection('http://localhost:8000')
-          .then(result => {
-            debugInfo.value.connectionTest = {
-              ...debugInfo.value.connectionTest,
-              localhost: result
-            }
-          })
-          .catch(error => {
-            debugInfo.value.connectionTest = {
-              ...debugInfo.value.connectionTest,
-              localhost: { error: error.message }
-            }
-          });
-      } catch (e) {
-        debugInfo.value = {
-          error: 'Error generating debug info: ' + e.message
-        }
-      }
-    }
-    
-    // Helper function to test connection to an API URL
-    async function testConnection(url) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        
-        const response = await fetch(url + '/api/health', {
-          method: 'GET',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        return {
-          status: response.status,
-          ok: response.ok,
-          timestamp: new Date().toISOString()
-        };
-      } catch (error) {
-        return {
-          error: error.message,
-          timestamp: new Date().toISOString()
-        };
-      }
-    }
-    
-    function testAuth() {
-      try {
-        testResult.value = `Auth Store Status: 
-- Store initialized: ${!!authStore}
-- Is authenticated: ${authStore.isAuthenticated}
-- Has token: ${!!authStore.token}
-- Has user: ${!!authStore.user}
-- Loading: ${authStore.loading}
-- Error: ${authStore.error || 'None'}`
-      } catch (err) {
-        testResult.value = `Auth Store Error: ${err.message}`
-      }
-    }
-    
-    function testLocalStorage() {
-      try {
-        // Try to write to localStorage
-        const testKey = 'login_test_' + Date.now()
-        localStorage.setItem(testKey, 'test value')
-        const readValue = localStorage.getItem(testKey)
-        localStorage.removeItem(testKey)
-        
-        testResult.value = `localStorage Test: ${readValue === 'test value' ? 'Success' : 'Failed - values don\'t match'}`
-      } catch (err) {
-        testResult.value = `localStorage Error: ${err.message}`
-      }
-    }
-    
-    function testRedirect() {
-      testResult.value = 'Testing redirect to /route-test...'
-      setTimeout(() => {
-        window.location.href = '/route-test'
-      }, 1000)
-    }
-    
-    function toggleDebugInfo() {
-      showDebugInfo.value = !showDebugInfo.value
-      if (showDebugInfo.value) {
-        updateDebugInfo()
-      }
-    }
-    
+    // Simplified login function
     async function handleLogin() {
       try {
         console.log('Login: Attempting login with username', username.value)
-        updateDebugInfo() // Ensure debug info is updated even if not showing
         
-        // Enhanced direct fetch for debugging
-        try {
-          const formData = new URLSearchParams()
-          formData.append('username', username.value)
-          formData.append('password', password.value)
-          
-          // Define URLs to try
-          const testUrls = [
-            'http://localhost:8000/api/auth/token',
-            'http://' + window.location.hostname + ':8000/api/auth/token',
-            window.location.origin.replace(':8080', ':8000') + '/api/auth/token'
-          ]
-          
-          debugInfo.value.loginAttempts = []
-          
-          // Only test one URL if debug not showing to avoid delays
-          const urlsToTest = showDebugInfo.value ? testUrls : [testUrls[0]]
-          
-          for (const url of urlsToTest) {
-            try {
-              console.log('Login: Trying direct fetch to', url)
-              
-              const startTime = new Date().getTime()
-              const directResponse = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: formData,
-                mode: 'cors'
-              })
-              const endTime = new Date().getTime()
-              
-              let responseData = {}
-              try {
-                responseData = await directResponse.json()
-              } catch (e) {
-                responseData = { parseError: e.message }
-              }
-              
-              const attemptResult = {
-                url: url,
-                latency: endTime - startTime + 'ms',
-                status: directResponse.status,
-                success: directResponse.ok,
-                data: responseData
-              }
-              
-              debugInfo.value.loginAttempts.push(attemptResult)
-              console.log('Login: Direct fetch response', attemptResult)
-              
-              if (directResponse.ok) {
-                // Found a working URL, no need to try others
-                break
-              }
-            } catch (urlError) {
-              const attemptResult = {
-                url: url,
-                error: urlError.message,
-                errorType: urlError.name
-              }
-              debugInfo.value.loginAttempts.push(attemptResult)
-              console.error('Login: Direct fetch failed for ' + url, urlError)
-            }
-          }
-        } catch (directError) {
-          console.error('Login: All direct fetch attempts failed', directError)
-          debugInfo.value.directFetchError = directError.message
-        }
-        
-        // Always show debug info on error
-        showDebugInfo.value = true
-        
-        // Use the auth store for actual login
+        // Use the auth store for login
         const success = await authStore.login(username.value, password.value)
         
         if (success) {
-          const redirectPath = route.query.redirect || '/dashboard'
-          console.log('Login: Redirecting to', redirectPath)
-          router.push(redirectPath)
+          console.log('Login: Login successful, redirecting to dashboard')
+          
+          // Simple redirect to dashboard after successful login
+          window.location.href = '/'
         } else {
           console.error('Login: Failed', authStore.error)
-          updateDebugInfo()
         }
       } catch (err) {
         console.error('Login: Exception occurred', err)
-        showDebugInfo.value = true // Always show debug info on error
-        updateDebugInfo()
       }
     }
     
-    // Lifecycle hooks
+    // Clear any previous errors when component mounts
     onMounted(() => {
       console.log('Login: Component mounted')
       authStore.error = null
-      updateDebugInfo()
     })
     
     return {
@@ -418,55 +155,13 @@ export default defineComponent({
       password,
       loading,
       error,
-      showDebugInfo,
-      debugInfo,
-      handleLogin,
-      toggleDebugInfo,
-      testAuth,
-      testLocalStorage,
-      testRedirect,
-      testResult,
-      apiInfo,
-      hasToken,
-      tokenFirstChars
+      handleLogin
     }
   }
 })
 </script>
 
 <style scoped>
-.error-message {
-  color: #e53935;
-  margin: 15px 0;
-  text-align: center;
-  background-color: rgba(229, 57, 53, 0.1);
-  padding: 10px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.debug-info {
-  margin-top: 10px;
-  text-align: left;
-  font-size: 12px;
-  background-color: #f5f5f5;
-  padding: 10px;
-  border-radius: 4px;
-  overflow: auto;
-  max-height: 150px;
-}
-
-.debug-toggle {
-  margin-top: 15px;
-  text-align: center;
-  color: #666;
-  cursor: pointer;
-}
-
-.debug-toggle:hover {
-  text-decoration: underline;
-}
-
 .spinner {
   display: inline-block;
   width: 16px;

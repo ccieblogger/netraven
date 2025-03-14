@@ -77,28 +77,25 @@ const router = createRouter({
   routes
 })
 
-// Simple navigation guard for authentication
+// Robust navigation guard for authentication
 router.beforeEach((to, from, next) => {
-  try {
-    // Log navigation for debugging
-    console.log(`Navigating from ${from.path} to ${to.path}`);
-    
-    // Get token from localStorage
-    const token = localStorage.getItem('access_token');
-    
-    // Check if the route requires authentication
-    if (to.matched.some(record => record.meta.requiresAuth) && !token) {
-      console.log('Authentication required, redirecting to login');
-      next({ name: 'Login', query: { redirect: to.fullPath } });
-    } else {
-      // Continue with navigation
-      next();
-    }
-  } catch (error) {
-    console.error('Navigation error:', error);
-    // If there's an error, try to continue navigation
-    next();
+  console.log(`Router: Navigating from ${from.path || '/'} to ${to.path}`);
+
+  // Skip authentication check for login and public pages
+  if (to.path === '/login') {
+    return next();
   }
-})
+
+  // Check if user is authenticated
+  const token = localStorage.getItem('access_token');
+  
+  if (!token) {
+    console.log('Router: No token found, redirecting to login');
+    return next('/login');
+  }
+  
+  // User has token, allow navigation
+  next();
+});
 
 export default router 

@@ -106,10 +106,9 @@ export const useAuthStore = defineStore('auth', {
       this.token = null;
       this.user = null;
       
-      // Force redirect to login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+      // Direct navigation to login page - simplest and most reliable approach
+      console.log('Auth Store: Redirecting to login page');
+      window.location.href = '/login';
     }
   }
 }) 

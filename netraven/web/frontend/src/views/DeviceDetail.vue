@@ -89,30 +89,29 @@
             </div>
             
             <!-- Tags -->
-            <div class="mt-4">
-              <h3 class="text-md font-semibold mb-2">Tags</h3>
-              <div v-if="loadingTags" class="text-sm text-gray-500">
-                Loading tags...
-              </div>
-              <div v-else-if="deviceTags.length === 0" class="text-sm text-gray-500">
-                No tags assigned to this device.
-              </div>
-              <div v-else class="flex flex-wrap gap-2">
-                <TagBadge 
-                  v-for="tag in deviceTags" 
-                  :key="tag.id" 
-                  :tag="tag" 
-                  :removable="true"
-                  @remove="removeTagFromDevice(tag)"
-                />
-              </div>
-              <div class="mt-2">
+            <div class="mb-6">
+              <div class="flex justify-between items-center mb-2">
+                <h3 class="text-lg font-medium">Tags</h3>
                 <button 
-                  @click="showTagModal = true" 
-                  class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  @click.stop.prevent="openTagModal" 
+                  class="text-sm bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-3 rounded transition-colors"
                 >
                   Manage Tags
                 </button>
+              </div>
+              
+              <div class="flex flex-wrap gap-2">
+                <span 
+                  v-for="tag in deviceTags" 
+                  :key="tag.id"
+                  class="px-3 py-1 rounded-full text-sm"
+                  :style="{ backgroundColor: tag.color || '#6366F1', color: 'white' }"
+                >
+                  {{ formatTagName(tag.name) }}
+                </span>
+                <span v-if="!deviceTags || deviceTags.length === 0" class="text-gray-500 italic">
+                  No tags assigned
+                </span>
               </div>
             </div>
           </div>
@@ -169,7 +168,7 @@
       </div>
     </div>
     
-    <!-- Edit Device Modal would go here -->
+    <!-- Edit Device Modal -->
     <div v-if="showEditModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
       <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
         <div class="p-6">
@@ -302,70 +301,89 @@
     </div>
     
     <!-- Tag Management Modal -->
-    <div v-if="showTagModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-        <h2 class="text-xl font-bold mb-4">Manage Device Tags</h2>
+    <TagModal 
+      :show="showTagModal" 
+      :device-id="deviceId"
+      @close="closeTagModal"
+      @update:tags="updateDeviceTags"
+      @open-create-tag="showCreateTagModal = true"
+    />
+    
+    <!-- Create Tag Modal -->
+    <div v-if="showCreateTagModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 mx-4 overflow-hidden" @click.stop>
+        <button 
+          class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" 
+          @click="showCreateTagModal = false"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
         
-        <div v-if="loadingTags || loadingAllTags" class="text-center py-4">
-          <p>Loading tags...</p>
-        </div>
-        <div v-else>
-          <div class="mb-4">
-            <h3 class="text-md font-semibold mb-2">Current Tags</h3>
-            <div v-if="deviceTags.length === 0" class="text-sm text-gray-500 mb-2">
-              No tags assigned to this device.
-            </div>
-            <div v-else class="flex flex-wrap gap-2 mb-2">
-              <TagBadge 
-                v-for="tag in deviceTags" 
-                :key="tag.id" 
-                :tag="tag" 
-                :removable="true"
-                @remove="removeTagFromDevice(tag)"
+        <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Create New Tag</h2>
+        
+        <form @submit.prevent="createTag">
+          <div class="space-y-4">
+            <div>
+              <label for="tagName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tag Name</label>
+              <input
+                type="text"
+                id="tagName"
+                v-model="newTag.name"
+                required
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
               />
+            </div>
+            
+            <div>
+              <label for="tagColor" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Color</label>
+              <div class="flex items-center mt-1">
+                <input
+                  type="color"
+                  id="tagColor"
+                  v-model="newTag.color"
+                  class="w-10 h-10 rounded border border-gray-300 dark:border-gray-600"
+                />
+                <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">{{ newTag.color }}</span>
+              </div>
+            </div>
+            
+            <div>
+              <label for="tagDescription" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Description (optional)</label>
+              <textarea
+                id="tagDescription"
+                v-model="newTag.description"
+                rows="2"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
+              ></textarea>
             </div>
           </div>
           
-          <div class="mb-4">
-            <h3 class="text-md font-semibold mb-2">Available Tags</h3>
-            <div v-if="availableTags.length === 0" class="text-sm text-gray-500 mb-2">
-              No more tags available.
-            </div>
-            <div v-else>
-              <select
-                v-model="selectedTagId"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              >
-                <option value="" disabled selected>Select a tag to add</option>
-                <option 
-                  v-for="tag in availableTags" 
-                  :key="tag.id" 
-                  :value="tag.id"
-                >
-                  {{ tag.name }}
-                </option>
-              </select>
-              
-              <button
-                @click="addTagToDevice"
-                class="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
-                :disabled="!selectedTagId"
-                :class="{'opacity-50 cursor-not-allowed': !selectedTagId}"
-              >
-                Add Tag
-              </button>
-            </div>
+          <div class="mt-6 flex justify-end space-x-3">
+            <button
+              type="button"
+              @click="showCreateTagModal = false"
+              class="py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              :disabled="creatingTag"
+              class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {{ creatingTag ? 'Creating...' : 'Create Tag' }}
+            </button>
           </div>
-        </div>
-        
-        <div class="flex justify-end mt-4">
-          <button
-            @click="showTagModal = false"
-            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+          
+          <div 
+            v-if="createTagError" 
+            class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md"
           >
-            Close
-          </button>
-        </div>
+            {{ createTagError }}
+          </div>
+        </form>
       </div>
     </div>
   </MainLayout>
@@ -374,17 +392,20 @@
 <script>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { Teleport } from 'vue'
 import MainLayout from '@/components/MainLayout.vue'
 import TagBadge from '@/components/TagBadge.vue'
 import { useDeviceStore } from '@/store/devices'
 import { useBackupStore } from '@/store/backups'
 import { useTagStore } from '@/store/tags'
+import TagModal from '@/components/TagModal.vue'
 
 export default {
   name: 'DeviceDetail',
   components: {
     MainLayout,
-    TagBadge
+    TagBadge,
+    TagModal
   },
   props: {
     id: {
@@ -424,11 +445,20 @@ export default {
       password: ''
     })
     
-    const deviceTags = computed(() => tagStore.deviceTags)
+    const deviceTags = ref([])
     const allTags = computed(() => tagStore.tags)
     const loadingTags = computed(() => tagStore.loading)
     const showTagModal = ref(false)
     const selectedTagId = ref('')
+    
+    const showCreateTagModal = ref(false)
+    const creatingTag = ref(false)
+    const createTagError = ref(null)
+    const newTag = ref({
+      name: '',
+      color: '#6366F1', // Default indigo color
+      description: ''
+    })
     
     onMounted(async () => {
       loading.value = true
@@ -463,7 +493,7 @@ export default {
       }
       
       // Fetch tags for the device
-      await tagStore.fetchTagsForDevice(deviceId.value)
+      await fetchDeviceTags()
       // Fetch all tags
       await tagStore.fetchTags()
     })
@@ -521,6 +551,12 @@ export default {
       return date.toLocaleString()
     }
     
+    // Format tag name by removing "tag-" prefix if present
+    const formatTagName = (name) => {
+      if (!name) return ''
+      return name.startsWith('tag-') ? name.substring(4) : name
+    }
+    
     const backupDevice = async () => {
       backingUp.value = true
       try {
@@ -553,17 +589,14 @@ export default {
       return allTags.value.filter(tag => !deviceTags.value.some(dt => dt.id === tag.id))
     })
     
-    const addTagToDevice = async () => {
-      if (!selectedTagId.value) return
+    const addTagToDevice = async (tagId) => {
+      if (!tagId) return
       
       try {
-        await tagStore.assignTagToDevice(deviceId.value, selectedTagId.value)
-        
-        // Reset selection
-        selectedTagId.value = ''
+        await tagStore.assignTagToDevice(deviceId.value, tagId)
         
         // Refresh device tags
-        await tagStore.fetchTagsForDevice(deviceId.value)
+        await fetchDeviceTags()
         // Refresh device data
         await deviceStore.fetchDevice(deviceId.value)
       } catch (error) {
@@ -572,17 +605,99 @@ export default {
       }
     }
     
-    const removeTagFromDevice = async (tag) => {
+    const removeTagFromDevice = async (tagId) => {
+      if (!tagId) return
+      
       try {
-        await tagStore.removeTagFromDevice(deviceId.value, tag.id)
+        await tagStore.removeTagFromDevice(deviceId.value, tagId)
         
         // Refresh device tags
-        await tagStore.fetchTagsForDevice(deviceId.value)
+        await fetchDeviceTags()
         // Refresh device data
         await deviceStore.fetchDevice(deviceId.value)
       } catch (error) {
         console.error('Error removing tag from device:', error)
         alert(`Failed to remove tag: ${error.response?.data?.detail || error.message}`)
+      }
+    }
+    
+    const fetchDeviceTags = async () => {
+      if (!deviceId.value) return
+      
+      try {
+        const tags = await tagStore.fetchTagsForDevice(deviceId.value)
+        deviceTags.value = tags
+      } catch (error) {
+        console.error('Failed to fetch device tags:', error)
+      }
+    }
+    
+    const openTagModal = (event) => {
+      if (event) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+      showTagModal.value = true
+      return false // Prevent link navigation
+    }
+    
+    const closeTagModal = () => {
+      console.log('Closing tag modal');
+      showTagModal.value = false;
+    }
+    
+    const updateDeviceTags = (tags) => {
+      console.log('Updating device tags:', tags);
+      deviceTags.value = tags || [];
+    }
+    
+    const createTag = async () => {
+      if (!newTag.value.name) {
+        console.error('Tag name is required');
+        createTagError.value = 'Tag name is required';
+        return;
+      }
+      
+      console.log('Creating new tag:', newTag.value);
+      creatingTag.value = true;
+      createTagError.value = null;
+      
+      try {
+        // Create the tag
+        const tag = await tagStore.createTag(newTag.value);
+        console.log('Tag created successfully:', tag);
+        
+        // Close the modal
+        showCreateTagModal.value = false;
+        
+        // Reset form
+        newTag.value = {
+          name: '',
+          color: '#6366F1',
+          description: ''
+        };
+        
+        // Refresh tags list
+        await tagStore.fetchTags();
+        
+        // If device id exists, assign the tag to the device
+        if (deviceId.value && tag) {
+          await tagStore.assignTagToDevice(deviceId.value, tag.id);
+          await fetchDeviceTags();
+        }
+        
+        // If the tag modal is open, close it and reopen to refresh
+        if (showTagModal.value) {
+          showTagModal.value = false;
+          setTimeout(() => {
+            showTagModal.value = true;
+          }, 100);
+        }
+      } catch (error) {
+        console.error('Failed to create tag:', error);
+        createTagError.value = 'Failed to create tag. Please try again.';
+      } finally {
+        creatingTag.value = false;
       }
     }
     
@@ -598,16 +713,24 @@ export default {
       errors,
       formatDeviceType,
       formatDate,
+      formatTagName,
       backupDevice,
       restoreBackup,
       saveDevice,
       deviceTags,
       loadingTags,
       showTagModal,
-      selectedTagId,
+      openTagModal,
+      closeTagModal,
+      updateDeviceTags,
       availableTags,
       addTagToDevice,
-      removeTagFromDevice
+      removeTagFromDevice,
+      showCreateTagModal,
+      creatingTag,
+      createTagError,
+      newTag,
+      createTag
     }
   }
 }

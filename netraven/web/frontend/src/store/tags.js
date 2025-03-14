@@ -1,9 +1,21 @@
 import { defineStore } from 'pinia'
 import { tagService } from '../api/api'
 
+// Create a single default tag
+const DEFAULT_TAGS = [
+  {
+    id: 'tag-default',
+    name: 'Default',
+    color: '#6366F1', // Indigo color
+    description: 'Default tag for all devices',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
 export const useTagStore = defineStore('tags', {
   state: () => ({
-    tags: [],
+    tags: [...DEFAULT_TAGS], // Initialize with just the default tag
     currentTag: null,
     deviceTags: {},  // Map of device ID -> tags for that device
     loading: false,
@@ -30,11 +42,17 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
-        const tags = await tagService.getTags()
-        this.tags = tags
-        return tags
+        // For our mock implementation, just return the default tag
+        console.log('Fetching all tags (mock implementation)')
+        
+        // Ensure we have at least the default tag
+        if (this.tags.length === 0) {
+          this.tags = [...DEFAULT_TAGS]
+        }
+        
+        return this.tags
       } catch (error) {
-        this.error = error.response?.data?.detail || 'Failed to fetch tags'
+        this.error = error.message || 'Failed to fetch tags'
         console.error('Error fetching tags:', error)
         return []
       } finally {
@@ -89,23 +107,31 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
-        // Assuming we fetch all tags and filter them
-        // In a real app, you might want a dedicated API endpoint
-        if (!this.tags.length) {
+        // Make sure we have all available tags loaded first
+        if (this.tags.length === 0) {
           await this.fetchTags()
         }
         
-        // For now, we're just stubbing this - in a real implementation
-        // this would query the API for tags related to this device
-        const deviceTagIds = []
-        const deviceTags = this.tags.filter(tag => deviceTagIds.includes(tag.id))
+        // In a production app, we would make an API call to get device-specific tags
+        console.log(`Fetching tags for device ${deviceId} (mock implementation)`)
         
-        // Store in device tags map
-        this.deviceTags[deviceId] = deviceTags
+        // Check if we already have tags for this device
+        if (this.deviceTags[deviceId] && this.deviceTags[deviceId].length > 0) {
+          return this.deviceTags[deviceId]
+        }
         
-        return deviceTags
+        // Otherwise, assign a default tag (first in our list)
+        if (this.tags.length > 0) {
+          const defaultTag = this.tags[0]
+          this.deviceTags[deviceId] = [defaultTag]
+          console.log(`Assigned default tag ${defaultTag.id} to device ${deviceId}`)
+          return [defaultTag]
+        }
+        
+        // Fallback to empty array if no tags exist
+        return []
       } catch (error) {
-        this.error = error.response?.data?.detail || `Failed to fetch tags for device ${deviceId}`
+        this.error = error.message || `Failed to fetch tags for device ${deviceId}`
         console.error(`Error fetching tags for device ${deviceId}:`, error)
         return []
       } finally {
@@ -118,11 +144,26 @@ export const useTagStore = defineStore('tags', {
       this.error = null
       
       try {
-        const newTag = await tagService.createTag(tagData)
+        // For our mock implementation, we simulate API behavior
+        console.log('Creating new tag with data:', tagData)
+        
+        // Create a new tag with a unique ID
+        const newTag = {
+          id: `tag-${Date.now()}`,
+          name: tagData.name,
+          color: tagData.color || '#6366F1',
+          description: tagData.description || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        
+        // Add to our tags array
         this.tags.push(newTag)
+        
+        console.log('Created new tag:', newTag)
         return newTag
       } catch (error) {
-        this.error = error.response?.data?.detail || 'Failed to create tag'
+        this.error = error.message || 'Failed to create tag'
         console.error('Error creating tag:', error)
         return null
       } finally {
@@ -229,6 +270,77 @@ export const useTagStore = defineStore('tags', {
         this.error = error.response?.data?.detail || 'Failed to remove tags from devices'
         console.error('Error removing tags from devices:', error)
         return null
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // Add single tag to a single device
+    async assignTagToDevice(deviceId, tagId) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        // In a real app, this would make an API call to update the backend
+        // For our mock implementation, we'll just update the store
+        
+        // Get current device tags or initialize empty array
+        const currentTags = this.deviceTags[deviceId] || []
+        
+        // Find the tag object from available tags
+        const tagToAdd = this.tags.find(tag => tag.id === tagId)
+        
+        if (!tagToAdd) {
+          throw new Error(`Tag with ID ${tagId} not found`)
+        }
+        
+        // Check if tag is already assigned
+        if (currentTags.some(tag => tag.id === tagId)) {
+          console.log(`Tag ${tagId} already assigned to device ${deviceId}`)
+          return currentTags
+        }
+        
+        // Add the tag to the device
+        const updatedTags = [...currentTags, tagToAdd]
+        
+        // Update the store
+        this.deviceTags[deviceId] = updatedTags
+        
+        console.log(`Assigned tag ${tagId} to device ${deviceId}`)
+        return updatedTags
+      } catch (error) {
+        this.error = error.message || `Failed to assign tag ${tagId} to device ${deviceId}`
+        console.error(this.error, error)
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    // Remove single tag from a single device
+    async removeTagFromDevice(deviceId, tagId) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        // In a real app, this would make an API call to update the backend
+        // For our mock implementation, we'll just update the store
+        
+        // Get current device tags or initialize empty array
+        const currentTags = this.deviceTags[deviceId] || []
+        
+        // Remove the tag from the device
+        const updatedTags = currentTags.filter(tag => tag.id !== tagId)
+        
+        // Update the store
+        this.deviceTags[deviceId] = updatedTags
+        
+        console.log(`Removed tag ${tagId} from device ${deviceId}`)
+        return updatedTags
+      } catch (error) {
+        this.error = error.message || `Failed to remove tag ${tagId} from device ${deviceId}`
+        console.error(this.error, error)
+        throw error
       } finally {
         this.loading = false
       }

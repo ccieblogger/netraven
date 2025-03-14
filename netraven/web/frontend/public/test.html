@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetRaven Test Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #3b82f6;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      margin-top: 0;
+      color: #1f2937;
+    }
+    button {
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #2563eb;
+    }
+    pre {
+      background-color: #f3f4f6;
+      padding: 12px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .status-good {
+      color: green;
+    }
+    .status-bad {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>NetRaven Test Page</h1>
+    <p>This page is used to diagnose potential issues with the NetRaven application.</p>
+    
+    <div class="card">
+      <h2>Browser Information</h2>
+      <p>User Agent: <span id="user-agent"></span></p>
+      <p>Viewport: <span id="viewport"></span></p>
+    </div>
+
+    <div class="card">
+      <h2>Network Test</h2>
+      <p>API Status: <span id="api-status">Testing...</span></p>
+      <button id="test-api">Test API Connection</button>
+      <div id="api-response" style="margin-top: 10px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Local Storage Test</h2>
+      <p>Status: <span id="storage-status">Not tested</span></p>
+      <button id="test-storage">Test Storage</button>
+    </div>
+
+    <div class="card">
+      <h2>Navigation</h2>
+      <p>Links to key pages:</p>
+      <ul>
+        <li><a href="/" id="home-link">Home/Dashboard</a></li>
+        <li><a href="/login" id="login-link">Login Page</a></li>
+        <li><a href="/devices" id="devices-link">Devices Page</a></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>JavaScript Console Errors</h2>
+      <p>Check your browser console (F12) for JavaScript errors.</p>
+    </div>
+  </div>
+
+  <script>
+    // Populate browser info
+    document.getElementById('user-agent').textContent = navigator.userAgent;
+    document.getElementById('viewport').textContent = `${window.innerWidth}px × ${window.innerHeight}px`;
+
+    // Test API connection
+    document.getElementById('test-api').addEventListener('click', async () => {
+      const apiStatus = document.getElementById('api-status');
+      const apiResponse = document.getElementById('api-response');
+      
+      apiStatus.textContent = 'Testing...';
+      apiStatus.className = '';
+      apiResponse.innerHTML = '';
+      
+      // URLs to test
+      const urls = [
+        'http://localhost:8000/api/health',
+        'http://127.0.0.1:8000/api/health',
+        window.location.origin.replace(':8080', ':8000') + '/api/health'
+      ];
+      
+      let resultsHtml = '<h3>Results:</h3>';
+      
+      try {
+        for (const url of urls) {
+          try {
+            resultsHtml += `<p>Testing ${url}... `;
+            
+            const startTime = Date.now();
+            const response = await fetch(url, { 
+              method: 'GET',
+              headers: { 'Accept': 'application/json' },
+              mode: 'cors'
+            });
+            const endTime = Date.now();
+            
+            if (response.ok) {
+              const data = await response.json();
+              resultsHtml += `<span class="status-good">SUCCESS</span> (${endTime - startTime}ms)`;
+              resultsHtml += `<br>Response: ${JSON.stringify(data)}</p>`;
+            } else {
+              resultsHtml += `<span class="status-bad">FAILED</span> (${response.status} ${response.statusText})</p>`;
+            }
+          } catch (err) {
+            resultsHtml += `<span class="status-bad">ERROR</span><br>Message: ${err.message}</p>`;
+          }
+        }
+        
+        apiResponse.innerHTML = resultsHtml;
+        
+        // Update overall status
+        if (resultsHtml.includes('SUCCESS')) {
+          apiStatus.textContent = 'API is reachable';
+          apiStatus.className = 'status-good';
+        } else {
+          apiStatus.textContent = 'API could not be reached';
+          apiStatus.className = 'status-bad';
+        }
+      } catch (e) {
+        apiStatus.textContent = 'Test failed';
+        apiStatus.className = 'status-bad';
+        apiResponse.innerHTML = `<p>Error: ${e.message}</p>`;
+      }
+    });
+
+    // Test localStorage
+    document.getElementById('test-storage').addEventListener('click', () => {
+      const storageStatus = document.getElementById('storage-status');
+      
+      try {
+        // Try to write to localStorage
+        const testKey = 'netraven_test_' + Date.now();
+        localStorage.setItem(testKey, 'test value');
+        const readValue = localStorage.getItem(testKey);
+        localStorage.removeItem(testKey);
+        
+        if (readValue === 'test value') {
+          storageStatus.textContent = 'Working properly';
+          storageStatus.className = 'status-good';
+        } else {
+          storageStatus.textContent = 'Failed: values don\'t match';
+          storageStatus.className = 'status-bad';
+        }
+      } catch (e) {
+        storageStatus.textContent = `Failed: ${e.message}`;
+        storageStatus.className = 'status-bad';
+      }
+    });
+
+    // Add token info display if exists
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      const storageCard = document.querySelector('.card h2').parentElement;
+      const tokenInfo = document.createElement('p');
+      tokenInfo.innerHTML = `Access Token: <span style="font-size: 12px; word-break: break-all;">${token.substring(0, 20)}...</span>`;
+      storageCard.appendChild(tokenInfo);
+    }
+  </script>
+</body>
+</html> 

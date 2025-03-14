@@ -119,35 +119,35 @@
       <table v-else class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hostname</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial Number</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device Type</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Backup</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hostname</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial Number</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device Type</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Backup</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr v-for="device in filteredDevices" :key="device.id">
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap">
               <router-link :to="`/devices/${device.id}`" class="text-blue-600 hover:text-blue-900 font-medium">
                 {{ device.hostname }}
               </router-link>
               <p v-if="device.description" class="text-sm text-gray-500">{{ device.description }}</p>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap">
               {{ device.ip_address }}
               <span v-if="device.port !== 22" class="text-gray-500 text-sm">:{{ device.port }}</span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap">
               {{ device.serial_number || 'Unknown' }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap">
               {{ formatDeviceType(device.device_type) }}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap">
               <span 
                 class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
                 :class="device.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
@@ -155,19 +155,14 @@
                 {{ device.enabled ? 'Enabled' : 'Disabled' }}
               </span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span v-if="device.last_backup_at">
+            <td class="px-4 py-2 whitespace-nowrap">
+              <span v-if="device.last_backup_at" 
+                :class="device.last_backup_status === 'success' ? 'text-green-700' : 'text-red-600'">
                 {{ formatDate(device.last_backup_at) }}
-                <div 
-                  :class="device.last_backup_status === 'success' ? 'text-green-600' : 'text-red-600'"
-                  class="text-sm"
-                >
-                  {{ device.last_backup_status || 'unknown' }}
-                </div>
               </span>
               <span v-else class="text-gray-500">Never</span>
             </td>
-            <td class="px-6 py-4">
+            <td class="px-4 py-2">
               <div v-if="device.tags && device.tags.length > 0" class="flex flex-wrap gap-1">
                 <TagBadge 
                   v-for="tag in device.tags" 
@@ -177,7 +172,7 @@
               </div>
               <span v-else class="text-gray-500 text-sm">No tags</span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap">
               <div class="flex space-x-2">
                 <button 
                   @click="backupDevice(device.id)"

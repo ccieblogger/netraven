@@ -6,7 +6,7 @@
       color: textColor 
     }"
   >
-    <span>{{ tag.name }}</span>
+    <span>{{ displayName }}</span>
     <button 
       v-if="removable" 
       class="ml-1 focus:outline-none" 
@@ -34,6 +34,9 @@ export default {
     }
   },
   computed: {
+    displayName() {
+      return this.tag.name || `Tag-${this.tag.id?.substring(0, 4) || 'Unknown'}`;
+    },
     backgroundColor() {
       return this.tag.color || '#4F46E5'; // Default to Indigo-600 if no color
     },
