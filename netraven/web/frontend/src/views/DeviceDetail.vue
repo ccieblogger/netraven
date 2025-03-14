@@ -702,10 +702,10 @@ export default {
     }
     
     return {
-      loading,
-      loadingBackups,
       device,
+      loading,
       deviceBackups,
+      loadingBackups,
       backingUp,
       showEditModal,
       deviceForm,
@@ -730,7 +730,8 @@ export default {
       creatingTag,
       createTagError,
       newTag,
-      createTag
+      createTag,
+      deviceId
     }
   }
 }

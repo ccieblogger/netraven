@@ -76,6 +76,7 @@
                 <select 
                   v-model="selectedTagId"
                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 dark:text-gray-100"
+                  @change="onTagSelected"
                 >
                   <option value="" disabled>Select a tag</option>
                   <option 
@@ -169,24 +170,20 @@ export default {
     
     // Computed properties
     const currentTags = computed(() => {
-      if (!props.deviceId) return [];
-      const deviceTags = tagsStore.deviceTags[props.deviceId] || [];
-      console.log('Current tags for device:', deviceTags);
-      return deviceTags;
+      const deviceTags = props.deviceId ? tagsStore.deviceTags[props.deviceId] || [] : []
+      return deviceTags
+    })
+    
+    const allTags = computed(() => {
+      return tagsStore.tags || []
     })
     
     const availableTags = computed(() => {
-      const allTags = tagsStore.tags || [];
-      console.log('All available tags:', allTags);
-      
-      if (!currentTags.value || currentTags.value.length === 0) {
-        return allTags;
-      }
-      
-      const deviceTagIds = currentTags.value.map(t => t.id);
-      const filtered = allTags.filter(tag => !deviceTagIds.includes(tag.id));
-      console.log('Filtered available tags:', filtered);
-      return filtered;
+      // Filter out tags that are already assigned to the device
+      const filtered = allTags.value.filter(tag => 
+        !currentTags.value.some(dt => dt.id === tag.id)
+      )
+      return filtered
     })
     
     // Methods
@@ -213,6 +210,14 @@ export default {
       }
     }
     
+    // Handle tag selection change
+    const onTagSelected = (event) => {
+      // Clear any previous error message when a new tag is selected
+      if (selectedTagId.value) {
+        error.value = null;
+      }
+    }
+    
     // Format tag name by removing "tag-" prefix if present
     const formatTagName = (name) => {
       if (!name) return ''
@@ -220,36 +225,88 @@ export default {
     }
     
     const addTag = async () => {
-      if (!selectedTagId.value || !props.deviceId) return
+      // Force convert selectedTagId to string if it exists
+      const tagId = selectedTagId.value ? String(selectedTagId.value) : '';
       
-      isAddingTag.value = true
-      error.value = null
+      if (!tagId || !props.deviceId) {
+        error.value = 'Please select a tag to add';
+        return;
+      }
+      
+      isAddingTag.value = true;
+      error.value = null;
       
       try {
-        await tagsStore.assignTagToDevice(props.deviceId, selectedTagId.value)
-        await tagsStore.fetchTagsForDevice(props.deviceId) // Refresh tags
-        selectedTagId.value = ''
-        emit('update:tags', tagsStore.deviceTags[props.deviceId])
+        await tagsStore.assignTagToDevice(props.deviceId, tagId);
+        await tagsStore.fetchTagsForDevice(props.deviceId); // Refresh tags
+        
+        selectedTagId.value = '';
+        emit('update:tags', tagsStore.deviceTags[props.deviceId]);
       } catch (err) {
-        error.value = 'Failed to add tag. Please try again.'
-        console.error('Error adding tag:', err)
+        console.error('=== ERROR DETAILS ===');
+        console.error('Error object:', err);
+        console.error('Error name:', err.name);
+        console.error('Error message:', err.message);
+        console.error('Error stack:', err.stack);
+        console.error('Response status:', err.response?.status);
+        console.error('Response data:', err.response?.data);
+        console.error('=== END ERROR DETAILS ===');
+        
+        // Provide more specific error messages based on the error
+        if (err.response) {
+          if (err.response.status === 404) {
+            error.value = 'The tag or device could not be found. Please refresh and try again.';
+          } else if (err.response.status === 409) {
+            error.value = 'This tag is already assigned to the device.';
+          } else if (err.response.data && err.response.data.detail) {
+            error.value = `Failed to add tag: ${err.response.data.detail}`;
+          } else {
+            error.value = `Failed to add tag (${err.response.status}). Please try again.`;
+          }
+        } else if (err.message) {
+          error.value = `Failed to add tag: ${err.message}`;
+        } else {
+          error.value = 'Failed to add tag. Please try again.';
+        }
+        
+        console.error('Error adding tag:', err);
       } finally {
-        isAddingTag.value = false
+        isAddingTag.value = false;
       }
     }
     
     const removeTag = async (tagId) => {
-      if (!tagId || !props.deviceId) return
+      if (!tagId || !props.deviceId) {
+        error.value = 'Cannot remove tag';
+        return;
+      }
       
-      isRemovingTag.value = tagId
-      error.value = null
+      isRemovingTag.value = tagId;
+      error.value = null;
       
       try {
-        await tagsStore.removeTagFromDevice(props.deviceId, tagId)
-        await tagsStore.fetchTagsForDevice(props.deviceId) // Refresh tags
-        emit('update:tags', tagsStore.deviceTags[props.deviceId])
+        await tagsStore.removeTagFromDevice(props.deviceId, tagId);
+        await tagsStore.fetchTagsForDevice(props.deviceId); // Refresh tags
+        
+        emit('update:tags', tagsStore.deviceTags[props.deviceId]);
       } catch (err) {
-        error.value = 'Failed to remove tag. Please try again.'
+        console.error('Detailed error removing tag:', err)
+        
+        // Provide more specific error messages based on the error
+        if (err.response) {
+          if (err.response.status === 404) {
+            error.value = 'The tag or device could not be found. Please refresh and try again.'
+          } else if (err.response.data && err.response.data.detail) {
+            error.value = `Failed to remove tag: ${err.response.data.detail}`
+          } else {
+            error.value = `Failed to remove tag (${err.response.status}). Please try again.`
+          }
+        } else if (err.message) {
+          error.value = `Failed to remove tag: ${err.message}`
+        } else {
+          error.value = 'Failed to remove tag. Please try again.'
+        }
+        
         console.error('Error removing tag:', err)
       } finally {
         isRemovingTag.value = null
@@ -257,8 +314,7 @@ export default {
     }
     
     const openCreateTagModal = () => {
-      console.log('Opening create tag modal');
-      emit('open-create-tag');
+      emit('open-create-tag')
     }
     
     // Lifecycle hooks
@@ -285,7 +341,8 @@ export default {
       addTag,
       removeTag,
       openCreateTagModal,
-      formatTagName
+      formatTagName,
+      onTagSelected
     }
   }
 }
