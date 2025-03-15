@@ -36,16 +36,19 @@ export default {
     
     // Simple error handler
     onErrorCaptured((err, instance, info) => {
-      console.error('App Error:', err)
+      console.error('App-level error captured:', err, info);
       
-      // Show errors in the UI
-      appError.value = `${err.message || 'Unknown error'}`
+      // Don't set app error for authentication errors - they're handled by components
+      if (err.message?.includes('authentication') || 
+          err.message?.includes('token') || 
+          err.response?.status === 401) {
+        console.log('Authentication error caught at App level - not displaying global error');
+        return false; // Don't propagate auth errors
+      }
       
-      // Don't propagate app-level errors
-      return instance && instance.$options && 
-             ['App'].includes(instance.$options.name) 
-        ? false 
-        : true;
+      // Set global error for other types of errors
+      appError.value = `${err.message || 'An unexpected error occurred'}`;
+      return false; // Don't propagate app-level errors
     })
     
     // Simple initialization

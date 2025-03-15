@@ -115,19 +115,22 @@ api.interceptors.response.use(
       data: error.response?.data,
       message: error.message
     })
+    
+    // Handle authentication errors (401)
     if (error.response && error.response.status === 401) {
-      // Token expired or invalid - clear the token but don't redirect
-      // This prevents automatic redirects that might interfere with Vue Router
-      console.log('API: Token invalid (401), clearing token but not redirecting')
+      // Token expired or invalid - clear the token
+      console.log('API: Token invalid (401), clearing token')
       localStorage.removeItem('access_token')
       
-      // Only redirect to login if not already on login page
-      // This prevents redirect loops
-      if (!window.location.pathname.includes('/login')) {
-        console.log('API: Not on login page, router will handle redirection')
-        // We'll let the Vue Router handle this redirection now
+      // Add a custom property to the error to indicate it's an auth error
+      error.isAuthError = true;
+      
+      // Enhance the error message for better user feedback
+      if (!error.message || error.message === 'Request failed with status code 401') {
+        error.message = 'Authentication failed. Please log in again.';
       }
     }
+    
     return Promise.reject(error)
   }
 )
@@ -191,9 +194,21 @@ export const authService = {
   async getCurrentUser() {
     console.log('Auth Service: Fetching current user')
     try {
-      const response = await api.get('/api/auth/users/me')
-      console.log('Auth Service: User data received', response.data)
-      return response.data
+      // Try the new endpoint first
+      try {
+        const response = await api.get('/api/auth/users/me')
+        console.log('Auth Service: User data received from auth endpoint', response.data)
+        return response.data
+      } catch (error) {
+        // If 404, try the old endpoint
+        if (error.response?.status === 404) {
+          console.log('Auth Service: Auth endpoint not found, trying users endpoint')
+          const response = await api.get('/api/users/me')
+          console.log('Auth Service: User data received from users endpoint', response.data)
+          return response.data
+        }
+        throw error
+      }
     } catch (error) {
       console.error('Auth Service: Failed to fetch user', error)
       throw error
@@ -422,6 +437,92 @@ export const tagRuleService = {
     const response = await api.post('/api/tag-rules/test', {
       rule_criteria: ruleCriteria
     })
+    return response.data
+  }
+}
+
+// Job Logs API methods
+export const jobLogsService = {
+  async getJobLogs(params = {}) {
+    console.log('Job Logs Service: Getting job logs', params)
+    const response = await api.get('/api/job-logs', { params })
+    return response.data
+  },
+  
+  async getJobLog(id, includeEntries = false) {
+    console.log('Job Logs Service: Getting job log', id)
+    const response = await api.get(`/api/job-logs/${id}`, { 
+      params: { include_entries: includeEntries } 
+    })
+    return response.data
+  },
+  
+  async getJobLogEntries(id, params = {}) {
+    console.log('Job Logs Service: Getting job log entries', id, params)
+    const response = await api.get(`/api/job-logs/${id}/entries`, { params })
+    return response.data
+  },
+  
+  async deleteJobLog(id) {
+    console.log('Job Logs Service: Deleting job log', id)
+    await api.delete(`/api/job-logs/${id}`)
+    return true
+  },
+  
+  async updateRetentionPolicy(policyData) {
+    console.log('Job Logs Service: Updating retention policy', policyData)
+    const response = await api.post('/api/job-logs/retention', policyData)
+    return response.data
+  },
+  
+  async cleanupJobLogs(days) {
+    console.log('Job Logs Service: Cleaning up job logs', days)
+    const response = await api.post('/api/job-logs/cleanup', { days })
+    return response.data
+  }
+}
+
+// Scheduled Jobs API methods
+export const scheduledJobsService = {
+  async getScheduledJobs(params = {}) {
+    console.log('Scheduled Jobs Service: Getting scheduled jobs', params)
+    const response = await api.get('/api/scheduled-jobs', { params })
+    return response.data
+  },
+  
+  async getScheduledJob(id) {
+    console.log('Scheduled Jobs Service: Getting scheduled job', id)
+    const response = await api.get(`/api/scheduled-jobs/${id}`)
+    return response.data
+  },
+  
+  async createScheduledJob(jobData) {
+    console.log('Scheduled Jobs Service: Creating scheduled job', jobData)
+    const response = await api.post('/api/scheduled-jobs', jobData)
+    return response.data
+  },
+  
+  async updateScheduledJob(id, jobData) {
+    console.log('Scheduled Jobs Service: Updating scheduled job', id, jobData)
+    const response = await api.put(`/api/scheduled-jobs/${id}`, jobData)
+    return response.data
+  },
+  
+  async deleteScheduledJob(id) {
+    console.log('Scheduled Jobs Service: Deleting scheduled job', id)
+    await api.delete(`/api/scheduled-jobs/${id}`)
+    return true
+  },
+  
+  async runScheduledJob(id) {
+    console.log('Scheduled Jobs Service: Running scheduled job', id)
+    const response = await api.post(`/api/scheduled-jobs/${id}/run`)
+    return response.data
+  },
+  
+  async toggleScheduledJob(id, enabled) {
+    console.log('Scheduled Jobs Service: Toggling scheduled job', id, enabled)
+    const response = await api.post(`/api/scheduled-jobs/${id}/toggle`, { enabled })
     return response.data
   }
 }

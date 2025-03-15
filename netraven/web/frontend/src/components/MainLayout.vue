@@ -11,7 +11,7 @@
         <div class="ml-3">
           <p class="text-sm text-red-700">
             {{ layoutError }}
-            <button @click="retryLayout" class="font-medium underline text-red-700 hover:text-red-600">
+            <button @click="retryLayout" class="font-medium underline text-red-700 hover:text-red-600 ml-2">
               Retry
             </button>
           </p>
@@ -33,6 +33,8 @@
             <router-link to="/backups" class="hover:text-blue-200 transition">Backups</router-link>
             <router-link to="/tags" class="hover:text-blue-200 transition">Tags</router-link>
             <router-link to="/tag-rules" class="hover:text-blue-200 transition">Tag Rules</router-link>
+            <router-link to="/job-logs" class="hover:text-blue-200 transition">Job Logs</router-link>
+            <router-link to="/scheduled-jobs" class="hover:text-blue-200 transition">Scheduled Jobs</router-link>
           </div>
           
           <div class="relative">
@@ -66,6 +68,8 @@
         <router-link to="/backups" class="hover:text-blue-200 transition">Backups</router-link>
         <router-link to="/tags" class="hover:text-blue-200 transition">Tags</router-link>
         <router-link to="/tag-rules" class="hover:text-blue-200 transition">Rules</router-link>
+        <router-link to="/job-logs" class="hover:text-blue-200 transition">Logs</router-link>
+        <router-link to="/scheduled-jobs" class="hover:text-blue-200 transition">Jobs</router-link>
       </div>
     </div>
     
@@ -111,11 +115,14 @@ export default {
     
     const username = computed(() => {
       try {
-        if (!authStore.user) return ''
-        return authStore.user.username || authStore.user.full_name || 'User'
+        if (!authStore.user) {
+          // If we have a token but no user data, show a placeholder
+          return hasToken.value ? 'User' : '';
+        }
+        return authStore.user.username || authStore.user.full_name || 'User';
       } catch (e) {
-        console.error('Error computing username:', e)
-        return 'User'
+        console.error('Error computing username:', e);
+        return 'User';
       }
     })
     
@@ -181,17 +188,26 @@ export default {
     }
     
     onMounted(async () => {
-      console.log('MainLayout: Component mounted')
+      console.log('MainLayout mounted');
       
-      try {
-        // Fetch user if authenticated but no user data
-        if (isAuthenticated.value && !authStore.user) {
-          console.log('MainLayout: Fetching current user')
-          await authStore.fetchCurrentUser()
+      // If we have a token but no user data, fetch the user
+      if (hasToken.value && !authStore.user) {
+        try {
+          console.log('MainLayout: Token found but no user data, fetching user');
+          await authStore.fetchCurrentUser();
+        } catch (err) {
+          console.error('MainLayout: Failed to fetch user data on mount', err);
+          
+          // Only show error for non-404 responses
+          if (err.response?.status !== 404) {
+            layoutError.value = 'Failed to load user data';
+          } else {
+            console.log('MainLayout: User endpoint not found (404), continuing without user data');
+          }
+          
+          // Don't redirect on initial load to avoid disrupting the current flow
+          // User can use the retry button if needed
         }
-      } catch (err) {
-        console.error('MainLayout: Failed to fetch user', err)
-        layoutError.value = 'Failed to load user data. Please try refreshing the page.'
       }
     })
     
@@ -208,13 +224,27 @@ export default {
     }
     
     const retryLayout = async () => {
-      layoutError.value = null
+      layoutError.value = null;
+      
       try {
-        if (isAuthenticated.value) {
-          await authStore.fetchCurrentUser()
+        // Check if we have a token but no user data
+        if (hasToken.value) {
+          console.log('MainLayout: Retrying user data fetch');
+          await authStore.fetchCurrentUser();
+        } else {
+          // If no token, redirect to login
+          console.log('MainLayout: No token found, redirecting to login');
+          router.push('/login');
         }
       } catch (err) {
-        layoutError.value = 'Still having issues. Try logging out and back in.'
+        console.error('MainLayout: Retry failed', err);
+        layoutError.value = 'Still having issues. Try logging out and back in.';
+        
+        // If we get a 401 error, redirect to login
+        if (err.response?.status === 401) {
+          console.log('MainLayout: Token invalid (401), redirecting to login');
+          router.push('/login');
+        }
       }
     }
     

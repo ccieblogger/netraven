@@ -155,6 +155,17 @@ async def get_current_active_user(
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+async def get_current_admin_user(
+    current_user: UserModel = Depends(get_current_active_user)
+) -> UserModel:
+    """Check if user is an admin."""
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+    return current_user
+
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -197,4 +208,5 @@ async def read_users_me(
     current_user: UserModel = Depends(get_current_active_user)
 ) -> UserModel:
     """Get current user information."""
+    logger.info(f"User {current_user.username} requested their profile")
     return current_user 

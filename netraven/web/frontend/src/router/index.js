@@ -8,6 +8,9 @@ import BackupList from '../views/BackupList.vue'
 import BackupDetail from '../views/BackupDetail.vue'
 import TagList from '../views/TagList.vue'
 import TagRuleList from '../views/TagRuleList.vue'
+import JobLogList from '../views/JobLogList.vue'
+import JobLogDetail from '../views/JobLogDetail.vue'
+import ScheduledJobList from '../views/ScheduledJobList.vue'
 import Login from '../views/Login.vue'
 import RouteTest from '../views/RouteTest.vue'
 
@@ -58,6 +61,25 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/job-logs',
+    name: 'JobLogs',
+    component: JobLogList,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/job-logs/:id',
+    name: 'JobLogDetail',
+    component: JobLogDetail,
+    props: true,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/scheduled-jobs',
+    name: 'ScheduledJobs',
+    component: ScheduledJobList,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/login',
     name: 'Login',
     component: Login,
@@ -81,8 +103,16 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   console.log(`Router: Navigating from ${from.path || '/'} to ${to.path}`);
 
+  // Check if the route requires authentication
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth !== false);
+  
   // Skip authentication check for login and public pages
-  if (to.path === '/login') {
+  if (to.path === '/login' || !requiresAuth) {
+    // If user is already logged in and tries to access login page, redirect to dashboard
+    if (to.path === '/login' && localStorage.getItem('access_token')) {
+      console.log('Router: User already logged in, redirecting to dashboard');
+      return next('/');
+    }
     return next();
   }
 
@@ -91,7 +121,12 @@ router.beforeEach((to, from, next) => {
   
   if (!token) {
     console.log('Router: No token found, redirecting to login');
-    return next('/login');
+    // Store the intended destination to redirect after login
+    const redirectPath = to.path !== '/' ? to.fullPath : undefined;
+    return next({
+      path: '/login',
+      query: redirectPath ? { redirect: redirectPath } : {}
+    });
   }
   
   // User has token, allow navigation

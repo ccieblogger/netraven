@@ -108,12 +108,15 @@
 <script>
 import { defineComponent, ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../store/auth'
+import { useRouter, useRoute } from 'vue-router'
 
 export default defineComponent({
   name: 'Login',
   
   setup() {
     const authStore = useAuthStore()
+    const router = useRouter()
+    const route = useRoute()
     
     // Simple state management
     const username = ref('admin')
@@ -122,6 +125,7 @@ export default defineComponent({
     // Computed properties
     const loading = computed(() => authStore.loading)
     const error = computed(() => authStore.error)
+    const redirectPath = computed(() => route.query.redirect || '/')
     
     // Simplified login function
     async function handleLogin() {
@@ -132,10 +136,10 @@ export default defineComponent({
         const success = await authStore.login(username.value, password.value)
         
         if (success) {
-          console.log('Login: Login successful, redirecting to dashboard')
+          console.log('Login: Login successful, redirecting to', redirectPath.value)
           
-          // Simple redirect to dashboard after successful login
-          window.location.href = '/'
+          // Use Vue Router for navigation
+          router.push(redirectPath.value)
         } else {
           console.error('Login: Failed', authStore.error)
         }
@@ -148,6 +152,12 @@ export default defineComponent({
     onMounted(() => {
       console.log('Login: Component mounted')
       authStore.error = null
+      
+      // If user is already authenticated, redirect to dashboard
+      if (authStore.isAuthenticated) {
+        console.log('Login: User already authenticated, redirecting')
+        router.push('/')
+      }
     })
     
     return {
@@ -155,6 +165,7 @@ export default defineComponent({
       password,
       loading,
       error,
+      redirectPath,
       handleLogin
     }
   }
