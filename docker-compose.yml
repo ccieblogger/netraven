@@ -28,12 +28,11 @@ services:
     command: >
       bash -c "cd /app && \
       apt-get update && \
-      apt-get install -y curl postgresql-client && \
+      apt-get install -y curl && \
       pip install -e . && \
       pip install email-validator psycopg2-binary alembic schedule fastapi uvicorn sqlalchemy pydantic python-jose python-multipart requests prometheus-client pyjwt && \
-      python -m netraven.web.migrations.run_migrations && \
-      python -m netraven.web.migrations.test_migrations && \
-      uvicorn netraven.web:app --host 0.0.0.0 --port 8000 --reload"
+      bash scripts/simple-migrations.sh && \
+      python -m uvicorn netraven.web:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "8000:8000"
     environment:
