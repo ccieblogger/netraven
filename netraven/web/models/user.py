@@ -4,17 +4,26 @@ User model for the NetRaven web interface.
 This module provides the User model for the NetRaven web interface.
 """
 
-from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import Column, String, Boolean, Integer, DateTime
+from sqlalchemy.orm import relationship
+from datetime import datetime
+import uuid
 
-class User(BaseModel):
-    """User model."""
-    id: int
-    username: str
-    email: EmailStr
-    is_active: bool = True
-    is_admin: bool = False
+from netraven.web.database import Base
+
+class User(Base):
+    """User model for SQLAlchemy."""
+    __tablename__ = "users"
     
-    class Config:
-        """Pydantic configuration."""
-        orm_mode = True 
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    email = Column(String(100), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(100), nullable=False)
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    scheduled_jobs = relationship("ScheduledJob", back_populates="user", cascade="all, delete-orphan")
+    job_logs = relationship("JobLog", back_populates="user", cascade="all, delete-orphan") 

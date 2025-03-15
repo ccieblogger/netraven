@@ -10,6 +10,7 @@ import subprocess
 import logging
 import socket
 from pathlib import Path
+import tempfile
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -101,6 +102,103 @@ def fix_problematic_migration_files():
         
         logger.info(f"Fixed merge migration file: {merge_file}")
 
+def create_new_merge_migration(env):
+    """
+    Create a new merge migration to handle multiple heads.
+    
+    Args:
+        env: Environment variables for subprocess
+        
+    Returns:
+        Path to the new migration file or None if creation failed
+    """
+    logger.info("Creating a new merge migration to handle multiple heads...")
+    
+    try:
+        # Get the current heads
+        heads_output = subprocess.run(
+            ["alembic", "-c", "/app/netraven/web/migrations/alembic.ini", "heads"],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        # Parse the heads from the output
+        heads = []
+        for line in heads_output.stdout.splitlines():
+            if line.strip() and ":" in line:
+                head_id = line.split(":")[0].strip()
+                heads.append(head_id)
+        
+        if len(heads) <= 1:
+            logger.info("No multiple heads found, no need for a merge migration")
+            return None
+        
+        logger.info(f"Found {len(heads)} heads: {', '.join(heads)}")
+        
+        # Create a temporary file with the merge migration content
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.py') as temp_file:
+            temp_path = temp_file.name
+            
+            # Write a simple merge migration
+            temp_file.write(f"""\"\"\"Merge multiple heads
+
+Revision ID: merge_{int(time.time())}
+Revises: {', '.join(heads)}
+Create Date: {time.strftime('%Y-%m-%d %H:%M:%S')}
+
+\"\"\"
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+# revision identifiers, used by Alembic.
+revision = 'merge_{int(time.time())}'
+down_revision = None
+branch_labels = None
+depends_on = None
+
+def upgrade() -> None:
+    \"\"\"
+    This is a merge migration that doesn't need to do anything.
+    It just serves to connect multiple migration branches.
+    \"\"\"
+    pass
+
+def downgrade() -> None:
+    \"\"\"
+    This is a merge migration that doesn't need to do anything.
+    \"\"\"
+    pass
+""")
+        
+        # Create a merge migration using the alembic merge command
+        merge_output = subprocess.run(
+            ["alembic", "-c", "/app/netraven/web/migrations/alembic.ini", "merge", "-m", f"merge_heads_{int(time.time())}", *heads],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        # Get the path to the new migration file from the output
+        for line in merge_output.stdout.splitlines():
+            if "Generating" in line and ".py" in line:
+                migration_file = line.split("Generating ")[-1].strip()
+                logger.info(f"Created new merge migration: {migration_file}")
+                return migration_file
+        
+        logger.warning("Could not determine the path of the new merge migration")
+        return None
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error creating merge migration: {e}")
+        logger.error(f"stdout: {e.stdout}")
+        logger.error(f"stderr: {e.stderr}")
+        return None
+
 def run_migrations():
     """
     Run all pending Alembic migrations.
@@ -155,6 +253,30 @@ def run_migrations():
     except subprocess.CalledProcessError as e:
         logger.warning(f"Error during standard migration: {e}")
         
+        # Check if the error is due to multiple heads
+        if "Multiple head revisions are present" in str(e):
+            logger.info("Multiple head revisions detected, creating a merge migration...")
+            
+            # Create a new merge migration
+            merge_file = create_new_merge_migration(env)
+            
+            if merge_file:
+                try:
+                    # Try to upgrade to the new merge revision
+                    logger.info("Upgrading to the new merge revision...")
+                    result = subprocess.run(
+                        ["alembic", "-c", "/app/netraven/web/migrations/alembic.ini", "upgrade", "head"],
+                        env=env,
+                        check=True
+                    )
+                    
+                    if result.returncode == 0:
+                        logger.info("Migration to new merge revision completed successfully")
+                        return True
+                        
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Error upgrading to new merge revision: {e}")
+        
         try:
             # If that fails, try to upgrade with the --sql flag to see the SQL that would be executed
             logger.info("Generating SQL for migrations...")
@@ -171,13 +293,13 @@ def run_migrations():
             # Try to upgrade with the merge revision explicitly
             logger.info("Attempting to upgrade to merge revision...")
             result = subprocess.run(
-                ["alembic", "-c", "/app/netraven/web/migrations/alembic.ini", "upgrade", "4a227448e6fe"],
+                ["alembic", "-c", "/app/netraven/web/migrations/alembic.ini", "upgrade", "heads"],
                 env=env,
                 check=True
             )
             
             if result.returncode == 0:
-                logger.info("Migration to merge revision completed successfully")
+                logger.info("Migration to all heads completed successfully")
                 return True
                 
         except subprocess.CalledProcessError as e:
@@ -185,16 +307,35 @@ def run_migrations():
             
             try:
                 # As a last resort, try to stamp the database with the merge revision
-                logger.info("Attempting to stamp the database with the merge revision...")
-                result = subprocess.run(
-                    ["alembic", "-c", "/app/netraven/web/migrations/alembic.ini", "stamp", "4a227448e6fe"],
+                logger.info("Attempting to stamp the database with the latest revision...")
+                
+                # Get the latest revision
+                latest_output = subprocess.run(
+                    ["alembic", "-c", "/app/netraven/web/migrations/alembic.ini", "heads"],
                     env=env,
+                    capture_output=True,
+                    text=True,
                     check=True
                 )
                 
-                if result.returncode == 0:
-                    logger.info("Database stamped with merge revision successfully")
-                    return True
+                # Parse the latest revision from the output
+                latest_revision = None
+                for line in latest_output.stdout.splitlines():
+                    if line.strip() and ":" in line:
+                        latest_revision = line.split(":")[0].strip()
+                        break
+                
+                if latest_revision:
+                    logger.info(f"Stamping database with revision: {latest_revision}")
+                    result = subprocess.run(
+                        ["alembic", "-c", "/app/netraven/web/migrations/alembic.ini", "stamp", latest_revision],
+                        env=env,
+                        check=True
+                    )
+                    
+                    if result.returncode == 0:
+                        logger.info("Database stamped with latest revision successfully")
+                        return True
                     
             except subprocess.CalledProcessError as e:
                 logger.error(f"Error stamping database: {e}")
