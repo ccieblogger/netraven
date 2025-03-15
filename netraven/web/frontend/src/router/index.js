@@ -13,6 +13,7 @@ import JobLogDetail from '../views/JobLogDetail.vue'
 import ScheduledJobList from '../views/ScheduledJobList.vue'
 import Login from '../views/Login.vue'
 import RouteTest from '../views/RouteTest.vue'
+import GatewayDashboard from '../views/GatewayDashboard.vue'
 
 // Define routes
 const routes = [
@@ -77,6 +78,12 @@ const routes = [
     path: '/scheduled-jobs',
     name: 'ScheduledJobs',
     component: ScheduledJobList,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/gateway',
+    name: 'Gateway',
+    component: GatewayDashboard,
     meta: { requiresAuth: true }
   },
   {

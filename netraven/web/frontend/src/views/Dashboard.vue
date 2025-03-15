@@ -41,9 +41,19 @@
             <div class="w-3 h-3 rounded-full bg-green-500"></div>
             <span>Database: Connected</span>
           </div>
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center space-x-2 mb-2">
             <div class="w-3 h-3 rounded-full bg-green-500"></div>
             <span>Scheduler: Running</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <div 
+              class="w-3 h-3 rounded-full" 
+              :class="gatewayStatus === 'running' ? 'bg-green-500' : 'bg-red-500'"
+            ></div>
+            <span>Gateway: {{ gatewayStatus === 'running' ? 'Online' : 'Offline' }}</span>
+          </div>
+          <div v-if="gatewayStatus === 'running'" class="mt-2 text-xs text-gray-500">
+            <router-link to="/gateway" class="text-blue-500 hover:underline">View Gateway Dashboard</router-link>
           </div>
         </div>
         
@@ -245,6 +255,7 @@ import { useBackupStore } from '../store/backups'
 import { useAuthStore } from '../store/auth'
 import { useJobLogStore } from '../store/job-logs'
 import { useScheduledJobStore } from '../store/scheduled-jobs'
+import api from '@/api/api'
 
 export default {
   name: 'Dashboard',
@@ -264,6 +275,7 @@ export default {
     const error = ref(null)
     const renderError = ref(null)
     const appLoaded = ref(false)
+    const gatewayStatus = ref(null)
     
     const isAuthenticated = computed(() => authStore.isAuthenticated)
     
@@ -382,6 +394,10 @@ export default {
           scheduledJobStore.fetchScheduledJobs()
         ])
         
+        // Check gateway status
+        const gatewayData = await api.getGatewayStatus()
+        gatewayStatus.value = gatewayData.status
+        
         appLoaded.value = true
       } catch (err) {
         console.error('Dashboard: Error loading data:', err)
@@ -454,7 +470,8 @@ export default {
       retryRender,
       formatDate,
       formatDateTime,
-      formatJobType
+      formatJobType,
+      gatewayStatus
     }
   }
 }

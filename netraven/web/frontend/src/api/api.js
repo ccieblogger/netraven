@@ -48,488 +48,447 @@ if (envApiBaseUrl) {
   // Production/Docker environment
   // If we're accessing the frontend from outside Docker via 8080 port
   // we need to construct the API URL using the same hostname but port 8000
-  const currentOrigin = window.location.origin;
-  const apiOrigin = currentOrigin.replace(':8080', ':8000');
-  browserApiUrl = apiOrigin;
-  console.log('Using dynamic API URL based on frontend origin');
+  const hostname = window.location.hostname;
+  browserApiUrl = `http://${hostname}:8000`;
+  console.log('Using production API URL with hostname:', hostname);
 }
 
-// Ensure we always have a fallback URL if nothing else worked
-if (!browserApiUrl) {
-  browserApiUrl = 'http://localhost:8000';
-  console.log('Falling back to default API URL: http://localhost:8000');
-}
+console.log('Final API URL:', browserApiUrl);
 
-console.log('Final API URL:', browserApiUrl)
-
-// For direct container-to-container communication within Docker
-// This overrides the browser URL for server-side API calls that happen within Docker
-// With host network mode, we use localhost instead of container name
-const internalApiUrl = 'http://localhost:8000';
-
-// Create API client with retry capability
-const api = axios.create({
-  baseURL: browserApiUrl,
-  headers: {
-    'Content-Type': 'application/json'
+// Create API client
+const apiClient = {
+  // Get auth header for authenticated requests
+  getAuthHeader() {
+    const token = localStorage.getItem('access_token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
   },
-  // Add important options for cross-origin requests
-  withCredentials: false,
-  timeout: 15000 // 15 seconds timeout
-})
 
-// Add request interceptor to attach the authentication token
-api.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`
-    }
-    console.log('API Request:', {
-      url: config.url,
-      method: config.method,
-      baseURL: config.baseURL,
-      fullURL: config.baseURL + config.url,
-      hasToken: !!token
-    })
-    return config
-  },
-  error => {
-    console.error('API Request Error:', error)
-    return Promise.reject(error)
-  }
-)
-
-// Add response interceptor for error handling
-api.interceptors.response.use(
-  response => {
-    return response
-  },
-  async error => {
-    const originalRequest = error.config
-    
-    // If the error is a network error (no response from server)
-    if (error.message && error.message.includes('Network Error') && !originalRequest._retry) {
-      console.error('Network error detected, retrying request...')
-      
-      // Mark the request as retried to prevent infinite loops
-      originalRequest._retry = true
-      
-      // Wait a moment before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Retry the request
-      return api(originalRequest)
-    }
-    
-    // If the error is a timeout
-    if (error.code === 'ECONNABORTED' && !originalRequest._retry) {
-      console.error('Request timeout, retrying...')
-      
-      // Mark the request as retried to prevent infinite loops
-      originalRequest._retry = true
-      
-      // Wait a moment before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Retry the request
-      return api(originalRequest)
-    }
-    
-    return Promise.reject(error)
-  }
-)
-
-// Auth service
-export const authService = {
+  // Authentication methods
   async login(username, password) {
-    console.log('Auth Service: Login attempt for user:', username)
-    const formData = new URLSearchParams()
-    formData.append('username', username)
-    formData.append('password', password)
-    
-    // Try multiple login approaches in sequence for better reliability
-    const loginUrlOptions = [
-      browserApiUrl + '/api/auth/token',
-      'http://localhost:8000/api/auth/token', 
-      window.location.hostname + ':8000/api/auth/token',
-      'http://' + window.location.hostname + ':8000/api/auth/token'
-    ];
-    
-    let lastError = null;
-    
-    // Try each URL in sequence until one works
-    for (const loginUrl of loginUrlOptions) {
-      try {
-        console.log('Auth Service: Attempting login with URL:', loginUrl);
-        
-        const response = await fetch(loginUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: formData,
-          mode: 'cors'
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Auth Service: Login response not OK', response.status, errorData);
-          throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.detail || 'Unknown error'}`);
-        }
-        
-        const data = await response.json();
-        console.log('Auth Service: Login successful, token received', data);
-        
-        // Store the token
-        localStorage.setItem('access_token', data.access_token);
-        return data;
-      } catch (error) {
-        console.error(`Auth Service: Login attempt failed for URL ${loginUrl}:`, error);
-        lastError = error;
-        // Continue to the next URL option
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/auth/token`, {
+        username,
+        password
+      });
+      
+      // Store token in localStorage
+      localStorage.setItem('access_token', response.data.access_token);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Login error:', error);
+      
+      // Handle different error scenarios
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        return {
+          success: false,
+          status: error.response.status,
+          message: error.response.data.detail || 'Authentication failed'
+        };
+      } else if (error.request) {
+        // The request was made but no response was received
+        return {
+          success: false,
+          message: 'No response from server. Please check your connection.'
+        };
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        return {
+          success: false,
+          message: 'Error setting up request: ' + error.message
+        };
       }
     }
-    
-    // If we get here, all login attempts failed
-    console.error('Auth Service: All login attempts failed');
-    throw lastError || new Error('Failed to connect to the API server. Please check your network connection.');
   },
-  
+
   async getCurrentUser() {
-    console.log('Auth Service: Fetching current user')
     try {
-      // Try the new endpoint first
-      try {
-        const response = await api.get('/api/auth/users/me')
-        console.log('Auth Service: User data received from auth endpoint', response.data)
-        return response.data
-      } catch (error) {
-        // If 404, try the old endpoint
-        if (error.response?.status === 404) {
-          console.log('Auth Service: Auth endpoint not found, trying users endpoint')
-          const response = await api.get('/api/users/me')
-          console.log('Auth Service: User data received from users endpoint', response.data)
-          return response.data
-        }
-        throw error
+      const response = await axios.get(`${browserApiUrl}/api/users/me`, {
+        headers: this.getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      
+      // If we get a 401 Unauthorized, clear the token
+      if (error.response && error.response.status === 401) {
+        localStorage.removeItem('access_token');
       }
-    } catch (error) {
-      console.error('Auth Service: Failed to fetch user', error)
-      throw error
+      
+      throw error;
     }
   },
-  
+
   logout() {
-    console.log('Auth Service: Logging out')
-    localStorage.removeItem('access_token')
-  }
-}
+    localStorage.removeItem('access_token');
+    return true;
+  },
 
-// Devices service
-export const deviceService = {
+  // Device methods
   async getDevices() {
-    const response = await api.get('/api/devices')
-    return response.data
-  },
-  
-  async getDevice(id) {
-    const response = await api.get(`/api/devices/${id}`)
-    return response.data
-  },
-  
-  async createDevice(deviceData) {
-    console.log('API: Creating device with data:', deviceData)
-    const response = await api.post('/api/devices', deviceData)
-    console.log('API: Device creation response:', response.data)
-    return response.data
-  },
-  
-  async updateDevice(id, deviceData) {
-    console.log('API: Updating device with data:', deviceData)
-    const response = await api.put(`/api/devices/${id}`, deviceData)
-    console.log('API: Device update response:', response.data)
-    return response.data
-  },
-  
-  async deleteDevice(id) {
-    const response = await api.delete(`/api/devices/${id}`)
-    return response.data
-  },
-  
-  async backupDevice(id) {
-    const response = await api.post(`/api/devices/${id}/backup`)
-    return response.data
-  }
-}
-
-// Backups service
-export const backupService = {
-  async getBackups(params = {}) {
-    const response = await api.get('/api/backups', { params })
-    return response.data
-  },
-  
-  async getBackup(id) {
-    const response = await api.get(`/api/backups/${id}`)
-    return response.data
-  },
-  
-  async getBackupContent(id) {
-    const response = await api.get(`/api/backups/${id}/content`)
-    return response.data
-  },
-  
-  async compareBackups(backup1Id, backup2Id) {
-    const response = await api.post('/api/backups/compare', {
-      backup1_id: backup1Id,
-      backup2_id: backup2Id
-    })
-    return response.data
-  },
-  
-  async restoreBackup(id) {
-    const response = await api.post(`/api/backups/${id}/restore`)
-    return response.data
-  },
-  
-  async deleteBackup(id) {
-    const response = await api.delete(`/api/backups/${id}`)
-    return response.data
-  }
-}
-
-// Tag service
-export const tagService = {
-  async getTags(params = {}) {
-    console.log('Tag Service: Fetching all tags', params)
-    const response = await api.get('/api/tags', { params })
-    return response.data
-  },
-  
-  async getTag(id) {
-    console.log('Tag Service: Fetching tag', id)
-    const response = await api.get(`/api/tags/${id}`)
-    return response.data
-  },
-  
-  async createTag(tagData) {
-    console.log('Tag Service: Creating tag', tagData)
-    const response = await api.post('/api/tags', tagData)
-    return response.data
-  },
-  
-  async updateTag(id, tagData) {
-    console.log('Tag Service: Updating tag', id, tagData)
-    const response = await api.put(`/api/tags/${id}`, tagData)
-    return response.data
-  },
-  
-  async deleteTag(id) {
-    console.log('Tag Service: Deleting tag', id)
-    await api.delete(`/api/tags/${id}`)
-    return true
-  },
-  
-  async getDevicesForTag(id, params = {}) {
-    console.log('Tag Service: Fetching devices for tag', id, params)
-    const response = await api.get(`/api/tags/${id}/devices`, { params })
-    return response.data
-  },
-  
-  async assignTagsToDevices(deviceIds, tagIds) {
-    console.log('=== API DEBUG: assignTagsToDevices ===');
-    console.log('Method called with params:', { deviceIds, tagIds });
-    console.log('deviceIds type:', Array.isArray(deviceIds) ? 'array' : typeof deviceIds);
-    console.log('tagIds type:', Array.isArray(tagIds) ? 'array' : typeof tagIds);
-    console.log('API URL:', `/api/tags/assign`);
-    console.log('Request body:', {
-      device_ids: deviceIds,
-      tag_ids: tagIds
+    const response = await axios.get(`${browserApiUrl}/api/devices`, {
+      headers: this.getAuthHeader()
     });
-    
-    try {
-      console.log('Making API request...');
-      const response = await api.post('/api/tags/assign', {
+    return response.data;
+  },
+
+  async getDevice(id) {
+    const response = await axios.get(`${browserApiUrl}/api/devices/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async createDevice(deviceData) {
+    const response = await axios.post(`${browserApiUrl}/api/devices`, deviceData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async updateDevice(id, deviceData) {
+    const response = await axios.put(`${browserApiUrl}/api/devices/${id}`, deviceData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async deleteDevice(id) {
+    const response = await axios.delete(`${browserApiUrl}/api/devices/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async backupDevice(id) {
+    const response = await axios.post(`${browserApiUrl}/api/devices/${id}/backup`, {}, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  // Backup methods
+  async getBackups(params = {}) {
+    const response = await axios.get(`${browserApiUrl}/api/backups`, {
+      headers: this.getAuthHeader(),
+      params
+    });
+    return response.data;
+  },
+
+  async getBackup(id) {
+    const response = await axios.get(`${browserApiUrl}/api/backups/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async getBackupContent(id) {
+    const response = await axios.get(`${browserApiUrl}/api/backups/${id}/content`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async compareBackups(backup1Id, backup2Id) {
+    const response = await axios.get(`${browserApiUrl}/api/backups/compare`, {
+      headers: this.getAuthHeader(),
+      params: {
+        backup1_id: backup1Id,
+        backup2_id: backup2Id
+      }
+    });
+    return response.data;
+  },
+
+  async restoreBackup(id) {
+    const response = await axios.post(`${browserApiUrl}/api/backups/${id}/restore`, {}, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async deleteBackup(id) {
+    const response = await axios.delete(`${browserApiUrl}/api/backups/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  // Tag methods
+  async getTags(params = {}) {
+    const response = await axios.get(`${browserApiUrl}/api/tags`, {
+      headers: this.getAuthHeader(),
+      params
+    });
+    return response.data;
+  },
+
+  async getTag(id) {
+    const response = await axios.get(`${browserApiUrl}/api/tags/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async createTag(tagData) {
+    const response = await axios.post(`${browserApiUrl}/api/tags`, tagData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async updateTag(id, tagData) {
+    const response = await axios.put(`${browserApiUrl}/api/tags/${id}`, tagData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async deleteTag(id) {
+    const response = await axios.delete(`${browserApiUrl}/api/tags/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async getDevicesForTag(id, params = {}) {
+    const response = await axios.get(`${browserApiUrl}/api/tags/${id}/devices`, {
+      headers: this.getAuthHeader(),
+      params
+    });
+    return response.data;
+  },
+
+  async assignTagsToDevices(deviceIds, tagIds) {
+    const response = await axios.post(
+      `${browserApiUrl}/api/tags/assign`,
+      {
         device_ids: deviceIds,
         tag_ids: tagIds
-      });
-      
-      console.log('API response status:', response.status);
-      console.log('API response data:', response.data);
-      console.log('=== END API DEBUG ===');
-      
-      return response.data;
-    } catch (error) {
-      console.error('=== API ERROR ===');
-      console.error('Error in assignTagsToDevices:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      console.error('=== END API ERROR ===');
-      throw error;
-    }
+      },
+      {
+        headers: this.getAuthHeader()
+      }
+    );
+    return response.data;
   },
-  
+
   async removeTagsFromDevices(deviceIds, tagIds) {
-    console.log('=== API DEBUG: removeTagsFromDevices ===');
-    console.log('Method called with params:', { deviceIds, tagIds });
-    console.log('deviceIds type:', Array.isArray(deviceIds) ? 'array' : typeof deviceIds);
-    console.log('tagIds type:', Array.isArray(tagIds) ? 'array' : typeof tagIds);
-    
-    try {
-      console.log('Making API request...');
-      const response = await api.post('/api/tags/unassign', {
+    const response = await axios.post(
+      `${browserApiUrl}/api/tags/remove`,
+      {
         device_ids: deviceIds,
         tag_ids: tagIds
+      },
+      {
+        headers: this.getAuthHeader()
+      }
+    );
+    return response.data;
+  },
+
+  // Tag rule methods
+  async getTagRules(params = {}) {
+    const response = await axios.get(`${browserApiUrl}/api/tag-rules`, {
+      headers: this.getAuthHeader(),
+      params
+    });
+    return response.data;
+  },
+
+  async getTagRule(id) {
+    const response = await axios.get(`${browserApiUrl}/api/tag-rules/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async createTagRule(ruleData) {
+    const response = await axios.post(`${browserApiUrl}/api/tag-rules`, ruleData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async updateTagRule(id, ruleData) {
+    const response = await axios.put(`${browserApiUrl}/api/tag-rules/${id}`, ruleData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async deleteTagRule(id) {
+    const response = await axios.delete(`${browserApiUrl}/api/tag-rules/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async applyTagRule(id) {
+    const response = await axios.post(`${browserApiUrl}/api/tag-rules/${id}/apply`, {}, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async testRule(ruleCriteria) {
+    const response = await axios.post(`${browserApiUrl}/api/tag-rules/test`, ruleCriteria, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  // Job log methods
+  async getJobLogs(params = {}) {
+    const response = await axios.get(`${browserApiUrl}/api/job-logs`, {
+      headers: this.getAuthHeader(),
+      params
+    });
+    return response.data;
+  },
+
+  async getJobLog(id, includeEntries = false) {
+    const response = await axios.get(`${browserApiUrl}/api/job-logs/${id}`, {
+      headers: this.getAuthHeader(),
+      params: { include_entries: includeEntries }
+    });
+    return response.data;
+  },
+
+  async getJobLogEntries(id, params = {}) {
+    const response = await axios.get(`${browserApiUrl}/api/job-logs/${id}/entries`, {
+      headers: this.getAuthHeader(),
+      params
+    });
+    return response.data;
+  },
+
+  async deleteJobLog(id) {
+    const response = await axios.delete(`${browserApiUrl}/api/job-logs/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async updateRetentionPolicy(policyData) {
+    const response = await axios.put(`${browserApiUrl}/api/job-logs/retention`, policyData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async cleanupJobLogs(days) {
+    const response = await axios.post(`${browserApiUrl}/api/job-logs/cleanup`, { days }, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  // Scheduled job methods
+  async getScheduledJobs(params = {}) {
+    const response = await axios.get(`${browserApiUrl}/api/scheduled-jobs`, {
+      headers: this.getAuthHeader(),
+      params
+    });
+    return response.data;
+  },
+
+  async getScheduledJob(id) {
+    const response = await axios.get(`${browserApiUrl}/api/scheduled-jobs/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async createScheduledJob(jobData) {
+    const response = await axios.post(`${browserApiUrl}/api/scheduled-jobs`, jobData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async updateScheduledJob(id, jobData) {
+    const response = await axios.put(`${browserApiUrl}/api/scheduled-jobs/${id}`, jobData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async deleteScheduledJob(id) {
+    const response = await axios.delete(`${browserApiUrl}/api/scheduled-jobs/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async runScheduledJob(id) {
+    const response = await axios.post(`${browserApiUrl}/api/scheduled-jobs/${id}/run`, {}, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async toggleScheduledJob(id, enabled) {
+    const response = await axios.post(`${browserApiUrl}/api/scheduled-jobs/${id}/toggle`, { enabled }, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  // Gateway API methods
+  async getGatewayStatus() {
+    try {
+      const response = await axios.get(`${browserApiUrl}/api/gateway/status`, {
+        headers: this.getAuthHeader()
       });
-      
-      console.log('API response status:', response.status);
-      console.log('API response data:', response.data);
-      console.log('=== END API DEBUG ===');
-      
       return response.data;
     } catch (error) {
-      console.error('=== API ERROR ===');
-      console.error('Error in removeTagsFromDevices:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      console.error('=== END API ERROR ===');
-      throw error;
+      console.error('Error getting gateway status:', error);
+      return { status: 'error', error: error.message };
+    }
+  },
+
+  async getGatewayMetrics() {
+    try {
+      const response = await axios.get(`${browserApiUrl}/api/gateway/metrics`, {
+        headers: this.getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting gateway metrics:', error);
+      return { error: error.message };
+    }
+  },
+
+  async resetGatewayMetrics() {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/gateway/reset-metrics`, {}, {
+        headers: this.getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error resetting gateway metrics:', error);
+      return { error: error.message };
+    }
+  },
+
+  async getGatewayConfig() {
+    try {
+      const response = await axios.get(`${browserApiUrl}/api/gateway/config`, {
+        headers: this.getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting gateway config:', error);
+      return { error: error.message };
     }
   }
 }
 
-// Tag Rules service
-export const tagRuleService = {
-  async getTagRules(params = {}) {
-    console.log('Tag Rule Service: Fetching all tag rules', params)
-    const response = await api.get('/api/tag-rules', { params })
-    return response.data
-  },
-  
-  async getTagRule(id) {
-    console.log('Tag Rule Service: Fetching tag rule', id)
-    const response = await api.get(`/api/tag-rules/${id}`)
-    return response.data
-  },
-  
-  async createTagRule(ruleData) {
-    console.log('Tag Rule Service: Creating tag rule', ruleData)
-    const response = await api.post('/api/tag-rules', ruleData)
-    return response.data
-  },
-  
-  async updateTagRule(id, ruleData) {
-    console.log('Tag Rule Service: Updating tag rule', id, ruleData)
-    const response = await api.put(`/api/tag-rules/${id}`, ruleData)
-    return response.data
-  },
-  
-  async deleteTagRule(id) {
-    console.log('Tag Rule Service: Deleting tag rule', id)
-    await api.delete(`/api/tag-rules/${id}`)
-    return true
-  },
-  
-  async applyTagRule(id) {
-    console.log('Tag Rule Service: Applying tag rule', id)
-    const response = await api.post(`/api/tag-rules/${id}/apply`)
-    return response.data
-  },
-  
-  async testRule(ruleCriteria) {
-    console.log('Tag Rule Service: Testing rule criteria', ruleCriteria)
-    const response = await api.post('/api/tag-rules/test', {
-      rule_criteria: ruleCriteria
-    })
-    return response.data
-  }
-}
-
-// Job Logs API methods
-export const jobLogsService = {
-  async getJobLogs(params = {}) {
-    console.log('Job Logs Service: Getting job logs', params)
-    const response = await api.get('/api/job-logs', { params })
-    return response.data
-  },
-  
-  async getJobLog(id, includeEntries = false) {
-    console.log('Job Logs Service: Getting job log', id)
-    const response = await api.get(`/api/job-logs/${id}`, { 
-      params: { include_entries: includeEntries } 
-    })
-    return response.data
-  },
-  
-  async getJobLogEntries(id, params = {}) {
-    console.log('Job Logs Service: Getting job log entries', id, params)
-    const response = await api.get(`/api/job-logs/${id}/entries`, { params })
-    return response.data
-  },
-  
-  async deleteJobLog(id) {
-    console.log('Job Logs Service: Deleting job log', id)
-    await api.delete(`/api/job-logs/${id}`)
-    return true
-  },
-  
-  async updateRetentionPolicy(policyData) {
-    console.log('Job Logs Service: Updating retention policy', policyData)
-    const response = await api.post('/api/job-logs/retention', policyData)
-    return response.data
-  },
-  
-  async cleanupJobLogs(days) {
-    console.log('Job Logs Service: Cleaning up job logs', days)
-    const response = await api.post('/api/job-logs/cleanup', { days })
-    return response.data
-  }
-}
-
-// Scheduled Jobs API methods
-export const scheduledJobsService = {
-  async getScheduledJobs(params = {}) {
-    console.log('Scheduled Jobs Service: Getting scheduled jobs', params)
-    const response = await api.get('/api/scheduled-jobs', { params })
-    return response.data
-  },
-  
-  async getScheduledJob(id) {
-    console.log('Scheduled Jobs Service: Getting scheduled job', id)
-    const response = await api.get(`/api/scheduled-jobs/${id}`)
-    return response.data
-  },
-  
-  async createScheduledJob(jobData) {
-    console.log('Scheduled Jobs Service: Creating scheduled job', jobData)
-    const response = await api.post('/api/scheduled-jobs', jobData)
-    return response.data
-  },
-  
-  async updateScheduledJob(id, jobData) {
-    console.log('Scheduled Jobs Service: Updating scheduled job', id, jobData)
-    const response = await api.put(`/api/scheduled-jobs/${id}`, jobData)
-    return response.data
-  },
-  
-  async deleteScheduledJob(id) {
-    console.log('Scheduled Jobs Service: Deleting scheduled job', id)
-    await api.delete(`/api/scheduled-jobs/${id}`)
-    return true
-  },
-  
-  async runScheduledJob(id) {
-    console.log('Scheduled Jobs Service: Running scheduled job', id)
-    const response = await api.post(`/api/scheduled-jobs/${id}/run`)
-    return response.data
-  },
-  
-  async toggleScheduledJob(id, enabled) {
-    console.log('Scheduled Jobs Service: Toggling scheduled job', id, enabled)
-    const response = await api.post(`/api/scheduled-jobs/${id}/toggle`, { enabled })
-    return response.data
-  }
-}
-
-export default api 
+export default apiClient 
