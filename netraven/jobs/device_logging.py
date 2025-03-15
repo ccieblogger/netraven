@@ -12,20 +12,13 @@ from typing import Optional, Dict, Any
 from netraven.core.logging import get_logger
 from netraven.core.config import load_config, get_default_config_path
 
-# Import database logging if available
-try:
-    from netraven.core.db_logging import get_db_logger, start_db_job_session, end_db_job_session
-    _db_logging_available = True
-except ImportError:
-    _db_logging_available = False
-
 # Load configuration
 config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
 config, _ = load_config(config_path)
 
 # Get logging configuration
 _use_database_logging = config["logging"].get("use_database_logging", False)
-_transition_period = config["logging"].get("transition_period", True)
+_log_to_file = config["logging"].get("log_to_file", False)
 
 # Job session ID for associating log messages with specific job runs
 _current_job_session: Optional[str] = None
@@ -34,7 +27,9 @@ _current_device_id: Optional[str] = None
 _current_user_id: Optional[str] = None
 
 # Create a logger with the jobs prefix to ensure logs are routed to jobs.log
-if _use_database_logging and _db_logging_available:
+if _use_database_logging:
+    # Import here to avoid circular imports
+    from netraven.core.db_logging import get_db_logger
     logger = get_db_logger("netraven.jobs.device_comm")
 else:
     logger = get_logger("netraven.jobs.device_comm")
@@ -57,8 +52,10 @@ def start_job_session(description: str = "Backup job", user_id: Optional[str] = 
     _current_user_id = user_id
     
     # Start database job session if enabled
-    if _use_database_logging and _db_logging_available:
-        start_db_job_session("device_backup", None, user_id)
+    if _use_database_logging:
+        # Import here to avoid circular imports
+        from netraven.core.db_logging import _db_handler
+        _db_handler.start_job_session("device_backup", None, user_id)
     
     logger.info(f"[Session: {session_id}] {description} started")
     return session_id
@@ -82,8 +79,10 @@ def end_job_session(session_id: Optional[str] = None, success: bool = True) -> N
         logger.info(f"[Session: {session_id}] {result_message}")
         
         # End database job session if enabled
-        if _use_database_logging and _db_logging_available:
-            end_db_job_session(success, result_message)
+        if _use_database_logging:
+            # Import here to avoid circular imports
+            from netraven.core.db_logging import _db_handler
+            _db_handler.end_job_session(success, result_message)
         
         # Clear the current session if it matches
         if _current_job_session == session_id:

@@ -41,7 +41,7 @@ class JobLogBase(BaseModel):
 class JobLogCreate(JobLogBase):
     """Schema for creating a new job log."""
     device_id: Optional[str] = Field(None, min_length=36, max_length=36)
-    created_by: str = Field(..., min_length=36, max_length=36)
+    created_by: str = Field(..., min_length=1, max_length=36)
 
 class JobLogUpdate(BaseModel):
     """Schema for updating a job log."""

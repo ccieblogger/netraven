@@ -1,8 +1,8 @@
 """
 Database logging for NetRaven.
 
-This module provides a custom logger that writes log entries to both
-files and the database, with a configuration flag to control the transition.
+This module provides a custom logger that writes log entries to the
+database, with an optional configuration flag to enable file logging.
 """
 
 import logging
@@ -24,7 +24,7 @@ config, _ = load_config(config_path)
 
 # Get logging configuration
 use_database_logging = config["logging"].get("use_database_logging", False)
-transition_period = config["logging"].get("transition_period", True)
+log_to_file = config["logging"].get("log_to_file", False)
 default_retention_days = config["logging"].get("retention_days", 30)
 
 class DatabaseLogHandler(logging.Handler):
@@ -72,6 +72,15 @@ class DatabaseLogHandler(logging.Handler):
             try:
                 db = SessionLocal()
                 try:
+                    # Get admin user ID if no user ID is provided
+                    if not user_id:
+                        from netraven.web.crud.user import get_user_by_username
+                        admin_user = get_user_by_username(db, "admin")
+                        if admin_user:
+                            user_id = admin_user.id
+                        else:
+                            user_id = "system"  # Fallback
+                    
                     # Create job log
                     job_log_data = JobLogCreate(
                         session_id=self.current_session_id,
@@ -243,7 +252,7 @@ _db_handler = DatabaseLogHandler(level=logging.INFO)
 
 def get_db_logger(name: str) -> logging.Logger:
     """
-    Get a logger that writes to both files and database.
+    Get a logger that writes to the database and optionally to files.
     
     Args:
         name: Logger name
@@ -251,9 +260,24 @@ def get_db_logger(name: str) -> logging.Logger:
     Returns:
         Logger instance
     """
-    # Get the standard logger
-    from netraven.core.logging import get_logger
-    logger = get_logger(name)
+    # Get the standard logger if file logging is enabled
+    if log_to_file:
+        from netraven.core.logging import get_logger
+        logger = get_logger(name)
+    else:
+        # Create a basic logger without file handlers
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.DEBUG)
+        logger.propagate = False
+        
+        # Add console handler if enabled in config
+        if config["logging"]["console"]["enabled"]:
+            console_handler = logging.StreamHandler()
+            console_level = getattr(logging, config["logging"]["console"]["level"])
+            console_handler.setLevel(console_level)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
     
     # Add the database handler if database logging is enabled
     if use_database_logging:
@@ -273,6 +297,7 @@ def start_db_job_session(job_type: str, device_id: Optional[str] = None, user_id
     Returns:
         Session ID
     """
+    global _db_handler
     return _db_handler.start_job_session(job_type, device_id, user_id)
 
 def end_db_job_session(success: bool = True, result_message: Optional[str] = None) -> None:

@@ -18,7 +18,7 @@ logging:
   # Retention policy settings
   retention_days: 30
   use_database_logging: true
-  transition_period: true
+  log_to_file: false
   console:
     enabled: true
     level: INFO

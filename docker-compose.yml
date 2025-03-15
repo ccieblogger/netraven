@@ -48,7 +48,7 @@ services:
       - NETRAVEN_CONFIG=/app/config.yml
       - NETRAVEN_LOGGING_RETENTION_DAYS=30
       - NETRAVEN_LOGGING_USE_DATABASE=true
-      - NETRAVEN_LOGGING_TRANSITION_PERIOD=true
+      - NETRAVEN_LOGGING_LOG_TO_FILE=false
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,7 +85,7 @@ services:
       - NETRAVEN_CONFIG=/app/config.yml
       - NETRAVEN_LOGGING_RETENTION_DAYS=30
       - NETRAVEN_LOGGING_USE_DATABASE=true
-      - NETRAVEN_LOGGING_TRANSITION_PERIOD=true
+      - NETRAVEN_LOGGING_LOG_TO_FILE=false
     depends_on:
       postgres:
         condition: service_healthy

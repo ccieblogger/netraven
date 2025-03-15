@@ -16,8 +16,6 @@ from typing import Dict, List, Optional, Any, Callable
 import uuid
 
 from netraven.core.config import load_config, get_default_config_path
-from netraven.jobs.device_connector import backup_device_config
-from netraven.jobs.device_logging import start_job_session, end_job_session, log_backup_failure
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -91,6 +89,10 @@ class BackupScheduler:
         
         # Create job function
         def job_func():
+            # Import here to avoid circular imports
+            from netraven.jobs.device_logging import start_job_session, end_job_session, log_backup_failure
+            from netraven.jobs.device_connector import backup_device_config
+            
             session_id = start_job_session(f"Scheduled backup: {job_name}", self.user_id)
             try:
                 logger.info(f"Running scheduled backup job {job_id} for device {host}")
