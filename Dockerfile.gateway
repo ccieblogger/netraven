@@ -24,7 +24,11 @@ RUN pip install --no-cache-dir -e . && \
     schedule \
     pyjwt \
     psycopg2-binary \
-    prometheus-client
+    prometheus-client \
+    python-jose \
+    python-multipart \
+    sqlalchemy \
+    pydantic
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/data/backups
