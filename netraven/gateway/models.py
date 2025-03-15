@@ -63,4 +63,18 @@ class DeviceResponse(BaseModel):
     """Device response model."""
     status: str = Field(..., description="Status of the operation (success or error)")
     message: str = Field(..., description="Message describing the result")
-    data: Optional[Any] = Field(None, description="Response data, if any") 
+    data: Optional[Any] = Field(None, description="Response data, if any")
+
+
+class DeviceBackupRequest(BaseModel):
+    """Device backup request model."""
+    host: str
+    username: str
+    password: str
+    device_type: Optional[str] = None
+    port: int = 22
+    use_keys: bool = False
+    key_file: Optional[str] = None
+    timeout: int = 60
+    device_id: Optional[str] = None
+    storage_path: Optional[str] = None 

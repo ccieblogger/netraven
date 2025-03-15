@@ -24,7 +24,8 @@ from netraven.gateway.models import (
     DeviceResponse,
     HealthResponse,
     TokenRequest,
-    TokenResponse
+    TokenResponse,
+    DeviceBackupRequest
 )
 from netraven.gateway import __version__
 from netraven.gateway.auth import validate_api_key, create_access_token
@@ -181,13 +182,9 @@ async def metrics_middleware(request: Request, call_next: Callable) -> Response:
         response_time_ms = (time.time() - start_time) * 1000
         is_error = response.status_code >= 400
         
-        metrics.record_request(
-            endpoint=request.url.path,
-            client_id=client_id,
-            status_code=response.status_code,
-            response_time_ms=response_time_ms,
-            is_error=is_error
-        )
+        # Record request metrics
+        metrics.record_request(endpoint=request.url.path)
+        metrics.record_latency(endpoint=request.url.path, latency_seconds=response_time_ms / 1000)
         
         if is_error:
             metrics.record_error(f"HTTP_{response.status_code}")
@@ -227,14 +224,9 @@ async def metrics_middleware(request: Request, call_next: Callable) -> Response:
         # Record error metrics
         response_time_ms = (time.time() - start_time) * 1000
         
-        metrics.record_request(
-            endpoint=request.url.path,
-            client_id=client_id,
-            status_code=500,
-            response_time_ms=response_time_ms,
-            is_error=True
-        )
-        
+        # Record request and error metrics
+        metrics.record_request(endpoint=request.url.path)
+        metrics.record_latency(endpoint=request.url.path, latency_seconds=response_time_ms / 1000)
         metrics.record_error(type(e).__name__)
         
         # Log exception
@@ -725,6 +717,410 @@ async def execute_command(
             device_id=request.host,
             session_id=session_id,
             exc_info=e
+        )
+        
+        # Record error metrics
+        metrics.record_error(type(e).__name__)
+        
+        # End gateway session with error
+        end_gateway_session(
+            success=False,
+            result_message=f"Error: {str(e)}"
+        )
+        
+        return {
+            "status": "error",
+            "message": str(e),
+            "data": None
+        }
+
+@app.post("/backup", response_model=DeviceResponse)
+async def backup_device_config(
+    request: DeviceBackupRequest,
+    client_info: Dict[str, Any] = Depends(validate_api_key)
+):
+    """
+    Backup device configuration.
+    
+    This endpoint connects to the specified device, retrieves the running
+    configuration, and saves it to a file.
+    """
+    # Start a new gateway session for this device operation
+    session_id = start_gateway_session(
+        client_id="api_client",
+        device_id=request.host
+    )
+    
+    log_with_context(
+        logger,
+        level=20,  # INFO
+        message=f"Backup request for {request.host}",
+        client_id="api_client",
+        device_id=request.host,
+        session_id=session_id
+    )
+    
+    # Log sanitized request (without password)
+    sanitized_request = sanitize_log_data(request.dict())
+    log_with_context(
+        logger,
+        level=10,  # DEBUG
+        message=f"Sanitized request: {sanitized_request}",
+        client_id="api_client",
+        device_id=request.host,
+        session_id=session_id
+    )
+    
+    try:
+        # Record start time for device metrics
+        start_time = time.time()
+        
+        # Create device connector
+        device = DeviceConnector(
+            host=request.host,
+            username=request.username,
+            password=request.password,
+            device_type=request.device_type,
+            port=request.port,
+            use_keys=request.use_keys,
+            key_file=request.key_file,
+            timeout=request.timeout
+        )
+        
+        log_with_context(
+            logger,
+            level=20,  # INFO
+            message=f"Connecting to {request.host} for configuration backup",
+            client_id="api_client",
+            device_id=request.host,
+            session_id=session_id
+        )
+        
+        # Connect to device
+        connected = device.connect()
+        
+        # Record device connection metrics
+        connection_time_ms = (time.time() - start_time) * 1000
+        metrics.record_device_connection(
+            host=request.host,
+            success=connected,
+            response_time_ms=connection_time_ms
+        )
+        
+        if not connected:
+            log_with_context(
+                logger,
+                level=40,  # ERROR
+                message=f"Failed to connect to {request.host} for backup",
+                client_id="api_client",
+                device_id=request.host,
+                session_id=session_id
+            )
+            
+            # End gateway session with error
+            end_gateway_session(
+                success=False,
+                result_message=f"Failed to connect to {request.host}"
+            )
+            
+            return {
+                "status": "error",
+                "message": f"Failed to connect to {request.host}",
+                "data": None
+            }
+        
+        # Get device information
+        device_info = {}
+        try:
+            # Get serial number
+            serial = device.get_serial()
+            if serial:
+                device_info["serial_number"] = serial
+            
+            # Get OS information
+            os_info = device.get_os()
+            if os_info:
+                device_info.update(os_info)
+                
+            log_with_context(
+                logger,
+                level=20,  # INFO
+                message=f"Retrieved device info for {request.host}: {device_info}",
+                client_id="api_client",
+                device_id=request.host,
+                session_id=session_id
+            )
+        except Exception as e:
+            log_with_context(
+                logger,
+                level=30,  # WARNING
+                message=f"Error retrieving device info for {request.host}: {str(e)}",
+                client_id="api_client",
+                device_id=request.host,
+                session_id=session_id
+            )
+        
+        # Get running configuration
+        log_with_context(
+            logger,
+            level=20,  # INFO
+            message=f"Retrieving running configuration from {request.host}",
+            client_id="api_client",
+            device_id=request.host,
+            session_id=session_id
+        )
+        
+        config_start_time = time.time()
+        config = device.get_running()
+        config_time_ms = (time.time() - config_start_time) * 1000
+        
+        if not config:
+            log_with_context(
+                logger,
+                level=40,  # ERROR
+                message=f"Failed to retrieve configuration from {request.host}",
+                client_id="api_client",
+                device_id=request.host,
+                session_id=session_id
+            )
+            
+            # Disconnect from device
+            device.disconnect()
+            
+            # End gateway session with error
+            end_gateway_session(
+                success=False,
+                result_message=f"Failed to retrieve configuration from {request.host}"
+            )
+            
+            return {
+                "status": "error",
+                "message": f"Failed to retrieve configuration from {request.host}",
+                "data": None
+            }
+        
+        # Generate backup filename
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{request.host}_{timestamp}.txt"
+        
+        # Create backup data
+        backup_data = {
+            "config": config,
+            "filename": filename,
+            "timestamp": timestamp,
+            "device_info": device_info
+        }
+        
+        # Disconnect from device
+        device.disconnect()
+        
+        # Record total operation time
+        total_time_ms = (time.time() - start_time) * 1000
+        metrics.record_device_backup(
+            host=request.host,
+            success=True,
+            response_time_ms=total_time_ms,
+            config_size=len(config)
+        )
+        
+        log_with_context(
+            logger,
+            level=20,  # INFO
+            message=f"Successfully backed up configuration from {request.host} ({len(config)} bytes)",
+            client_id="api_client",
+            device_id=request.host,
+            session_id=session_id
+        )
+        
+        # End gateway session with success
+        end_gateway_session(
+            success=True,
+            result_message=f"Successfully backed up configuration from {request.host}"
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Successfully backed up configuration from {request.host}",
+            "data": backup_data
+        }
+    
+    except Exception as e:
+        log_with_context(
+            logger,
+            level=40,  # ERROR
+            message=f"Error backing up {request.host}: {str(e)}",
+            client_id="api_client",
+            device_id=request.host,
+            session_id=session_id,
+            exc_info=True
+        )
+        
+        # Record error metrics
+        metrics.record_error(type(e).__name__)
+        
+        # End gateway session with error
+        end_gateway_session(
+            success=False,
+            result_message=f"Error: {str(e)}"
+        )
+        
+        return {
+            "status": "error",
+            "message": str(e),
+            "data": None
+        }
+
+@app.post("/reachability", response_model=DeviceResponse)
+async def check_device_reachability(
+    request: DeviceConnectionRequest,
+    client_info: Dict[str, Any] = Depends(validate_api_key)
+):
+    """
+    Check device reachability.
+    
+    This endpoint checks if a device is reachable using both ICMP ping
+    and SSH/Telnet connectivity tests.
+    """
+    # Start a new gateway session for this device operation
+    session_id = start_gateway_session(
+        client_id="api_client",
+        device_id=request.host
+    )
+    
+    log_with_context(
+        logger,
+        level=20,  # INFO
+        message=f"Reachability check request for {request.host}",
+        client_id="api_client",
+        device_id=request.host,
+        session_id=session_id
+    )
+    
+    try:
+        # Record start time for device metrics
+        start_time = time.time()
+        
+        # Check ICMP ping
+        import subprocess
+        ping_result = False
+        ping_output = ""
+        
+        try:
+            # Use ping command with timeout
+            ping_process = subprocess.run(
+                ["ping", "-c", "3", "-W", "2", request.host],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            ping_result = ping_process.returncode == 0
+            ping_output = ping_process.stdout
+            
+            log_with_context(
+                logger,
+                level=20,  # INFO
+                message=f"ICMP ping result for {request.host}: {'Success' if ping_result else 'Failed'}",
+                client_id="api_client",
+                device_id=request.host,
+                session_id=session_id
+            )
+        except Exception as e:
+            log_with_context(
+                logger,
+                level=30,  # WARNING
+                message=f"Error during ICMP ping for {request.host}: {str(e)}",
+                client_id="api_client",
+                device_id=request.host,
+                session_id=session_id
+            )
+        
+        # Check SSH/Telnet connectivity
+        ssh_result = False
+        ssh_error = ""
+        
+        try:
+            # Create device connector with short timeout
+            device = DeviceConnector(
+                host=request.host,
+                username=request.username,
+                password=request.password,
+                device_type=request.device_type,
+                port=request.port,
+                use_keys=request.use_keys,
+                key_file=request.key_file,
+                timeout=5  # Short timeout for reachability check
+            )
+            
+            # Try to connect
+            ssh_result = device.connect()
+            
+            if ssh_result:
+                # Disconnect if successful
+                device.disconnect()
+            else:
+                ssh_error = "Failed to establish SSH/Telnet connection"
+            
+            log_with_context(
+                logger,
+                level=20,  # INFO
+                message=f"SSH/Telnet connectivity result for {request.host}: {'Success' if ssh_result else 'Failed'}",
+                client_id="api_client",
+                device_id=request.host,
+                session_id=session_id
+            )
+        except Exception as e:
+            ssh_error = str(e)
+            log_with_context(
+                logger,
+                level=30,  # WARNING
+                message=f"Error during SSH/Telnet connectivity check for {request.host}: {str(e)}",
+                client_id="api_client",
+                device_id=request.host,
+                session_id=session_id
+            )
+        
+        # Record total operation time
+        total_time_ms = (time.time() - start_time) * 1000
+        
+        # Prepare result data
+        reachability_data = {
+            "host": request.host,
+            "icmp_reachable": ping_result,
+            "ssh_reachable": ssh_result,
+            "reachable": ping_result or ssh_result,
+            "icmp_details": ping_output[:500] if ping_output else "",
+            "ssh_error": ssh_error,
+            "response_time_ms": total_time_ms
+        }
+        
+        # Record metrics
+        metrics.record_device_reachability(
+            host=request.host,
+            success=ping_result or ssh_result,
+            response_time_ms=total_time_ms
+        )
+        
+        # End gateway session
+        end_gateway_session(
+            success=True,
+            result_message=f"Reachability check completed for {request.host}"
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Reachability check completed for {request.host}",
+            "data": reachability_data
+        }
+    
+    except Exception as e:
+        log_with_context(
+            logger,
+            level=40,  # ERROR
+            message=f"Error checking reachability for {request.host}: {str(e)}",
+            client_id="api_client",
+            device_id=request.host,
+            session_id=session_id,
+            exc_info=True
         )
         
         # Record error metrics

@@ -1,278 +1,287 @@
 """
-Metrics collection for the Device Gateway.
+Metrics collection for the NetRaven gateway.
 
-This module provides functionality for collecting and reporting metrics
-about the gateway service, such as request counts, response times, and errors.
+This module provides metrics collection for the NetRaven gateway.
 """
 
 import time
-import threading
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
-import logging
+from typing import Dict, Any, Optional, List
+from prometheus_client import Counter, Histogram, Gauge, Summary
 
-from netraven.core.logging import get_logger
+# Define metrics
+REQUEST_COUNT = Counter(
+    "gateway_request_total",
+    "Total number of requests",
+    ["endpoint"]
+)
 
-# Configure logging
-logger = get_logger("netraven.gateway.metrics")
+ERROR_COUNT = Counter(
+    "gateway_error_total",
+    "Total number of errors",
+    ["error_type"]
+)
+
+REQUEST_LATENCY = Histogram(
+    "gateway_request_latency_seconds",
+    "Request latency in seconds",
+    ["endpoint"]
+)
+
+DEVICE_CONNECTION_COUNT = Counter(
+    "gateway_device_connection_total",
+    "Total number of device connections",
+    ["host", "success"]
+)
+
+DEVICE_CONNECTION_LATENCY = Histogram(
+    "gateway_device_connection_latency_seconds",
+    "Device connection latency in seconds",
+    ["host", "success"]
+)
+
+DEVICE_COMMAND_COUNT = Counter(
+    "gateway_device_command_total",
+    "Total number of device commands",
+    ["host", "success"]
+)
+
+DEVICE_COMMAND_LATENCY = Histogram(
+    "gateway_device_command_latency_seconds",
+    "Device command latency in seconds",
+    ["host", "success"]
+)
+
+DEVICE_BACKUP_COUNT = Counter(
+    "gateway_device_backup_total",
+    "Total number of device backups",
+    ["host", "success"]
+)
+
+DEVICE_BACKUP_LATENCY = Histogram(
+    "gateway_device_backup_latency_seconds",
+    "Device backup latency in seconds",
+    ["host", "success"]
+)
+
+DEVICE_BACKUP_SIZE = Summary(
+    "gateway_device_backup_size_bytes",
+    "Device backup size in bytes",
+    ["host"]
+)
+
+DEVICE_REACHABILITY_COUNT = Counter(
+    "gateway_device_reachability_total",
+    "Total number of device reachability checks",
+    ["host", "success"]
+)
+
+DEVICE_REACHABILITY_LATENCY = Histogram(
+    "gateway_device_reachability_latency_seconds",
+    "Device reachability check latency in seconds",
+    ["host", "success"]
+)
+
+CONNECTED_DEVICES = Gauge(
+    "gateway_connected_devices",
+    "Number of currently connected devices"
+)
 
 class MetricsCollector:
-    """Collector for gateway metrics"""
+    """Metrics collector for the NetRaven gateway."""
     
     def __init__(self):
         """Initialize the metrics collector."""
         self.metrics = {
-            "requests": {
-                "total": 0,
-                "success": 0,
-                "error": 0,
-                "by_endpoint": {},
-                "by_client": {}
-            },
-            "response_times": {
-                "avg_ms": 0,
-                "min_ms": float('inf'),
-                "max_ms": 0,
-                "by_endpoint": {}
-            },
-            "devices": {
-                "total_connections": 0,
-                "successful_connections": 0,
-                "failed_connections": 0,
-                "by_host": {}
-            },
-            "errors": {
-                "total": 0,
-                "by_type": {}
-            },
-            "start_time": datetime.now(),
-            "uptime_seconds": 0
+            "request_count": 0,
+            "error_count": 0,
+            "device_connections": 0,
+            "device_commands": 0,
+            "device_backups": 0,
+            "device_reachability_checks": 0,
+            "connected_devices": 0,
+            "errors_by_type": {}
         }
-        
-        # Lock for thread safety
-        self.lock = threading.Lock()
+        self.connected_devices = set()
     
-    def record_request(
-        self,
-        endpoint: str,
-        client_id: str,
-        status_code: int,
-        response_time_ms: float,
-        is_error: bool = False
-    ) -> None:
+    def reset_metrics(self):
+        """Reset all metrics."""
+        self.metrics = {
+            "request_count": 0,
+            "error_count": 0,
+            "device_connections": 0,
+            "device_commands": 0,
+            "device_backups": 0,
+            "device_reachability_checks": 0,
+            "connected_devices": 0,
+            "errors_by_type": {}
+        }
+        self.connected_devices = set()
+    
+    def record_request(self, endpoint: str):
         """
-        Record a request to the gateway.
+        Record a request.
         
         Args:
             endpoint: API endpoint
-            client_id: Client ID
-            status_code: HTTP status code
-            response_time_ms: Response time in milliseconds
-            is_error: Whether the request resulted in an error
         """
-        with self.lock:
-            # Update request counts
-            self.metrics["requests"]["total"] += 1
-            
-            if is_error:
-                self.metrics["requests"]["error"] += 1
-                self.metrics["errors"]["total"] += 1
-            else:
-                self.metrics["requests"]["success"] += 1
-            
-            # Update by endpoint
-            if endpoint not in self.metrics["requests"]["by_endpoint"]:
-                self.metrics["requests"]["by_endpoint"][endpoint] = {
-                    "total": 0,
-                    "success": 0,
-                    "error": 0
-                }
-            
-            self.metrics["requests"]["by_endpoint"][endpoint]["total"] += 1
-            if is_error:
-                self.metrics["requests"]["by_endpoint"][endpoint]["error"] += 1
-            else:
-                self.metrics["requests"]["by_endpoint"][endpoint]["success"] += 1
-            
-            # Update by client
-            if client_id not in self.metrics["requests"]["by_client"]:
-                self.metrics["requests"]["by_client"][client_id] = {
-                    "total": 0,
-                    "success": 0,
-                    "error": 0
-                }
-            
-            self.metrics["requests"]["by_client"][client_id]["total"] += 1
-            if is_error:
-                self.metrics["requests"]["by_client"][client_id]["error"] += 1
-            else:
-                self.metrics["requests"]["by_client"][client_id]["success"] += 1
-            
-            # Update response times
-            current_total = self.metrics["requests"]["total"] - 1
-            current_avg = self.metrics["response_times"]["avg_ms"]
-            
-            # Calculate new average
-            if current_total > 0:
-                self.metrics["response_times"]["avg_ms"] = (
-                    (current_avg * current_total) + response_time_ms
-                ) / self.metrics["requests"]["total"]
-            else:
-                self.metrics["response_times"]["avg_ms"] = response_time_ms
-            
-            # Update min/max
-            if response_time_ms < self.metrics["response_times"]["min_ms"]:
-                self.metrics["response_times"]["min_ms"] = response_time_ms
-            
-            if response_time_ms > self.metrics["response_times"]["max_ms"]:
-                self.metrics["response_times"]["max_ms"] = response_time_ms
-            
-            # Update by endpoint
-            if endpoint not in self.metrics["response_times"]["by_endpoint"]:
-                self.metrics["response_times"]["by_endpoint"][endpoint] = {
-                    "avg_ms": 0,
-                    "min_ms": float('inf'),
-                    "max_ms": 0,
-                    "count": 0
-                }
-            
-            endpoint_metrics = self.metrics["response_times"]["by_endpoint"][endpoint]
-            current_endpoint_count = endpoint_metrics["count"]
-            current_endpoint_avg = endpoint_metrics["avg_ms"]
-            
-            # Calculate new endpoint average
-            if current_endpoint_count > 0:
-                endpoint_metrics["avg_ms"] = (
-                    (current_endpoint_avg * current_endpoint_count) + response_time_ms
-                ) / (current_endpoint_count + 1)
-            else:
-                endpoint_metrics["avg_ms"] = response_time_ms
-            
-            # Update endpoint min/max
-            if response_time_ms < endpoint_metrics["min_ms"]:
-                endpoint_metrics["min_ms"] = response_time_ms
-            
-            if response_time_ms > endpoint_metrics["max_ms"]:
-                endpoint_metrics["max_ms"] = response_time_ms
-            
-            endpoint_metrics["count"] += 1
-            
-            # Update uptime
-            self.metrics["uptime_seconds"] = (
-                datetime.now() - self.metrics["start_time"]
-            ).total_seconds()
+        self.metrics["request_count"] += 1
+        REQUEST_COUNT.labels(endpoint=endpoint).inc()
     
-    def record_device_connection(
-        self,
-        host: str,
-        success: bool,
-        response_time_ms: float
-    ) -> None:
+    def record_error(self, error_type: str, error_message: Optional[str] = None):
         """
-        Record a device connection attempt.
+        Record an error.
+        
+        Args:
+            error_type: Type of error
+            error_message: Error message (optional)
+        """
+        self.metrics["error_count"] += 1
+        
+        if error_type not in self.metrics["errors_by_type"]:
+            self.metrics["errors_by_type"][error_type] = 0
+        
+        self.metrics["errors_by_type"][error_type] += 1
+        ERROR_COUNT.labels(error_type=error_type).inc()
+    
+    def record_latency(self, endpoint: str, latency_seconds: float):
+        """
+        Record request latency.
+        
+        Args:
+            endpoint: API endpoint
+            latency_seconds: Latency in seconds
+        """
+        REQUEST_LATENCY.labels(endpoint=endpoint).observe(latency_seconds)
+    
+    def record_device_connection(self, host: str, success: bool, response_time_ms: float):
+        """
+        Record a device connection.
         
         Args:
             host: Device hostname or IP address
             success: Whether the connection was successful
             response_time_ms: Response time in milliseconds
         """
-        with self.lock:
-            # Update device connection counts
-            self.metrics["devices"]["total_connections"] += 1
-            
-            if success:
-                self.metrics["devices"]["successful_connections"] += 1
-            else:
-                self.metrics["devices"]["failed_connections"] += 1
-            
-            # Update by host
-            if host not in self.metrics["devices"]["by_host"]:
-                self.metrics["devices"]["by_host"][host] = {
-                    "total": 0,
-                    "success": 0,
-                    "failure": 0,
-                    "avg_response_time_ms": 0
-                }
-            
-            host_metrics = self.metrics["devices"]["by_host"][host]
-            host_metrics["total"] += 1
-            
-            if success:
-                host_metrics["success"] += 1
-            else:
-                host_metrics["failure"] += 1
-            
-            # Update average response time
-            current_host_count = host_metrics["total"] - 1
-            current_host_avg = host_metrics["avg_response_time_ms"]
-            
-            if current_host_count > 0:
-                host_metrics["avg_response_time_ms"] = (
-                    (current_host_avg * current_host_count) + response_time_ms
-                ) / host_metrics["total"]
-            else:
-                host_metrics["avg_response_time_ms"] = response_time_ms
+        self.metrics["device_connections"] += 1
+        
+        # Update connected devices count
+        if success:
+            self.connected_devices.add(host)
+            CONNECTED_DEVICES.set(len(self.connected_devices))
+        
+        # Record connection metrics
+        DEVICE_CONNECTION_COUNT.labels(
+            host=host,
+            success=str(success)
+        ).inc()
+        
+        DEVICE_CONNECTION_LATENCY.labels(
+            host=host,
+            success=str(success)
+        ).observe(response_time_ms / 1000)  # Convert to seconds
     
-    def record_error(self, error_type: str) -> None:
+    def record_device_command(self, host: str, success: bool, response_time_ms: float):
         """
-        Record an error.
+        Record a device command.
         
         Args:
-            error_type: Type of error
+            host: Device hostname or IP address
+            success: Whether the command was successful
+            response_time_ms: Response time in milliseconds
         """
-        with self.lock:
-            # Update error counts
-            if error_type not in self.metrics["errors"]["by_type"]:
-                self.metrics["errors"]["by_type"][error_type] = 0
-            
-            self.metrics["errors"]["by_type"][error_type] += 1
+        self.metrics["device_commands"] += 1
+        
+        # Record command metrics
+        DEVICE_COMMAND_COUNT.labels(
+            host=host,
+            success=str(success)
+        ).inc()
+        
+        DEVICE_COMMAND_LATENCY.labels(
+            host=host,
+            success=str(success)
+        ).observe(response_time_ms / 1000)  # Convert to seconds
+    
+    def record_device_backup(self, host: str, success: bool, response_time_ms: float, config_size: int = 0):
+        """
+        Record a device backup.
+        
+        Args:
+            host: Device hostname or IP address
+            success: Whether the backup was successful
+            response_time_ms: Response time in milliseconds
+            config_size: Size of the configuration in bytes
+        """
+        self.metrics["device_backups"] += 1
+        
+        # Record backup metrics
+        DEVICE_BACKUP_COUNT.labels(
+            host=host,
+            success=str(success)
+        ).inc()
+        
+        DEVICE_BACKUP_LATENCY.labels(
+            host=host,
+            success=str(success)
+        ).observe(response_time_ms / 1000)  # Convert to seconds
+        
+        if success and config_size > 0:
+            DEVICE_BACKUP_SIZE.labels(host=host).observe(config_size)
+    
+    def record_device_reachability(self, host: str, success: bool, response_time_ms: float):
+        """
+        Record a device reachability check.
+        
+        Args:
+            host: Device hostname or IP address
+            success: Whether the device was reachable
+            response_time_ms: Response time in milliseconds
+        """
+        self.metrics["device_reachability_checks"] += 1
+        
+        # Record reachability metrics
+        DEVICE_REACHABILITY_COUNT.labels(
+            host=host,
+            success=str(success)
+        ).inc()
+        
+        DEVICE_REACHABILITY_LATENCY.labels(
+            host=host,
+            success=str(success)
+        ).observe(response_time_ms / 1000)  # Convert to seconds
+    
+    def record_device_disconnect(self, host: str):
+        """
+        Record a device disconnection.
+        
+        Args:
+            host: Device hostname or IP address
+        """
+        if host in self.connected_devices:
+            self.connected_devices.remove(host)
+            CONNECTED_DEVICES.set(len(self.connected_devices))
+    
+    def record_success(self):
+        """Record a successful operation."""
+        pass
     
     def get_metrics(self) -> Dict[str, Any]:
         """
-        Get the current metrics.
+        Get all metrics.
         
         Returns:
-            Dict containing metrics
+            Dict[str, Any]: Metrics dictionary
         """
-        with self.lock:
-            # Update uptime
-            self.metrics["uptime_seconds"] = (
-                datetime.now() - self.metrics["start_time"]
-            ).total_seconds()
-            
-            # Return a copy of the metrics
-            return self.metrics.copy()
-    
-    def reset_metrics(self) -> None:
-        """Reset all metrics."""
-        with self.lock:
-            self.metrics = {
-                "requests": {
-                    "total": 0,
-                    "success": 0,
-                    "error": 0,
-                    "by_endpoint": {},
-                    "by_client": {}
-                },
-                "response_times": {
-                    "avg_ms": 0,
-                    "min_ms": float('inf'),
-                    "max_ms": 0,
-                    "by_endpoint": {}
-                },
-                "devices": {
-                    "total_connections": 0,
-                    "successful_connections": 0,
-                    "failed_connections": 0,
-                    "by_host": {}
-                },
-                "errors": {
-                    "total": 0,
-                    "by_type": {}
-                },
-                "start_time": datetime.now(),
-                "uptime_seconds": 0
-            }
+        return {
+            "request_count": self.metrics["request_count"],
+            "error_count": self.metrics["error_count"],
+            "device_connections": self.metrics["device_connections"],
+            "device_commands": self.metrics["device_commands"],
+            "device_backups": self.metrics["device_backups"],
+            "device_reachability_checks": self.metrics["device_reachability_checks"],
+            "connected_devices": len(self.connected_devices),
+            "errors_by_type": self.metrics["errors_by_type"]
+        }
 
-# Create a singleton instance
+# Create a global metrics collector instance
 metrics = MetricsCollector() 
