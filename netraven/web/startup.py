@@ -50,19 +50,23 @@ def ensure_default_admin(db: Session) -> None:
     # Create new default admin user
     logger.info(f"Creating default admin user '{DEFAULT_ADMIN_USERNAME}'")
     
-    user_data = UserCreate(
-        username=DEFAULT_ADMIN_USERNAME,
-        email=DEFAULT_ADMIN_EMAIL,
-        full_name=DEFAULT_ADMIN_FULL_NAME,
-        is_admin=True,
-        is_active=True
-    )
-    
-    # Hash the password
-    hashed_password = get_password_hash(DEFAULT_ADMIN_PASSWORD)
-    
-    # Create the user
-    user = create_user(db, user_data, hashed_password)
-    
-    logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' created successfully.")
-    logger.info(f"You can log in with username '{DEFAULT_ADMIN_USERNAME}' and password '{DEFAULT_ADMIN_PASSWORD}'") 
+    try:
+        # Create UserCreate object with all required fields including password
+        user_data = UserCreate(
+            username=DEFAULT_ADMIN_USERNAME,
+            email=DEFAULT_ADMIN_EMAIL,
+            full_name=DEFAULT_ADMIN_FULL_NAME,
+            password=DEFAULT_ADMIN_PASSWORD,  # Include password in the UserCreate object
+            is_admin=True,
+            is_active=True
+        )
+        
+        # Create the user
+        user = create_user(db, user_data)
+        
+        logger.info(f"Default admin user '{DEFAULT_ADMIN_USERNAME}' created successfully.")
+        logger.info(f"You can log in with username '{DEFAULT_ADMIN_USERNAME}' and password '{DEFAULT_ADMIN_PASSWORD}'")
+    except Exception as e:
+        logger.error(f"Error creating default admin user: {e}")
+        # Continue execution even if user creation fails
+        # This allows the application to start even if there's an issue with user creation 

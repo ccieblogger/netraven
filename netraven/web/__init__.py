@@ -37,6 +37,8 @@ try:
     db = SessionLocal()
     try:
         ensure_default_admin(db)
+    except Exception as e:
+        logger.warning(f"Could not create default admin user: {e}")
     finally:
         db.close()
         
@@ -61,7 +63,7 @@ app.add_middleware(
 
 # Import and include routers
 # These imports are placed here to avoid circular imports
-from netraven.web.routers import auth, devices, backups, tags, tag_rules
+from netraven.web.routers import auth, devices, backups, tags, tag_rules, users, job_logs, scheduled_jobs
 
 # Mount routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
@@ -69,6 +71,18 @@ app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
 app.include_router(tags.router, prefix="/api/tags", tags=["Tags"])
 app.include_router(tag_rules.router, prefix="/api/tag-rules", tags=["Tag Rules"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(job_logs.router, prefix="/api/job-logs", tags=["Job Logs"])
+app.include_router(scheduled_jobs.router, prefix="/api/scheduled-jobs", tags=["Scheduled Jobs"])
+
+# Initialize scheduler service
+try:
+    from netraven.web.services import get_scheduler_service
+    scheduler_service = get_scheduler_service()
+    scheduler_service.start()
+    logger.info("Scheduler service started successfully")
+except Exception as e:
+    logger.error(f"Error starting scheduler service: {e}")
 
 @app.get("/api")
 async def api_root(request: Request) -> JSONResponse:
@@ -82,6 +96,8 @@ async def api_root(request: Request) -> JSONResponse:
         "backups": f"{base_url}/api/backups",
         "tags": f"{base_url}/api/tags",
         "tag_rules": f"{base_url}/api/tag-rules",
+        "job_logs": f"{base_url}/api/job-logs",
+        "scheduled_jobs": f"{base_url}/api/scheduled-jobs",
         "health": f"{base_url}/api/health",
         "docs": f"{base_url}/docs"
     }

@@ -17,8 +17,8 @@ from alembic import context
 sys.path.append(str(Path(__file__).parent.parent.parent.parent))
 
 # Import our models and database configuration
-from netraven.web.database import Base, get_db, DATABASE_URL
-from netraven.web.models import user, device, backup
+from netraven.web.database import Base, get_db
+from netraven.web.models import user, device, backup, job_log
 from netraven.core.logging import get_logger
 
 # Initialize logger
@@ -29,6 +29,12 @@ config = context.config
 
 # Set up logging
 fileConfig(config.config_file_name)
+
+# Get the DATABASE_URL from environment or use the default
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", 
+    "postgresql://netraven:netraven@postgres:5432/netraven"
+)
 
 # Set the SQLAlchemy URL in the Alembic config
 alembic_config_section = config.get_section(config.config_ini_section)
@@ -69,6 +75,7 @@ def run_migrations_online() -> None:
     In online mode, migrations are performed with a direct connection to the database.
     """
     logger.info("Running migrations in online mode")
+    logger.info(f"Using database URL: {DATABASE_URL}")
     
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),

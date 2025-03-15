@@ -32,6 +32,8 @@ class User(Base):
     
     # Relationships
     devices = relationship("Device", back_populates="owner", cascade="all, delete-orphan")
+    job_logs = relationship("JobLog", back_populates="user")
+    scheduled_jobs = relationship("ScheduledJob", back_populates="user")
     
     def __repr__(self) -> str:
         return f"<User {self.username}>" 

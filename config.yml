@@ -15,6 +15,10 @@ logging:
   level: INFO
   directory: logs
   filename: netraven.log
+  # Retention policy settings
+  retention_days: 30
+  use_database_logging: true
+  transition_period: true
   console:
     enabled: true
     level: INFO

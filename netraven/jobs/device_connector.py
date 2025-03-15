@@ -44,7 +44,8 @@ class JobDeviceConnector:
         key_file: Optional[str] = None,
         timeout: int = 30,
         alt_passwords: Optional[List[str]] = None,
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        user_id: Optional[str] = None
     ):
         """
         Initialize the JobDeviceConnector.
@@ -60,26 +61,31 @@ class JobDeviceConnector:
             key_file: Path to SSH private key file
             timeout: Connection timeout in seconds (default: 30)
             alt_passwords: List of alternative passwords to try
-            session_id: Job session ID for logging
+            session_id: Session ID for logging (generated if not provided)
+            user_id: User ID for database logging
         """
+        # Store parameters
         self.device_id = device_id
         self.host = host
-        self.device_type = device_type
-        self.session_id = session_id
+        self.username = username
+        self.password = password
+        self.device_type = device_type or "autodetect"
+        self.port = port
+        self.use_keys = use_keys
+        self.key_file = key_file
+        self.timeout = timeout
+        self.alt_passwords = alt_passwords or []
         
-        # If no session ID provided, create a new one
-        if not self.session_id:
-            self.session_id = start_job_session(f"Device job for {host}")
-            
-        # Register this device with the job logging system
-        register_device(
-            device_id=device_id,
-            hostname=host,
-            device_type=device_type or "unknown",
-            session_id=self.session_id
-        )
-            
-        # Create the core connector
+        # Create or use session ID
+        if session_id is None:
+            self.session_id = start_job_session(f"Device connection: {host}", user_id)
+        else:
+            self.session_id = session_id
+        
+        # Register device
+        register_device(device_id, host, self.device_type, self.session_id)
+        
+        # Create core connector (but don't connect yet)
         self.connector = CoreDeviceConnector(
             host=host,
             username=username,
@@ -92,10 +98,13 @@ class JobDeviceConnector:
             alt_passwords=alt_passwords
         )
         
+        # Track connection state
+        self._connected = False
+        
     @property
     def is_connected(self) -> bool:
         """Return whether the device is currently connected."""
-        return self.connector.is_connected
+        return self._connected
         
     def connect(self) -> bool:
         """
@@ -111,6 +120,7 @@ class JobDeviceConnector:
             
             if result:
                 log_device_connect_success(self.device_id, self.session_id)
+                self._connected = True
             else:
                 log_device_connect_failure(self.device_id, "Connection failed", self.session_id)
                 
@@ -291,6 +301,7 @@ def backup_device_config(
     config: Optional[Dict[str, Any]] = None,
     use_keys: bool = False,
     key_file: Optional[str] = None,
+    user_id: Optional[str] = None,
 ) -> bool:
     """
     Backup the configuration of a network device with enhanced logging.
@@ -305,6 +316,7 @@ def backup_device_config(
         config: Configuration dictionary
         use_keys: Whether to use key-based authentication
         key_file: Path to SSH key file
+        user_id: User ID for database logging
         
     Returns:
         bool: True if backup was successful, False otherwise
@@ -317,7 +329,7 @@ def backup_device_config(
         config, _ = load_config(config_path)
     
     # Start a new job session for this backup
-    session_id = start_job_session(f"Backup job for device {host}")
+    session_id = start_job_session(f"Backup job for device {host}", user_id)
     
     # Create device connector with job logging
     device = JobDeviceConnector(
@@ -329,7 +341,8 @@ def backup_device_config(
         port=port,
         use_keys=use_keys,
         key_file=key_file,
-        session_id=session_id
+        session_id=session_id,
+        user_id=user_id
     )
     
     try:

@@ -13,6 +13,7 @@ setup(
         "gitpython>=3.1.42",
         "boto3>=1.34.34",
         "argparse>=1.4.0",
+        "schedule>=1.2.0",
         # Web backend dependencies
         "fastapi>=0.104.0",
         "uvicorn>=0.23.2",
@@ -24,6 +25,7 @@ setup(
         "passlib>=1.7.4",
         "python-multipart>=0.0.6",
         "psycopg2-binary>=2.9.9",
+        "email-validator>=2.0.0",
     ],
     extras_require={
         "dev": [
@@ -38,7 +40,7 @@ setup(
             "httpx>=0.24.0",
         ],
         "web": [
-            "email-validator>=2.0.0",
+            # "email-validator>=2.0.0",  # Moved to main dependencies
         ],
     },
     python_requires=">=3.10",

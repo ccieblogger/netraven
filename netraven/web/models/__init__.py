@@ -9,4 +9,6 @@ for the NetRaven application.
 from netraven.web.models.user import User
 from netraven.web.models.device import Device
 from netraven.web.models.backup import Backup
-from netraven.web.models.tag import Tag, TagRule 
+from netraven.web.models.tag import Tag, TagRule
+from netraven.web.models.job_log import JobLog, JobLogEntry
+from netraven.web.models.scheduled_job import ScheduledJob 

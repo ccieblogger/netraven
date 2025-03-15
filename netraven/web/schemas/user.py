@@ -5,13 +5,33 @@ This module provides Pydantic models for user-related API requests and responses
 """
 
 from pydantic import BaseModel, Field, EmailStr, field_validator, ConfigDict
-from typing import Optional
+from typing import Optional, Annotated
 from datetime import datetime
+import re
+
+# Custom email validator that allows .local domains
+class LocalEmailStr(str):
+    """Custom email type that allows .local domains."""
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if not isinstance(v, str):
+            raise ValueError('string required')
+        
+        # Simple regex for email validation that allows .local domains
+        pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-.]+)*$'
+        if not re.match(pattern, v):
+            raise ValueError('invalid email format')
+        
+        return v
 
 class UserBase(BaseModel):
     """Base user schema with common attributes."""
     username: str = Field(..., min_length=3, max_length=64)
-    email: EmailStr
+    email: Annotated[str, LocalEmailStr]  # Use our custom validator
     full_name: Optional[str] = Field(None, max_length=120)
     is_active: Optional[bool] = True
     is_admin: Optional[bool] = False

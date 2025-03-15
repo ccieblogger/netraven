@@ -43,6 +43,8 @@ class Device(Base):
     owner = relationship("User", back_populates="devices")
     backups = relationship("Backup", back_populates="device", cascade="all, delete-orphan")
     tags = relationship("Tag", secondary="device_tags", back_populates="devices")
+    job_logs = relationship("JobLog", back_populates="device")
+    scheduled_jobs = relationship("ScheduledJob", back_populates="device", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         return f"<Device {self.hostname} ({self.ip_address})>" 

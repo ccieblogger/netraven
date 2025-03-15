@@ -9,15 +9,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import Optional, List, Dict, Any, Union
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 
 from netraven.web.models.user import User
 from netraven.web.models.device import Device
 from netraven.web.models.backup import Backup
+from netraven.web.models.job_log import JobLog, JobLogEntry
 from netraven.web.schemas import user as user_schemas
 from netraven.web.schemas import device as device_schemas
 from netraven.web.schemas import backup as backup_schemas
+from netraven.web.schemas import job_log as job_log_schemas
 from netraven.core.logging import get_logger
 
 # Initialize logger
@@ -498,4 +500,345 @@ def get_device_latest_backup(db: Session, device_id: str) -> Optional[Backup]:
         .filter(Backup.device_id == device_id)\
         .filter(Backup.status == "complete")\
         .order_by(Backup.created_at.desc())\
-        .first() 
+        .first()
+
+# Job Log operations
+
+def create_job_log(db: Session, job_log: job_log_schemas.JobLogCreate) -> JobLog:
+    """
+    Create a new job log.
+    
+    Args:
+        db: Database session
+        job_log: Job log creation data
+        
+    Returns:
+        Created job log
+    """
+    db_job_log = JobLog(
+        id=str(uuid.uuid4()),
+        session_id=job_log.session_id,
+        job_type=job_log.job_type,
+        status=job_log.status,
+        start_time=job_log.start_time,
+        end_time=job_log.end_time,
+        result_message=job_log.result_message,
+        job_data=job_log.job_data,
+        retention_days=job_log.retention_days,
+        device_id=job_log.device_id,
+        created_by=job_log.created_by
+    )
+    db.add(db_job_log)
+    db.commit()
+    db.refresh(db_job_log)
+    logger.info(f"Created job log: {db_job_log.id} for session {job_log.session_id}")
+    return db_job_log
+
+def get_job_log(db: Session, job_log_id: str) -> Optional[JobLog]:
+    """
+    Get a job log by ID.
+    
+    Args:
+        db: Database session
+        job_log_id: Job log ID
+        
+    Returns:
+        Job log or None if not found
+    """
+    return db.query(JobLog).filter(JobLog.id == job_log_id).first()
+
+def get_job_logs(
+    db: Session, 
+    device_id: Optional[str] = None,
+    job_type: Optional[str] = None,
+    status: Optional[str] = None,
+    start_time_from: Optional[datetime] = None,
+    start_time_to: Optional[datetime] = None,
+    created_by: Optional[str] = None,
+    session_id: Optional[str] = None,
+    skip: int = 0, 
+    limit: int = 100
+) -> List[JobLog]:
+    """
+    Get job logs with optional filtering.
+    
+    Args:
+        db: Database session
+        device_id: Filter by device ID
+        job_type: Filter by job type
+        status: Filter by status
+        start_time_from: Filter by start time (from)
+        start_time_to: Filter by start time (to)
+        created_by: Filter by creator user ID
+        session_id: Filter by session ID
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        
+    Returns:
+        List of job logs
+    """
+    query = db.query(JobLog)
+    
+    # Apply filters
+    if device_id:
+        query = query.filter(JobLog.device_id == device_id)
+    if job_type:
+        query = query.filter(JobLog.job_type == job_type)
+    if status:
+        query = query.filter(JobLog.status == status)
+    if start_time_from:
+        query = query.filter(JobLog.start_time >= start_time_from)
+    if start_time_to:
+        query = query.filter(JobLog.start_time <= start_time_to)
+    if created_by:
+        query = query.filter(JobLog.created_by == created_by)
+    if session_id:
+        query = query.filter(JobLog.session_id == session_id)
+    
+    # Order by start time descending (newest first)
+    query = query.order_by(JobLog.start_time.desc())
+    
+    # Apply pagination
+    return query.offset(skip).limit(limit).all()
+
+def update_job_log(db: Session, job_log_id: str, job_log: job_log_schemas.JobLogUpdate) -> Optional[JobLog]:
+    """
+    Update a job log.
+    
+    Args:
+        db: Database session
+        job_log_id: Job log ID
+        job_log: Job log update data
+        
+    Returns:
+        Updated job log or None if not found
+    """
+    db_job_log = get_job_log(db, job_log_id)
+    if not db_job_log:
+        return None
+    
+    # Update fields if provided
+    update_data = job_log.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_job_log, key, value)
+    
+    db.commit()
+    db.refresh(db_job_log)
+    logger.info(f"Updated job log: {job_log_id}")
+    return db_job_log
+
+def delete_job_log(db: Session, job_log_id: str) -> bool:
+    """
+    Delete a job log.
+    
+    Args:
+        db: Database session
+        job_log_id: Job log ID
+        
+    Returns:
+        True if deleted, False if not found
+    """
+    db_job_log = get_job_log(db, job_log_id)
+    if not db_job_log:
+        return False
+    
+    db.delete(db_job_log)
+    db.commit()
+    logger.info(f"Deleted job log: {job_log_id}")
+    return True
+
+def create_job_log_entry(db: Session, entry: job_log_schemas.JobLogEntryCreate) -> JobLogEntry:
+    """
+    Create a new job log entry.
+    
+    Args:
+        db: Database session
+        entry: Job log entry creation data
+        
+    Returns:
+        Created job log entry
+    """
+    db_entry = JobLogEntry(
+        id=str(uuid.uuid4()),
+        job_log_id=entry.job_log_id,
+        timestamp=entry.timestamp,
+        level=entry.level,
+        category=entry.category,
+        message=entry.message,
+        details=entry.details
+    )
+    db.add(db_entry)
+    db.commit()
+    db.refresh(db_entry)
+    return db_entry
+
+def get_job_log_entries(
+    db: Session, 
+    job_log_id: str,
+    level: Optional[str] = None,
+    category: Optional[str] = None,
+    skip: int = 0, 
+    limit: int = 100
+) -> List[JobLogEntry]:
+    """
+    Get job log entries for a job log.
+    
+    Args:
+        db: Database session
+        job_log_id: Job log ID
+        level: Filter by log level
+        category: Filter by category
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        
+    Returns:
+        List of job log entries
+    """
+    query = db.query(JobLogEntry).filter(JobLogEntry.job_log_id == job_log_id)
+    
+    # Apply filters
+    if level:
+        query = query.filter(JobLogEntry.level == level)
+    if category:
+        query = query.filter(JobLogEntry.category == category)
+    
+    # Order by timestamp ascending (oldest first)
+    query = query.order_by(JobLogEntry.timestamp.asc())
+    
+    # Apply pagination
+    return query.offset(skip).limit(limit).all()
+
+def get_job_log_with_entries(
+    db: Session, 
+    job_log_id: str,
+    entry_level: Optional[str] = None,
+    entry_category: Optional[str] = None,
+    entry_limit: int = 100
+) -> Optional[Dict[str, Any]]:
+    """
+    Get a job log with its entries.
+    
+    Args:
+        db: Database session
+        job_log_id: Job log ID
+        entry_level: Filter entries by log level
+        entry_category: Filter entries by category
+        entry_limit: Maximum number of entries to return
+        
+    Returns:
+        Job log with entries or None if not found
+    """
+    db_job_log = get_job_log(db, job_log_id)
+    if not db_job_log:
+        return None
+    
+    # Get entries
+    entries = get_job_log_entries(
+        db=db, 
+        job_log_id=job_log_id,
+        level=entry_level,
+        category=entry_category,
+        limit=entry_limit
+    )
+    
+    # Convert to Pydantic model
+    job_log_with_entries = job_log_schemas.JobLogWithEntries.model_validate(db_job_log)
+    job_log_with_entries.entries = [job_log_schemas.JobLogEntry.model_validate(entry) for entry in entries]
+    
+    return job_log_with_entries
+
+def get_job_log_with_details(
+    db: Session, 
+    job_log_id: str,
+    include_entries: bool = False,
+    entry_limit: int = 100
+) -> Optional[Dict[str, Any]]:
+    """
+    Get a job log with device and user details.
+    
+    Args:
+        db: Database session
+        job_log_id: Job log ID
+        include_entries: Whether to include log entries
+        entry_limit: Maximum number of entries to return
+        
+    Returns:
+        Job log with details or None if not found
+    """
+    db_job_log = get_job_log(db, job_log_id)
+    if not db_job_log:
+        return None
+    
+    # Create a complete job log object
+    complete_job_log = job_log_schemas.JobLogComplete.model_validate(db_job_log)
+    
+    # Add device details if available
+    if db_job_log.device:
+        complete_job_log.device_hostname = db_job_log.device.hostname
+        complete_job_log.device_ip = db_job_log.device.ip_address
+    
+    # Add user details
+    if db_job_log.user:
+        complete_job_log.username = db_job_log.user.username
+        complete_job_log.user_full_name = db_job_log.user.full_name
+    
+    # Add entries if requested
+    if include_entries:
+        entries = get_job_log_entries(db=db, job_log_id=job_log_id, limit=entry_limit)
+        complete_job_log.entries = [job_log_schemas.JobLogEntry.model_validate(entry) for entry in entries]
+    
+    return complete_job_log
+
+def delete_old_job_logs(db: Session, days: int) -> int:
+    """
+    Delete job logs older than the specified number of days.
+    
+    Args:
+        db: Database session
+        days: Number of days to keep logs for
+        
+    Returns:
+        Number of deleted job logs
+    """
+    # Calculate the cutoff date
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Find job logs to delete
+    logs_to_delete = db.query(JobLog).filter(JobLog.start_time < cutoff_date).all()
+    count = len(logs_to_delete)
+    
+    # Delete the logs
+    for log in logs_to_delete:
+        db.delete(log)
+    
+    db.commit()
+    logger.info(f"Deleted {count} job logs older than {days} days")
+    return count
+
+def delete_job_logs_by_retention_policy(db: Session) -> int:
+    """
+    Delete job logs based on their retention policy.
+    
+    Args:
+        db: Database session
+        
+    Returns:
+        Number of deleted job logs
+    """
+    # Get current date
+    current_date = datetime.utcnow()
+    
+    # Find job logs with retention_days set
+    logs_with_retention = db.query(JobLog).filter(JobLog.retention_days.isnot(None)).all()
+    count = 0
+    
+    # Delete logs that have exceeded their retention period
+    for log in logs_with_retention:
+        retention_date = log.start_time + timedelta(days=log.retention_days)
+        if current_date > retention_date:
+            db.delete(log)
+            count += 1
+    
+    db.commit()
+    logger.info(f"Deleted {count} job logs based on retention policy")
+    return count 
