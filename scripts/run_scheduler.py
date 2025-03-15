@@ -32,6 +32,7 @@ parser.add_argument('--check-interval', type=int, default=60, help='Interval in 
 parser.add_argument('--sync-interval', type=int, default=300, help='Interval in seconds to sync with database')
 parser.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                     help='Logging level')
+parser.add_argument('--use-gateway', action='store_true', help='Use gateway for device operations')
 args = parser.parse_args()
 
 # Load configuration
@@ -47,6 +48,13 @@ logging.basicConfig(
     ]
 )
 logger = get_logger("netraven.scheduler")
+
+# Check if gateway should be used
+use_gateway = args.use_gateway or config.get('gateway', {}).get('use_by_default', False)
+if use_gateway:
+    logger.info("Using gateway for device operations")
+else:
+    logger.info("Using direct device connections")
 
 # Initialize database
 try:
@@ -93,19 +101,43 @@ def load_jobs_from_db():
                 logger.warning(f"Device {job.device_id} not found for job {job.id}")
                 continue
             
-            # Schedule the job
-            scheduler_job_id = scheduler.schedule_backup(
-                device_id=device.id,
-                host=device.hostname,
-                username=device.username,
-                password=device.password,
-                device_type=device.device_type,
-                schedule_type=job.schedule_type,
-                schedule_time=job.schedule_time,
-                schedule_interval=job.schedule_interval,
-                schedule_day=job.schedule_day,
-                job_name=job.name
-            )
+            # Check job type
+            if job.job_type == "command" and hasattr(job, "command"):
+                # Schedule command job
+                scheduler_job_id = scheduler.schedule_command(
+                    device_id=device.id,
+                    host=device.hostname,
+                    username=device.username,
+                    password=device.password,
+                    command=job.command,
+                    device_type=device.device_type,
+                    port=device.port or 22,
+                    use_keys=device.use_keys or False,
+                    key_file=device.key_file,
+                    schedule_type=job.schedule_type,
+                    schedule_time=job.schedule_time,
+                    schedule_interval=job.schedule_interval,
+                    schedule_day=job.schedule_day,
+                    job_name=job.name
+                )
+            else:
+                # Schedule backup job
+                scheduler_job_id = scheduler.schedule_backup(
+                    device_id=device.id,
+                    host=device.hostname,
+                    username=device.username,
+                    password=device.password,
+                    device_type=device.device_type,
+                    port=device.port or 22,
+                    use_keys=device.use_keys or False,
+                    key_file=device.key_file,
+                    schedule_type=job.schedule_type,
+                    schedule_time=job.schedule_time,
+                    schedule_interval=job.schedule_interval,
+                    schedule_day=job.schedule_day,
+                    job_name=job.name,
+                    use_gateway=use_gateway
+                )
             
             # Map database job ID to scheduler job ID
             job_map[job.id] = scheduler_job_id
@@ -136,19 +168,43 @@ def sync_with_db():
                     logger.warning(f"Device {job.device_id} not found for job {job.id}")
                     continue
                 
-                # Schedule the job
-                scheduler_job_id = scheduler.schedule_backup(
-                    device_id=device.id,
-                    host=device.hostname,
-                    username=device.username,
-                    password=device.password,
-                    device_type=device.device_type,
-                    schedule_type=job.schedule_type,
-                    schedule_time=job.schedule_time,
-                    schedule_interval=job.schedule_interval,
-                    schedule_day=job.schedule_day,
-                    job_name=job.name
-                )
+                # Check job type
+                if job.job_type == "command" and hasattr(job, "command"):
+                    # Schedule command job
+                    scheduler_job_id = scheduler.schedule_command(
+                        device_id=device.id,
+                        host=device.hostname,
+                        username=device.username,
+                        password=device.password,
+                        command=job.command,
+                        device_type=device.device_type,
+                        port=device.port or 22,
+                        use_keys=device.use_keys or False,
+                        key_file=device.key_file,
+                        schedule_type=job.schedule_type,
+                        schedule_time=job.schedule_time,
+                        schedule_interval=job.schedule_interval,
+                        schedule_day=job.schedule_day,
+                        job_name=job.name
+                    )
+                else:
+                    # Schedule backup job
+                    scheduler_job_id = scheduler.schedule_backup(
+                        device_id=device.id,
+                        host=device.hostname,
+                        username=device.username,
+                        password=device.password,
+                        device_type=device.device_type,
+                        port=device.port or 22,
+                        use_keys=device.use_keys or False,
+                        key_file=device.key_file,
+                        schedule_type=job.schedule_type,
+                        schedule_time=job.schedule_time,
+                        schedule_interval=job.schedule_interval,
+                        schedule_day=job.schedule_day,
+                        job_name=job.name,
+                        use_gateway=use_gateway
+                    )
                 
                 # Map database job ID to scheduler job ID
                 job_map[job.id] = scheduler_job_id
@@ -191,18 +247,79 @@ def run_job(job_id, user_id=None):
             logger.warning(f"Device {job.device_id} not found for job {job_id}")
             return False
         
-        # Run the job
-        from netraven.jobs.device_connector import backup_device_config
-        
-        logger.info(f"Running job {job_id} for device {device.hostname}")
-        result = backup_device_config(
-            device_id=device.id,
-            host=device.hostname,
-            username=device.username,
-            password=device.password,
-            device_type=device.device_type,
-            user_id=user_id or job.created_by
-        )
+        # Run the job based on type
+        if job.job_type == "command" and hasattr(job, "command"):
+            # Run command job
+            if use_gateway:
+                from netraven.jobs.gateway_connector import execute_command_via_gateway
+                
+                logger.info(f"Running command job {job_id} for device {device.hostname} via gateway")
+                success, _ = execute_command_via_gateway(
+                    device_id=device.id,
+                    host=device.hostname,
+                    username=device.username,
+                    password=device.password,
+                    command=job.command,
+                    device_type=device.device_type,
+                    port=device.port or 22,
+                    use_keys=device.use_keys or False,
+                    key_file=device.key_file,
+                    user_id=user_id or job.created_by
+                )
+                result = success
+            else:
+                from netraven.jobs.device_connector import JobDeviceConnector
+                
+                logger.info(f"Running command job {job_id} for device {device.hostname}")
+                connector = JobDeviceConnector(
+                    device_id=device.id,
+                    host=device.hostname,
+                    username=device.username,
+                    password=device.password,
+                    device_type=device.device_type,
+                    user_id=user_id or job.created_by
+                )
+                
+                try:
+                    connector.connect()
+                    _, output = connector.send_command(job.command)
+                    connector.disconnect()
+                    result = True
+                except Exception as e:
+                    logger.exception(f"Error executing command: {e}")
+                    result = False
+        else:
+            # Run backup job
+            if use_gateway:
+                from netraven.jobs.gateway_connector import backup_device_config_via_gateway
+                
+                logger.info(f"Running backup job {job_id} for device {device.hostname} via gateway")
+                result = backup_device_config_via_gateway(
+                    device_id=device.id,
+                    host=device.hostname,
+                    username=device.username,
+                    password=device.password,
+                    device_type=device.device_type,
+                    port=device.port or 22,
+                    use_keys=device.use_keys or False,
+                    key_file=device.key_file,
+                    user_id=user_id or job.created_by
+                )
+            else:
+                from netraven.jobs.device_connector import backup_device_config
+                
+                logger.info(f"Running backup job {job_id} for device {device.hostname}")
+                result = backup_device_config(
+                    device_id=device.id,
+                    host=device.hostname,
+                    username=device.username,
+                    password=device.password,
+                    device_type=device.device_type,
+                    port=device.port or 22,
+                    use_keys=device.use_keys or False,
+                    key_file=device.key_file,
+                    user_id=user_id or job.created_by
+                )
         
         # Update last run time
         update_job_last_run(db_session, job_id)
@@ -253,11 +370,14 @@ try:
             # Sleep for check interval
             time.sleep(args.check_interval)
         except Exception as e:
-            logger.exception(f"Error in scheduler loop: {e}")
-            # Continue running despite errors
+            logger.exception(f"Error in main loop: {e}")
             time.sleep(args.check_interval)
 finally:
     # Stop scheduler
     logger.info("Stopping scheduler")
     scheduler.stop()
+    
+    # Close database session
+    db_session.close()
+    
     logger.info("Scheduler stopped") 

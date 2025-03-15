@@ -7,11 +7,14 @@ It acts as a gateway between the application and external network devices.
 
 import os
 import time
-from fastapi import FastAPI, HTTPException, Depends, status, Request, Response
+import datetime
+import logging
+import jwt
+from fastapi import FastAPI, HTTPException, Depends, status, Request, Response, Header
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, Optional, List, Any, Callable
+from typing import Dict, Optional, List, Any, Callable, Tuple
 
 # Import device communication modules
 from netraven.core.device_comm import DeviceConnector
@@ -26,16 +29,18 @@ from netraven.gateway.models import (
 from netraven.gateway import __version__
 from netraven.gateway.auth import validate_api_key, create_access_token
 from netraven.gateway.utils import sanitize_log_data
-from netraven.gateway.metrics import metrics
+from netraven.gateway.metrics import metrics, MetricsCollector
 from netraven.gateway.logging_config import (
     get_gateway_logger, 
     start_gateway_session, 
     end_gateway_session,
     log_with_context
 )
+from netraven.core.config import load_config, get_default_config_path
+from netraven.core.logging import get_logger
 
 # Configure logging
-logger = get_gateway_logger("netraven.gateway.api")
+logger = get_logger("netraven.gateway")
 
 # Create FastAPI application
 app = FastAPI(
@@ -52,6 +57,81 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Load configuration
+config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
+config, _ = load_config(config_path)
+
+# Initialize metrics collector
+metrics = MetricsCollector()
+
+# Start time for uptime calculation
+start_time = time.time()
+
+# API key for authentication
+API_KEY = os.environ.get("GATEWAY_API_KEY", "netraven-api-key")
+JWT_SECRET = os.environ.get("GATEWAY_JWT_SECRET", "insecure-jwt-secret-change-in-production")
+
+# Models
+class DeviceCredentials(BaseModel):
+    """Device credentials model."""
+    host: str
+    username: str
+    password: str
+    device_type: Optional[str] = None
+    port: int = 22
+    use_keys: bool = False
+    key_file: Optional[str] = None
+
+class CommandRequest(BaseModel):
+    """Command request model."""
+    device_id: str
+    command: str
+    credentials: DeviceCredentials
+
+class ConnectRequest(BaseModel):
+    """Connect request model."""
+    device_id: str
+    credentials: DeviceCredentials
+
+class StatusResponse(BaseModel):
+    """Status response model."""
+    status: str
+    version: str
+    uptime: str
+    connected_devices: int
+    metrics: Dict[str, Any]
+
+# Authentication dependency
+async def verify_api_key(authorization: str = Header(None)):
+    """Verify API key."""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing API key",
+        )
+    
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication scheme",
+        )
+    
+    if token != API_KEY:
+        try:
+            # Try to validate as JWT
+            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            # If we get here, the JWT is valid
+            return payload
+        except jwt.PyJWTError:
+            # If JWT validation fails, raise exception
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid API key or JWT token",
+            )
+    
+    return {"type": "api_key"}
 
 # Add metrics middleware
 @app.middleware("http")
@@ -185,93 +265,72 @@ async def health_check():
         "version": __version__
     }
 
-@app.get("/metrics")
-async def get_metrics(client_info: Dict[str, Any] = Depends(validate_api_key)):
-    """
-    Get metrics about the gateway service.
+@app.get("/status", response_model=StatusResponse)
+async def get_status(auth: Dict = Depends(verify_api_key)):
+    """Get gateway status."""
+    # Record request
+    metrics.record_request("/status")
     
-    This endpoint returns metrics about the gateway service,
-    such as request counts, response times, and errors.
-    """
-    log_with_context(
-        logger,
-        level=20,  # INFO
-        message="Metrics requested",
-        client_id=client_info["client_id"]
-    )
+    # Calculate uptime
+    uptime_seconds = time.time() - start_time
+    uptime = str(datetime.timedelta(seconds=int(uptime_seconds)))
+    
+    return {
+        "status": "running",
+        "version": __version__,
+        "uptime": uptime,
+        "connected_devices": metrics.active_connections,
+        "metrics": metrics.get_metrics()
+    }
+
+@app.get("/metrics")
+async def get_metrics(auth: Dict = Depends(verify_api_key)):
+    """Get gateway metrics."""
+    # Record request
+    metrics.record_request("/metrics")
+    
     return metrics.get_metrics()
 
-@app.post("/token", response_model=TokenResponse)
-async def get_token(request: TokenRequest):
-    """
-    Get an access token using an API key.
+@app.post("/reset-metrics")
+async def reset_metrics(auth: Dict = Depends(verify_api_key)):
+    """Reset gateway metrics."""
+    # Record request
+    metrics.record_request("/reset-metrics")
     
-    This endpoint validates the API key and returns a JWT token
-    that can be used for subsequent requests.
-    """
-    # Validate API key
+    # Reset metrics
+    metrics.reset_metrics()
+    
+    return {"status": "ok", "message": "Metrics reset successfully"}
+
+@app.post("/check-device")
+async def check_device(device: DeviceCredentials, auth: Dict = Depends(verify_api_key)):
+    """Check device connectivity."""
+    # Record request
+    metrics.record_request("/check-device")
+    
+    # Import here to avoid circular imports
+    from netraven.jobs.device_connector import check_device_connectivity
+    
     try:
-        # In a real application, this would validate against a database
-        if request.api_key not in ["netraven-api-key", "netraven-scheduler-key"]:
-            log_with_context(
-                logger,
-                level=40,  # ERROR
-                message=f"Invalid API key: {request.api_key[:5]}...",
-                client_id="unknown"
-            )
-            
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid API key"
-            )
-        
-        # Get client info based on API key
-        client_info = {
-            "netraven-api-key": {
-                "client_id": "netraven-api",
-                "permissions": ["device:read", "device:write"]
-            },
-            "netraven-scheduler-key": {
-                "client_id": "netraven-scheduler",
-                "permissions": ["device:read", "device:write"]
-            }
-        }[request.api_key]
-        
-        log_with_context(
-            logger,
-            level=20,  # INFO
-            message=f"Token requested for client: {client_info['client_id']}",
-            client_id=client_info['client_id']
+        # Check device connectivity
+        reachable, error = check_device_connectivity(
+            host=device.host,
+            port=device.port
         )
         
-        # Create access token
-        token = create_access_token(client_info)
-        
-        log_with_context(
-            logger,
-            level=20,  # INFO
-            message=f"Token generated for client: {client_info['client_id']}",
-            client_id=client_info['client_id']
-        )
-        
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_in": 3600
-        }
+        if reachable:
+            metrics.record_success()
+            return {"reachable": True}
+        else:
+            metrics.record_error("connectivity_error", error)
+            return {"reachable": False, "error": error}
     except Exception as e:
-        log_with_context(
-            logger,
-            level=40,  # ERROR
-            message=f"Error generating token: {str(e)}",
-            client_id="unknown",
-            exc_info=e
-        )
+        # Record error
+        error_msg = str(e)
+        metrics.record_error("exception", error_msg)
         
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error generating token: {str(e)}"
-        )
+        # Return error
+        return {"reachable": False, "error": error_msg}
 
 @app.post("/connect", response_model=DeviceResponse)
 async def connect_device(

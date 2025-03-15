@@ -12,11 +12,22 @@ import os
 import logging
 from pathlib import Path
 from typing import Dict, Any
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 # Import internal modules
 from netraven.core.config import load_config, get_default_config_path
 from netraven.core.logging import get_logger
 from netraven.web.database import init_db, SessionLocal
+from netraven.web.routes import (
+    auth,
+    users,
+    devices,
+    jobs,
+    backups,
+    dashboard,
+    gateway
+)
 
 # Create logger
 logger = get_logger("netraven.web")
@@ -84,6 +95,11 @@ try:
 except Exception as e:
     logger.error(f"Error starting scheduler service: {e}")
 
+# Include additional routers
+app.include_router(jobs.router)
+app.include_router(dashboard.router)
+app.include_router(gateway.router)
+
 @app.get("/api")
 async def api_root(request: Request) -> JSONResponse:
     """Root API endpoint that provides information about available endpoints."""
@@ -121,4 +137,21 @@ async def health_check() -> Dict[str, str]:
     return {
         "status": "ok",
         "version": "0.1.0"
-    } 
+    }
+
+# Mount static files
+try:
+    app.mount("/static", StaticFiles(directory="netraven/web/static"), name="static")
+    templates = Jinja2Templates(directory="netraven/web/templates")
+except Exception as e:
+    logger.warning(f"Could not mount static files: {e}")
+
+# Error handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler."""
+    logger.exception(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    ) 
