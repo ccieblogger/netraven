@@ -155,13 +155,66 @@ The web interface provides:
 
 ## Features
 
-- Secure retrieval of device configurations
-- Multiple storage destinations:
-  - Local file storage with Git integration for version control
-  - AWS S3 remote storage
-- Comprehensive logging system
-- Configurable backup schedules
-- Secure credential management
+- **Device Management**: Add, edit, and organize network devices
+- **Configuration Backup**: Automated backup of device configurations
+- **Scheduled Jobs**: Schedule recurring backup and command execution tasks
+- **Job Logging**: Comprehensive logging of all operations
+- **Tag-based Organization**: Organize devices with tags and tag rules
+- **Device Gateway**: Secure gateway for device communication with metrics collection
+
+## Architecture
+
+NetRaven consists of several components:
+
+1. **Web API**: FastAPI-based REST API for device management and job control
+2. **Scheduler**: Background service for executing scheduled jobs
+3. **Device Gateway**: Secure gateway for device communication
+4. **Frontend**: Vue.js-based web interface
+5. **Database**: PostgreSQL database for storing device information, backups, and logs
+
+## Gateway Integration
+
+NetRaven includes a Device Gateway service that provides a secure way to communicate with network devices. The gateway offers several benefits:
+
+- **Centralized Access**: All device connections go through a single point, simplifying security management
+- **Metrics Collection**: Comprehensive metrics on device connections, commands, and errors
+- **Secure API**: JWT-based authentication for secure access
+- **Scheduler Integration**: Seamless integration with the job scheduling system
+
+### Gateway Configuration
+
+The gateway can be configured in the `config.yml` file:
+
+```yaml
+gateway:
+  url: http://localhost:8001
+  api_key: your-api-key-here
+  use_by_default: false
+  connect_timeout: 30
+  command_timeout: 60
+  max_retries: 3
+  retry_delay: 5
+```
+
+### Using the Gateway
+
+To use the gateway for device operations:
+
+1. Ensure the gateway service is running
+2. Set `use_by_default: true` in the config or use the `--use-gateway` flag with the scheduler
+3. Monitor gateway metrics through the web interface at `/gateway`
+
+### Gateway API
+
+The gateway provides the following API endpoints:
+
+- `/health`: Health check endpoint
+- `/status`: Gateway status information
+- `/metrics`: Detailed metrics about gateway operations
+- `/check-device`: Check device connectivity
+- `/connect`: Connect to a device
+- `/execute`: Execute a command on a device
+- `/backup`: Backup device configuration
 
 ## Logging System
 
