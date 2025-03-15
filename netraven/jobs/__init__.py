@@ -7,6 +7,12 @@ and job scheduling.
 """
 
 from netraven.jobs.device_connector import JobDeviceConnector, backup_device_config
+from netraven.jobs.gateway_connector import (
+    check_device_connectivity_via_gateway,
+    connect_device_via_gateway,
+    execute_command_via_gateway,
+    backup_device_config_via_gateway
+)
 from netraven.jobs.device_logging import (
     start_job_session,
     end_job_session,
@@ -25,6 +31,10 @@ from netraven.jobs.scheduler import BackupScheduler, get_scheduler
 __all__ = [
     'JobDeviceConnector',
     'backup_device_config',
+    'check_device_connectivity_via_gateway',
+    'connect_device_via_gateway',
+    'execute_command_via_gateway',
+    'backup_device_config_via_gateway',
     'start_job_session',
     'end_job_session',
     'register_device',

@@ -54,6 +54,17 @@ logging:
       backend: backend.log
       jobs: jobs.log
       auth: auth.log
+gateway:
+  url: http://localhost:8001
+  api_key: netraven-scheduler-key
+  # Whether to use the gateway for device operations by default
+  use_by_default: false
+  # Timeout settings
+  connect_timeout: 30
+  command_timeout: 60
+  # Retry settings
+  max_retries: 3
+  retry_delay: 5
 web:
   host: 127.0.0.1
   port: 8080
