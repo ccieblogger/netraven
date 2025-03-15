@@ -14,6 +14,7 @@ import schedule
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Callable
 import uuid
+import socket
 
 from netraven.core.config import load_config, get_default_config_path
 
@@ -50,6 +51,57 @@ class BackupScheduler:
         
         # Track scheduled jobs
         self.scheduled_jobs = {}
+        
+        # Check network connectivity
+        self._check_network_connectivity()
+    
+    def _check_network_connectivity(self):
+        """
+        Check network connectivity to ensure the scheduler can reach devices.
+        
+        This method logs warnings if there are potential network connectivity issues.
+        """
+        logger.info("Checking network connectivity for the scheduler...")
+        
+        # Try to resolve common DNS names to check internet connectivity
+        try:
+            socket.gethostbyname("google.com")
+            logger.info("Internet connectivity check: Success")
+        except socket.error:
+            logger.warning("Internet connectivity check: Failed - May have limited internet access")
+        
+        # Check if we can reach the local network
+        try:
+            # Get the local IP address
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            
+            # Get the network prefix (first 3 octets)
+            network_prefix = ".".join(local_ip.split(".")[:3])
+            logger.info(f"Local IP address: {local_ip}")
+            logger.info(f"Local network: {network_prefix}.0/24")
+            
+            # Try to ping a few addresses in the local network
+            reachable_count = 0
+            for i in range(1, 5):
+                test_ip = f"{network_prefix}.{i}"
+                if test_ip != local_ip:  # Skip our own IP
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(0.5)
+                    result = sock.connect_ex((test_ip, 22))
+                    sock.close()
+                    if result == 0:
+                        reachable_count += 1
+            
+            if reachable_count > 0:
+                logger.info(f"Local network connectivity check: Success ({reachable_count} devices reachable)")
+            else:
+                logger.warning("Local network connectivity check: Limited - Few or no devices reachable")
+                
+        except Exception as e:
+            logger.warning(f"Local network connectivity check: Failed - {str(e)}")
     
     def schedule_backup(
         self,
@@ -96,6 +148,25 @@ class BackupScheduler:
             session_id = start_job_session(f"Scheduled backup: {job_name}", self.user_id)
             try:
                 logger.info(f"Running scheduled backup job {job_id} for device {host}")
+                
+                # Check if the device is reachable before attempting backup
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                try:
+                    sock.connect((host, 22))  # Assuming SSH port 22
+                    reachable = True
+                except socket.error:
+                    reachable = False
+                finally:
+                    sock.close()
+                
+                if not reachable:
+                    error_msg = f"Device {host} is not reachable"
+                    logger.error(error_msg)
+                    log_backup_failure(session_id, device_id, error_msg)
+                    end_job_session(session_id, "failed", error_msg)
+                    return
+                
                 result = backup_device_config(
                     device_id=device_id,
                     host=host,

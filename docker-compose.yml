@@ -21,6 +21,7 @@ services:
   # Backend API service
   api:
     image: python:3.10-slim
+    network_mode: "host"
     volumes:
       - .:/app
       - logs_data:/app/logs
@@ -28,19 +29,17 @@ services:
     command: >
       bash -c "cd /app && \
       apt-get update && \
-      apt-get install -y curl postgresql-client && \
+      apt-get install -y curl postgresql-client iputils-ping openssh-client && \
       pip install -e . && \
       pip install email-validator psycopg2-binary alembic schedule && \
       python -m netraven.web.migrations.run_migrations && \
       python -m netraven.web.migrations.test_migrations && \
       uvicorn netraven.web:app --host 0.0.0.0 --port 8000 --reload"
-    ports:
-      - "8000:8000"
     environment:
       - PYTHONPATH=/app
-      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
+      - DATABASE_URL=postgresql://netraven:netraven@localhost:5432/netraven
       - NETRAVEN_WEB_DB_TYPE=postgres
-      - NETRAVEN_WEB_DB_HOST=postgres
+      - NETRAVEN_WEB_DB_HOST=localhost
       - NETRAVEN_WEB_DB_PORT=5432
       - NETRAVEN_WEB_DB_NAME=netraven
       - NETRAVEN_WEB_DB_USER=netraven
@@ -62,6 +61,7 @@ services:
   # Scheduler service
   scheduler:
     image: python:3.10-slim
+    network_mode: "host"
     volumes:
       - .:/app
       - logs_data:/app/logs
@@ -69,15 +69,15 @@ services:
     command: >
       bash -c "cd /app && \
       apt-get update && \
-      apt-get install -y postgresql-client && \
+      apt-get install -y postgresql-client iputils-ping openssh-client && \
       pip install -e . && \
       pip install psycopg2-binary schedule email-validator && \
       python scripts/run_scheduler.py --check-interval 60 --sync-interval 300 --log-level INFO"
     environment:
       - PYTHONPATH=/app
-      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
+      - DATABASE_URL=postgresql://netraven:netraven@localhost:5432/netraven
       - NETRAVEN_WEB_DB_TYPE=postgres
-      - NETRAVEN_WEB_DB_HOST=postgres
+      - NETRAVEN_WEB_DB_HOST=localhost
       - NETRAVEN_WEB_DB_PORT=5432
       - NETRAVEN_WEB_DB_NAME=netraven
       - NETRAVEN_WEB_DB_USER=netraven
@@ -107,7 +107,7 @@ services:
     depends_on:
       - api
     environment:
-      - VUE_APP_API_URL=http://api:8000
+      - VUE_APP_API_URL=http://localhost:8000
     healthcheck:
       test: ["CMD", "ps", "aux", "|", "grep", "node"]
       interval: 30s

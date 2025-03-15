@@ -6,8 +6,12 @@ that adds comprehensive logging of device communications to the jobs log.
 """
 
 import os
+import time
+import socket
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
+import uuid
+import logging
 
 from netraven.core.device_comm import DeviceConnector as CoreDeviceConnector
 from netraven.jobs.device_logging import (
@@ -21,8 +25,15 @@ from netraven.jobs.device_logging import (
     log_device_response,
     log_device_disconnect,
     log_backup_success,
-    log_backup_failure
+    log_backup_failure,
+    log_backup_start,
+    log_device_info,
 )
+from netraven.core.config import load_config, get_default_config_path, get_storage_path
+from netraven.core.logging import get_logger
+
+# Configure logging
+logger = get_logger(__name__)
 
 class JobDeviceConnector:
     """
@@ -290,6 +301,34 @@ class JobDeviceConnector:
         if self.session_id:
             end_job_session(self.session_id, exc_type is None)
 
+def check_device_connectivity(host: str, port: int = 22, timeout: int = 5) -> Tuple[bool, Optional[str]]:
+    """
+    Check if a device is reachable via TCP connection.
+    
+    Args:
+        host: Device hostname or IP address
+        port: Port to connect to (default: 22 for SSH)
+        timeout: Connection timeout in seconds (default: 5)
+        
+    Returns:
+        Tuple[bool, Optional[str]]: (is_reachable, error_message)
+    """
+    logger.debug(f"Checking connectivity to {host}:{port}")
+    
+    # Try to establish a TCP connection to the host and port
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+    
+    try:
+        sock.connect((host, port))
+        logger.debug(f"Device {host} is reachable on port {port}")
+        return True, None
+    except socket.error as e:
+        error_msg = f"Device {host} is not reachable on port {port}: {str(e)}"
+        logger.error(error_msg)
+        return False, error_msg
+    finally:
+        sock.close()
 
 def backup_device_config(
     device_id: str,
@@ -298,13 +337,12 @@ def backup_device_config(
     password: str,
     device_type: Optional[str] = None,
     port: int = 22,
-    config: Optional[Dict[str, Any]] = None,
     use_keys: bool = False,
     key_file: Optional[str] = None,
-    user_id: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> bool:
     """
-    Backup the configuration of a network device with enhanced logging.
+    Backup device configuration.
     
     Args:
         device_id: Device ID
@@ -313,25 +351,25 @@ def backup_device_config(
         password: Password for authentication
         device_type: Device type (auto-detected if not provided)
         port: SSH port (default: 22)
-        config: Configuration dictionary
-        use_keys: Whether to use key-based authentication
-        key_file: Path to SSH key file
-        user_id: User ID for database logging
+        use_keys: Whether to use key-based authentication (default: False)
+        key_file: Path to SSH key file (if use_keys is True)
+        session_id: Job session ID for logging (optional)
         
     Returns:
         bool: True if backup was successful, False otherwise
     """
-    # Load config if not provided
-    if config is None:
-        from netraven.core.config import load_config, get_default_config_path
-        import os
-        config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
-        config, _ = load_config(config_path)
+    # Log backup start
+    if session_id:
+        log_backup_start(session_id, device_id, host)
     
-    # Start a new job session for this backup
-    session_id = start_job_session(f"Backup job for device {host}", user_id)
+    # Check device connectivity before attempting to connect
+    reachable, error = check_device_connectivity(host, port)
+    if not reachable:
+        if session_id:
+            log_backup_failure(session_id, device_id, error)
+        return False
     
-    # Create device connector with job logging
+    # Create device connector
     device = JobDeviceConnector(
         device_id=device_id,
         host=host,
@@ -342,72 +380,80 @@ def backup_device_config(
         use_keys=use_keys,
         key_file=key_file,
         session_id=session_id,
-        user_id=user_id
+        user_id=None
     )
     
     try:
         # Connect to device
+        logger.info(f"Connecting to device {host}")
         if not device.connect():
-            log_backup_failure(device_id, f"Failed to connect to {host}", session_id)
-            return False
-        
-        # Get running configuration
-        config_text = device.get_running()
-        if not config_text:
-            log_backup_failure(device_id, f"Failed to retrieve configuration from {host}", session_id)
-            device.disconnect()
+            error_msg = f"Failed to connect to device {host}"
+            logger.error(error_msg)
+            if session_id:
+                log_backup_failure(session_id, device_id, error_msg)
             return False
         
         # Get device information
-        serial = device.get_serial() or "unknown"
-        os_info = device.get_os() or {}
-        os_version = os_info.get("version", "unknown")
+        logger.info(f"Getting device information for {host}")
+        serial_number = device.get_serial()
+        os_info = device.get_os()
         
-        # Disconnect from device
-        device.disconnect()
+        # Log device information
+        if session_id and (serial_number or os_info):
+            log_device_info(
+                session_id=session_id,
+                device_id=device_id,
+                serial_number=serial_number,
+                os_version=os_info.get("version") if os_info else None,
+                os_model=os_info.get("model") if os_info else None,
+            )
         
-        # Generate filename
-        from netraven.core.device_comm import get_backup_filename_format, get_storage_path
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename_format = get_backup_filename_format(config)
-        filename = filename_format.format(
-            host=host,
-            timestamp=timestamp,
-            serial=serial,
-            version=os_version
-        )
-        
-        # Get storage path
-        filepath = get_storage_path(config, filename)
+        # Get running configuration
+        logger.info(f"Getting running configuration for {host}")
+        config = device.get_running()
+        if not config:
+            error_msg = f"Failed to get running configuration for {host}"
+            logger.error(error_msg)
+            if session_id:
+                log_backup_failure(session_id, device_id, error_msg)
+            return False
         
         # Save configuration to file
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        config_dir = os.path.join(get_storage_path(), "configs", device_id)
+        os.makedirs(config_dir, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{host}_{timestamp}.txt"
+        filepath = os.path.join(config_dir, filename)
+        
         with open(filepath, "w") as f:
-            f.write(config_text)
+            f.write(config)
         
-        # Add metadata to the backup
-        metadata_path = f"{filepath}.meta"
-        with open(metadata_path, "w") as f:
-            f.write(f"host: {host}\n")
-            f.write(f"timestamp: {timestamp}\n")
-            f.write(f"serial: {serial}\n")
-            f.write(f"os_version: {os_version}\n")
-            f.write(f"device_type: {device.device_type or 'unknown'}\n")
+        # Log backup success
+        if session_id:
+            log_backup_success(
+                session_id=session_id,
+                device_id=device_id,
+                file_path=filepath,
+                file_size=len(config),
+                serial_number=serial_number,
+            )
         
-        # Log success
-        log_backup_success(device_id, filepath, len(config_text), session_id)
-        
-        # End the session
-        end_job_session(session_id, True)
-        
+        logger.info(f"Successfully backed up configuration for {host} to {filepath}")
         return True
     
     except Exception as e:
-        log_backup_failure(device_id, str(e), session_id)
+        error_msg = f"Error backing up {host}: {str(e)}"
+        logger.exception(error_msg)
+        if session_id:
+            log_backup_failure(session_id, device_id, error_msg)
+        return False
+    
+    finally:
+        # Disconnect from device
         if device.is_connected:
             device.disconnect()
-            
-        # End the session
-        end_job_session(session_id, False)
         
-        return False 
+        # End the session
+        if session_id:
+            end_job_session(session_id, False) 

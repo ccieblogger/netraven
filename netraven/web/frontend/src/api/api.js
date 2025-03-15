@@ -64,8 +64,10 @@ console.log('Final API URL:', browserApiUrl)
 
 // For direct container-to-container communication within Docker
 // This overrides the browser URL for server-side API calls that happen within Docker
-const internalApiUrl = 'http://netraven-api-1:8000';
+// With host network mode, we use localhost instead of container name
+const internalApiUrl = 'http://localhost:8000';
 
+// Create API client with retry capability
 const api = axios.create({
   baseURL: browserApiUrl,
   headers: {
@@ -98,37 +100,40 @@ api.interceptors.request.use(
   }
 )
 
-// Add response interceptor to handle token expiration
+// Add response interceptor for error handling
 api.interceptors.response.use(
   response => {
-    console.log('API Response:', {
-      url: response.config.url,
-      status: response.status,
-      data: response.data
-    })
     return response
   },
-  error => {
-    console.error('API Response Error:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
-    })
+  async error => {
+    const originalRequest = error.config
     
-    // Handle authentication errors (401)
-    if (error.response && error.response.status === 401) {
-      // Token expired or invalid - clear the token
-      console.log('API: Token invalid (401), clearing token')
-      localStorage.removeItem('access_token')
+    // If the error is a network error (no response from server)
+    if (error.message && error.message.includes('Network Error') && !originalRequest._retry) {
+      console.error('Network error detected, retrying request...')
       
-      // Add a custom property to the error to indicate it's an auth error
-      error.isAuthError = true;
+      // Mark the request as retried to prevent infinite loops
+      originalRequest._retry = true
       
-      // Enhance the error message for better user feedback
-      if (!error.message || error.message === 'Request failed with status code 401') {
-        error.message = 'Authentication failed. Please log in again.';
-      }
+      // Wait a moment before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Retry the request
+      return api(originalRequest)
+    }
+    
+    // If the error is a timeout
+    if (error.code === 'ECONNABORTED' && !originalRequest._retry) {
+      console.error('Request timeout, retrying...')
+      
+      // Mark the request as retried to prevent infinite loops
+      originalRequest._retry = true
+      
+      // Wait a moment before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Retry the request
+      return api(originalRequest)
     }
     
     return Promise.reject(error)

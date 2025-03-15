@@ -112,57 +112,58 @@ class DeviceConnector:
         # Connection state
         self._connection = None
         self._connected = False
+        self.last_error = None
+        self.detected_device_type = None
+        
+        # Validate connection parameters
+        self._validate_parameters()
         
         logger.debug(
             f"Initialized DeviceConnector for {host} (username: {username}, "
             f"device_type: {device_type or 'auto'}, port: {port})"
         )
     
-    @property
-    def is_connected(self) -> bool:
-        """
-        Check if the device is currently connected.
+    def _validate_parameters(self) -> None:
+        """Validate connection parameters."""
+        # Check if host is provided
+        if not self.host:
+            raise ValueError("Host is required")
         
-        Returns:
-            bool: True if connected, False otherwise
-        """
-        return self._connected
+        # Check if username is provided
+        if not self.username:
+            raise ValueError("Username is required")
+        
+        # Check if password or key is provided
+        if not self.use_keys and not self.password and not self.alt_passwords:
+            raise ValueError("Password is required when not using key-based authentication")
+        
+        # Check if key file exists when using key-based authentication
+        if self.use_keys and self.key_file and not os.path.exists(os.path.expanduser(self.key_file)):
+            raise ValueError(f"Key file not found: {self.key_file}")
     
-    def _check_reachability(self) -> Tuple[bool, Optional[str]]:
+    def _check_host_reachability(self) -> bool:
         """
-        Check if the device is reachable via ping.
+        Check if the host is reachable before attempting to connect.
         
         Returns:
-            tuple: (is_reachable, error_message)
+            bool: True if the host is reachable, False otherwise
         """
-        logger.debug(f"Checking reachability for {self.host}")
+        logger.debug(f"Checking if host {self.host} is reachable on port {self.port}")
+        
+        # Try to establish a TCP connection to the host and port
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)  # 5 second timeout for the check
         
         try:
-            # Try a simple socket connection to the device
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(self.timeout)
-            result = sock.connect_ex((self.host, self.port))
+            sock.connect((self.host, self.port))
+            logger.debug(f"Host {self.host} is reachable on port {self.port}")
+            return True
+        except socket.error as e:
+            logger.error(f"Host {self.host} is not reachable on port {self.port}: {str(e)}")
+            self.last_error = f"Host unreachable: {str(e)}"
+            return False
+        finally:
             sock.close()
-            
-            if result == 0:
-                return True, None
-            
-            # If socket connection fails, try ping as a fallback
-            if os.name == "nt":  # Windows
-                ping_cmd = ["ping", "-n", "1", "-w", str(self.timeout * 1000), self.host]
-            else:  # Unix/Linux
-                ping_cmd = ["ping", "-c", "1", "-W", str(self.timeout), self.host]
-            
-            with subprocess.Popen(
-                ping_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            ) as proc:
-                proc.communicate()
-                if proc.returncode == 0:
-                    return True, None
-                
-            return False, f"Host {self.host} is not reachable"
-        except Exception as e:
-            return False, f"Error checking reachability: {str(e)}"
     
     def _autodetect_device_type(self) -> Optional[str]:
         """
@@ -228,22 +229,29 @@ class DeviceConnector:
         Returns:
             bool: True if connected successfully, False otherwise
         """
-        if self.is_connected:
+        if self._connected and self._connection:
             logger.debug(f"Already connected to {self.host}")
             return True
         
-        # Check reachability first
-        reachable, error = self._check_reachability()
-        if not reachable:
-            logger.error(f"Device {self.host} is not reachable: {error}")
+        # Check if host is reachable before attempting to connect
+        if not self._check_host_reachability():
+            logger.error(f"Cannot connect to {self.host}: Host is not reachable")
             return False
         
-        # Detect device type if not specified
-        detected_type = self._autodetect_device_type()
+        # Auto-detect device type if not provided
+        if not self.device_type:
+            logger.debug(f"Auto-detecting device type for {self.host}")
+            self.device_type = self._autodetect_device_type()
+            
+            if not self.device_type:
+                logger.error(f"Failed to detect device type for {self.host}")
+                return False
+            
+            logger.debug(f"Detected device type: {self.device_type}")
         
         # Prepare connection parameters
         device_info = {
-            "device_type": detected_type,
+            "device_type": self.device_type,
             "host": self.host,
             "username": self.username,
             "port": self.port,
@@ -265,33 +273,40 @@ class DeviceConnector:
             return False
         
         # Try to connect with primary password
+        if self._try_connect():
+            return True
+        
+        # Try alternative passwords if primary failed
+        if self.alt_passwords:
+            logger.debug(f"Trying alternative passwords for {self.host}")
+            original_password = self.password
+            
+            for alt_password in self.alt_passwords:
+                self.password = alt_password
+                if self._try_connect():
+                    return True
+            
+            # Restore original password
+            self.password = original_password
+        
+        logger.error(f"Failed to connect to {self.host} after all attempts")
+        return False
+    
+    def _try_connect(self) -> bool:
+        """
+        Attempt to connect to the device using the current connection parameters.
+        
+        Returns:
+            bool: True if connected successfully, False otherwise
+        """
         try:
             logger.debug(f"Attempting connection to {self.host}")
-            self._connection = ConnectHandler(**device_info)
+            self._connection = ConnectHandler(**self.connection_info)
             self._connected = True
             logger.info(f"Successfully connected to {self.host}")
             return True
         except NetMikoAuthenticationException:
-            # Only try alternate passwords if not using key-based auth
-            if not self.use_keys and self.alt_passwords:
-                logger.debug(f"Primary authentication failed, trying alternate passwords")
-                for alt_password in self.alt_passwords:
-                    try:
-                        device_info["password"] = alt_password
-                        self._connection = ConnectHandler(**device_info)
-                        self._connected = True
-                        logger.info(f"Successfully connected to {self.host} with alternate credentials")
-                        return True
-                    except NetMikoAuthenticationException:
-                        continue
-                    except Exception as e:
-                        logger.error(f"Error connecting to {self.host}: {str(e)}")
-                        return False
-                
-                logger.error(f"Authentication failed for {self.host} with all provided credentials")
-            else:
-                logger.error(f"Authentication failed for {self.host}")
-            
+            logger.error(f"Authentication failed for {self.host}")
             return False
         except NetMikoTimeoutException:
             logger.error(f"Connection timed out for {self.host}")
@@ -310,7 +325,7 @@ class DeviceConnector:
         Returns:
             bool: True if disconnected successfully, False otherwise
         """
-        if not self.is_connected:
+        if not self._connected:
             logger.debug(f"Not connected to {self.host}")
             return True
         
@@ -331,7 +346,7 @@ class DeviceConnector:
         Returns:
             str: The running configuration or None if retrieval failed
         """
-        if not self.is_connected:
+        if not self._connected:
             logger.error(f"Not connected to {self.host}")
             return None
         
@@ -354,7 +369,7 @@ class DeviceConnector:
         Returns:
             str: The serial number or None if retrieval failed
         """
-        if not self.is_connected:
+        if not self._connected:
             logger.error(f"Not connected to {self.host}")
             return None
         
@@ -387,7 +402,7 @@ class DeviceConnector:
         Returns:
             dict: OS information or None if retrieval failed
         """
-        if not self.is_connected:
+        if not self._connected:
             logger.error(f"Not connected to {self.host}")
             return None
         
@@ -517,6 +532,6 @@ def backup_device_config(
     
     except Exception as e:
         logger.exception(f"Error backing up {host}: {e}")
-        if device.is_connected:
+        if device._connected:
             device.disconnect()
         return False 
