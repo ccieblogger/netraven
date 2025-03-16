@@ -30,7 +30,7 @@ netraven/
 │       └── ...                # Frontend files
 ```
 
-## Development Environment
+## Environment Setup
 
 ### Prerequisites
 
@@ -38,7 +38,7 @@ netraven/
 - Docker and Docker Compose
 - Node.js and npm (if developing frontend without Docker)
 
-### Setting Up Development Environment
+### Setting Up Your Environment
 
 1. Clone the repository:
    ```bash
@@ -63,25 +63,14 @@ netraven/
 
 The easiest way to run the complete NetRaven environment is using Docker Compose:
 
+To start the application:
+
 ```bash
-# From the project root directory
+# Start all services
 docker compose up
-```
 
-This will:
-- Build and start both the backend API and frontend containers
-- Mount the appropriate volumes for development
-- Expose the backend on port 8000 and frontend on port 8080
-- Enable hot-reloading for both services
-
-You can also use the included development script which performs some additional checks:
-
-```bash
-# Make the script executable if needed
-chmod +x dev.sh
-
-# Run the development script
-./dev.sh
+# Or to run in the background
+docker compose up -d
 ```
 
 #### Testing Authentication
@@ -276,16 +265,15 @@ Before deploying NetRaven to production, ensure you complete the following check
 
 ### Frontend Preparation
 1. **Resolve Linting Issues**: 
-   - The development environment has ESLint disabled to simplify development
-   - Before building for production, enable linting and fix all issues:
+   - Run ESLint and fix any issues:
    ```bash
    cd netraven/web/frontend
    npm run lint -- --fix
    ```
    
 2. **Update Configuration**:
-   - Modify `vue.config.js` to enable appropriate production settings
-   - Set API endpoint URLs for the production environment
+   - Modify `vue.config.js` to enable appropriate settings
+   - Set API endpoint URLs in the environment configuration
 
 3. **Build and Test**:
    - Perform a local production build:
@@ -330,3 +318,33 @@ python scripts/reset_admin_password.py
 This will reset the admin password back to the default "NetRaven". This script should only be used as an emergency measure to regain access to the system.
 
 **Security Note**: This script should be kept secure and only accessible to authorized personnel. After using it, immediately change the admin password.
+
+## Database Migrations
+
+NetRaven uses Alembic for database migrations. Migrations are automatically run when the application containers start up.
+
+### Running Migrations
+
+Migrations are handled automatically when you start the application with Docker Compose:
+
+```bash
+docker-compose up
+```
+
+The API container will run the migrations before starting the API service.
+
+### Creating New Migrations
+
+To create a new migration:
+
+1. Make changes to the SQLAlchemy models in the application
+2. Generate a new migration script:
+
+```bash
+# From the project root
+docker-compose exec api alembic -c netraven/web/migrations/alembic.ini revision --autogenerate -m "Description of changes"
+```
+
+3. Review the generated migration script in `netraven/web/migrations/versions/`
+
+For more details, see the [migrations README](netraven/web/migrations/README.md).

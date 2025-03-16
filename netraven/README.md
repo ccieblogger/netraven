@@ -45,11 +45,11 @@ The web interface provides:
 
 ## Development
 
-### Setting Up Development Environment
+### Setting Up Your Environment
 
 1. Clone the repository
 2. Install dependencies: `pip install -e .`
-3. Start the development server:
+3. Start the server:
    ```bash
    cd netraven/web
    docker-compose up

@@ -33,7 +33,7 @@
 - Maintain compatibility with Python 3.8+.
 - Securely handle sensitive information such as Netbox API tokens.
 - Provide clear and comprehensive documentation for users and developers.
-- Implmenet both a testing and production environment and structure code and configuration
+- Implement a well-structured environment and organize code and configuration
   according to best practices.
 
 ## Technical Specifications
@@ -49,7 +49,7 @@
 - `logging` for logging and error handling
 
 
-### Development Environment
+### Environment Setup
 - Operating System: Ubuntu 22.04 LTS
 - IDE/Editor: VS Code/Cursor
 - Version Control: Git with GitHub repository (https://github.com/ccieblogger/netraven.git)

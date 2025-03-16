@@ -215,7 +215,7 @@ class DeviceConnector:
             tuple: (is_hostkey_ok, error_message)
         """
         # This is a simplified implementation that assumes the host key is already accepted
-        # In a production environment, you might want to perform proper host key verification
+        # For a more secure implementation, you might want to perform proper host key verification
         return True, None
     
     def connect(self) -> bool:

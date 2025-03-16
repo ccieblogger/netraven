@@ -2,17 +2,26 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json first for better caching
+# Create a non-root user with UID/GID 1001 to avoid conflicts
+RUN addgroup -S netraven -g 1001 && \
+    adduser -S -G netraven -u 1001 netraven
+
+# Copy package.json and package-lock.json first for better layer caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies and make sure Babel packages are installed
+RUN npm install && \
+    npm install --save-dev @babel/core @babel/eslint-parser @babel/preset-env && \
+    chown -R netraven:netraven /app
 
-# Copy the rest of the application
-COPY . .
+# Switch to non-root user
+USER netraven
 
-# Expose port for development server
+# The source code will be mounted as a volume in docker-compose.yml
+# This allows for hot-reloading
+
+# Expose the server port
 EXPOSE 8080
 
-# Start the development server
+# Default command to run the app
 CMD ["npm", "run", "serve"] 

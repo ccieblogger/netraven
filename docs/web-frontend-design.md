@@ -250,7 +250,7 @@ BackupJob (1) --- (*) BackupFile
 **Deliverables:**
 1. **Project Setup & Configuration**
    - Project structure setup
-   - Development environment configuration (Docker, WSL compatibility)
+   - Environment configuration (Docker, WSL compatibility)
    - Dependency management
    - CI/CD pipeline basics
 
@@ -395,9 +395,9 @@ BackupJob (1) --- (*) BackupFile
 **Key Milestones:**
 - Production-ready application
 - Comprehensive documentation
-- Deployment templates for various environments
+- Deployment templates
 
-## 7. Development Environment
+## 7. Environment Setup
 
 ### 7.1 Directory Structure
 
@@ -436,12 +436,12 @@ netraven/
 │   │   └── App.vue                # Basic app shell
 │   ├── package.json               # JavaScript dependencies
 │   └── Dockerfile                 # Frontend container
-├── docker-compose.yml             # Development environment
+├── docker-compose.yml             # Application environment
 ├── .gitignore                     # Git ignore file
 └── README.md                      # Project documentation
 ```
 
-### 7.2 Development Setup
+### 7.2 Setup Instructions
 
 #### 7.2.1 Prerequisites
 - Docker and Docker Compose

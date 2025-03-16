@@ -1,5 +1,8 @@
 import axios from 'axios'
 
+// Configure axios defaults
+axios.defaults.withCredentials = false;
+
 // Safely access environment variables with fallbacks
 const getEnvVariable = (key, defaultValue) => {
   // Check if import.meta.env exists (in Vite) and contains the key
@@ -14,7 +17,7 @@ const getEnvVariable = (key, defaultValue) => {
   return defaultValue;
 };
 
-// Determine the API URL based on the current environment
+// Determine the API URL
 let browserApiUrl = '';
 
 // Get API base URL from environment variables with fallback
@@ -31,19 +34,15 @@ console.log('Browser hostname:', window.location.hostname)
 console.log('Is WSL environment:', isWsl)
 console.log('Environment API URL:', envApiBaseUrl)
 
-// Determine the best API URL to use
+// Determine the API URL to use
 if (envApiBaseUrl) {
   // Use environment variable if available
   browserApiUrl = envApiBaseUrl;
-  console.log('Using environment variable API URL');
-} else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-  // Local development - frontend port 8080, API port 8000
+  console.log('Using configured API URL from environment');
+} else if (isWsl || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  // Local or WSL environment - use localhost with port 8000
   browserApiUrl = 'http://localhost:8000';
-  console.log('Using local development API URL');
-} else if (isWsl) {
-  // WSL environment - use localhost with port 8000
-  browserApiUrl = 'http://localhost:8000';
-  console.log('Using WSL localhost API URL');
+  console.log('Using localhost API URL');
 } else {
   // Production/Docker environment
   // If we're accessing the frontend from outside Docker via 8080 port
@@ -66,9 +65,17 @@ const apiClient = {
   // Authentication methods
   async login(username, password) {
     try {
-      const response = await axios.post(`${browserApiUrl}/api/auth/token`, {
-        username,
-        password
+      // Create form data
+      const formData = new URLSearchParams();
+      formData.append('username', username);
+      formData.append('password', password);
+
+      const response = await axios.post(`${browserApiUrl}/api/auth/token`, formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
+        },
+        withCredentials: false
       });
       
       // Store token in localStorage
@@ -167,6 +174,13 @@ const apiClient = {
 
   async backupDevice(id) {
     const response = await axios.post(`${browserApiUrl}/api/devices/${id}/backup`, {}, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async checkDeviceReachability(id) {
+    const response = await axios.post(`${browserApiUrl}/api/devices/${id}/reachability`, {}, {
       headers: this.getAuthHeader()
     });
     return response.data;

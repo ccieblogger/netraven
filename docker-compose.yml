@@ -17,6 +17,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - netraven-network
 
   # Backend API service
   api:
@@ -32,6 +34,7 @@ services:
       pip install -e . && \
       pip install email-validator psycopg2-binary alembic schedule fastapi uvicorn sqlalchemy pydantic python-jose python-multipart requests prometheus-client pyjwt && \
       bash scripts/simple-migrations.sh && \
+      python scripts/create_default_admin.py && \
       python -m uvicorn netraven.web:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "8000:8000"
@@ -58,6 +61,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    networks:
+      - netraven-network
 
   # Scheduler service
   scheduler:
@@ -96,6 +101,8 @@ services:
       device_gateway:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - netraven-network
 
   # Device Gateway service
   device_gateway:
@@ -138,12 +145,14 @@ services:
       - NET_BIND_SERVICE
     security_opt:
       - no-new-privileges:true
+    networks:
+      - netraven-network
 
   # Frontend service
   frontend:
     build:
       context: ./netraven/web/frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     volumes:
       - ./netraven/web/frontend:/app
       # Use a named volume for node_modules to prevent overwriting
@@ -154,8 +163,8 @@ services:
       - api
       - device_gateway
     environment:
-      - VUE_APP_API_URL=http://api:8000
-      - VUE_APP_GATEWAY_URL=http://device_gateway:8001
+      - VUE_APP_API_URL=http://localhost:8000
+      - VUE_APP_GATEWAY_URL=http://localhost:8001
     healthcheck:
       test: ["CMD", "ps", "aux", "|", "grep", "node"]
       interval: 30s
@@ -164,8 +173,14 @@ services:
       start_period: 40s
     # Non-root user for security
     user: "1001:1001"
+    networks:
+      - netraven-network
 
 volumes:
   frontend_node_modules:
   postgres_data:
-  logs_data: 
+  logs_data:
+
+networks:
+  netraven-network:
+    driver: bridge 

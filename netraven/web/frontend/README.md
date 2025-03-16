@@ -41,16 +41,16 @@ This will:
 If you want to run only the frontend in Docker:
 
 ```bash
-# Build and start the development container from this directory
-docker compose -f docker-compose.dev.yml up --build
+# Build and start the container from this directory
+docker compose up --build
 
-# The development server will be available at http://localhost:8080
+# The server will be available at http://localhost:8080
 ```
 
 To stop the container:
 
 ```bash
-docker compose -f docker-compose.dev.yml down
+docker compose down
 ```
 
 ### Option 3: Standard Setup
@@ -181,19 +181,18 @@ This project includes a production-ready Docker setup that:
 To deploy using Docker:
 
 ```bash
-# Build and start the production container
-docker-compose -f docker-compose.prod.yml up -d
+# Build and start the container
+docker compose up -d
 
 # The application will be available at http://localhost:8080
 ```
 
-#### Customizing the Production Deployment
+#### Customizing the Deployment
 
-The production Docker setup can be customized in several ways:
+The Docker setup can be customized in several ways:
 
-1. **Nginx Configuration**: Uncomment and modify the nginx.conf line in Dockerfile.prod
-2. **Environment Variables**: Add environment-specific variables in docker-compose.prod.yml
-3. **SSL/TLS**: Mount SSL certificates for HTTPS support
+1. **Environment Variables**: Add environment variables in docker-compose.yml
+2. **SSL/TLS**: Mount SSL certificates for HTTPS support
 
 #### Cloud Deployment
 
