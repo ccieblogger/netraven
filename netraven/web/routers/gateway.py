@@ -7,14 +7,18 @@ including status checks, metrics, and configuration.
 
 from typing import Dict, Any, List, Optional
 import requests
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
 from pydantic import BaseModel
 import os
 import logging
+from jose import JWTError, jwt
+from fastapi.security import OAuth2PasswordBearer
 
 from netraven.core.config import get_config, get_default_config_path, load_config
-from netraven.web.auth import get_current_active_user, get_api_key
-from netraven.web.models.user import User
+from netraven.core.auth import get_authorization_header
+from netraven.web.auth import get_api_key, get_current_active_user, SECRET_KEY, ALGORITHM, API_KEY
+from netraven.web.database import get_db
+from netraven.web.models import User
 from netraven.core.logging import get_logger
 
 # Create logger
@@ -36,11 +40,80 @@ api_key = os.environ.get(
     config.get("web", {}).get("api_key", "netraven-api-key")
 )
 
+# Create the router
 router = APIRouter(
     prefix="/api/gateway",
     tags=["gateway"],
     responses={404: {"description": "Not found"}},
 )
+
+# Add an optional OAuth2 scheme that doesn't raise exceptions
+class OAuth2PasswordBearerOptional(OAuth2PasswordBearer):
+    """
+    An OAuth2 password bearer that doesn't raise exceptions.
+    """
+    async def __call__(self, request: Request) -> Optional[str]:
+        try:
+            return await super().__call__(request)
+        except HTTPException:
+            # Return None instead of raising an exception
+            return None
+        except Exception as e:
+            logger.exception(f"Unexpected OAuth2 error: {str(e)}")
+            return None
+
+# Create the optional OAuth2 scheme
+oauth2_scheme_optional = OAuth2PasswordBearerOptional(tokenUrl="api/auth/token")
+
+async def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme_optional)):
+    """
+    Optional version of get_current_user that doesn't raise exceptions.
+    
+    Args:
+        token: Optional JWT token
+        
+    Returns:
+        User: The current active user or None if not authenticated
+    """
+    if not token:
+        return None
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+        
+        db = next(get_db())
+        user = db.query(User).filter(User.username == username).first()
+        
+        if user is None:
+            return None
+            
+        return user
+    except JWTError:
+        return None
+    except Exception as e:
+        logger.exception(f"Unexpected error in get_current_user_optional: {str(e)}")
+        return None
+
+def get_current_active_user_optional(current_user: Optional[User] = Depends(get_current_user_optional)):
+    """
+    Optional version of get_current_active_user that doesn't raise exceptions.
+    
+    Args:
+        current_user: The current user or None if not authenticated
+        
+    Returns:
+        User: The current active user or None if not authenticated
+    """
+    if not current_user:
+        return None
+    
+    if not current_user.is_active:
+        return None
+    
+    return current_user
 
 class GatewayStatus(BaseModel):
     """Gateway status model."""
@@ -63,7 +136,8 @@ class GatewayMetrics(BaseModel):
 
 @router.get("/status")
 async def get_gateway_status(
-    current_user: Optional[User] = Depends(get_current_active_user),
+    request: Request,
+    current_user: Optional[User] = Depends(get_current_active_user_optional),
     x_api_key: Optional[str] = Depends(get_api_key)
 ):
     """
@@ -71,10 +145,16 @@ async def get_gateway_status(
     
     This endpoint checks if the gateway service is available and returns its status.
     """
-    logger.debug("Gateway status endpoint called")
-    logger.debug(f"Current user: {current_user}")
-    logger.debug(f"API key header: {x_api_key}")
     
+    logger.info("Gateway status endpoint called")
+    
+    # Log the request headers for debugging
+    logger.info(f"Request headers: {dict(request.headers)}")
+    
+    # Log authentication info
+    logger.info(f"Authentication info - User: {current_user is not None}, API Key: {x_api_key is not None}")
+    
+    # Authentication check
     if not current_user and not x_api_key:
         logger.warning("Authentication failed: No valid user or API key provided")
         raise HTTPException(
@@ -83,64 +163,66 @@ async def get_gateway_status(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Define a default response in case of errors
-    default_response = {
-        "status": "unknown",
-        "version": "unknown",
-        "uptime": 0,
-        "connected_devices": 0,
-        "message": "Gateway status unknown"
-    }
-    
     try:
-        # Use direct container name for reliable communication
-        gateway_health_url = "http://device_gateway:8001/health"
-        logger.debug(f"Checking gateway status at {gateway_health_url}")
+        # Use the direct container name URL for reliable communication
+        gateway_status_url = "http://device_gateway:8001/status"
+        logger.info(f"Checking gateway status at {gateway_status_url}")
         
-        # Make the request without headers first for simplicity
-        response = requests.get(gateway_health_url, timeout=2.0)
-        logger.debug(f"Gateway response status code: {response.status_code}")
+        # Get the API key to use - prioritize the validated key from the dependency
+        actual_api_key = x_api_key if x_api_key else api_key
         
-        if response.status_code == 200:
-            try:
-                response_data = response.json()
-                logger.debug(f"Gateway response data: {response_data}")
-                
-                # Ensure the response has the expected fields
-                result = {
-                    "status": response_data.get("status", "unknown"),
-                    "version": response_data.get("version", "unknown"),
-                    "uptime": response_data.get("uptime", 0),
-                    "connected_devices": response_data.get("connected_devices", 0)
-                }
-                
-                return result
-            except ValueError as json_err:
-                logger.error(f"Invalid JSON response from gateway: {json_err}")
-                default_response["message"] = "Invalid response format from gateway"
-                return default_response
-        else:
-            logger.error(f"Gateway returned non-200 status code: {response.status_code}")
-            default_response["message"] = f"Gateway returned status code {response.status_code}"
-            return default_response
+        # Log the API key being used (masked for security)
+        masked_key = actual_api_key[:4] + "..." if actual_api_key else "None"
+        logger.info(f"Using API key for gateway request: {masked_key}")
+        
+        # Get proper authorization header from core auth module
+        headers = get_authorization_header(actual_api_key)
+        logger.info(f"Request headers for gateway: {headers}")
+        
+        # Make the request with sufficient timeout and proper headers
+        try:
+            response = requests.get(
+                gateway_status_url, 
+                headers=headers, 
+                timeout=10.0
+            )
             
-    except requests.exceptions.Timeout:
-        logger.error("Gateway connection timed out")
-        default_response["status"] = "timeout"
-        default_response["message"] = "Gateway service connection timed out"
-        return default_response
-        
-    except requests.exceptions.ConnectionError:
-        logger.error("Could not connect to gateway service")
-        default_response["status"] = "offline"
-        default_response["message"] = "Could not connect to gateway service"
-        return default_response
-        
-    except Exception as exc:
-        logger.exception(f"Unexpected error checking gateway status: {exc}")
-        default_response["status"] = "error"
-        default_response["message"] = f"Error checking gateway status: {str(exc)}"
-        return default_response
+            logger.info(f"Gateway response status: {response.status_code}")
+            logger.info(f"Gateway response headers: {response.headers}")
+            
+            # Return a simple dictionary response rather than streaming
+            if response.status_code == 200:
+                data = response.json()
+                result = {
+                    "status": data.get("status", "unknown"),
+                    "version": data.get("version", "unknown"),
+                    "uptime": data.get("uptime", "0"),
+                    "connected_devices": data.get("connected_devices", 0),
+                    "metrics": data.get("metrics", {})
+                }
+                logger.info(f"Returning result: {result}")
+                return result
+            else:
+                logger.error(f"Gateway service returned error: {response.status_code}")
+                error_response = {
+                    "status": "error",
+                    "message": f"Gateway returned status code {response.status_code}"
+                }
+                logger.info(f"Returning error response: {error_response}")
+                return error_response
+        except requests.exceptions.RequestException as e:
+            logger.exception(f"Request error: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Request error: {str(e)}"
+            }
+    except Exception as e:
+        # Catch all exceptions
+        logger.exception(f"Unexpected error: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Error: {str(e)}"
+        }
 
 @router.get("/metrics", response_model=GatewayMetrics)
 async def get_gateway_metrics(current_user: User = Depends(get_current_active_user)):
@@ -221,4 +303,110 @@ async def get_gateway_config(current_user: User = Depends(get_current_active_use
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error getting gateway config: {str(exc)}"
-        ) 
+        )
+
+@router.get("/test")
+async def test_endpoint():
+    """
+    Simple test endpoint for the gateway router.
+    
+    Returns:
+        dict: Test response
+    """
+    return {"status": "ok"}
+
+@router.get("/api-key-test")
+async def test_api_key(
+    request: Request,
+    x_api_key: Optional[str] = Depends(get_api_key)
+):
+    """
+    Test endpoint for API key validation.
+    
+    Returns:
+        dict: Test response with API key status
+    """
+    logger.info("API key test endpoint called")
+    logger.info(f"Request headers: {dict(request.headers)}")
+    logger.info(f"API Key: {x_api_key is not None}")
+    
+    if x_api_key:
+        return {"status": "ok", "api_key_valid": True}
+    else:
+        return {"status": "error", "api_key_valid": False, "message": "No valid API key provided"}
+
+@router.get("/status-no-auth")
+async def get_gateway_status_no_auth(
+    request: Request
+):
+    """
+    Get the status of the device gateway service without authentication.
+    
+    This endpoint checks if the gateway service is available and returns its status.
+    """
+    
+    logger.info("Gateway status-no-auth endpoint called")
+    
+    # Log the request headers for debugging
+    logger.info(f"Request headers: {dict(request.headers)}")
+    
+    try:
+        # Use the direct container name URL for reliable communication
+        gateway_status_url = "http://device_gateway:8001/status"
+        logger.info(f"Checking gateway status at {gateway_status_url}")
+        
+        # Get the API key from config
+        actual_api_key = api_key
+        
+        # Log the API key being used (masked for security)
+        masked_key = actual_api_key[:4] + "..." if actual_api_key else "None"
+        logger.info(f"Using API key for gateway request: {masked_key}")
+        
+        # Get proper authorization header from core auth module
+        headers = get_authorization_header(actual_api_key)
+        logger.info(f"Request headers for gateway: {headers}")
+        
+        # Make the request with sufficient timeout and proper headers
+        try:
+            response = requests.get(
+                gateway_status_url, 
+                headers=headers, 
+                timeout=10.0
+            )
+            
+            logger.info(f"Gateway response status: {response.status_code}")
+            logger.info(f"Gateway response headers: {response.headers}")
+            
+            # Return a simple dictionary response rather than streaming
+            if response.status_code == 200:
+                data = response.json()
+                result = {
+                    "status": data.get("status", "unknown"),
+                    "version": data.get("version", "unknown"),
+                    "uptime": data.get("uptime", "0"),
+                    "connected_devices": data.get("connected_devices", 0),
+                    "metrics": data.get("metrics", {})
+                }
+                logger.info(f"Returning result: {result}")
+                return result
+            else:
+                logger.error(f"Gateway service returned error: {response.status_code}")
+                error_response = {
+                    "status": "error",
+                    "message": f"Gateway returned status code {response.status_code}"
+                }
+                logger.info(f"Returning error response: {error_response}")
+                return error_response
+        except requests.exceptions.RequestException as e:
+            logger.exception(f"Request error: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Request error: {str(e)}"
+            }
+    except Exception as e:
+        # Catch all exceptions
+        logger.exception(f"Unexpected error: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Error: {str(e)}"
+        } 

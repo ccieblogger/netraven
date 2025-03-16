@@ -5,15 +5,23 @@ This package provides authentication-related functionality.
 """
 
 from netraven.web.auth.utils import get_password_hash, verify_password
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 from netraven.web.models.user import User
 from netraven.core.config import get_config
 from netraven.core.logging import get_logger
+from netraven.core.auth import verify_api_key_dependency
 import os
+import logging
+import time
+import traceback
+from netraven.core.auth import get_authorization_header
+from netraven.core.config import load_config
+from netraven.web.database import get_db
+from netraven.web.models import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
 
@@ -55,11 +63,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         token: JWT token
         
     Returns:
-        User: Current user
+        User: The current user
         
     Raises:
-        HTTPException: If the token is invalid
+        HTTPException: If the token is invalid or the user is not found
     """
+    debug_logger = logging.getLogger("netraven.debug")
+    auth_id = f"auth_{time.time()}"
+    debug_logger.info(f"[{auth_id}] get_current_user function called with token: {token[:10]}...")
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -67,21 +79,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        debug_logger.info(f"[{auth_id}] JWT payload decoded: {payload}")
+        username: str = payload.get("sub")
+        if username is None:
+            debug_logger.warning(f"[{auth_id}] No sub field in JWT payload")
             raise credentials_exception
-    except JWTError:
+        token_data = TokenData(username=username)
+    except JWTError as e:
+        debug_logger.warning(f"[{auth_id}] JWT decode error: {str(e)}")
         raise credentials_exception
     
-    # For testing purposes, return a mock user
-    # In a real application, you would look up the user in the database
-    user = User(
-        id=user_id,
-        username="admin",
-        email="admin@example.com",
-        is_active=True,
-        is_admin=True
-    )
+    db = next(get_db())
+    debug_logger.info(f"[{auth_id}] Looking up user: {token_data.username}")
+    user = db.query(User).filter(User.username == token_data.username).first()
+    if user is None:
+        debug_logger.warning(f"[{auth_id}] User not found: {token_data.username}")
+        raise credentials_exception
+    debug_logger.info(f"[{auth_id}] User found: {user.username} (id: {user.id})")
     return user
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
@@ -89,49 +103,127 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     Get the current active user.
     
     Args:
-        current_user: Current user
+        current_user: The current user
         
     Returns:
-        User: Current active user
+        User: The current active user
         
     Raises:
         HTTPException: If the user is inactive
     """
+    debug_logger = logging.getLogger("netraven.debug")
+    auth_id = f"active_user_{time.time()}"
+    debug_logger.info(f"[{auth_id}] get_current_active_user function called")
+    
     if not current_user.is_active:
+        debug_logger.warning(f"[{auth_id}] User {current_user.username} is inactive")
         raise HTTPException(status_code=400, detail="Inactive user")
+    
+    debug_logger.info(f"[{auth_id}] Active user: {current_user.username} (id: {current_user.id})")
     return current_user
 
-async def get_api_key(x_api_key: Optional[str] = Header(None)):
+def get_api_key_dependency():
     """
-    Get and validate the API key from the X-API-Key header.
+    Create a dependency for extracting and validating API key from request headers.
     
-    Args:
-        x_api_key: API key from the X-API-Key header
-        
     Returns:
-        str: Validated API key
-        
-    Raises:
-        HTTPException: If the API key is invalid or missing
+        callable: Dependency function for extracting API key
     """
     logger = get_logger("netraven.web.auth")
-    logger.debug("get_api_key function called")
-    logger.debug(f"API Key received: {x_api_key}")
-    logger.debug(f"Expected API Key: {API_KEY}")
+    debug_logger = logging.getLogger("netraven.debug")
+    debug_logger.info("Creating get_api_key dependency")
+    logger.info("Creating get_api_key dependency")
     
-    if x_api_key is None:
-        logger.warning("No API key provided")
-        return None
-    
-    if x_api_key != API_KEY:
-        logger.warning(f"Invalid API key: {x_api_key}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    logger.debug("API key validated successfully")
-    return x_api_key
+    async def _get_api_key(request: Request) -> Optional[str]:
+        """
+        Get and validate the API key from the X-API-Key header or Authorization header.
+        
+        Args:
+            request: The FastAPI Request object
+            
+        Returns:
+            str: Validated API key or None if no valid API key provided
+        """
+        # Generate a unique ID for this request
+        dependency_id = f"get_api_key_{time.time()}"
+        debug_logger.info(f"[{dependency_id}] get_api_key function called")
+        logger.info("get_api_key function called")
+        
+        # Extract headers from the request
+        try:
+            debug_logger.info(f"[{dependency_id}] Extracting headers from request")
+            debug_logger.info(f"[{dependency_id}] Request headers: {dict(request.headers)}")
+            authorization = request.headers.get("Authorization")
+            x_api_key = request.headers.get("X-API-Key")
+            
+            # Log raw header values (partially masked for security)
+            auth_value = "None" if authorization is None else f"{authorization[:10]}..." if len(authorization or "") > 10 else authorization
+            xapi_value = "None" if x_api_key is None else f"{x_api_key[:4]}..." if len(x_api_key or "") > 4 else x_api_key
+            debug_logger.info(f"[{dependency_id}] Raw headers - Authorization: {auth_value}, X-API-Key: {xapi_value}")
+            logger.info(f"Raw headers - Authorization: {auth_value}, X-API-Key: {xapi_value}")
+            
+            # Check API key from environment
+            expected_api_key = API_KEY
+            debug_logger.info(f"[{dependency_id}] Expected API key (masked): {expected_api_key[:4]}...")
+            logger.info(f"Expected API key (masked): {expected_api_key[:4]}...")
+            
+            # First try Authorization header (preferred method)
+            if authorization and authorization.startswith("Bearer "):
+                debug_logger.info(f"[{dependency_id}] Found Authorization header with Bearer prefix")
+                token = authorization.split()[1]
+                debug_logger.info(f"[{dependency_id}] Checking Authorization Bearer token")
+                logger.info("Checking Authorization Bearer token")
+                
+                # Log comparison for debugging
+                is_match = token == expected_api_key
+                token_masked = f"{token[:4]}..." if len(token) > 4 else token
+                debug_logger.info(f"[{dependency_id}] Token validation: {token_masked} valid = {is_match}")
+                logger.info(f"Token validation: {token_masked} valid = {is_match}")
+                
+                if is_match:
+                    debug_logger.info(f"[{dependency_id}] Valid API key from Authorization header")
+                    logger.info("Valid API key from Authorization header")
+                    return token
+                else:
+                    debug_logger.warning(f"[{dependency_id}] Invalid API key from Authorization header")
+                    
+            # Then try X-API-Key header (for backward compatibility)
+            if x_api_key:
+                debug_logger.info(f"[{dependency_id}] Found X-API-Key header")
+                debug_logger.info(f"[{dependency_id}] Checking X-API-Key header")
+                logger.info("Checking X-API-Key header")
+                
+                # Log comparison for debugging
+                is_match = x_api_key == expected_api_key
+                debug_logger.info(f"[{dependency_id}] X-API-Key validation: {xapi_value} valid = {is_match}")
+                logger.info(f"X-API-Key validation: {xapi_value} valid = {is_match}")
+                
+                if is_match:
+                    debug_logger.info(f"[{dependency_id}] Valid API key from X-API-Key header")
+                    logger.info("Valid API key from X-API-Key header")
+                    return x_api_key
+                else:
+                    debug_logger.warning(f"[{dependency_id}] Invalid API key from X-API-Key header")
+            
+            # If we get here, no valid API key was found
+            debug_logger.warning(f"[{dependency_id}] No valid API key found in request headers")
+            logger.warning("No valid API key found in request headers")
+            return None
+        except Exception as e:
+            debug_logger.exception(f"[{dependency_id}] Exception in get_api_key: {str(e)}")
+            debug_logger.error(f"[{dependency_id}] Stack trace: {traceback.format_exc()}")
+            logger.exception(f"Exception in get_api_key: {str(e)}")
+            # Return None on exception to maintain the same interface
+            return None
+        
+    return _get_api_key
+
+# Create the dependency
+get_api_key = get_api_key_dependency()
+
+# TEMPORARY - Debug class for token data
+class TokenData:
+    def __init__(self, username: Optional[str] = None):
+        self.username = username
 
 __all__ = ["get_password_hash", "verify_password", "get_current_user", "get_current_active_user", "create_access_token", "get_api_key"] 

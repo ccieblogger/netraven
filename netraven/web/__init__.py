@@ -7,11 +7,13 @@ and database models.
 
 import os
 import logging
-from pathlib import Path
-from fastapi import FastAPI, Request
+from typing import List, Optional
+import importlib
+
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from netraven.core.config import get_default_config_path, load_config
 from netraven.core.logging import configure_logging, get_logger
@@ -25,10 +27,9 @@ config_path = get_default_config_path()
 config, _ = load_config(config_path)
 
 # Import database and models
-from netraven.web.database import init_db, SessionLocal, Base, engine
-from netraven.web.models import User, Device, Backup, Tag, TagRule, JobLog, ScheduledJob
+from netraven.web.database import init_db
 
-# Import routers
+# Detect and include all routers
 from netraven.web.routers import (
     auth,
     devices,
@@ -44,8 +45,11 @@ from netraven.web.routers import (
 # Create FastAPI app
 app = FastAPI(
     title="NetRaven API",
-    description="API for the NetRaven network device management system",
-    version="0.1.0"
+    description="Network automation and management platform API",
+    version="0.1.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 # Add CORS middleware
@@ -121,9 +125,17 @@ except Exception as e:
 # Error handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler."""
-    logger.exception(f"Unhandled exception: {exc}")
+    """
+    Global exception handler.
+    
+    Args:
+        request: FastAPI request
+        exc: Exception
+    """
+    logger.exception(f"Unhandled exception: {str(exc)}")
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={
+            "detail": "Internal server error",
+        },
     ) 
