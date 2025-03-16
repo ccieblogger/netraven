@@ -5,13 +5,15 @@ This package provides authentication-related functionality.
 """
 
 from netraven.web.auth.utils import get_password_hash, verify_password
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
 from netraven.web.models.user import User
 from netraven.core.config import get_config
+from netraven.core.logging import get_logger
+import os
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
 
@@ -21,6 +23,9 @@ auth_config = config.get("web", {}).get("authentication", {})
 SECRET_KEY = auth_config.get("jwt_secret", "netraven-dev-secret-key")
 ALGORITHM = auth_config.get("jwt_algorithm", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = auth_config.get("token_expiration", 86400) // 60  # Convert seconds to minutes
+
+# API Key configuration - use environment variable or default to "netraven-api-key"
+API_KEY = os.environ.get("NETRAVEN_API_KEY", "netraven-api-key")
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
@@ -62,8 +67,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        user_id: str = payload.get("sub")
+        if user_id is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
@@ -71,9 +76,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     # For testing purposes, return a mock user
     # In a real application, you would look up the user in the database
     user = User(
-        id=1,
-        username=username,
-        email=f"{username}@example.com",
+        id=user_id,
+        username="admin",
+        email="admin@example.com",
         is_active=True,
         is_admin=True
     )
@@ -96,4 +101,37 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
-__all__ = ["get_password_hash", "verify_password", "get_current_user", "get_current_active_user", "create_access_token"] 
+async def get_api_key(x_api_key: Optional[str] = Header(None)):
+    """
+    Get and validate the API key from the X-API-Key header.
+    
+    Args:
+        x_api_key: API key from the X-API-Key header
+        
+    Returns:
+        str: Validated API key
+        
+    Raises:
+        HTTPException: If the API key is invalid or missing
+    """
+    logger = get_logger("netraven.web.auth")
+    logger.debug("get_api_key function called")
+    logger.debug(f"API Key received: {x_api_key}")
+    logger.debug(f"Expected API Key: {API_KEY}")
+    
+    if x_api_key is None:
+        logger.warning("No API key provided")
+        return None
+    
+    if x_api_key != API_KEY:
+        logger.warning(f"Invalid API key: {x_api_key}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    logger.debug("API key validated successfully")
+    return x_api_key
+
+__all__ = ["get_password_hash", "verify_password", "get_current_user", "get_current_active_user", "create_access_token", "get_api_key"] 

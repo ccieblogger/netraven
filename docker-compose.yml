@@ -52,6 +52,7 @@ services:
       - NETRAVEN_LOGGING_USE_DATABASE=true
       - NETRAVEN_LOGGING_LOG_TO_FILE=false
       - GATEWAY_API_KEY=netraven-api-key
+      - NETRAVEN_API_KEY=netraven-api-key
     depends_on:
       postgres:
         condition: service_healthy
