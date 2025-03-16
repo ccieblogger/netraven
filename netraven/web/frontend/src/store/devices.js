@@ -1,53 +1,12 @@
 import { defineStore } from 'pinia'
 import { deviceService } from '../api/api'
 
-// Mock data for development and error recovery
-const mockDevices = [
-  {
-    id: 'device-1',
-    hostname: 'router-01',
-    ip_address: '192.168.1.1',
-    device_type: 'router',
-    vendor: 'Cisco',
-    model: 'ISR 4321',
-    status: 'online',
-    enabled: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: 'device-2',
-    hostname: 'switch-01',
-    ip_address: '192.168.1.2',
-    device_type: 'switch',
-    vendor: 'Cisco',
-    model: 'Catalyst 3850',
-    status: 'online',
-    enabled: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: 'device-3',
-    hostname: 'firewall-01',
-    ip_address: '192.168.1.3',
-    device_type: 'firewall',
-    vendor: 'Fortinet',
-    model: 'FortiGate 100E',
-    status: 'offline',
-    enabled: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-];
-
 export const useDeviceStore = defineStore('devices', {
   state: () => ({
     devices: [],
     currentDevice: null,
     loading: false,
-    error: null,
-    useMockData: false
+    error: null
   }),
   
   getters: {
@@ -66,7 +25,6 @@ export const useDeviceStore = defineStore('devices', {
       this.error = null
       
       try {
-        // First attempt to get real data
         const devices = await deviceService.getDevices()
         
         // Ensure each device has a tags array
@@ -77,18 +35,13 @@ export const useDeviceStore = defineStore('devices', {
         })
         
         this.devices = devices
-        this.useMockData = false
-        console.log('Device Store: Successfully loaded real device data')
+        console.log('Device Store: Successfully loaded device data')
         return devices
       } catch (error) {
-        console.error('Device Store: Error fetching devices, using mock data:', error)
+        console.error('Device Store: Error fetching devices:', error)
         this.error = error.response?.data?.detail || 'Failed to fetch devices'
-        
-        // If real data fails, use mock data as a fallback
-        this.devices = [...mockDevices]
-        this.useMockData = true
-        console.log('Device Store: Using mock device data')
-        return this.devices
+        this.devices = []
+        return []
       } finally {
         this.loading = false
       }
@@ -100,26 +53,18 @@ export const useDeviceStore = defineStore('devices', {
       
       try {
         const device = await deviceService.getDevice(id)
-        
-        // Ensure device has a tags array
-        if (!device.tags) {
-          device.tags = []
-        }
-        
         this.currentDevice = device
         
         // Update the device in the devices array if it exists
         const index = this.devices.findIndex(d => d.id === id)
         if (index !== -1) {
           this.devices[index] = device
-        } else {
-          this.devices.push(device)
         }
         
         return device
       } catch (error) {
+        console.error(`Device Store: Error fetching device ${id}:`, error)
         this.error = error.response?.data?.detail || `Failed to fetch device ${id}`
-        console.error(`Error fetching device ${id}:`, error)
         return null
       } finally {
         this.loading = false
@@ -154,7 +99,7 @@ export const useDeviceStore = defineStore('devices', {
         const updatedDevice = await deviceService.updateDevice(id, deviceData)
         
         // Update the device in the devices array
-        const index = this.devices.findIndex(d => d.id === id)
+        const index = this.devices.findIndex(device => device.id === id)
         if (index !== -1) {
           this.devices[index] = updatedDevice
         }
@@ -166,8 +111,8 @@ export const useDeviceStore = defineStore('devices', {
         
         return updatedDevice
       } catch (error) {
+        console.error(`Device Store: Error updating device ${id}:`, error)
         this.error = error.response?.data?.detail || `Failed to update device ${id}`
-        console.error(`Error updating device ${id}:`, error)
         return null
       } finally {
         this.loading = false
@@ -182,7 +127,7 @@ export const useDeviceStore = defineStore('devices', {
         await deviceService.deleteDevice(id)
         
         // Remove the device from the devices array
-        this.devices = this.devices.filter(d => d.id !== id)
+        this.devices = this.devices.filter(device => device.id !== id)
         
         // Clear currentDevice if it matches the deleted device
         if (this.currentDevice && this.currentDevice.id === id) {
@@ -191,8 +136,8 @@ export const useDeviceStore = defineStore('devices', {
         
         return true
       } catch (error) {
+        console.error(`Device Store: Error deleting device ${id}:`, error)
         this.error = error.response?.data?.detail || `Failed to delete device ${id}`
-        console.error(`Error deleting device ${id}:`, error)
         return false
       } finally {
         this.loading = false
@@ -207,38 +152,39 @@ export const useDeviceStore = defineStore('devices', {
         const result = await deviceService.backupDevice(id)
         return result
       } catch (error) {
+        console.error(`Device Store: Error backing up device ${id}:`, error)
         this.error = error.response?.data?.detail || `Failed to backup device ${id}`
-        console.error(`Error backing up device ${id}:`, error)
         return null
       } finally {
         this.loading = false
       }
     },
     
-    async checkReachability(id) {
+    async checkDeviceReachability(id) {
+      this.loading = true
       this.error = null
       
       try {
         const result = await deviceService.checkDeviceReachability(id)
         
         // Update the device in the devices array
-        const index = this.devices.findIndex(d => d.id === id)
-        if (index !== -1) {
-          this.devices[index].is_reachable = result.reachable
-          this.devices[index].last_reachability_check = new Date().toISOString()
+        const index = this.devices.findIndex(device => device.id === id)
+        if (index !== -1 && result.status) {
+          this.devices[index].status = result.status
         }
         
         // Update currentDevice if it matches the checked device
-        if (this.currentDevice && this.currentDevice.id === id) {
-          this.currentDevice.is_reachable = result.reachable
-          this.currentDevice.last_reachability_check = new Date().toISOString()
+        if (this.currentDevice && this.currentDevice.id === id && result.status) {
+          this.currentDevice.status = result.status
         }
         
         return result
       } catch (error) {
-        this.error = error.response?.data?.detail || `Failed to check reachability for device ${id}`
-        console.error(`Error checking reachability for device ${id}:`, error)
+        console.error(`Device Store: Error checking device reachability ${id}:`, error)
+        this.error = error.response?.data?.detail || `Failed to check device reachability ${id}`
         return null
+      } finally {
+        this.loading = false
       }
     }
   }
