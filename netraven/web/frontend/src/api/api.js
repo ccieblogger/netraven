@@ -505,4 +505,41 @@ const apiClient = {
   }
 }
 
+// Create individual service objects that use the main apiClient
+export const deviceService = {
+  getDevices: () => apiClient.getDevices(),
+  getDevice: (id) => apiClient.getDevice(id),
+  createDevice: (deviceData) => apiClient.createDevice(deviceData),
+  updateDevice: (id, deviceData) => apiClient.updateDevice(id, deviceData),
+  deleteDevice: (id) => apiClient.deleteDevice(id),
+  backupDevice: (id) => apiClient.backupDevice(id),
+  checkDeviceReachability: (id) => apiClient.checkDeviceReachability(id)
+}
+
+export const backupService = {
+  getBackups: (params) => apiClient.getBackups(params),
+  getBackup: (id) => apiClient.getBackup(id),
+  getBackupContent: (id) => apiClient.getBackupContent(id),
+  compareBackups: (backup1Id, backup2Id) => apiClient.compareBackups(backup1Id, backup2Id),
+  restoreBackup: (id) => apiClient.restoreBackup(id),
+  deleteBackup: (id) => apiClient.deleteBackup(id)
+}
+
+export const jobLogsService = {
+  getJobLogs: (params) => apiClient.getJobLogs(params),
+  getJobLog: (id, includeEntries) => apiClient.getJobLog(id, includeEntries),
+  getJobLogEntries: (id, params) => apiClient.getJobLogEntries(id, params),
+  deleteJobLog: (id) => apiClient.deleteJobLog(id)
+}
+
+export const scheduledJobsService = {
+  getScheduledJobs: (params) => apiClient.getScheduledJobs(params),
+  getScheduledJob: (id) => apiClient.getScheduledJob(id),
+  createScheduledJob: (jobData) => apiClient.createScheduledJob(jobData),
+  updateScheduledJob: (id, jobData) => apiClient.updateScheduledJob(id, jobData),
+  deleteScheduledJob: (id) => apiClient.deleteScheduledJob(id),
+  runScheduledJob: (id) => apiClient.runScheduledJob(id),
+  toggleScheduledJob: (id, enabled) => apiClient.toggleScheduledJob(id, enabled)
+}
+
 export default apiClient 
