@@ -29,7 +29,7 @@ from netraven.core.logging import get_logger
 logger = get_logger(__name__)
 
 # Create router
-router = APIRouter()
+router = APIRouter(prefix="/api/tags", tags=["tags"])
 
 @router.get("", response_model=List[Tag])
 async def list_tags(

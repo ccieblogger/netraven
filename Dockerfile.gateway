@@ -28,7 +28,8 @@ RUN pip install --no-cache-dir -e . && \
     python-jose \
     python-multipart \
     sqlalchemy \
-    pydantic
+    pydantic \
+    alembic
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/data/backups

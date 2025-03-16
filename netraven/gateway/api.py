@@ -250,8 +250,15 @@ async def metrics_middleware(request: Request, call_next: Callable) -> Response:
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint"""
-    logger.info("Health check requested")
+    """
+    Check the health of the gateway service.
+    
+    Returns:
+        Health status of the gateway service
+    """
+    uptime_seconds = time.time() - start_time
+    uptime_str = str(datetime.timedelta(seconds=int(uptime_seconds)))
+    
     return {
         "status": "healthy",
         "version": __version__
@@ -1136,4 +1143,30 @@ async def check_device_reachability(
             "status": "error",
             "message": str(e),
             "data": None
-        } 
+        }
+
+@app.post("/get-token", response_model=TokenResponse)
+async def get_token(request: TokenRequest):
+    """
+    Get an access token for the gateway API.
+    
+    Args:
+        request: Token request with client ID and API key
+        
+    Returns:
+        Access token
+    """
+    # Validate API key
+    if request.api_key != API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+    
+    # Create access token
+    access_token = create_access_token(
+        data={"client_id": request.client_id},
+        expires_delta=datetime.timedelta(minutes=60)
+    )
+    
+    return {"access_token": access_token} 

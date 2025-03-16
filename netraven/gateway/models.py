@@ -17,13 +17,12 @@ class HealthResponse(BaseModel):
 class TokenRequest(BaseModel):
     """Token request model."""
     api_key: str = Field(..., description="API key for authentication")
+    client_id: str = Field(..., description="Client ID for the token")
 
 
 class TokenResponse(BaseModel):
     """Token response model."""
     access_token: str
-    token_type: str
-    expires_in: int
 
 
 class DeviceConnectionRequest(BaseModel):

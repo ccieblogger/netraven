@@ -1,53 +1,75 @@
 """
-Logging configuration for the Device Gateway API.
+Logging configuration for the gateway service.
 
-This module provides specialized logging functionality for the gateway service,
-integrating with both file-based and database logging systems.
+This module provides functions for configuring and using loggers in the gateway service.
 """
 
-import os
 import logging
-import uuid
-from typing import Optional, Dict, Any
+import os
+import sys
+from pathlib import Path
+from typing import Optional
 
-from netraven.core.config import load_config, get_default_config_path
-from netraven.core.logging import get_logger
+# Default logging configuration
+DEFAULT_LOG_LEVEL = logging.INFO
+DEFAULT_LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+DEFAULT_LOG_DIR = 'logs'
+DEFAULT_LOG_FILE = 'gateway.log'
 
-# Load configuration
-config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
-config, _ = load_config(config_path)
+# Configure logging
+def configure_gateway_logging():
+    """
+    Configure logging for the gateway service.
+    
+    This function sets up console and file logging for the gateway service.
+    """
+    # Create logger
+    logger = logging.getLogger("netraven.gateway")
+    logger.setLevel(DEFAULT_LOG_LEVEL)
+    
+    # Create console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(DEFAULT_LOG_LEVEL)
+    console_formatter = logging.Formatter(DEFAULT_LOG_FORMAT)
+    console_handler.setFormatter(console_formatter)
+    logger.addHandler(console_handler)
+    
+    # Create file handler if log directory exists
+    log_dir = os.environ.get("NETRAVEN_LOGGING_LOG_DIR", DEFAULT_LOG_DIR)
+    if log_dir:
+        log_path = Path(log_dir) / DEFAULT_LOG_FILE
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # Create file handler
+            file_handler = logging.FileHandler(log_path)
+            file_handler.setLevel(DEFAULT_LOG_LEVEL)
+            file_formatter = logging.Formatter(DEFAULT_LOG_FORMAT)
+            file_handler.setFormatter(file_formatter)
+            logger.addHandler(file_handler)
+        except Exception as e:
+            logger.error(f"Failed to set up file logging: {e}")
+    
+    return logger
 
-# Get logging configuration
-use_database_logging = config["logging"].get("use_database_logging", False)
-log_to_file = config["logging"].get("log_to_file", False)
-
-# Current gateway session tracking
-_current_gateway_session: Optional[str] = None
-_current_device_id: Optional[str] = None
-_current_client_id: Optional[str] = None
-
+# Get logger
 def get_gateway_logger(name: str) -> logging.Logger:
     """
     Get a logger for the gateway service.
-    
-    This function returns a logger configured for the gateway service,
-    with support for both file and database logging.
     
     Args:
         name: Logger name
         
     Returns:
-        Configured logger instance
+        Logger instance
     """
-    if use_database_logging:
-        # Import here to avoid circular imports
-        from netraven.core.db_logging import get_db_logger
-        logger = get_db_logger(name)
-    else:
-        # Use standard file-based logger
-        logger = get_logger(name)
+    # Configure logging if not already configured
+    if not logging.getLogger("netraven.gateway").handlers:
+        configure_gateway_logging()
     
-    return logger
+    # Return logger
+    return logging.getLogger(name)
 
 def start_gateway_session(client_id: str, device_id: Optional[str] = None) -> str:
     """
@@ -60,23 +82,8 @@ def start_gateway_session(client_id: str, device_id: Optional[str] = None) -> st
     Returns:
         Session ID
     """
-    global _current_gateway_session, _current_device_id, _current_client_id
-    
-    # Generate a new session ID
-    _current_gateway_session = str(uuid.uuid4())
-    _current_device_id = device_id
-    _current_client_id = client_id
-    
-    # Start a database job session if database logging is enabled
-    if use_database_logging:
-        from netraven.core.db_logging import start_db_job_session
-        start_db_job_session(
-            job_type="gateway_operation",
-            device_id=device_id,
-            user_id=client_id
-        )
-    
-    return _current_gateway_session
+    # Implement the logic to start a new gateway session
+    pass
 
 def end_gateway_session(success: bool = True, result_message: Optional[str] = None) -> None:
     """
@@ -86,17 +93,8 @@ def end_gateway_session(success: bool = True, result_message: Optional[str] = No
         success: Whether the operation was successful
         result_message: Optional result message
     """
-    global _current_gateway_session, _current_device_id, _current_client_id
-    
-    # End the database job session if database logging is enabled
-    if use_database_logging and _current_gateway_session:
-        from netraven.core.db_logging import end_db_job_session
-        end_db_job_session(success, result_message)
-    
-    # Clear the current session
-    _current_gateway_session = None
-    _current_device_id = None
-    _current_client_id = None
+    # Implement the logic to end the current gateway session
+    pass
 
 def log_with_context(
     logger: logging.Logger,
@@ -119,31 +117,5 @@ def log_with_context(
         client_id: Optional client ID
         **kwargs: Additional log data
     """
-    # Use current session values if not provided
-    session_id = session_id or _current_gateway_session
-    device_id = device_id or _current_device_id
-    client_id = client_id or _current_client_id
-    
-    # Add context to the message
-    context_parts = []
-    if session_id:
-        context_parts.append(f"Session: {session_id}")
-    if device_id:
-        context_parts.append(f"Device: {device_id}")
-    if client_id:
-        context_parts.append(f"Client: {client_id}")
-    
-    context = " | ".join(context_parts)
-    full_message = f"[{context}] {message}" if context else message
-    
-    # Add extra data for database logging
-    extra = kwargs.copy()
-    if not extra.get("job_data") and (session_id or device_id or client_id):
-        extra["job_data"] = {
-            "session_id": session_id,
-            "device_id": device_id,
-            "client_id": client_id
-        }
-    
-    # Log the message
-    logger.log(level, full_message, extra=extra) 
+    # Implement the logic to log a message with gateway context
+    pass 

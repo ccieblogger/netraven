@@ -52,11 +52,11 @@ def reset_admin_password(db: Session, username: str = "admin", password: str = "
         logger.error(f"Admin user '{username}' not found")
         return
     
-    # Generate the password hash
+    # Hash the password
     hashed_password = get_password_hash(password)
     
-    # Update the password
-    admin_user.hashed_password = hashed_password
+    # Update the admin user's password
+    admin_user.password_hash = hashed_password
     db.commit()
     
     logger.info(f"PASSWORD RESET: User '{username}' password has been reset to '{password}'")

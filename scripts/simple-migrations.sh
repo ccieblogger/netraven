@@ -26,5 +26,17 @@ else
   exit 1
 fi
 
+# Create default admin user
+echo "Creating default admin user..."
+python ${PYTHONPATH}/scripts/create_default_admin.py
+
+# Check admin user creation status
+if [ $? -eq 0 ]; then
+  echo "Default admin user created successfully!"
+else
+  echo "Warning: Default admin user creation failed!"
+  # Continue execution even if user creation fails
+fi
+
 echo "Database setup complete!"
 exit 0 

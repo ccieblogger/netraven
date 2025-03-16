@@ -6,16 +6,18 @@ and database models.
 """
 
 import os
-from fastapi import FastAPI
+import logging
+from pathlib import Path
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 
 from netraven.core.config import get_default_config_path, load_config
-from netraven.core.logging import setup_logging, get_logger
+from netraven.core.logging import configure_logging, get_logger
 
 # Setup logging
-setup_logging()
+configure_logging()
 logger = get_logger("netraven.web")
 
 # Load configuration
@@ -23,7 +25,7 @@ config_path = get_default_config_path()
 config, _ = load_config(config_path)
 
 # Import database and models
-from netraven.web.database import init_db, SessionLocal
+from netraven.web.database import init_db, SessionLocal, Base, engine
 from netraven.web.models import User, Device, Backup, Tag, TagRule, JobLog, ScheduledJob
 
 # Import routers
@@ -36,6 +38,7 @@ from netraven.web.routers import (
     users,
     job_logs,
     scheduled_jobs,
+    gateway
 )
 
 # Create FastAPI app
@@ -48,10 +51,12 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.get("web", {}).get("allowed_origins", ["*"]),
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Set to False to avoid issues with credentials
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=86400,  # Cache preflight requests for 24 hours
 )
 
 # Include routers
@@ -66,7 +71,6 @@ app.include_router(scheduled_jobs.router)
 
 # Try to include gateway router if it exists
 try:
-    from netraven.web.routers import gateway
     app.include_router(gateway.router)
     logger.info("Gateway router included")
 except ImportError:
@@ -82,6 +86,12 @@ async def health_check():
         dict: Status information
     """
     return {"status": "ok"}
+
+# Add OPTIONS handler for CORS preflight requests
+@app.options("/{rest_of_path:path}")
+async def options_handler(rest_of_path: str):
+    """Handle OPTIONS requests for CORS preflight."""
+    return {}
 
 # Startup event
 @app.on_event("startup")

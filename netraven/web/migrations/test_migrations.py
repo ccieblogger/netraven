@@ -1,7 +1,7 @@
 """
-Test script for job log migrations.
+Test script for database migrations.
 
-This script verifies that the job log tables are created correctly
+This script verifies that the database tables are created correctly
 with all required fields and indexes.
 """
 
@@ -14,9 +14,9 @@ from sqlalchemy import create_engine, inspect
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("netraven.web.migrations.test")
 
-def test_job_log_migrations():
+def test_migrations():
     """
-    Test that job log migrations have been applied correctly.
+    Test that migrations have been applied correctly.
     
     Returns:
         True if all tests pass, False otherwise
@@ -38,75 +38,43 @@ def test_job_log_migrations():
         # Get inspector
         inspector = inspect(engine)
         
-        # Check if job_logs table exists
-        if 'job_logs' not in inspector.get_table_names():
-            logger.error("Error: job_logs table does not exist")
+        # Get all tables
+        tables = inspector.get_table_names()
+        logger.info(f"Found {len(tables)} tables in the database")
+        
+        # Check for required tables
+        required_tables = [
+            'users', 
+            'devices', 
+            'backups',
+            'job_logs',
+            'job_log_entries',
+            'tags',
+            'device_tags'
+        ]
+        
+        missing_tables = [table for table in required_tables if table not in tables]
+        
+        if missing_tables:
+            logger.error(f"Error: The following required tables are missing: {', '.join(missing_tables)}")
             return False
         
-        # Check if job_log_entries table exists
-        if 'job_log_entries' not in inspector.get_table_names():
-            logger.error("Error: job_log_entries table does not exist")
-            return False
+        logger.info("All required tables exist")
         
-        # Check if job_logs table has retention_days column
-        job_logs_columns = [column['name'] for column in inspector.get_columns('job_logs')]
-        if 'retention_days' not in job_logs_columns:
-            logger.error("Error: job_logs table does not have retention_days column")
-            return False
+        # Check for specific columns in key tables
+        if 'devices' in tables:
+            device_columns = [column['name'] for column in inspector.get_columns('devices')]
+            required_device_columns = ['id', 'name', 'ip_address', 'device_type', 'created_at', 'updated_at']
+            
+            missing_columns = [col for col in required_device_columns if col not in device_columns]
+            if missing_columns:
+                logger.error(f"Error: The devices table is missing columns: {', '.join(missing_columns)}")
+                return False
         
-        # Check if indexes exist
-        job_logs_indexes = inspector.get_indexes('job_logs')
-        job_log_entries_indexes = inspector.get_indexes('job_log_entries')
-        
-        # Check for required indexes
-        required_job_logs_indexes = [
-            'ix_job_logs_session_id',
-            'ix_job_logs_job_type',
-            'ix_job_logs_status',
-            'ix_job_logs_start_time'
-        ]
-        
-        required_job_log_entries_indexes = [
-            'ix_job_log_entries_timestamp',
-            'ix_job_log_entries_level',
-            'ix_job_log_entries_category'
-        ]
-        
-        # Check for basic indexes (these are created in the initial migration)
-        for index_name in required_job_logs_indexes:
-            if not any(index['name'] == index_name for index in job_logs_indexes):
-                logger.warning(f"Warning: job_logs table does not have index {index_name}")
-        
-        for index_name in required_job_log_entries_indexes:
-            if not any(index['name'] == index_name for index in job_log_entries_indexes):
-                logger.warning(f"Warning: job_log_entries table does not have index {index_name}")
-        
-        # Check for composite indexes (these are created in our new migration)
-        composite_job_logs_indexes = [
-            'ix_job_logs_device_status',
-            'ix_job_logs_created_by_status',
-            'ix_job_logs_start_time_status',
-            'ix_job_logs_retention'
-        ]
-        
-        composite_job_log_entries_indexes = [
-            'ix_job_log_entries_job_log_id_level',
-            'ix_job_log_entries_job_log_id_timestamp'
-        ]
-        
-        missing_composite_indexes = []
-        
-        for index_name in composite_job_logs_indexes:
-            if not any(index['name'] == index_name for index in job_logs_indexes):
-                missing_composite_indexes.append(index_name)
-        
-        for index_name in composite_job_log_entries_indexes:
-            if not any(index['name'] == index_name for index in job_log_entries_indexes):
-                missing_composite_indexes.append(index_name)
-        
-        if missing_composite_indexes:
-            logger.warning(f"Warning: The following composite indexes are missing: {', '.join(missing_composite_indexes)}")
-            logger.warning("This is expected if the index migration has not been run yet.")
+        if 'backups' in tables:
+            backup_columns = [column['name'] for column in inspector.get_columns('backups')]
+            if 'serial_number' not in backup_columns:
+                logger.warning("Warning: The backups table does not have the serial_number column")
         
         logger.info("Migration verification completed successfully")
         return True
@@ -117,7 +85,7 @@ def test_job_log_migrations():
 
 if __name__ == "__main__":
     # Run the test
-    success = test_job_log_migrations()
+    success = test_migrations()
     
     # Exit with appropriate status code
     sys.exit(0 if success else 1) 

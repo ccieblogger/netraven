@@ -38,7 +38,6 @@ def ensure_default_admin(db: Session) -> None:
     DEFAULT_ADMIN_USERNAME = "admin"
     DEFAULT_ADMIN_PASSWORD = "NetRaven"
     DEFAULT_ADMIN_EMAIL = "admin@netraven.local"
-    DEFAULT_ADMIN_FULL_NAME = "NetRaven Administrator"
     
     # Check if default admin user already exists
     existing_user = get_user_by_username(db, DEFAULT_ADMIN_USERNAME)
@@ -55,8 +54,7 @@ def ensure_default_admin(db: Session) -> None:
         user_data = UserCreate(
             username=DEFAULT_ADMIN_USERNAME,
             email=DEFAULT_ADMIN_EMAIL,
-            full_name=DEFAULT_ADMIN_FULL_NAME,
-            password=DEFAULT_ADMIN_PASSWORD,  # Include password in the UserCreate object
+            password=DEFAULT_ADMIN_PASSWORD,
             is_admin=True,
             is_active=True
         )

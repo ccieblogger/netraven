@@ -1,6 +1,6 @@
 """Add job log models
 
-Revision ID: 2e227448c5fc
+Revision ID: 3e227448c5fc
 Revises: 1a227448b5ec
 Create Date: 2025-03-14 22:00:00.000000+00:00
 
@@ -13,7 +13,7 @@ from sqlalchemy.engine.reflection import Inspector
 
 
 # revision identifiers, used by Alembic.
-revision: str = "2e227448c5fc"
+revision: str = "3e227448c5fc"
 down_revision: Union[str, None] = "1a227448b5ec"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

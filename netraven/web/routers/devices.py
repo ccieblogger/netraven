@@ -34,7 +34,7 @@ from netraven.core.logging import get_logger
 logger = get_logger(__name__)
 
 # Create router
-router = APIRouter()
+router = APIRouter(prefix="/api/devices", tags=["devices"])
 
 class DeviceBase(BaseModel):
     """Base model for device data."""
@@ -215,9 +215,11 @@ async def backup_device(
     
     # Import here to avoid circular imports
     from netraven.jobs.device_logging import start_job_session, log_backup_failure
-    from netraven.jobs.device_connector import backup_device_config
     from netraven.web.schemas.backup import BackupCreate
     from netraven.web.crud import create_backup
+    
+    # Import the gateway client
+    from netraven.gateway.client import GatewayClient
     
     try:
         # Start a job session
@@ -226,117 +228,94 @@ async def backup_device(
         # Log the backup request
         logger.info(f"Backup requested for device {device.hostname} (ID: {device_id})")
         
-        # Execute the backup directly for now (in a real app, this would be async)
-        success = backup_device_config(
-            device_id=device_id,
+        # Get gateway API key from environment
+        gateway_api_key = os.environ.get("GATEWAY_API_KEY", "netraven-api-key")
+        gateway_url = os.environ.get("GATEWAY_URL", "http://device_gateway:8001")
+        
+        # Create gateway client
+        gateway_client = GatewayClient(
+            gateway_url=gateway_url,
+            api_key=gateway_api_key,
+            client_id=f"api-{current_user.id}"
+        )
+        
+        # Execute the backup via gateway
+        backup_result = gateway_client.backup_device_config(
             host=device.ip_address,
             username=device.username,
             password=device.password,
             device_type=device.device_type,
-            port=device.port
+            port=device.port,
+            device_id=device_id
         )
         
-        # If backup was successful, create a backup record in the database
-        if success:
+        # Check if backup was successful
+        if backup_result["status"] == "success" and backup_result.get("data"):
+            # Extract data from the gateway response
+            backup_data = backup_result["data"]
+            config = backup_data.get("config", "")
+            filename = backup_data.get("filename", "")
+            timestamp = backup_data.get("timestamp", "")
+            device_info = backup_data.get("device_info", {})
+            
+            # Get serial number from device info
+            serial_number = device_info.get("serial_number", "unknown")
+            
             # Load config to get the proper paths
             from netraven.core.config import load_config, get_default_config_path
             config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
-            config, _ = load_config(config_path)
+            config_obj, _ = load_config(config_path)
             
-            # Generate the path where the backup should be stored (this should match what backup_device_config used)
-            from netraven.core.config import get_backup_filename_format, get_storage_path
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename_format = get_backup_filename_format(config)
+            # Generate the path where the backup should be stored
+            from netraven.core.config import get_storage_path
+            filepath = get_storage_path(config_obj, filename)
             
-            # The format is likely just '{host}_config.txt' without timestamp
-            # Let's check if the file exists with just the hostname
-            filename = filename_format.format(
-                host=device.ip_address,
-                timestamp=timestamp,
-                serial="unknown",
-                version="unknown"
+            # Save the configuration to file
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            with open(filepath, "w") as f:
+                f.write(config)
+            
+            # Create a backup record in the database
+            backup_data = BackupCreate(
+                device_id=device_id,
+                version=timestamp,
+                file_path=filepath,
+                file_size=len(config),
+                status="complete",
+                is_automatic=False
             )
             
-            # Get the expected file path
-            filepath = get_storage_path(config, filename)
+            # Add to database
+            backup = create_backup(db, backup_data, serial_number=serial_number)
+            logger.info(f"Created backup record for device {device.hostname} (ID: {device_id})")
             
-            # If the file doesn't exist, try looking in the data/backups directory directly
-            if not os.path.exists(filepath):
-                # Try alternative paths
-                alt_paths = [
-                    f"/app/data/backups/{device.ip_address}_config.txt",
-                    f"/app/data/backups/{device.ip_address.lower()}_config.txt",
-                    f"/app/data/backups/{device.ip_address}.cfg",
-                    f"/app/data/backups/{device.hostname}_config.txt",
-                    f"/app/data/backups/{device.hostname.lower()}_config.txt",
-                    f"/app/data/backups/{device.hostname}.cfg",
-                    f"/tmp/backups/{device.hostname.lower()}.cfg",
-                    f"/tmp/backups/{device.hostname}.example.com.cfg"
-                ]
-                
-                for alt_path in alt_paths:
-                    if os.path.exists(alt_path):
-                        filepath = alt_path
-                        logger.info(f"Found backup file at alternative path: {filepath}")
-                        break
+            # Update the device's serial number in the database if it was retrieved
+            if serial_number and serial_number != "unknown":
+                # Update the device record with the serial number
+                device.serial_number = serial_number
+                db.commit()
+                logger.info(f"Updated device {device.hostname} with serial number: {serial_number}")
             
-            # Check if file exists and get its size
-            if os.path.exists(filepath):
-                file_size = os.path.getsize(filepath)
-                
-                # Try to read the metadata file to get the serial number
-                serial_number = "unknown"
-                metadata_path = f"{filepath}.meta"
-                if os.path.exists(metadata_path):
-                    try:
-                        with open(metadata_path, "r") as f:
-                            for line in f:
-                                if line.startswith("serial:"):
-                                    serial_number = line.split(":", 1)[1].strip()
-                                    break
-                    except Exception as e:
-                        logger.error(f"Error reading metadata file: {e}")
-                
-                # Create a backup record in the database
-                backup_data = BackupCreate(
-                    device_id=device_id,
-                    version=timestamp,
-                    file_path=filepath,
-                    file_size=file_size,
-                    status="complete",
-                    is_automatic=False
-                )
-                
-                # Add to database
-                backup = create_backup(db, backup_data, serial_number=serial_number)
-                logger.info(f"Created backup record for device {device.hostname} (ID: {device_id})")
-                
-                # Update the device's serial number in the database if it was retrieved
-                if serial_number and serial_number != "unknown":
-                    # Update the device record with the serial number
-                    device.serial_number = serial_number
-                    db.commit()
-                    logger.info(f"Updated device {device.hostname} with serial number: {serial_number}")
-                
-                # Update response with success
-                return {
-                    "message": f"Backup completed for device {device.hostname}",
-                    "job_id": job_id,
-                    "device_id": device_id,
-                    "status": "complete",
-                    "backup_id": backup.id
-                }
-            else:
-                logger.error(f"Backup file not found at expected path: {filepath}")
-                return {
-                    "message": f"Backup job for device {device.hostname} completed but file not found",
-                    "job_id": job_id,
-                    "device_id": device_id,
-                    "status": "error"
-                }
-        else:
+            # Update device backup status
+            update_device_backup_status(db, device_id, "success")
+            
+            # Update response with success
             return {
-                "message": f"Backup job for device {device.hostname} failed",
+                "message": f"Backup completed for device {device.hostname}",
+                "job_id": job_id,
+                "device_id": device_id,
+                "status": "complete",
+                "backup_id": backup.id
+            }
+        else:
+            # Update device backup status
+            update_device_backup_status(db, device_id, "error")
+            
+            error_message = backup_result.get("message", "Unknown error")
+            logger.error(f"Backup failed for device {device.hostname}: {error_message}")
+            
+            return {
+                "message": f"Backup job for device {device.hostname} failed: {error_message}",
                 "job_id": job_id,
                 "device_id": device_id,
                 "status": "error"
@@ -345,10 +324,119 @@ async def backup_device(
     except Exception as e:
         logger.exception(f"Error executing backup job for {device.hostname}: {e}")
         
+        # Update device backup status
+        update_device_backup_status(db, device_id, "error")
+        
         # Return a response with the job ID
         return {
             "message": f"Backup job for device {device.hostname} failed with error: {str(e)}",
             "job_id": job_id,
             "device_id": device_id,
             "status": "error"
+        }
+
+@router.post("/{device_id}/reachability", status_code=status.HTTP_200_OK)
+async def check_device_reachability(
+    device_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Check device reachability.
+    
+    This endpoint checks if a device is reachable using both ICMP ping
+    and SSH/Telnet connectivity tests.
+    """
+    # Check if the device exists and belongs to the user
+    device = get_device(db, device_id)
+    if not device or device.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Device with ID {device_id} not found"
+        )
+    
+    # Import the gateway client
+    from netraven.gateway.client import GatewayClient
+    
+    try:
+        # Log the reachability check request
+        logger.info(f"Reachability check requested for device {device.hostname} (ID: {device_id})")
+        
+        # Get gateway API key from environment
+        gateway_api_key = os.environ.get("GATEWAY_API_KEY", "netraven-api-key")
+        gateway_url = os.environ.get("GATEWAY_URL", "http://device_gateway:8001")
+        
+        # Create gateway client
+        gateway_client = GatewayClient(
+            gateway_url=gateway_url,
+            api_key=gateway_api_key,
+            client_id=f"api-{current_user.id}"
+        )
+        
+        # Execute the reachability check via gateway
+        reachability_result = gateway_client.check_device_reachability(
+            host=device.ip_address,
+            username=device.username,
+            password=device.password,
+            device_type=device.device_type,
+            port=device.port
+        )
+        
+        # Check if the reachability check was successful
+        if reachability_result["status"] == "success" and reachability_result.get("data"):
+            # Extract data from the gateway response
+            reachability_data = reachability_result["data"]
+            reachable = reachability_data.get("reachable", False)
+            icmp_reachable = reachability_data.get("icmp_reachable", False)
+            ssh_reachable = reachability_data.get("ssh_reachable", False)
+            
+            # Update the device's reachability status in the database
+            device.last_reachability_check = datetime.utcnow()
+            device.is_reachable = reachable
+            db.commit()
+            
+            logger.info(f"Reachability check for device {device.hostname}: {'Reachable' if reachable else 'Unreachable'}")
+            
+            # Return the reachability status
+            return {
+                "device_id": device_id,
+                "hostname": device.hostname,
+                "ip_address": device.ip_address,
+                "reachable": reachable,
+                "icmp_reachable": icmp_reachable,
+                "ssh_reachable": ssh_reachable,
+                "details": reachability_data
+            }
+        else:
+            error_message = reachability_result.get("message", "Unknown error")
+            logger.error(f"Reachability check failed for device {device.hostname}: {error_message}")
+            
+            # Update the device's reachability status in the database
+            device.last_reachability_check = datetime.utcnow()
+            device.is_reachable = False
+            db.commit()
+            
+            return {
+                "device_id": device_id,
+                "hostname": device.hostname,
+                "ip_address": device.ip_address,
+                "reachable": False,
+                "error": error_message
+            }
+        
+    except Exception as e:
+        logger.exception(f"Error checking reachability for {device.hostname}: {e}")
+        
+        # Update the device's reachability status in the database
+        device.last_reachability_check = datetime.utcnow()
+        device.is_reachable = False
+        db.commit()
+        
+        # Return a response with the error
+        return {
+            "device_id": device_id,
+            "hostname": device.hostname,
+            "ip_address": device.ip_address,
+            "reachable": False,
+            "error": str(e)
         } 

@@ -27,7 +27,7 @@ from netraven.core.logging import get_logger
 logger = get_logger("netraven.web.routers.auth")
 
 # Create router
-router = APIRouter()
+router = APIRouter(prefix="/api/auth")
 
 # Setup OAuth2 scheme for token-based authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
@@ -48,8 +48,7 @@ DEMO_USER = {
     "email": "admin@example.com",
     "full_name": "Admin User",
     "disabled": False,
-    # Password is "password" - not secure, just for initial testing
-    "hashed_password": "$2b$12$EI.RDcKOc8mxBpEr3O8YYekjZU3XI1ED3fJZ7hZ5NN1qZw6UlUKYy"
+    "password_hash": "$2b$12$EI.RDcKOc8mxBpEr3O8YYekjZU3XI1ED3fJZ7hZ5NN1qZw6UlUKYy"
 }
 
 class Token(BaseModel):
@@ -70,7 +69,7 @@ class User(BaseModel):
 
 class UserInDB(User):
     """User model with password hash."""
-    hashed_password: str
+    password_hash: str
 
 def get_user(username: str) -> Optional[UserInDB]:
     """Get user by username."""
@@ -84,7 +83,7 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
     user = get_user_by_username(db, username)
     if not user:
         return None
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(password, user.password_hash):
         return None
     if not user.is_active:
         return None

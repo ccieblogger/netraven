@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { authService } from '../api/api'
+import apiClient from '../api/api'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -21,19 +21,25 @@ export const useAuthStore = defineStore('auth', {
       this.error = null
       
       try {
-        const data = await authService.login(username, password)
-        this.token = data.access_token
+        const result = await apiClient.login(username, password)
         
-        // After successful login, fetch the user data
-        try {
-          await this.fetchCurrentUser()
-        } catch (userError) {
-          console.error('Failed to fetch user after login:', userError)
-          // Continue with login even if user fetch fails
-          // The user can retry fetching later
+        if (result.success) {
+          this.token = result.data.access_token
+          
+          // After successful login, fetch the user data
+          try {
+            await this.fetchCurrentUser()
+          } catch (userError) {
+            console.error('Failed to fetch user after login:', userError)
+            // Continue with login even if user fetch fails
+            // The user can retry fetching later
+          }
+          
+          return true
+        } else {
+          this.error = result.message || 'Login failed'
+          return false
         }
-        
-        return true
       } catch (error) {
         console.error('Login failed:', error)
         this.error = error.message || 'Login failed'
@@ -55,7 +61,7 @@ export const useAuthStore = defineStore('auth', {
           throw new Error('Authentication required')
         }
         
-        const userData = await authService.getCurrentUser()
+        const userData = await apiClient.getCurrentUser()
         this.user = userData
         return userData
       } catch (error) {
@@ -86,7 +92,7 @@ export const useAuthStore = defineStore('auth', {
     },
     
     logout() {
-      authService.logout()
+      apiClient.logout()
       this.user = null
       this.token = null
       this.error = null

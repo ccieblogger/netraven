@@ -43,7 +43,7 @@ def create_user(db: Session, user: user_schemas.UserCreate, password_hash: str) 
         id=str(uuid.uuid4()),
         username=user.username,
         email=user.email,
-        hashed_password=password_hash,
+        password_hash=password_hash,
         full_name=user.full_name,
         is_active=user.is_active,
         is_admin=user.is_admin
@@ -134,26 +134,25 @@ def update_user(db: Session, user_id: str, user: user_schemas.UserUpdate) -> Opt
     logger.info(f"Updated user: {db_user.username}")
     return db_user
 
-def update_user_password(db: Session, user_id: str, hashed_password: str) -> Optional[User]:
+def update_user_password(db: Session, user_id: str, password_hash: str) -> Optional[User]:
     """
     Update a user's password.
     
     Args:
         db: Database session
         user_id: User ID
-        hashed_password: New hashed password
+        password_hash: New hashed password
         
     Returns:
-        Updated user if found, None otherwise
+        Updated user or None if user not found
     """
     db_user = get_user(db, user_id)
-    if db_user is None:
+    if not db_user:
         return None
-        
-    db_user.hashed_password = hashed_password
+    
+    db_user.password_hash = password_hash
     db.commit()
     db.refresh(db_user)
-    logger.info(f"Updated password for user: {db_user.username}")
     return db_user
 
 def delete_user(db: Session, user_id: str) -> bool:

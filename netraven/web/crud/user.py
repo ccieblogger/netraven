@@ -103,14 +103,15 @@ def create_user(db: Session, user: UserCreate) -> User:
         logger.warning(f"User with email {user.email} already exists")
         raise IntegrityError("User with this email already exists", None, None)
     
-    # Create new user
+    # Hash the password
     hashed_password = get_password_hash(user.password)
+    
+    # Create new user
     db_user = User(
         id=str(uuid.uuid4()),
         username=user.username,
         email=user.email,
-        hashed_password=hashed_password,
-        full_name=user.full_name,
+        password_hash=hashed_password,
         is_active=user.is_active,
         is_admin=user.is_admin,
         created_at=datetime.utcnow(),
@@ -167,9 +168,9 @@ def update_user(db: Session, user_id: str, user_update: UserUpdate) -> Optional[
     # Update user data
     update_data = user_update.model_dump(exclude_unset=True)
     
-    # Handle password separately to hash it
+    # If password is provided, hash it
     if "password" in update_data:
-        update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
+        update_data["password_hash"] = get_password_hash(update_data.pop("password"))
     
     # Update the fields
     for key, value in update_data.items():

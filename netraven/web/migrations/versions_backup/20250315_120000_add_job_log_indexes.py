@@ -1,7 +1,7 @@
 """Add indexes for job logs
 
-Revision ID: 5a227448f7fe
-Revises: 4a227448e6fe
+Revision ID: 7e227448c5fc
+Revises: 6e227448c5fc
 Create Date: 2025-03-15 12:00:00.000000+00:00
 
 """
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.engine.reflection import Inspector
 
 # revision identifiers, used by Alembic.
-revision: str = "5a227448f7fe"
-down_revision: Union[str, None] = "4a227448e6fe"
+revision: str = "7e227448c5fc"
+down_revision: Union[str, None] = "6e227448c5fc"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

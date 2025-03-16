@@ -20,6 +20,11 @@ RUN mkdir -p /.local /.cache && \
 
 WORKDIR /app
 
+# Install Python dependencies
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir fastapi uvicorn sqlalchemy psycopg2-binary pydantic pyjwt python-multipart
+
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV HOME=/tmp

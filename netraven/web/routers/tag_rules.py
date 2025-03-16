@@ -27,7 +27,7 @@ from netraven.core.logging import get_logger
 logger = get_logger(__name__)
 
 # Create router
-router = APIRouter()
+router = APIRouter(prefix="/api/tag-rules", tags=["tag-rules"])
 
 @router.get("", response_model=List[TagRule])
 async def list_tag_rules(

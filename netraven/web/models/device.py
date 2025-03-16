@@ -35,6 +35,8 @@ class Device(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     serial_number = Column(String(100), nullable=True)  # Serial number of the device
+    is_reachable = Column(Boolean, nullable=True)  # Whether the device is reachable
+    last_reachability_check = Column(DateTime, nullable=True)  # When the device was last checked for reachability
     
     # Foreign keys
     owner_id = Column(String(36), ForeignKey("users.id"), nullable=False)

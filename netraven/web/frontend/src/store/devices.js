@@ -213,6 +213,33 @@ export const useDeviceStore = defineStore('devices', {
       } finally {
         this.loading = false
       }
+    },
+    
+    async checkReachability(id) {
+      this.error = null
+      
+      try {
+        const result = await deviceService.checkDeviceReachability(id)
+        
+        // Update the device in the devices array
+        const index = this.devices.findIndex(d => d.id === id)
+        if (index !== -1) {
+          this.devices[index].is_reachable = result.reachable
+          this.devices[index].last_reachability_check = new Date().toISOString()
+        }
+        
+        // Update currentDevice if it matches the checked device
+        if (this.currentDevice && this.currentDevice.id === id) {
+          this.currentDevice.is_reachable = result.reachable
+          this.currentDevice.last_reachability_check = new Date().toISOString()
+        }
+        
+        return result
+      } catch (error) {
+        this.error = error.response?.data?.detail || `Failed to check reachability for device ${id}`
+        console.error(`Error checking reachability for device ${id}:`, error)
+        return null
+      }
     }
   }
 }) 

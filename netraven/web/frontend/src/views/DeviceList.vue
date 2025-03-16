@@ -127,6 +127,7 @@
             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial Number</th>
             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device Type</th>
             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reachability</th>
             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Backup</th>
             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tags</th>
             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -157,6 +158,22 @@
               >
                 {{ device.enabled ? 'Enabled' : 'Disabled' }}
               </span>
+            </td>
+            <td class="px-4 py-2 whitespace-nowrap">
+              <span v-if="device.last_reachability_check" 
+                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                :class="device.is_reachable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+              >
+                {{ device.is_reachable ? 'Reachable' : 'Unreachable' }}
+              </span>
+              <span v-else class="text-gray-500">Unknown</span>
+              <button 
+                @click="checkReachability(device.id)"
+                class="ml-2 text-xs text-blue-600 hover:text-blue-900"
+                :disabled="checkingReachability === device.id"
+              >
+                {{ checkingReachability === device.id ? 'Checking...' : 'Check' }}
+              </button>
             </td>
             <td class="px-4 py-2 whitespace-nowrap">
               <span v-if="device.last_backup_at" 
@@ -392,6 +409,7 @@ export default {
     const showDeleteModal = ref(false)
     const deviceToDelete = ref(null)
     const backingUp = ref(null)
+    const checkingReachability = ref(null)
     const errors = ref({})
     
     const deviceForm = ref({
@@ -636,6 +654,17 @@ export default {
       filters.tagFilterMode = 'any'
     }
     
+    const checkReachability = async (deviceId) => {
+      checkingReachability.value = deviceId
+      try {
+        await deviceStore.checkReachability(deviceId)
+      } catch (error) {
+        console.error('Failed to check reachability:', error)
+      } finally {
+        checkingReachability.value = null
+      }
+    }
+    
     return {
       loading,
       saving,
@@ -647,6 +676,7 @@ export default {
       showDeleteModal,
       deviceToDelete,
       backingUp,
+      checkingReachability,
       deviceForm,
       errors,
       filteredDevices,
@@ -661,7 +691,8 @@ export default {
       loadingTags,
       filters,
       toggleTagFilter,
-      clearFilters
+      clearFilters,
+      checkReachability
     }
   }
 }

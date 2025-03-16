@@ -45,7 +45,7 @@ class GatewayClient:
         headers = {"Content-Type": "application/json"}
         
         if self.api_key:
-            headers["X-API-Key"] = self.api_key
+            headers["Authorization"] = f"Bearer {self.api_key}"
         
         return headers
     
@@ -411,4 +411,175 @@ class GatewayClient:
         if result["status"] == "success" and result["data"]:
             return result["data"]
         
-        return None 
+        return None
+    
+    def backup_device_config(
+        self,
+        host: str,
+        username: str,
+        password: Optional[str] = None,
+        device_type: Optional[str] = None,
+        port: int = 22,
+        use_keys: bool = False,
+        key_file: Optional[str] = None,
+        timeout: int = 60,
+        device_id: Optional[str] = None,
+        storage_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Backup device configuration.
+        
+        Args:
+            host: Device hostname or IP address
+            username: Username for authentication
+            password: Password for authentication
+            device_type: Device type (auto-detected if not provided)
+            port: SSH port
+            use_keys: Whether to use key-based authentication
+            key_file: Path to SSH key file
+            timeout: Connection timeout in seconds
+            device_id: Optional device ID for tracking
+            storage_path: Optional storage path for the backup
+            
+        Returns:
+            Dict containing backup result
+        """
+        try:
+            log_with_context(
+                logger,
+                level=20,  # INFO
+                message=f"Backing up configuration from {host} via gateway",
+                client_id=self.client_id,
+                device_id=host
+            )
+            
+            response = requests.post(
+                f"{self.gateway_url}/backup",
+                headers=self._get_headers(),
+                json={
+                    "host": host,
+                    "username": username,
+                    "password": password,
+                    "device_type": device_type,
+                    "port": port,
+                    "use_keys": use_keys,
+                    "key_file": key_file,
+                    "timeout": timeout,
+                    "device_id": device_id,
+                    "storage_path": storage_path
+                }
+            )
+            response.raise_for_status()
+            result = response.json()
+            
+            if result["status"] == "success":
+                log_with_context(
+                    logger,
+                    level=20,  # INFO
+                    message=f"Successfully backed up configuration from {host}",
+                    client_id=self.client_id,
+                    device_id=host
+                )
+            else:
+                log_with_context(
+                    logger,
+                    level=30,  # WARNING
+                    message=f"Failed to backup configuration from {host}: {result['message']}",
+                    client_id=self.client_id,
+                    device_id=host
+                )
+            
+            return result
+        except Exception as e:
+            log_with_context(
+                logger,
+                level=40,  # ERROR
+                message=f"Error backing up device via gateway: {str(e)}",
+                client_id=self.client_id,
+                device_id=host,
+                exc_info=e
+            )
+            raise
+    
+    def check_device_reachability(
+        self,
+        host: str,
+        username: str,
+        password: Optional[str] = None,
+        device_type: Optional[str] = None,
+        port: int = 22,
+        use_keys: bool = False,
+        key_file: Optional[str] = None,
+        timeout: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Check device reachability.
+        
+        Args:
+            host: Device hostname or IP address
+            username: Username for authentication
+            password: Password for authentication
+            device_type: Device type (auto-detected if not provided)
+            port: SSH port
+            use_keys: Whether to use key-based authentication
+            key_file: Path to SSH key file
+            timeout: Connection timeout in seconds
+            
+        Returns:
+            Dict containing reachability result
+        """
+        try:
+            log_with_context(
+                logger,
+                level=20,  # INFO
+                message=f"Checking reachability for {host} via gateway",
+                client_id=self.client_id,
+                device_id=host
+            )
+            
+            response = requests.post(
+                f"{self.gateway_url}/reachability",
+                headers=self._get_headers(),
+                json={
+                    "host": host,
+                    "username": username,
+                    "password": password,
+                    "device_type": device_type,
+                    "port": port,
+                    "use_keys": use_keys,
+                    "key_file": key_file,
+                    "timeout": timeout
+                }
+            )
+            response.raise_for_status()
+            result = response.json()
+            
+            if result["status"] == "success":
+                reachable = result.get("data", {}).get("reachable", False)
+                log_with_context(
+                    logger,
+                    level=20,  # INFO
+                    message=f"Reachability check for {host}: {'Reachable' if reachable else 'Unreachable'}",
+                    client_id=self.client_id,
+                    device_id=host
+                )
+            else:
+                log_with_context(
+                    logger,
+                    level=30,  # WARNING
+                    message=f"Failed to check reachability for {host}: {result['message']}",
+                    client_id=self.client_id,
+                    device_id=host
+                )
+            
+            return result
+        except Exception as e:
+            log_with_context(
+                logger,
+                level=40,  # ERROR
+                message=f"Error checking device reachability via gateway: {str(e)}",
+                client_id=self.client_id,
+                device_id=host,
+                exc_info=e
+            )
+            raise 

@@ -253,4 +253,18 @@ def get_backup_filename_format(config: Dict[str, Any]) -> str:
     Returns:
         Backup filename format string
     """
-    return config["backup"]["format"] 
+    return config["backup"]["format"]
+
+
+def get_config() -> Dict[str, Any]:
+    """
+    Get the configuration dictionary.
+    
+    This is a convenience function that loads the configuration and returns
+    just the config dictionary without the storage_config.
+    
+    Returns:
+        Configuration dictionary
+    """
+    config, _ = load_config()
+    return config 

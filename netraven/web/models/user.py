@@ -18,7 +18,7 @@ class User(Base):
     id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(100), nullable=False)
+    password_hash = Column(String(100), nullable=False)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -26,4 +26,5 @@ class User(Base):
     
     # Relationships
     scheduled_jobs = relationship("ScheduledJob", back_populates="user", cascade="all, delete-orphan")
-    job_logs = relationship("JobLog", back_populates="user", cascade="all, delete-orphan") 
+    job_logs = relationship("JobLog", back_populates="user", cascade="all, delete-orphan")
+    devices = relationship("Device", back_populates="owner", cascade="all, delete-orphan") 

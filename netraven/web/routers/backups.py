@@ -20,7 +20,7 @@ from netraven.web.models.backup import Backup as BackupModel
 from netraven.web.crud import get_backups, get_backup, create_backup, delete_backup, get_device
 
 # Create router
-router = APIRouter()
+router = APIRouter(prefix="/api/backups", tags=["backups"])
 
 class BackupBase(BaseModel):
     """Base model for backup data."""

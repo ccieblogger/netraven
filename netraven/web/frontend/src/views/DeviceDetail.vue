@@ -62,6 +62,25 @@
                   {{ device.enabled ? 'Enabled' : 'Disabled' }}
                 </span>
               </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Reachability:</span>
+                <div>
+                  <span v-if="device.last_reachability_check" 
+                    class="font-medium"
+                    :class="device.is_reachable ? 'text-green-600' : 'text-red-600'"
+                  >
+                    {{ device.is_reachable ? 'Reachable' : 'Unreachable' }}
+                  </span>
+                  <span v-else class="text-gray-500">Unknown</span>
+                  <button 
+                    @click="checkReachability" 
+                    class="ml-2 text-xs text-blue-600 hover:text-blue-900"
+                    :disabled="checkingReachability"
+                  >
+                    {{ checkingReachability ? 'Checking...' : 'Check' }}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -425,6 +444,7 @@ export default {
     const loading = ref(true)
     const loadingBackups = ref(true)
     const backingUp = ref(false)
+    const checkingReachability = ref(false)
     const showEditModal = ref(false)
     const saving = ref(false)
     const errors = ref({})
@@ -564,12 +584,10 @@ export default {
       backingUp.value = true
       try {
         await deviceStore.backupDevice(deviceId.value)
-        // Refresh the device to get updated backup status
         await deviceStore.fetchDevice(deviceId.value)
-        // Refresh backups
-        await backupStore.fetchBackups({ device_id: deviceId.value })
+        await backupStore.fetchBackupsByDevice(deviceId.value)
       } catch (error) {
-        console.error('Failed to backup device:', error)
+        console.error('Error backing up device:', error)
       } finally {
         backingUp.value = false
       }
@@ -582,6 +600,18 @@ export default {
         await deviceStore.fetchDevice(deviceId.value)
       } catch (error) {
         console.error('Failed to restore backup:', error)
+      }
+    }
+    
+    const checkReachability = async () => {
+      checkingReachability.value = true
+      try {
+        await deviceStore.checkReachability(deviceId.value)
+        await deviceStore.fetchDevice(deviceId.value)
+      } catch (error) {
+        console.error('Error checking device reachability:', error)
+      } finally {
+        checkingReachability.value = false
       }
     }
     
@@ -743,7 +773,9 @@ export default {
       newTag,
       createTag,
       deviceId,
-      handleOpenCreateTag
+      handleOpenCreateTag,
+      checkingReachability,
+      checkReachability
     }
   }
 }
