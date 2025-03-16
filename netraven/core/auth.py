@@ -1,172 +1,197 @@
 """
-Authentication utilities for NetRaven services.
+Core authentication module for NetRaven.
 
-This module provides centralized authentication functions for all NetRaven services,
-standardizing on Bearer token authentication while maintaining backward compatibility.
+This module provides core authentication functionality, including:
+- Token creation and validation
+- Scope-based permission checking
+- Token extraction from request headers
 """
 
 import os
 import logging
-from typing import Optional, Dict, Tuple, Any
-from fastapi import Depends, HTTPException, status, Header
-from jose import JWTError, jwt
+from typing import Dict, List, Optional, Literal, Union
+from datetime import datetime, timedelta
+import uuid
 
+from jose import jwt, JWTError
+
+from netraven.core.config import get_config
 from netraven.core.logging import get_logger
 
-# Initialize logger
+# Setup logger
 logger = get_logger("netraven.core.auth")
 
-def get_authorization_header(api_key: str) -> Dict[str, str]:
-    """
-    Generate an Authorization header with Bearer token for API requests.
-    
-    Args:
-        api_key: API key to include in the header
-        
-    Returns:
-        Dict containing the Authorization header
-    """
-    return {"Authorization": f"Bearer {api_key}"}
+# Get configuration
+config = get_config()
 
-def parse_authorization_header(authorization: Optional[str]) -> Tuple[bool, Optional[str]]:
-    """
-    Parse an Authorization header to extract the API key or token.
-    
-    Args:
-        authorization: Authorization header value
-        
-    Returns:
-        Tuple of (is_valid_format, token)
-    """
-    if not authorization:
-        return False, None
-    
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return False, None
-    
-    return True, parts[1]
+# Auth configuration
+TOKEN_SECRET_KEY = os.environ.get("TOKEN_SECRET_KEY", config.get("auth", {}).get("secret_key", "development-secret-key"))
+TOKEN_ALGORITHM = "HS256"
+TOKEN_EXPIRY_HOURS = int(os.environ.get("TOKEN_EXPIRY_HOURS", config.get("auth", {}).get("token_expiry_hours", "1")))
 
-def validate_api_key(
-    authorization: Optional[str], 
-    expected_api_key: str,
-    service_name: str = "service"
-) -> bool:
-    """
-    Validate an API key from an Authorization header.
-    
-    Args:
-        authorization: Authorization header value
-        expected_api_key: Expected API key value
-        service_name: Name of the service for logging purposes
-        
-    Returns:
-        True if the API key is valid, False otherwise
-    """
-    if not authorization:
-        logger.warning(f"Missing Authorization header for {service_name}")
-        return False
-    
-    is_valid_format, token = parse_authorization_header(authorization)
-    if not is_valid_format:
-        logger.warning(f"Invalid Authorization format for {service_name}: {authorization}")
-        return False
-    
-    if token != expected_api_key:
-        logger.warning(f"Invalid API key for {service_name}")
-        return False
-    
-    logger.debug(f"Valid API key for {service_name}")
-    return True
 
-def validate_jwt_token(
-    authorization: Optional[str],
-    jwt_secret: str,
-    algorithms: list = ["HS256"],
-    service_name: str = "service"
-) -> Optional[Dict[str, Any]]:
+def create_token(
+    subject: str,
+    token_type: Literal["user", "service"],
+    scopes: List[str],
+    expiration: Optional[timedelta] = None
+) -> str:
     """
-    Validate a JWT token from an Authorization header.
+    Create a unified token for authentication.
     
     Args:
-        authorization: Authorization header value
-        jwt_secret: Secret key for JWT validation
-        algorithms: List of allowed JWT algorithms
-        service_name: Name of the service for logging purposes
+        subject: User or service identifier
+        token_type: "user" for web sessions, "service" for API access
+        scopes: List of permission scopes
+        expiration: Token expiration (optional for service tokens)
         
     Returns:
-        Decoded JWT payload if valid, None otherwise
+        str: Signed JWT token
     """
-    if not authorization:
-        logger.warning(f"Missing Authorization header for {service_name}")
-        return None
+    now = datetime.utcnow()
     
-    is_valid_format, token = parse_authorization_header(authorization)
-    if not is_valid_format:
-        logger.warning(f"Invalid Authorization format for {service_name}: {authorization}")
-        return None
+    # Set default expiration based on token type
+    if expiration is None:
+        if token_type == "user":
+            expiration = timedelta(hours=TOKEN_EXPIRY_HOURS)
+        else:
+            # Service tokens have no expiration by default
+            expiration = None
     
+    # Create token payload
+    payload = {
+        "sub": subject,
+        "type": token_type,
+        "scope": scopes,
+        "iat": now,
+        "jti": str(uuid.uuid4())  # Unique token ID for revocation
+    }
+    
+    # Add expiration if provided
+    if expiration:
+        payload["exp"] = now + expiration
+    
+    # Encode and sign token
     try:
-        payload = jwt.decode(token, jwt_secret, algorithms=algorithms)
-        logger.debug(f"Valid JWT token for {service_name}, subject: {payload.get('sub', 'unknown')}")
-        return payload
-    except JWTError as e:
-        logger.warning(f"Invalid JWT token for {service_name}: {str(e)}")
-        return None
+        token = jwt.encode(payload, TOKEN_SECRET_KEY, algorithm=TOKEN_ALGORITHM)
+        logger.debug(f"Created {token_type} token for {subject}")
+        return token
+    except Exception as e:
+        logger.error(f"Error creating token: {str(e)}")
+        raise
 
-async def verify_api_key_dependency(
-    authorization: Optional[str] = Header(None),
-    x_api_key: Optional[str] = Header(None),
-    api_key_env_var: str = "NETRAVEN_API_KEY",
-    service_name: str = "service"
-) -> Dict[str, Any]:
+
+def validate_token(token: str, required_scopes: Optional[List[str]] = None) -> Dict:
     """
-    FastAPI dependency for API key verification.
-    Supports both Authorization header and X-API-Key header for backward compatibility.
+    Validate a token and check required scopes.
     
     Args:
-        authorization: Authorization header value
-        x_api_key: X-API-Key header value (for backward compatibility)
-        api_key_env_var: Environment variable name for the expected API key
-        service_name: Name of the service for logging purposes
+        token: The JWT token to validate
+        required_scopes: Optional list of scopes required for access
         
     Returns:
-        Dict containing authentication information
+        Dict: The validated token payload
         
     Raises:
-        HTTPException: If authentication fails
+        AuthError: If token is invalid, expired, or missing required scopes
     """
-    expected_api_key = os.environ.get(api_key_env_var, "")
+    try:
+        # Decode and verify token
+        payload = jwt.decode(token, TOKEN_SECRET_KEY, algorithms=[TOKEN_ALGORITHM])
+        
+        # Check if token is expired
+        if "exp" in payload:
+            exp_timestamp = payload["exp"]
+            if datetime.utcnow().timestamp() > exp_timestamp:
+                logger.warning(f"Token expired for {payload.get('sub')}")
+                raise AuthError("Token has expired")
+        
+        # Check required scopes if provided
+        if required_scopes:
+            token_scopes = payload.get("scope", [])
+            if not has_required_scopes(token_scopes, required_scopes):
+                logger.warning(f"Insufficient scopes for {payload.get('sub')}: {token_scopes} vs {required_scopes}")
+                raise AuthError("Insufficient permissions")
+        
+        logger.debug(f"Validated token for {payload.get('sub')}")
+        return payload
+    except JWTError as e:
+        logger.warning(f"JWT validation error: {str(e)}")
+        raise AuthError("Invalid token")
+    except Exception as e:
+        logger.error(f"Unexpected token validation error: {str(e)}")
+        raise AuthError(f"Token validation error: {str(e)}")
+
+
+def extract_token_from_header(authorization_header: Optional[str]) -> Optional[str]:
+    """
+    Extract token from Authorization header.
     
-    # Check Authorization header first (preferred method)
-    if authorization:
-        is_valid_format, token = parse_authorization_header(authorization)
-        if is_valid_format and token == expected_api_key:
-            logger.debug(f"API key validated via Authorization header for {service_name}")
-            return {"type": "api_key", "method": "bearer"}
+    Args:
+        authorization_header: The Authorization header value
+        
+    Returns:
+        Optional[str]: The extracted token or None
+    """
+    if not authorization_header:
+        return None
+        
+    if not authorization_header.startswith("Bearer "):
+        return None
+        
+    token = authorization_header.split(" ")[1]
+    return token
+
+
+def has_required_scopes(token_scopes: List[str], required_scopes: List[str]) -> bool:
+    """
+    Check if token has all required scopes.
     
-    # Fall back to X-API-Key header (backward compatibility)
-    if x_api_key:
-        if x_api_key == expected_api_key:
-            logger.debug(f"API key validated via X-API-Key header for {service_name}")
-            return {"type": "api_key", "method": "x-api-key"}
-        else:
-            logger.warning(f"Invalid X-API-Key for {service_name}")
-    else:
-        logger.warning(f"No valid authentication provided for {service_name}")
+    Args:
+        token_scopes: List of scopes in the token
+        required_scopes: List of scopes required for access
+        
+    Returns:
+        bool: True if token has all required scopes
+    """
+    # Check for wildcard scope
+    if "*" in token_scopes:
+        return True
+        
+    # Check for scope-specific wildcards
+    for scope in token_scopes:
+        if scope.endswith(":*"):
+            prefix = scope[:-1]  # Remove the * but keep the :
+            for required in required_scopes:
+                if required.startswith(prefix):
+                    return True
     
-    # If we get here, authentication failed
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or missing API key",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    # Check if all required scopes are in token scopes
+    return all(scope in token_scopes for scope in required_scopes)
+
+
+def get_authorization_header(token: str) -> Dict[str, str]:
+    """
+    Create an Authorization header with the given token.
+    
+    Args:
+        token: The token to include in the header
+        
+    Returns:
+        Dict[str, str]: The Authorization header
+    """
+    return {"Authorization": f"Bearer {token}"}
+
+
+class AuthError(Exception):
+    """Exception raised for authentication errors."""
+    pass
 
 # Export public functions
 __all__ = [
+    "create_token",
+    "validate_token",
+    "extract_token_from_header",
+    "has_required_scopes",
     "get_authorization_header",
-    "parse_authorization_header",
-    "validate_api_key",
-    "validate_jwt_token",
-    "verify_api_key_dependency",
 ] 

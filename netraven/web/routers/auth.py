@@ -1,178 +1,52 @@
 """
-Authentication router for the NetRaven web interface.
+Authentication router for NetRaven web API.
 
-This module provides authentication-related endpoints for
-user login, registration, and token management.
+This module handles authentication endpoints for token issuance and management.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from typing import List, Optional
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-import os
-from jose import JWTError, jwt
-from pydantic import BaseModel
 
-# Import database and models
-from netraven.web.database import get_db
-from netraven.web.models.user import User as UserModel
-from netraven.web.schemas.user import User, UserCreate, UserInDB
-from netraven.web.crud import get_user_by_username, create_user, update_user_last_login
-from netraven.web.auth import get_password_hash, verify_password
-from netraven.core.config import load_config, get_default_config_path
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer
+
+from netraven.core.auth import jwt, AuthError
+from netraven.core.token_store import token_store
 from netraven.core.logging import get_logger
+from netraven.web.auth import (
+    authenticate_user,
+    create_user_token,
+    create_service_token,
+    get_current_principal,
+    require_scope,
+    UserPrincipal
+)
+from netraven.web.models.auth import (
+    TokenRequest,
+    TokenResponse,
+    ServiceTokenRequest,
+    TokenMetadata
+)
 
-# Create logger
+# Setup logger
 logger = get_logger("netraven.web.routers.auth")
 
 # Create router
-router = APIRouter(prefix="/api/auth")
+router = APIRouter(prefix="/auth", tags=["authentication"])
 
-# Setup OAuth2 scheme for token-based authentication
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
+# Security scheme for OpenAPI
+security = HTTPBearer()
 
-# Load configuration
-config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
-config, _ = load_config(config_path)
-auth_config = config["web"]["authentication"]
 
-# Get secret key from environment or config
-SECRET_KEY = os.environ.get("NETRAVEN_WEB_SECRET_KEY", "change_this_to_a_secret_key")
-JWT_ALGORITHM = auth_config["jwt_algorithm"]
-ACCESS_TOKEN_EXPIRE_MINUTES = auth_config["token_expiration"] / 60  # Convert seconds to minutes
-
-# Demo user for initial testing - to be replaced with database storage
-DEMO_USER = {
-    "username": "admin",
-    "email": "admin@example.com",
-    "full_name": "Admin User",
-    "disabled": False,
-    "password_hash": "$2b$12$EI.RDcKOc8mxBpEr3O8YYekjZU3XI1ED3fJZ7hZ5NN1qZw6UlUKYy"
-}
-
-class Token(BaseModel):
-    """Token response model."""
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    """Token data model."""
-    user_id: str
-
-class User(BaseModel):
-    """User model."""
-    username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
-
-class UserInDB(User):
-    """User model with password hash."""
-    password_hash: str
-
-def get_user(username: str) -> Optional[UserInDB]:
-    """Get user by username."""
-    # This is a placeholder - in a real app, this would query the database
-    if username == DEMO_USER["username"]:
-        return UserInDB(**DEMO_USER)
-    return None
-
-def authenticate_user(db: Session, username: str, password: str) -> Optional[UserModel]:
-    """Authenticate user with username and password."""
-    user = get_user_by_username(db, username)
-    if not user:
-        return None
-    if not verify_password(password, user.password_hash):
-        return None
-    if not user.is_active:
-        return None
-    return user
-
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    """Create JWT access token."""
-    to_encode = data.copy()
+@router.post("/token", response_model=TokenResponse)
+async def login_for_access_token(form_data: TokenRequest):
+    """
+    Issue a JWT token for user authentication.
     
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        
-    to_encode.update({"exp": expire})
-    
-    encoded_jwt = jwt.encode(
-        to_encode, 
-        SECRET_KEY, 
-        algorithm=JWT_ALGORITHM
-    )
-    
-    return encoded_jwt
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme), 
-    db: Session = Depends(get_db)
-) -> UserModel:
-    """Get current user from token."""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        payload = jwt.decode(
-            token, 
-            SECRET_KEY, 
-            algorithms=[JWT_ALGORITHM]
-        )
-        
-        user_id: str = payload.get("sub")
-        
-        if user_id is None:
-            raise credentials_exception
-            
-        token_data = TokenData(user_id=user_id)
-    
-    except JWTError:
-        logger.warning("Invalid JWT token")
-        raise credentials_exception
-        
-    from netraven.web.crud import get_user
-    user = get_user(db, user_id=token_data.user_id)
-    
-    if user is None:
-        logger.warning(f"User with ID {token_data.user_id} not found")
-        raise credentials_exception
-        
-    return user
-
-async def get_current_active_user(
-    current_user: UserModel = Depends(get_current_user)
-) -> UserModel:
-    """Check if user is active."""
-    if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-    return current_user
-
-async def get_current_admin_user(
-    current_user: UserModel = Depends(get_current_active_user)
-) -> UserModel:
-    """Check if user is an admin."""
-    if not current_user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
-        )
-    return current_user
-
-@router.post("/token", response_model=Token)
-async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-) -> Dict[str, str]:
-    """Generate access token from username and password."""
-    user = authenticate_user(db, form_data.username, form_data.password)
-    
+    This endpoint authenticates a user with username and password,
+    and returns a JWT token if authentication is successful.
+    """
+    user = authenticate_user(form_data.username, form_data.password)
     if not user:
         logger.warning(f"Failed login attempt for user: {form_data.username}")
         raise HTTPException(
@@ -181,31 +55,126 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # For testing purposes, return a successful response if username is "testuser"
-    if form_data.username == "testuser":
-        logger.info(f"Test user login: {form_data.username}")
-        access_token = create_access_token(
-            data={"sub": user.id},
-            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        )
-        return {"access_token": access_token, "token_type": "bearer"}
-        
-    # Update last login timestamp
-    update_user_last_login(db, user.id)
+    # Create and return token
+    token = create_user_token(user)
     
-    logger.info(f"Successful login: {user.username}")
+    # Decode token to get expiration
+    token_data = jwt.decode(token, options={"verify_signature": False})
+    expires_at = None
+    if "exp" in token_data:
+        expires_at = datetime.fromtimestamp(token_data["exp"])
     
-    access_token = create_access_token(
-        data={"sub": user.id},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    logger.info(f"Issued token for user: {user.username}")
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_at=expires_at
+    )
+
+
+@router.post("/service-token", response_model=TokenResponse)
+async def create_service_access_token(
+    request: ServiceTokenRequest,
+    principal: UserPrincipal = Depends(require_scope(["admin:tokens"]))
+):
+    """
+    Create a service token for API access.
+    
+    This endpoint creates a service token with specified scopes and expiration.
+    Requires admin privileges.
+    """
+    # Calculate expiration if provided
+    expiration = None
+    if request.expires_in_days is not None:
+        expiration = timedelta(days=request.expires_in_days)
+    
+    # Create token
+    token = create_service_token(
+        service_name=request.service_name,
+        scopes=request.scopes,
+        created_by=principal.username,
+        expiration=expiration
     )
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Decode token to get expiration
+    token_data = jwt.decode(token, options={"verify_signature": False})
+    expires_at = None
+    if "exp" in token_data:
+        expires_at = datetime.fromtimestamp(token_data["exp"])
+    
+    logger.info(f"Service token created for {request.service_name} by {principal.username}")
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_at=expires_at
+    )
 
-@router.get("/users/me", response_model=User)
-async def read_users_me(
-    current_user: UserModel = Depends(get_current_active_user)
-) -> UserModel:
-    """Get current user information."""
-    logger.info(f"User {current_user.username} requested their profile")
-    return current_user 
+
+@router.get("/tokens", response_model=List[TokenMetadata])
+async def list_tokens(
+    subject: Optional[str] = None,
+    principal: UserPrincipal = Depends(require_scope(["admin:tokens"]))
+):
+    """
+    List active tokens.
+    
+    This endpoint lists all active tokens, optionally filtered by subject.
+    Requires admin privileges.
+    """
+    active_tokens = token_store.get_active_tokens(subject)
+    
+    # Convert to response model
+    result = []
+    for token in active_tokens:
+        token_id = token.pop("token_id")
+        expires_at = None
+        if "exp" in token:
+            expires_at = datetime.fromtimestamp(token["exp"])
+        
+        result.append(TokenMetadata(
+            token_id=token_id,
+            subject=token.get("sub", "unknown"),
+            token_type=token.get("type", "unknown"),
+            created_at=datetime.fromisoformat(token.get("created_at")),
+            created_by=token.get("created_by"),
+            expires_at=expires_at
+        ))
+    
+    logger.info(f"Listed {len(result)} active tokens for {principal.username}")
+    return result
+
+
+@router.delete("/tokens/{token_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_token(
+    token_id: str,
+    principal: UserPrincipal = Depends(require_scope(["admin:tokens"]))
+):
+    """
+    Revoke a token.
+    
+    This endpoint revokes a specific token by ID.
+    Requires admin privileges.
+    """
+    success = token_store.revoke_token(token_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Token not found or already revoked"
+        )
+    
+    logger.info(f"Token {token_id} revoked by {principal.username}")
+
+
+@router.delete("/tokens", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_all_tokens_for_subject(
+    subject: str,
+    principal: UserPrincipal = Depends(require_scope(["admin:tokens"]))
+):
+    """
+    Revoke all tokens for a subject.
+    
+    This endpoint revokes all active tokens for a specific subject.
+    Requires admin privileges.
+    """
+    count = token_store.revoke_all_for_subject(subject)
+    logger.info(f"{count} tokens revoked for {subject} by {principal.username}") 

@@ -8,14 +8,27 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
+from jose import jwt
+from datetime import datetime, timedelta
 
 from netraven.core.auth import (
     get_authorization_header,
     parse_authorization_header,
     validate_api_key,
     validate_jwt_token,
-    verify_api_key_dependency
+    verify_api_key_dependency,
+    create_token,
+    validate_token,
+    extract_token_from_header,
+    has_required_scopes,
+    AuthError,
+    TOKEN_SECRET_KEY
 )
+
+# Test data for new token-based auth tests
+TEST_SUBJECT = "test-user"
+TEST_SERVICE = "test-service"
+TEST_SCOPES = ["read:devices", "write:configs"]
 
 def test_get_authorization_header():
     """Test that the authorization header is correctly generated."""
@@ -156,4 +169,145 @@ async def test_verify_api_key_dependency_invalid():
             )
     
     assert excinfo.value.status_code == 401
-    mock_get.assert_called_once_with("TEST_API_KEY", "") 
+    mock_get.assert_called_once_with("TEST_API_KEY", "")
+
+def test_create_token_user():
+    """Test creating a user token with expiration."""
+    token = create_token(
+        subject=TEST_SUBJECT,
+        token_type="user",
+        scopes=TEST_SCOPES,
+        expiration=timedelta(minutes=5)
+    )
+    
+    # Verify token is a string
+    assert isinstance(token, str)
+    
+    # Decode and verify contents
+    payload = jwt.decode(token, TOKEN_SECRET_KEY, algorithms=["HS256"])
+    assert payload["sub"] == TEST_SUBJECT
+    assert payload["type"] == "user"
+    assert set(payload["scope"]) == set(TEST_SCOPES)
+    assert "exp" in payload
+    assert "iat" in payload
+    assert "jti" in payload
+
+def test_create_token_service():
+    """Test creating a service token without expiration."""
+    token = create_token(
+        subject=TEST_SERVICE,
+        token_type="service",
+        scopes=TEST_SCOPES
+    )
+    
+    # Verify token is a string
+    assert isinstance(token, str)
+    
+    # Decode and verify contents
+    payload = jwt.decode(token, TOKEN_SECRET_KEY, algorithms=["HS256"])
+    assert payload["sub"] == TEST_SERVICE
+    assert payload["type"] == "service"
+    assert set(payload["scope"]) == set(TEST_SCOPES)
+    assert "exp" not in payload
+    assert "iat" in payload
+    assert "jti" in payload
+
+def test_validate_token_success():
+    """Test successful token validation."""
+    token = create_token(
+        subject=TEST_SUBJECT,
+        token_type="user",
+        scopes=TEST_SCOPES,
+        expiration=timedelta(minutes=5)
+    )
+    
+    # Validate token
+    payload = validate_token(token)
+    assert payload["sub"] == TEST_SUBJECT
+    assert payload["type"] == "user"
+    assert set(payload["scope"]) == set(TEST_SCOPES)
+
+def test_validate_token_expired():
+    """Test validation of expired token."""
+    # Create token that's already expired
+    exp_time = datetime.utcnow() - timedelta(minutes=5)
+    payload = {
+        "sub": TEST_SUBJECT,
+        "type": "user",
+        "scope": TEST_SCOPES,
+        "exp": exp_time.timestamp(),
+        "iat": exp_time.timestamp() - 300,
+        "jti": "test-id"
+    }
+    token = jwt.encode(payload, TOKEN_SECRET_KEY, algorithm="HS256")
+    
+    # Validation should fail with AuthError
+    with pytest.raises(AuthError):
+        validate_token(token)
+
+def test_validate_token_invalid():
+    """Test validation of invalid token."""
+    # Create token with wrong signature
+    token = jwt.encode(
+        {
+            "sub": TEST_SUBJECT,
+            "type": "user",
+            "scope": TEST_SCOPES,
+            "iat": datetime.utcnow().timestamp(),
+            "jti": "test-id"
+        },
+        "wrong-secret-key",
+        algorithm="HS256"
+    )
+    
+    # Validation should fail with AuthError
+    with pytest.raises(AuthError):
+        validate_token(token)
+
+def test_validate_token_with_scopes():
+    """Test token validation with scope checking."""
+    token = create_token(
+        subject=TEST_SUBJECT,
+        token_type="user",
+        scopes=["read:devices", "write:configs"],
+        expiration=timedelta(minutes=5)
+    )
+    
+    # Validate with subset of scopes
+    payload = validate_token(token, required_scopes=["read:devices"])
+    assert payload["sub"] == TEST_SUBJECT
+    
+    # Validate with exact scopes
+    payload = validate_token(token, required_scopes=["read:devices", "write:configs"])
+    assert payload["sub"] == TEST_SUBJECT
+    
+    # Validation should fail with missing scope
+    with pytest.raises(AuthError):
+        validate_token(token, required_scopes=["admin:users"])
+
+def test_has_required_scopes():
+    """Test scope checking functionality."""
+    # Basic scope matching
+    assert has_required_scopes(["read:devices"], ["read:devices"])
+    assert has_required_scopes(["read:devices", "write:configs"], ["read:devices"])
+    assert not has_required_scopes(["read:devices"], ["write:configs"])
+    
+    # Wildcard scope
+    assert has_required_scopes(["*"], ["read:devices", "admin:users"])
+    
+    # Prefix wildcards
+    assert has_required_scopes(["read:*"], ["read:devices"])
+    assert has_required_scopes(["read:*", "write:*"], ["read:devices", "write:configs"])
+    assert not has_required_scopes(["read:*"], ["admin:users"])
+
+def test_extract_token_from_header():
+    """Test token extraction from Authorization header."""
+    # Valid header
+    token = extract_token_from_header("Bearer test-token")
+    assert token == "test-token"
+    
+    # Invalid headers
+    assert extract_token_from_header(None) is None
+    assert extract_token_from_header("") is None
+    assert extract_token_from_header("Basic dXNlcjpwYXNz") is None
+    assert extract_token_from_header("Bearer") is None 

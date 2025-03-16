@@ -21,15 +21,24 @@ RUN mkdir -p /.local /.cache && \
 WORKDIR /app
 
 # Install Python dependencies
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir fastapi uvicorn sqlalchemy psycopg2-binary pydantic pyjwt python-multipart
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy only the needed files
+COPY netraven/ netraven/
+COPY docker/ docker/
+
+# Make entrypoint executable
+RUN chmod +x docker/entrypoint.sh
 
 # Set environment variables
 ENV PYTHONPATH=/app
-ENV HOME=/tmp
+ENV SERVICE_TYPE=api
 
 EXPOSE 8000
 
 # Run as non-root user for health checks, etc.
-USER netraven 
+USER netraven
+
+# Run entrypoint
+ENTRYPOINT ["/app/docker/entrypoint.sh"] 

@@ -1,69 +1,32 @@
+version: '3.7'
+
 services:
   # PostgreSQL database service
   postgres:
-    image: postgres:14-alpine
+    image: postgres:13
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
-    environment:
-      - POSTGRES_USER=netraven
-      - POSTGRES_PASSWORD=netraven
-      - POSTGRES_DB=netraven
+      - postgres_data:/var/lib/postgresql/data/
     ports:
       - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U netraven"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - netraven-network
+    restart: unless-stopped
 
   # Backend API service
   api:
-    image: python:3.10-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
+      - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
+      - TOKEN_EXPIRY_HOURS=${TOKEN_EXPIRY_HOURS:-24}
+      - SETUP_ADMIN_TOKEN=${SETUP_ADMIN_TOKEN:-false}
     volumes:
-      - .:/app
-      - logs_data:/app/logs
-    working_dir: /app
-    command: >
-      bash -c "cd /app && \
-      apt-get update && \
-      apt-get install -y curl && \
-      pip install -e . && \
-      pip install email-validator psycopg2-binary alembic schedule fastapi uvicorn sqlalchemy pydantic python-jose python-multipart requests prometheus-client pyjwt && \
-      bash scripts/simple-migrations.sh && \
-      python scripts/create_default_admin.py && \
-      python -m uvicorn netraven.web:app --host 0.0.0.0 --port 8000 --reload"
+      - ./netraven:/app/netraven
     ports:
       - "8000:8000"
-    environment:
-      - PYTHONPATH=/app
-      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
-      - NETRAVEN_WEB_DB_TYPE=postgres
-      - NETRAVEN_WEB_DB_HOST=postgres
-      - NETRAVEN_WEB_DB_PORT=5432
-      - NETRAVEN_WEB_DB_NAME=netraven
-      - NETRAVEN_WEB_DB_USER=netraven
-      - NETRAVEN_WEB_DB_PASSWORD=netraven
-      - NETRAVEN_CONFIG=/app/config.yml
-      - NETRAVEN_LOGGING_RETENTION_DAYS=30
-      - NETRAVEN_LOGGING_USE_DATABASE=true
-      - NETRAVEN_LOGGING_LOG_TO_FILE=false
-      - GATEWAY_API_KEY=netraven-api-key
-      - NETRAVEN_API_KEY=netraven-api-key
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-X", "GET", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - netraven-network
+    restart: unless-stopped
 
   # Scheduler service
   scheduler:
@@ -113,33 +76,11 @@ services:
     ports:
       - "8001:8001"
     volumes:
-      - .:/app
-      - logs_data:/app/logs
+      - ./netraven:/app/netraven
     environment:
-      - PYTHONPATH=/app
-      - NETRAVEN_CONFIG=/app/config.yml
-      - NETRAVEN_LOGGING_RETENTION_DAYS=30
-      - NETRAVEN_LOGGING_USE_DATABASE=true
-      - NETRAVEN_LOGGING_LOG_TO_FILE=true
-      - NETRAVEN_LOGGING_LOG_DIR=/app/logs
-      - GATEWAY_JWT_SECRET=${GATEWAY_JWT_SECRET:-insecure-jwt-secret-change-in-production}
-      - GATEWAY_API_KEY=netraven-api-key
-      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
-      - NETRAVEN_WEB_DB_TYPE=postgres
-      - NETRAVEN_WEB_DB_HOST=postgres
-      - NETRAVEN_WEB_DB_PORT=5432
-      - NETRAVEN_WEB_DB_NAME=netraven
-      - NETRAVEN_WEB_DB_USER=netraven
-      - NETRAVEN_WEB_DB_PASSWORD=netraven
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-X", "GET", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
+      - GATEWAY_PORT=8001
+    restart: unless-stopped
     cap_drop:
       - ALL
     cap_add:

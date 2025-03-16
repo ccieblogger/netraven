@@ -2,40 +2,24 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    curl \
-    iputils-ping \
-    openssh-client \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir flask gunicorn
 
-# Copy application code
-COPY . /app/
+# Copy only the needed files
+COPY netraven/ netraven/
+COPY docker/ docker/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -e . && \
-    pip install --no-cache-dir \
-    fastapi \
-    uvicorn \
-    requests \
-    netmiko \
-    schedule \
-    pyjwt \
-    psycopg2-binary \
-    prometheus-client \
-    python-jose \
-    python-multipart \
-    sqlalchemy \
-    pydantic \
-    alembic
+# Make entrypoint executable
+RUN chmod +x docker/entrypoint.sh
 
-# Create necessary directories
-RUN mkdir -p /app/logs /app/data/backups
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV SERVICE_TYPE=gateway
 
-# Expose gateway API port
+# Expose port
 EXPOSE 8001
 
-# Run the gateway service
-CMD ["uvicorn", "netraven.gateway.api:app", "--host", "0.0.0.0", "--port", "8001"] 
+# Run entrypoint
+ENTRYPOINT ["/app/docker/entrypoint.sh"] 

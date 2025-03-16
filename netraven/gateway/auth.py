@@ -1,145 +1,81 @@
 """
-Authentication utilities for the gateway service.
+Authentication module for the gateway service.
 
-This module provides functions for authenticating requests to the gateway service.
+This module provides authentication functionality for the gateway service.
 """
 
 import os
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
 
-from fastapi import Depends, HTTPException, status, Header
-from fastapi.security import APIKeyHeader
-from jose import JWTError, jwt
+from netraven.core.auth import (
+    validate_token,
+    extract_token_from_header,
+    AuthError
+)
+from netraven.core.logging import get_logger
 
-from netraven.gateway.logging_config import get_gateway_logger
-from netraven.core.auth import validate_api_key as core_validate_api_key
-from netraven.core.auth import validate_jwt_token as core_validate_jwt_token
-from netraven.core.auth import parse_authorization_header
+# Setup logger
+logger = get_logger("netraven.gateway.auth")
 
-# Initialize logger
-logger = get_gateway_logger("netraven.gateway.auth")
 
-# API key header
-API_KEY_HEADER = APIKeyHeader(name="Authorization", auto_error=False)
-
-# JWT configuration
-JWT_SECRET = os.environ.get("GATEWAY_JWT_SECRET", "insecure-jwt-secret-change-in-production")
-JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
-# API key from environment
-API_KEY = os.environ.get("GATEWAY_API_KEY", "netraven-api-key")
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def authenticate_request(request_headers: Dict[str, str]) -> Optional[Dict[str, Any]]:
     """
-    Create a JWT access token.
+    Authenticate a request to the gateway service.
     
     Args:
-        data: Data to encode in the token
-        expires_delta: Optional expiration time
+        request_headers: Request headers
         
     Returns:
-        Encoded JWT token
+        Optional[Dict[str, Any]]: Token payload if authentication is successful, None otherwise
     """
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return encoded_jwt
+    # Extract token from headers
+    authorization = request_headers.get("Authorization")
+    token = extract_token_from_header(authorization)
+    
+    if not token:
+        logger.warning("No token provided in request")
+        return None
+    
+    try:
+        # Validate token and check for required scope
+        payload = validate_token(token, required_scopes=["read:gateway"])
+        logger.debug(f"Request authenticated for {payload.get('sub')}")
+        return payload
+    except AuthError as e:
+        logger.warning(f"Authentication error: {str(e)}")
+        return None
+    except Exception as e:
+        logger.exception(f"Unexpected error during authentication: {str(e)}")
+        return None
 
-def validate_api_key(api_key: str = Depends(API_KEY_HEADER)) -> str:
+
+def authenticate_request_with_scope(request_headers: Dict[str, str], required_scope: str) -> Optional[Dict[str, Any]]:
     """
-    Validate the API key.
+    Authenticate a request to the gateway service with a specific scope.
     
     Args:
-        api_key: API key from header
+        request_headers: Request headers
+        required_scope: Required scope for access
         
     Returns:
-        Validated API key
-        
-    Raises:
-        HTTPException: If the API key is invalid
+        Optional[Dict[str, Any]]: Token payload if authentication is successful, None otherwise
     """
-    if not api_key:
-        logger.warning("Missing API key")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing API key",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    # Extract token from headers
+    authorization = request_headers.get("Authorization")
+    token = extract_token_from_header(authorization)
     
-    # Use the core authentication module to validate the API key
-    is_valid_format, token = parse_authorization_header(api_key)
-    if not is_valid_format:
-        # If not in Bearer format, treat the whole string as the token
-        token = api_key
+    if not token:
+        logger.warning(f"No token provided in request requiring scope {required_scope}")
+        return None
     
-    # Check if it's a JWT token
-    jwt_payload = core_validate_jwt_token(f"Bearer {token}", JWT_SECRET, [JWT_ALGORITHM], "gateway")
-    if jwt_payload:
-        logger.info(f"JWT token validated for user: {jwt_payload.get('sub')}")
-        return token
-    
-    # Not a JWT token, check if it's a valid API key
-    if token != API_KEY:
-        logger.warning("Invalid API key")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    logger.info("API key validated")
-    return token
-
-async def verify_api_key_dependency(authorization: str = Header(None)) -> Dict[str, Any]:
-    """
-    FastAPI dependency for API key verification.
-    
-    Args:
-        authorization: Authorization header value
-        
-    Returns:
-        Dict containing authentication information
-        
-    Raises:
-        HTTPException: If authentication fails
-    """
-    if not authorization:
-        logger.warning("Missing Authorization header")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing API key",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    is_valid_format, token = parse_authorization_header(authorization)
-    if not is_valid_format:
-        logger.warning(f"Invalid Authorization format: {authorization}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication scheme",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # Check if it's a JWT token
-    jwt_payload = core_validate_jwt_token(authorization, JWT_SECRET, [JWT_ALGORITHM], "gateway")
-    if jwt_payload:
-        logger.info(f"JWT token validated for user: {jwt_payload.get('sub')}")
-        return jwt_payload
-    
-    # Not a JWT token, check if it's a valid API key
-    if token != API_KEY:
-        logger.warning("Invalid API key")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key or JWT token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    logger.info("API key validated")
-    return {"type": "api_key"} 
+    try:
+        # Validate token and check for required scope
+        payload = validate_token(token, required_scopes=[required_scope])
+        logger.debug(f"Request authenticated for {payload.get('sub')} with scope {required_scope}")
+        return payload
+    except AuthError as e:
+        logger.warning(f"Authentication error for scope {required_scope}: {str(e)}")
+        return None
+    except Exception as e:
+        logger.exception(f"Unexpected error during authentication for scope {required_scope}: {str(e)}")
+        return None 
