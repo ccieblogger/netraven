@@ -13,6 +13,7 @@ import uuid
 
 # Import authentication dependencies
 from netraven.web.routers.auth import User, get_current_active_user, get_current_admin_user
+from netraven.web.auth import get_api_key
 from netraven.web.database import get_db
 from netraven.web.models.job_log import JobLog as JobLogModel, JobLogEntry as JobLogEntryModel
 from netraven.web.schemas import job_log as job_log_schemas
@@ -51,7 +52,8 @@ async def list_job_logs(
     session_id: Optional[str] = None,
     limit: int = Query(10, gt=0, le=100),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_active_user),
+    current_user: Optional[User] = Depends(get_current_active_user),
+    x_api_key: Optional[str] = Depends(get_api_key),
     db: Session = Depends(get_db)
 ) -> List[job_log_schemas.JobLog]:
     """
@@ -62,8 +64,17 @@ async def list_job_logs(
     can see all logs.
     """
     try:
+        # Check authentication
+        if not current_user and not x_api_key:
+            logger.warning("Authentication failed: No valid user or API key provided")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
         # Check if user is admin
-        is_admin = current_user.is_admin
+        is_admin = current_user.is_admin if current_user else True  # API key has admin privileges
         
         # For regular users, only show logs for their devices
         created_by = None if is_admin else current_user.id
@@ -89,6 +100,9 @@ async def list_job_logs(
         
         # Convert to Pydantic models
         return [job_log_schemas.JobLog.model_validate(job_log) for job_log in job_logs]
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.exception(f"Error retrieving job logs: {e}")
         raise HTTPException(
@@ -101,7 +115,8 @@ async def get_job_log_details(
     job_log_id: str,
     include_entries: bool = Query(False),
     entry_limit: int = Query(100, gt=0, le=1000),
-    current_user: User = Depends(get_current_active_user),
+    current_user: Optional[User] = Depends(get_current_active_user),
+    x_api_key: Optional[str] = Depends(get_api_key),
     db: Session = Depends(get_db)
 ) -> job_log_schemas.JobLogComplete:
     """
@@ -111,6 +126,15 @@ async def get_job_log_details(
     device and user details, and optionally log entries.
     """
     try:
+        # Check authentication
+        if not current_user and not x_api_key:
+            logger.warning("Authentication failed: No valid user or API key provided")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
         # Get job log with details
         job_log = get_job_log_with_details(
             db=db,
@@ -125,7 +149,8 @@ async def get_job_log_details(
             )
         
         # Check if user has access to this job log
-        if not current_user.is_admin and job_log.get('created_by') != current_user.id:
+        # API key has admin privileges, so skip permission check if using API key
+        if current_user and not current_user.is_admin and job_log.get('created_by') != current_user.id:
             logger.warning(f"User {current_user.id} attempted to access job log {job_log_id} without permission")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -150,7 +175,8 @@ async def get_job_log_entries_endpoint(
     category: Optional[str] = None,
     limit: int = Query(100, gt=0, le=1000),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_active_user),
+    current_user: Optional[User] = Depends(get_current_active_user),
+    x_api_key: Optional[str] = Depends(get_api_key),
     db: Session = Depends(get_db)
 ) -> List[job_log_schemas.JobLogEntry]:
     """
@@ -160,6 +186,15 @@ async def get_job_log_entries_endpoint(
     by log level and category.
     """
     try:
+        # Check authentication
+        if not current_user and not x_api_key:
+            logger.warning("Authentication failed: No valid user or API key provided")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
         # Get job log
         job_log = get_job_log(db, job_log_id)
         
@@ -171,7 +206,8 @@ async def get_job_log_entries_endpoint(
             )
         
         # Check if user has access to this job log
-        if not current_user.is_admin and job_log.created_by != current_user.id:
+        # API key has admin privileges, so skip permission check if using API key
+        if current_user and not current_user.is_admin and job_log.created_by != current_user.id:
             logger.warning(f"User {current_user.id} attempted to access job log entries for {job_log_id} without permission")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -202,7 +238,8 @@ async def get_job_log_entries_endpoint(
 @router.delete("/{job_log_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_job_log_endpoint(
     job_log_id: str,
-    current_user: User = Depends(get_current_admin_user),
+    current_user: Optional[User] = Depends(get_current_admin_user),
+    x_api_key: Optional[str] = Depends(get_api_key),
     db: Session = Depends(get_db)
 ) -> None:
     """
@@ -212,6 +249,15 @@ async def delete_job_log_endpoint(
     Only admin users can delete job logs.
     """
     try:
+        # Check authentication
+        if not current_user and not x_api_key:
+            logger.warning("Authentication failed: No valid user or API key provided")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
         # Delete job log
         success = delete_job_log(db, job_log_id)
         
@@ -234,7 +280,8 @@ async def delete_job_log_endpoint(
 @router.post("/retention", status_code=status.HTTP_200_OK)
 async def update_retention_policy(
     retention_policy: job_log_schemas.RetentionPolicyUpdate,
-    current_user: User = Depends(get_current_admin_user),
+    current_user: Optional[User] = Depends(get_current_admin_user),
+    x_api_key: Optional[str] = Depends(get_api_key),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
@@ -243,34 +290,54 @@ async def update_retention_policy(
     This endpoint updates the default retention period for job logs.
     Only admin users can update the retention policy.
     """
-    # Update configuration
-    config["logging"]["retention_days"] = retention_policy.default_retention_days
-    
-    # Save configuration
-    # Note: In a real implementation, this would save the config to disk
-    logger.info(f"Updated job log retention policy to {retention_policy.default_retention_days} days")
-    
-    # Apply to existing logs if requested
-    updated_count = 0
-    if retention_policy.apply_to_existing:
-        # Update all logs without a retention_days value
-        logs_to_update = db.query(JobLogModel).filter(JobLogModel.retention_days.is_(None)).all()
-        for log in logs_to_update:
-            log.retention_days = retention_policy.default_retention_days
-            updated_count += 1
+    try:
+        # Check authentication
+        if not current_user and not x_api_key:
+            logger.warning("Authentication failed: No valid user or API key provided")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         
-        db.commit()
-        logger.info(f"Applied retention policy to {updated_count} existing job logs")
-    
-    return {
-        "message": f"Retention policy updated to {retention_policy.default_retention_days} days",
-        "updated_logs": updated_count
-    }
+        # Update configuration
+        config["logging"]["retention_days"] = retention_policy.default_retention_days
+        
+        # Save configuration
+        # Note: In a real implementation, this would save the config to disk
+        logger.info(f"Updated job log retention policy to {retention_policy.default_retention_days} days")
+        
+        # Apply to existing logs if requested
+        updated_count = 0
+        if retention_policy.apply_to_existing:
+            # Update all logs without a retention_days value
+            logs_to_update = db.query(JobLogModel).filter(JobLogModel.retention_days.is_(None)).all()
+            for log in logs_to_update:
+                log.retention_days = retention_policy.default_retention_days
+                updated_count += 1
+            
+            db.commit()
+            logger.info(f"Applied retention policy to {updated_count} existing job logs")
+        
+        return {
+            "message": f"Retention policy updated to {retention_policy.default_retention_days} days",
+            "updated_logs": updated_count
+        }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception(f"Error updating retention policy: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating retention policy: {str(e)}"
+        )
 
 @router.post("/cleanup", status_code=status.HTTP_200_OK)
 async def cleanup_job_logs(
     days: Optional[int] = None,
-    current_user: User = Depends(get_current_admin_user),
+    current_user: Optional[User] = Depends(get_current_admin_user),
+    x_api_key: Optional[str] = Depends(get_api_key),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
@@ -281,15 +348,34 @@ async def cleanup_job_logs(
     Otherwise, it uses the retention_days field of each log.
     Only admin users can clean up job logs.
     """
-    if days is not None:
-        # Delete logs older than the specified number of days
-        deleted_count = delete_old_job_logs(db, days)
-        return {
-            "message": f"Deleted {deleted_count} job logs older than {days} days"
-        }
-    else:
-        # Delete logs based on their retention policy
-        deleted_count = delete_job_logs_by_retention_policy(db)
-        return {
-            "message": f"Deleted {deleted_count} job logs based on retention policy"
-        } 
+    try:
+        # Check authentication
+        if not current_user and not x_api_key:
+            logger.warning("Authentication failed: No valid user or API key provided")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        if days is not None:
+            # Delete logs older than the specified number of days
+            deleted_count = delete_old_job_logs(db, days)
+            return {
+                "message": f"Deleted {deleted_count} job logs older than {days} days"
+            }
+        else:
+            # Delete logs based on their retention policy
+            deleted_count = delete_job_logs_by_retention_policy(db)
+            return {
+                "message": f"Deleted {deleted_count} job logs based on retention policy"
+            }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception(f"Error cleaning up job logs: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error cleaning up job logs: {str(e)}"
+        ) 
