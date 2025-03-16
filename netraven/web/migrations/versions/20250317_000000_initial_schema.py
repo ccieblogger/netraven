@@ -119,7 +119,7 @@ def upgrade() -> None:
         sa.Column('start_time', sa.DateTime(), nullable=False),
         sa.Column('end_time', sa.DateTime(), nullable=True),
         sa.Column('result_message', sa.Text(), nullable=True),
-        sa.Column('job_data', sa.JSON(), nullable=True),
+        sa.Column('job_data', sa.JSONB(), nullable=True),
         sa.Column('retention_days', sa.Integer(), nullable=True),
         sa.Column('device_id', sa.String(length=36), nullable=True),
         sa.Column('created_by', sa.String(length=36), nullable=False),

@@ -61,33 +61,40 @@ async def list_job_logs(
     Regular users can only see logs for devices they own, while admin users
     can see all logs.
     """
-    # Check if user is admin
-    is_admin = current_user.is_admin
-    
-    # For regular users, only show logs for their devices
-    created_by = None if is_admin else current_user.id
-    
-    # Create filter parameters
-    filter_params = JobLogFilter(
-        device_id=device_id,
-        job_type=job_type,
-        status=status,
-        start_date=start_time_from,
-        end_date=start_time_to,
-        created_by=created_by,
-        session_id=session_id
-    )
-    
-    # Get job logs
-    job_logs = get_job_logs(
-        db=db,
-        filter_params=filter_params,
-        skip=offset,
-        limit=limit
-    )
-    
-    # Convert to Pydantic models
-    return [job_log_schemas.JobLog.model_validate(job_log) for job_log in job_logs]
+    try:
+        # Check if user is admin
+        is_admin = current_user.is_admin
+        
+        # For regular users, only show logs for their devices
+        created_by = None if is_admin else current_user.id
+        
+        # Create filter parameters
+        filter_params = JobLogFilter(
+            device_id=device_id,
+            job_type=job_type,
+            status=status,
+            start_date=start_time_from,
+            end_date=start_time_to,
+            created_by=created_by,
+            session_id=session_id
+        )
+        
+        # Get job logs
+        job_logs = get_job_logs(
+            db=db,
+            filter_params=filter_params,
+            skip=offset,
+            limit=limit
+        )
+        
+        # Convert to Pydantic models
+        return [job_log_schemas.JobLog.model_validate(job_log) for job_log in job_logs]
+    except Exception as e:
+        logger.exception(f"Error retrieving job logs: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving job logs: {str(e)}"
+        )
 
 @router.get("/{job_log_id}", response_model=job_log_schemas.JobLogComplete)
 async def get_job_log_details(
@@ -103,26 +110,38 @@ async def get_job_log_details(
     This endpoint returns detailed information about a job log, including
     device and user details, and optionally log entries.
     """
-    # Get job log with details
-    job_log = get_job_log_with_details(
-        db=db,
-        log_id=job_log_id
-    )
-    
-    if not job_log:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job log with ID {job_log_id} not found"
+    try:
+        # Get job log with details
+        job_log = get_job_log_with_details(
+            db=db,
+            log_id=job_log_id
         )
-    
-    # Check if user has access to this job log
-    if not current_user.is_admin and job_log.created_by != current_user.id:
+        
+        if not job_log:
+            logger.warning(f"Job log with ID {job_log_id} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job log with ID {job_log_id} not found"
+            )
+        
+        # Check if user has access to this job log
+        if not current_user.is_admin and job_log.get('created_by') != current_user.id:
+            logger.warning(f"User {current_user.id} attempted to access job log {job_log_id} without permission")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to access this job log"
+            )
+        
+        return job_log
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception(f"Error retrieving job log details: {e}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to access this job log"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving job log details: {str(e)}"
         )
-    
-    return job_log
 
 @router.get("/{job_log_id}/entries", response_model=List[job_log_schemas.JobLogEntry])
 async def get_job_log_entries_endpoint(
@@ -140,33 +159,45 @@ async def get_job_log_entries_endpoint(
     This endpoint returns entries for a job log, with optional filtering
     by log level and category.
     """
-    # Get job log
-    job_log = get_job_log(db, job_log_id)
-    
-    if not job_log:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job log with ID {job_log_id} not found"
+    try:
+        # Get job log
+        job_log = get_job_log(db, job_log_id)
+        
+        if not job_log:
+            logger.warning(f"Job log with ID {job_log_id} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job log with ID {job_log_id} not found"
+            )
+        
+        # Check if user has access to this job log
+        if not current_user.is_admin and job_log.created_by != current_user.id:
+            logger.warning(f"User {current_user.id} attempted to access job log entries for {job_log_id} without permission")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to access this job log"
+            )
+        
+        # Get entries
+        entries = get_job_log_entries(
+            db=db,
+            log_id=job_log_id,
+            level=level,
+            skip=offset,
+            limit=limit
         )
-    
-    # Check if user has access to this job log
-    if not current_user.is_admin and job_log.created_by != current_user.id:
+        
+        # Convert to Pydantic models
+        return [job_log_schemas.JobLogEntry.model_validate(entry) for entry in entries]
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception(f"Error retrieving job log entries: {e}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to access this job log"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving job log entries: {str(e)}"
         )
-    
-    # Get entries
-    entries = get_job_log_entries(
-        db=db,
-        log_id=job_log_id,
-        level=level,
-        skip=offset,
-        limit=limit
-    )
-    
-    # Convert to Pydantic models
-    return [job_log_schemas.JobLogEntry.model_validate(entry) for entry in entries]
 
 @router.delete("/{job_log_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_job_log_endpoint(
@@ -180,13 +211,24 @@ async def delete_job_log_endpoint(
     This endpoint deletes a job log and all its entries.
     Only admin users can delete job logs.
     """
-    # Delete job log
-    success = delete_job_log(db, job_log_id)
-    
-    if not success:
+    try:
+        # Delete job log
+        success = delete_job_log(db, job_log_id)
+        
+        if not success:
+            logger.warning(f"Job log with ID {job_log_id} not found for deletion")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job log with ID {job_log_id} not found"
+            )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception(f"Error deleting job log: {e}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job log with ID {job_log_id} not found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting job log: {str(e)}"
         )
 
 @router.post("/retention", status_code=status.HTTP_200_OK)

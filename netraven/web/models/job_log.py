@@ -5,7 +5,7 @@ This module provides SQLAlchemy models for job logging, including
 both job execution logs and individual log entries.
 """
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Boolean, Integer
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Boolean, Integer, JSONB
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
@@ -28,7 +28,7 @@ class JobLog(Base):
     start_time = Column(DateTime, nullable=False, index=True)
     end_time = Column(DateTime, nullable=True)
     result_message = Column(Text, nullable=True)
-    job_data = Column(JSON, nullable=True)
+    job_data = Column(JSONB, nullable=True)
     retention_days = Column(Integer, nullable=True)
     
     # Foreign keys
