@@ -5,7 +5,8 @@ This module provides SQLAlchemy models for job logging, including
 both job execution logs and individual log entries.
 """
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Boolean, Integer, JSONB
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, JSON, Boolean, Integer
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
@@ -28,6 +29,8 @@ class JobLog(Base):
     start_time = Column(DateTime, nullable=False, index=True)
     end_time = Column(DateTime, nullable=True)
     result_message = Column(Text, nullable=True)
+    # Using PostgreSQL's JSONB type for better performance and query capabilities
+    # JSONB stores binary JSON data that can be efficiently indexed and queried
     job_data = Column(JSONB, nullable=True)
     retention_days = Column(Integer, nullable=True)
     

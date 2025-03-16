@@ -10,6 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 # revision identifiers, used by Alembic.
@@ -119,7 +120,10 @@ def upgrade() -> None:
         sa.Column('start_time', sa.DateTime(), nullable=False),
         sa.Column('end_time', sa.DateTime(), nullable=True),
         sa.Column('result_message', sa.Text(), nullable=True),
-        sa.Column('job_data', sa.JSONB(), nullable=True),
+        # Using PostgreSQL's JSONB type for better performance and query capabilities
+        # compared to regular JSON. JSONB is stored in a binary format that allows for
+        # efficient indexing and querying of nested JSON data.
+        sa.Column('job_data', JSONB(), nullable=True),
         sa.Column('retention_days', sa.Integer(), nullable=True),
         sa.Column('device_id', sa.String(length=36), nullable=True),
         sa.Column('created_by', sa.String(length=36), nullable=False),

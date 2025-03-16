@@ -348,3 +348,34 @@ docker-compose exec api alembic -c netraven/web/migrations/alembic.ini revision 
 3. Review the generated migration script in `netraven/web/migrations/versions/`
 
 For more details, see the [migrations README](netraven/web/migrations/README.md).
+
+## Authentication
+
+NetRaven supports two authentication methods:
+
+### JWT Token Authentication
+
+For user-based authentication, NetRaven uses JWT (JSON Web Token) authentication. This is primarily used for the web interface and API access by users.
+
+To obtain a token:
+
+```bash
+curl -X POST http://localhost:8000/api/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=NetRaven"
+```
+
+### API Key Authentication
+
+For service-to-service communication, NetRaven supports API key authentication. This is useful for integrating with other systems or for automated scripts.
+
+Use the API key in the `X-API-Key` header:
+
+```bash
+curl -X GET http://localhost:8000/api/health \
+  -H "X-API-Key: netraven-api-key"
+```
+
+The default API key is `netraven-api-key`, which can be changed in the configuration or by setting the `NETRAVEN_API_KEY` environment variable in the `docker-compose.yml` file.
+
+For more detailed API documentation, see [API Documentation](docs/api.md).

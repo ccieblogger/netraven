@@ -42,6 +42,11 @@ logger = get_logger("netraven.web.routers.job_logs")
 config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
 config, _ = load_config(config_path)
 
+# Note on job_data field:
+# The job_data field in the JobLog model uses PostgreSQL's JSONB type for storing
+# structured data with better performance and query capabilities compared to regular JSON.
+# This allows for efficient indexing and querying of nested JSON data.
+
 @router.get("", response_model=List[job_log_schemas.JobLog])
 async def list_job_logs(
     device_id: Optional[str] = None,
