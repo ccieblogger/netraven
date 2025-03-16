@@ -5,15 +5,17 @@ This module provides functions for authenticating requests to the gateway servic
 """
 
 import os
-import time
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import APIKeyHeader
 from jose import JWTError, jwt
 
 from netraven.gateway.logging_config import get_gateway_logger
+from netraven.core.auth import validate_api_key as core_validate_api_key
+from netraven.core.auth import validate_jwt_token as core_validate_jwt_token
+from netraven.core.auth import parse_authorization_header
 
 # Initialize logger
 logger = get_gateway_logger("netraven.gateway.auth")
@@ -27,7 +29,7 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # API key from environment
-API_KEY = os.environ.get("GATEWAY_API_KEY", "")
+API_KEY = os.environ.get("GATEWAY_API_KEY", "netraven-api-key")
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
@@ -70,24 +72,74 @@ def validate_api_key(api_key: str = Depends(API_KEY_HEADER)) -> str:
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Remove "Bearer " prefix if present
-    if api_key.startswith("Bearer "):
-        api_key = api_key[7:]
+    # Use the core authentication module to validate the API key
+    is_valid_format, token = parse_authorization_header(api_key)
+    if not is_valid_format:
+        # If not in Bearer format, treat the whole string as the token
+        token = api_key
     
     # Check if it's a JWT token
-    try:
-        payload = jwt.decode(api_key, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        logger.info(f"JWT token validated for user: {payload.get('sub')}")
-        return api_key
-    except JWTError:
-        # Not a JWT token, check if it's a valid API key
-        if api_key != API_KEY:
-            logger.warning("Invalid API key")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid API key",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+    jwt_payload = core_validate_jwt_token(f"Bearer {token}", JWT_SECRET, [JWT_ALGORITHM], "gateway")
+    if jwt_payload:
+        logger.info(f"JWT token validated for user: {jwt_payload.get('sub')}")
+        return token
+    
+    # Not a JWT token, check if it's a valid API key
+    if token != API_KEY:
+        logger.warning("Invalid API key")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    logger.info("API key validated")
+    return token
+
+async def verify_api_key_dependency(authorization: str = Header(None)) -> Dict[str, Any]:
+    """
+    FastAPI dependency for API key verification.
+    
+    Args:
+        authorization: Authorization header value
         
-        logger.info("API key validated")
-        return api_key 
+    Returns:
+        Dict containing authentication information
+        
+    Raises:
+        HTTPException: If authentication fails
+    """
+    if not authorization:
+        logger.warning("Missing Authorization header")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    is_valid_format, token = parse_authorization_header(authorization)
+    if not is_valid_format:
+        logger.warning(f"Invalid Authorization format: {authorization}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication scheme",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if it's a JWT token
+    jwt_payload = core_validate_jwt_token(authorization, JWT_SECRET, [JWT_ALGORITHM], "gateway")
+    if jwt_payload:
+        logger.info(f"JWT token validated for user: {jwt_payload.get('sub')}")
+        return jwt_payload
+    
+    # Not a JWT token, check if it's a valid API key
+    if token != API_KEY:
+        logger.warning("Invalid API key")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key or JWT token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    logger.info("API key validated")
+    return {"type": "api_key"} 

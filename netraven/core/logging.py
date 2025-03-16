@@ -381,150 +381,25 @@ def _ensure_log_directories() -> None:
 
 def get_logger(name: str) -> logging.Logger:
     """
-    Get a configured logger for the specified name.
-    
-    This function creates or returns a logger with handlers configured
-    according to the application settings. It also sets up component-specific
-    log files based on the logger name.
+    Get a logger with the specified name.
     
     Args:
-        name: Logger name, typically the module name
+        name: Logger name
         
     Returns:
-        Configured logger instance
+        Logger instance
     """
-    global _loggers
-    
-    # Return existing logger if already created
-    if name in _loggers:
-        return _loggers[name]
-    
-    # Create new logger
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)  # Set to lowest level to catch all logs
-    logger.propagate = False  # Don't propagate to root logger
     
-    # Clean existing handlers if any
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
+    # Set the log level to DEBUG for development
+    logger.setLevel(logging.DEBUG)
     
-    # Ensure log directories exist
-    _ensure_log_directories()
-    
-    # Add console handler if enabled
-    if _log_config["console"]["enabled"]:
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(_log_config["console"]["level"])
-        console_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        console_handler.setFormatter(console_formatter)
+    # Add a console handler if not already present
+    if not logger.handlers:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
-    
-    # Add file handler if enabled
-    if _log_config["file"]["enabled"]:
-        file_path = _log_config["file"]["path"]
-        
-        # Choose between time-based or size-based rotation
-        if _log_config["file"]["rotation_when"]:
-            # Time-based rotation
-            file_handler = logging.handlers.TimedRotatingFileHandler(
-                file_path,
-                when=_log_config["file"]["rotation_when"],
-                interval=_log_config["file"]["rotation_interval"],
-                backupCount=_log_config["file"]["backup_count"]
-            )
-        else:
-            # Size-based rotation
-            file_handler = logging.handlers.RotatingFileHandler(
-                file_path,
-                maxBytes=_log_config["file"]["max_bytes"],
-                backupCount=_log_config["file"]["backup_count"]
-            )
-            
-        file_handler.setLevel(_log_config["file"]["level"])
-        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(file_formatter)
-        
-        # Add sensitive data filter if enabled
-        if _log_config["sensitive_data"]["redact_enabled"]:
-            sensitive_filter = SensitiveFilter(_log_config["sensitive_data"]["patterns"])
-            file_handler.addFilter(sensitive_filter)
-        
-        logger.addHandler(file_handler)
-    
-    # Add JSON file handler if enabled
-    if _log_config["json"]["enabled"]:
-        json_file_path = _log_config["json"]["path"]
-        
-        # Choose between time-based or size-based rotation for JSON logs
-        if _log_config["json"]["rotation_when"]:
-            # Time-based rotation
-            json_file_handler = logging.handlers.TimedRotatingFileHandler(
-                json_file_path,
-                when=_log_config["json"]["rotation_when"],
-                interval=_log_config["json"]["rotation_interval"],
-                backupCount=_log_config["json"]["backup_count"]
-            )
-        else:
-            # Size-based rotation
-            json_file_handler = logging.handlers.RotatingFileHandler(
-                json_file_path,
-                maxBytes=_log_config["json"]["max_bytes"],
-                backupCount=_log_config["json"]["backup_count"]
-            )
-            
-        json_file_handler.setLevel(_log_config["file"]["level"])
-        json_formatter = JsonFormatter()
-        json_file_handler.setFormatter(json_formatter)
-        
-        # Add sensitive data filter if enabled
-        if _log_config["sensitive_data"]["redact_enabled"]:
-            sensitive_filter = SensitiveFilter(_log_config["sensitive_data"]["patterns"])
-            json_file_handler.addFilter(sensitive_filter)
-        
-        logger.addHandler(json_file_handler)
-    
-    # Add component-specific handlers if enabled
-    if _log_config["components"]["enabled"]:
-        # Determine which component-specific logs to add based on logger name
-        for component, log_path in _log_config["components"]["files"].items():
-            component_filter = ComponentFilter(component)
-            if component_filter.filter(logging.LogRecord(name, logging.INFO, "", 0, "", (), None)):
-                # Get the log directory from the main log file path
-                log_dir = os.path.dirname(_log_config["file"]["path"])
-                
-                # Construct the full component log path
-                full_log_path = os.path.join(log_dir, log_path)
-                
-                # Choose between time-based or size-based rotation for component logs
-                if _log_config["components"]["rotation_when"]:
-                    # Time-based rotation
-                    component_handler = logging.handlers.TimedRotatingFileHandler(
-                        full_log_path,
-                        when=_log_config["components"]["rotation_when"],
-                        interval=_log_config["components"]["rotation_interval"],
-                        backupCount=_log_config["components"]["backup_count"]
-                    )
-                else:
-                    # Size-based rotation
-                    component_handler = logging.handlers.RotatingFileHandler(
-                        full_log_path,
-                        maxBytes=_log_config["components"]["max_bytes"],
-                        backupCount=_log_config["components"]["backup_count"]
-                    )
-                
-                component_handler.setLevel(_log_config["components"]["level"])
-                component_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-                component_handler.setFormatter(component_formatter)
-                component_handler.addFilter(component_filter)
-                
-                # Add sensitive data filter if enabled
-                if _log_config["sensitive_data"]["redact_enabled"]:
-                    sensitive_filter = SensitiveFilter(_log_config["sensitive_data"]["patterns"])
-                    component_handler.addFilter(sensitive_filter)
-                
-                logger.addHandler(component_handler)
-    
-    # Store logger for future retrieval
-    _loggers[name] = logger
     
     return logger 

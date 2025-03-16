@@ -28,7 +28,7 @@ from netraven.gateway.models import (
     DeviceBackupRequest
 )
 from netraven.gateway import __version__
-from netraven.gateway.auth import validate_api_key, create_access_token
+from netraven.gateway.auth import validate_api_key, create_access_token, verify_api_key_dependency
 from netraven.gateway.utils import sanitize_log_data
 from netraven.gateway.metrics import metrics, MetricsCollector
 from netraven.gateway.logging_config import (
@@ -106,33 +106,8 @@ class StatusResponse(BaseModel):
 # Authentication dependency
 async def verify_api_key(authorization: str = Header(None)):
     """Verify API key."""
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing API key",
-        )
-    
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication scheme",
-        )
-    
-    if token != API_KEY:
-        try:
-            # Try to validate as JWT
-            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-            # If we get here, the JWT is valid
-            return payload
-        except jwt.PyJWTError:
-            # If JWT validation fails, raise exception
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid API key or JWT token",
-            )
-    
-    return {"type": "api_key"}
+    # Use the new dependency from the auth module
+    return await verify_api_key_dependency(authorization)
 
 # Add metrics middleware
 @app.middleware("http")
@@ -278,7 +253,7 @@ async def get_status(auth: Dict = Depends(verify_api_key)):
         "status": "running",
         "version": __version__,
         "uptime": uptime,
-        "connected_devices": metrics.active_connections,
+        "connected_devices": len(metrics.connected_devices),
         "metrics": metrics.get_metrics()
     }
 
