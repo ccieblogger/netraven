@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from netraven.core.logging import get_logger
 from netraven.web.database import init_db
 from netraven.web.routers import gateway, auth
+from netraven.web.api import api_router  # Import the API router
 from netraven.scripts.init_container import setup_initial_tokens
 
 # Setup logger
@@ -115,8 +116,7 @@ app.openapi = custom_openapi
 
 
 # Include routers
-app.include_router(gateway.router, prefix="/api")
-app.include_router(auth.router, prefix="/api")
+app.include_router(api_router, prefix="/api")
 
 
 __all__ = ["app"] 

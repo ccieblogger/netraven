@@ -36,7 +36,7 @@ from netraven.core.logging import get_logger
 logger = get_logger(__name__)
 
 # Create router
-router = APIRouter(prefix="/api/devices", tags=["devices"])
+router = APIRouter(prefix="", tags=["devices"])
 
 class DeviceBase(BaseModel):
     """Base model for device data."""
@@ -64,13 +64,13 @@ class Device(DeviceBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-@router.get("", response_model=List[Device])
+@router.get("/", response_model=List[Device])
 async def list_devices(
     current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> List[DeviceModel]:
     """
-    List all devices for the current user.
+    List all devices.
     
     Args:
         current_principal: The authenticated user
@@ -79,8 +79,25 @@ async def list_devices(
     Returns:
         List[DeviceModel]: List of devices
     """
-    require_scope(current_principal, "read:devices")
-    return get_devices(db, owner_id=current_principal.username)
+    # Instead of calling require_scope directly, check scope manually
+    if not current_principal.has_scope("read:devices"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions. Missing read:devices scope.",
+        )
+    
+    try:
+        # If user is admin, show all devices, otherwise just their own
+        if current_principal.is_admin:
+            return get_devices(db) 
+        else:
+            return get_devices(db, owner_id=current_principal.username)
+    except Exception as e:
+        logger.exception(f"Error listing devices: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error listing devices: {str(e)}"
+        )
 
 @router.get("/{device_id}", response_model=Device)
 async def get_device_endpoint(
@@ -116,9 +133,9 @@ async def get_device_endpoint(
         )
     return device
 
-@router.post("", response_model=Device, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=Device, status_code=status.HTTP_201_CREATED)
 async def create_device_endpoint(
-    device: DeviceCreate,
+    device: DeviceCreateSchema,
     current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> DeviceModel:

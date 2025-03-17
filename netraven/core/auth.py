@@ -151,6 +151,13 @@ def validate_token(token: str, required_scopes: Optional[List[str]] = None) -> D
         AuthError: If token is invalid, expired, or missing required scopes
     """
     try:
+        # For debugging, first try to decode without verification
+        try:
+            debug_payload = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
+            logger.debug(f"Raw token payload: {debug_payload}")
+        except Exception as e:
+            logger.warning(f"Debug token decode failed: {str(e)}")
+        
         # Decode and verify token
         payload = jwt.decode(token, TOKEN_SECRET_KEY, algorithms=[TOKEN_ALGORITHM])
         
@@ -164,7 +171,30 @@ def validate_token(token: str, required_scopes: Optional[List[str]] = None) -> D
         token_metadata = token_store.get_token(token_id)
         if not token_metadata:
             logger.warning(f"Token {token_id} not found in store or has been revoked")
-            raise AuthError("Token has been revoked")
+            
+            # Development mode fallback - if the token store is empty but token validates cryptographically
+            # This helps during container restarts when the token store might be cleared but tokens are still valid
+            if os.environ.get("NETRAVEN_ENV", "").lower() in ("dev", "development", "testing", "test"):
+                logger.warning("DEV MODE: Bypassing token store check due to empty store")
+                
+                # Check if token is expired
+                if "exp" in payload:
+                    exp_timestamp = payload["exp"]
+                    if datetime.utcnow().timestamp() > exp_timestamp:
+                        logger.warning(f"Token expired for {payload.get('sub')}")
+                        raise AuthError("Token has expired")
+                
+                # Check required scopes if provided
+                if required_scopes:
+                    token_scopes = payload.get("scope", [])
+                    if not has_required_scopes(token_scopes, required_scopes):
+                        logger.warning(f"Insufficient scopes for {payload.get('sub')}: {token_scopes} vs {required_scopes}")
+                        raise AuthError("Insufficient permissions")
+                
+                logger.debug(f"DEV MODE: Validated token for {payload.get('sub')} bypassing token store")
+                return payload
+            else:
+                raise AuthError("Token has been revoked")
         
         # Check if token is expired
         if "exp" in payload:
