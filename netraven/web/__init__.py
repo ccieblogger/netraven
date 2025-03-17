@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from netraven.core.logging import get_logger
 from netraven.web.database import init_db
 from netraven.web.routers import gateway, auth
+from netraven.scripts.init_container import setup_initial_tokens
 
 # Setup logger
 logger = get_logger("netraven.web")
@@ -47,6 +48,13 @@ async def startup_event():
     
     # Initialize database
     init_db()
+    
+    # Initialize authentication tokens
+    try:
+        setup_initial_tokens()
+        logger.info("Authentication tokens initialized")
+    except Exception as e:
+        logger.error(f"Error initializing authentication tokens: {str(e)}")
     
     logger.info("Web service started")
 
