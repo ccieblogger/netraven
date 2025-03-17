@@ -118,7 +118,7 @@ async def get_devices(
 @router.get("/metrics", response_model=GatewayMetrics)
 async def get_gateway_metrics(
     request: Request,
-    principal: Principal = Depends(require_scope(["read:metrics"]))
+    principal: Optional[Principal] = Depends(optional_auth(["read:metrics"]))
 ):
     """
     Get gateway metrics.
@@ -131,8 +131,10 @@ async def get_gateway_metrics(
     try:
         gateway_url = "http://device_gateway:8001/metrics"
         
-        # Use the same token for calling the gateway
-        headers = get_authorization_header(get_current_token(request))
+        # Use the same token for calling the gateway if available
+        headers = {}
+        if principal:
+            headers = get_authorization_header(get_current_token(request))
         
         logger.debug(f"Calling gateway metrics endpoint: {gateway_url}")
         response = requests.get(gateway_url, headers=headers)
