@@ -129,25 +129,40 @@ def get_metrics() -> Response:
     """
     Get gateway metrics.
     
-    This endpoint requires authentication with the 'read:metrics' scope.
+    This endpoint does not require authentication.
     
     Returns:
         Response: JSON response with gateway metrics
     """
-    # Authenticate request
-    token_data = authenticate_request_with_scope(request.headers, "read:metrics")
-    if not token_data:
-        logger.warning("Unauthorized access attempt to metrics endpoint")
-        return jsonify({
-            "status": "error",
-            "message": "Unauthorized"
-        }), 401
-    
     # Update metrics
     gateway_metrics["request_count"] += 1
     
     # Return metrics
     return jsonify(gateway_metrics)
+
+
+@app.route("/config", methods=["GET"])
+def get_config() -> Response:
+    """
+    Get gateway configuration.
+    
+    This endpoint does not require authentication.
+    
+    Returns:
+        Response: JSON response with gateway configuration
+    """
+    # Update metrics
+    gateway_metrics["request_count"] += 1
+    
+    # Return a sample configuration
+    return jsonify({
+        "listener_port": 8001,
+        "max_connections": 100,
+        "timeout_seconds": 30,
+        "retry_attempts": 3,
+        "logging_level": "INFO",
+        "connection_pool_size": 20
+    })
 
 
 @app.errorhandler(Exception)

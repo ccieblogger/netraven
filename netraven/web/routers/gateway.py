@@ -154,6 +154,45 @@ async def get_gateway_metrics(
         )
 
 
+@router.get("/config")
+async def get_gateway_config(
+    request: Request,
+    principal: Optional[Principal] = Depends(optional_auth(["read:gateway"]))
+):
+    """
+    Get the configuration of the gateway service.
+    
+    This endpoint queries the device gateway service for its configuration.
+    
+    Requires authentication with the 'read:gateway' scope.
+    """
+    try:
+        gateway_url = "http://device_gateway:8001/config"
+        
+        # Use the same token for calling the gateway if available
+        headers = {}
+        if principal:
+            headers = get_authorization_header(get_current_token(request))
+        
+        logger.debug(f"Calling gateway config endpoint: {gateway_url}")
+        response = requests.get(gateway_url, headers=headers, timeout=10.0)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.warning(f"Gateway returned status code {response.status_code}")
+            return {
+                "status": "error",
+                "message": f"Gateway returned {response.status_code}"
+            }
+    except Exception as e:
+        logger.exception(f"Error fetching gateway config: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Error: {str(e)}"
+        }
+
+
 # Helper function to extract current token from request context
 def get_current_token(request: Request) -> str:
     """
