@@ -12,7 +12,8 @@ from datetime import datetime
 import uuid
 
 # Import authentication dependencies
-from netraven.web.routers.auth import User, get_current_active_user, get_current_admin_user
+from netraven.web.auth import get_current_principal, UserPrincipal, require_scope
+from netraven.web.models.auth import User
 from netraven.web.database import get_db
 from netraven.web.models.scheduled_job import ScheduledJob as ScheduledJobModel
 from netraven.web.schemas import scheduled_job as scheduled_job_schemas
@@ -43,7 +44,7 @@ async def list_scheduled_jobs(
     enabled: Optional[bool] = None,
     limit: int = Query(10, gt=0, le=100),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> List[scheduled_job_schemas.ScheduledJobWithDevice]:
     """
@@ -90,7 +91,7 @@ async def list_scheduled_jobs(
 @router.get("/{job_id}", response_model=scheduled_job_schemas.ScheduledJobComplete)
 async def get_scheduled_job_details(
     job_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> scheduled_job_schemas.ScheduledJobComplete:
     """
@@ -125,7 +126,7 @@ async def get_scheduled_job_details(
 @router.post("", response_model=scheduled_job_schemas.ScheduledJob, status_code=status.HTTP_201_CREATED)
 async def create_scheduled_job_endpoint(
     job_data: scheduled_job_schemas.ScheduledJobCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> scheduled_job_schemas.ScheduledJob:
     """
@@ -207,7 +208,7 @@ async def create_scheduled_job_endpoint(
 async def update_scheduled_job_endpoint(
     job_id: str,
     job_data: scheduled_job_schemas.ScheduledJobUpdate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> scheduled_job_schemas.ScheduledJob:
     """
@@ -306,7 +307,7 @@ async def update_scheduled_job_endpoint(
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_scheduled_job_endpoint(
     job_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> None:
     """
@@ -354,7 +355,7 @@ async def delete_scheduled_job_endpoint(
 async def toggle_scheduled_job_endpoint(
     job_id: str,
     toggle_data: scheduled_job_schemas.ScheduledJobToggle,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> scheduled_job_schemas.ScheduledJob:
     """
@@ -425,7 +426,7 @@ async def toggle_scheduled_job_endpoint(
 @router.post("/{job_id}/run", response_model=Dict[str, Any])
 async def run_scheduled_job_endpoint(
     job_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """

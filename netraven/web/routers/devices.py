@@ -15,7 +15,8 @@ import logging
 import os
 
 # Import authentication dependencies
-from netraven.web.routers.auth import User, get_current_active_user
+from netraven.web.auth import get_current_principal, UserPrincipal, require_scope
+from netraven.web.models.auth import User
 from netraven.web.database import get_db
 from netraven.web.models.device import Device as DeviceModel
 from netraven.web.schemas.device import DeviceCreate as DeviceCreateSchema, DeviceUpdate
@@ -64,63 +65,96 @@ class Device(DeviceBase):
 
 @router.get("", response_model=List[Device])
 async def list_devices(
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> List[DeviceModel]:
     """
-    List all devices.
+    List all devices for the current user.
     
-    This endpoint returns a list of all network devices.
+    Args:
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        List[DeviceModel]: List of devices
     """
-    return get_devices(db)
+    require_scope(current_principal, "read:devices")
+    return get_devices(db, owner_id=current_principal.username)
 
 @router.get("/{device_id}", response_model=Device)
 async def get_device_endpoint(
     device_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> DeviceModel:
     """
-    Get a specific device by ID.
+    Get a device by ID.
     
-    This endpoint returns details for a specific device.
+    Args:
+        device_id: The device ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        DeviceModel: The device
+        
+    Raises:
+        HTTPException: If the device is not found
     """
+    require_scope(current_principal, "read:devices")
     device = get_device(db, device_id)
-    if not device or device.owner_id != current_user.id:
+    if not device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Device with ID {device_id} not found"
+        )
+    if device.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this device"
         )
     return device
 
 @router.post("", response_model=Device, status_code=status.HTTP_201_CREATED)
 async def create_device_endpoint(
     device: DeviceCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> DeviceModel:
     """
     Create a new device.
     
-    This endpoint creates a new network device.
+    Args:
+        device: The device data
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        DeviceModel: The created device
     """
-    # Log the received data
-    logger.info(f"Creating device with data: {device.dict()}")
+    require_scope(current_principal, "write:devices")
     
-    # Convert our API schema to the CRUD schema
-    device_data = DeviceCreateSchema(
-        hostname=device.hostname,
-        device_type=device.device_type,
-        ip_address=device.ip_address,
-        description=device.description,
-        port=device.port,
-        username=device.username,
-        password=device.password,
-        enabled=True
-    )
+    # Generate a UUID for the device
+    device_id = str(uuid.uuid4())
+    
+    # Create device data
+    device_data = {
+        "id": device_id,
+        "hostname": device.hostname,
+        "device_type": device.device_type,
+        "ip_address": device.ip_address,
+        "description": device.description,
+        "port": device.port,
+        "username": device.username,
+        "password": device.password,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+    
+    logger.info(f"Creating device: {device.hostname}")
     
     try:
-        new_device = create_device(db, device_data, current_user.id)
+        new_device = create_device(db, device_data, current_principal.username)
         logger.info(f"Device created successfully: {new_device.hostname}")
         return new_device
     except Exception as e:
@@ -134,80 +168,131 @@ async def create_device_endpoint(
 async def update_device_endpoint(
     device_id: str,
     device: DeviceUpdate,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> DeviceModel:
     """
     Update a device.
     
-    This endpoint updates an existing network device.
+    Args:
+        device_id: The device ID
+        device: The updated device data
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        DeviceModel: The updated device
+        
+    Raises:
+        HTTPException: If the device is not found or user is not authorized
     """
-    # Check if the device exists and belongs to the user
+    require_scope(current_principal, "write:devices")
+    
+    # Check if device exists
     existing_device = get_device(db, device_id)
-    if not existing_device or existing_device.owner_id != current_user.id:
+    if not existing_device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Device with ID {device_id} not found"
         )
     
-    # Log the received data
-    logger.info(f"Updating device with data: {device.dict(exclude_unset=True)}")
-    
-    # Update the device directly with the DeviceUpdate model
-    updated_device = update_device(db, device_id, device)
-    if not updated_device:
+    # Check if user owns the device
+    if existing_device.owner_id != current_principal.username:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error updating device"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this device"
         )
     
-    logger.info(f"Device updated successfully: {updated_device.hostname}")
-    return updated_device
+    # Update device
+    try:
+        updated_device = update_device(db, device_id, device.dict(exclude_unset=True))
+        return updated_device
+    except Exception as e:
+        logger.error(f"Error updating device: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating device: {str(e)}"
+        )
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_device_endpoint(
     device_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> None:
     """
     Delete a device.
     
-    This endpoint deletes a network device.
+    Args:
+        device_id: The device ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Raises:
+        HTTPException: If the device is not found or user is not authorized
     """
-    # Check if the device exists and belongs to the user
+    require_scope(current_principal, "write:devices")
+    
+    # Check if device exists
     existing_device = get_device(db, device_id)
-    if not existing_device or existing_device.owner_id != current_user.id:
+    if not existing_device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Device with ID {device_id} not found"
         )
     
-    # Delete the device
-    success = delete_device(db, device_id)
-    if not success:
+    # Check if user owns the device
+    if existing_device.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this device"
+        )
+    
+    # Delete device
+    try:
+        delete_device(db, device_id)
+    except Exception as e:
+        logger.error(f"Error deleting device: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error deleting device"
+            detail=f"Error deleting device: {str(e)}"
         )
 
 @router.post("/{device_id}/backup", status_code=status.HTTP_202_ACCEPTED)
 async def backup_device(
     device_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Trigger a backup for a device.
     
-    This endpoint initiates a backup job for a specific device.
+    Args:
+        device_id: The device ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Status of the backup request
+        
+    Raises:
+        HTTPException: If the device is not found or user is not authorized
     """
-    # Check if the device exists and belongs to the user
+    require_scope(current_principal, "write:backups")
+    
+    # Check if device exists
     device = get_device(db, device_id)
-    if not device or device.owner_id != current_user.id:
+    if not device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Device with ID {device_id} not found"
+        )
+    
+    # Check if user owns the device
+    if device.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to backup this device"
         )
     
     # Generate a job ID
@@ -236,7 +321,7 @@ async def backup_device(
         gateway_client = GatewayClient(
             gateway_url=gateway_url,
             api_key=gateway_api_key,
-            client_id=f"api-{current_user.id}"
+            client_id=f"api-{current_principal.username}"
         )
         
         # Execute the backup via gateway
@@ -338,21 +423,38 @@ async def backup_device(
 @router.post("/{device_id}/reachability", status_code=status.HTTP_200_OK)
 async def check_device_reachability(
     device_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Check device reachability.
+    Check if a device is reachable.
     
-    This endpoint checks if a device is reachable using both ICMP ping
-    and SSH/Telnet connectivity tests.
+    Args:
+        device_id: The device ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Reachability status
+        
+    Raises:
+        HTTPException: If the device is not found or user is not authorized
     """
-    # Check if the device exists and belongs to the user
+    require_scope(current_principal, "read:devices")
+    
+    # Check if device exists
     device = get_device(db, device_id)
-    if not device or device.owner_id != current_user.id:
+    if not device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Device with ID {device_id} not found"
+        )
+    
+    # Check if user owns the device
+    if device.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to check this device"
         )
     
     # Import the gateway client
@@ -370,7 +472,7 @@ async def check_device_reachability(
         gateway_client = GatewayClient(
             gateway_url=gateway_url,
             api_key=gateway_api_key,
-            client_id=f"api-{current_user.id}"
+            client_id=f"api-{current_principal.username}"
         )
         
         # Execute the reachability check via gateway

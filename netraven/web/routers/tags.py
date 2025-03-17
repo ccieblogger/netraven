@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 
 # Import authentication dependencies
-from netraven.web.routers.auth import User, get_current_active_user
+from netraven.web.auth import get_current_principal, UserPrincipal, require_scope
+from netraven.web.models.auth import User
 from netraven.web.database import get_db
 
 # Import schemas and CRUD functions
@@ -33,72 +34,115 @@ router = APIRouter(prefix="/api/tags", tags=["tags"])
 
 @router.get("", response_model=List[Tag])
 async def list_tags(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
-) -> List[Dict[str, Any]]:
+) -> List[Tag]:
     """
     List all tags.
     
-    This endpoint returns a list of all tags with optional pagination.
+    Args:
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        List[Tag]: List of tags
     """
-    return get_tags(db, skip=skip, limit=limit)
+    require_scope(current_principal, "read:tags")
+    return get_tags(db)
 
 @router.post("", response_model=Tag, status_code=status.HTTP_201_CREATED)
 async def create_tag_endpoint(
     tag: TagCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> Tag:
     """
     Create a new tag.
     
-    This endpoint creates a new tag with the provided details.
+    Args:
+        tag: The tag data
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Tag: The created tag
+        
+    Raises:
+        HTTPException: If a tag with the same name already exists
     """
-    # Check if tag with this name already exists
+    require_scope(current_principal, "write:tags")
+    
+    # Check if tag with same name already exists
     existing_tag = get_tag_by_name(db, tag.name)
     if existing_tag:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Tag with name '{tag.name}' already exists"
         )
     
-    # Create the tag
-    return create_tag(db, tag)
+    # Create tag
+    try:
+        new_tag = create_tag(db, tag.dict())
+        return new_tag
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating tag: {str(e)}"
+        )
 
 @router.get("/{tag_id}", response_model=Tag)
 async def get_tag_endpoint(
-    tag_id: str = Path(..., title="Tag ID"),
-    current_user: User = Depends(get_current_active_user),
+    tag_id: str,
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> Tag:
     """
-    Get a specific tag by ID.
+    Get a tag by ID.
     
-    This endpoint returns details for a specific tag.
+    Args:
+        tag_id: The tag ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Tag: The tag
+        
+    Raises:
+        HTTPException: If the tag is not found
     """
+    require_scope(current_principal, "read:tags")
     tag = get_tag(db, tag_id)
     if not tag:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Tag with ID {tag_id} not found"
         )
-    
     return tag
 
 @router.put("/{tag_id}", response_model=Tag)
 async def update_tag_endpoint(
+    tag_id: str,
     tag_data: TagUpdate,
-    tag_id: str = Path(..., title="Tag ID"),
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> Tag:
     """
-    Update a specific tag.
+    Update a tag.
     
-    This endpoint updates a specific tag with the provided details.
+    Args:
+        tag_id: The tag ID
+        tag_data: The updated tag data
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Tag: The updated tag
+        
+    Raises:
+        HTTPException: If the tag is not found or a tag with the same name already exists
     """
+    require_scope(current_principal, "write:tags")
+    
     # Check if tag exists
     tag = get_tag(db, tag_id)
     if not tag:
@@ -107,30 +151,49 @@ async def update_tag_endpoint(
             detail=f"Tag with ID {tag_id} not found"
         )
     
-    # Check for name uniqueness if name is being updated
+    # Check if tag with same name already exists (if name is being updated)
     if tag_data.name and tag_data.name != tag.name:
         existing_tag = get_tag_by_name(db, tag_data.name)
         if existing_tag:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Tag with name '{tag_data.name}' already exists"
             )
     
-    # Update the tag
-    updated_tag = update_tag(db, tag_id, tag_data)
-    return updated_tag
+    # Update tag
+    try:
+        updated_tag = update_tag(db, tag_id, tag_data.dict(exclude_unset=True))
+        if not updated_tag:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error updating tag"
+            )
+        return updated_tag
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating tag: {str(e)}"
+        )
 
 @router.delete("/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_tag_endpoint(
-    tag_id: str = Path(..., title="Tag ID"),
-    current_user: User = Depends(get_current_active_user),
+    tag_id: str,
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> None:
     """
-    Delete a specific tag.
+    Delete a tag.
     
-    This endpoint deletes a specific tag and removes it from all devices.
+    Args:
+        tag_id: The tag ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Raises:
+        HTTPException: If the tag is not found
     """
+    require_scope(current_principal, "write:tags")
+    
     # Check if tag exists
     tag = get_tag(db, tag_id)
     if not tag:
@@ -139,16 +202,26 @@ async def delete_tag_endpoint(
             detail=f"Tag with ID {tag_id} not found"
         )
     
-    # Delete the tag
-    delete_tag(db, tag_id)
-    return None
+    # Delete tag
+    try:
+        success = delete_tag(db, tag_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error deleting tag"
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting tag: {str(e)}"
+        )
 
 @router.get("/{tag_id}/devices", response_model=TagWithDevices)
 async def get_devices_for_tag_endpoint(
     tag_id: str = Path(..., title="Tag ID"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
@@ -195,37 +268,147 @@ async def get_devices_for_tag_endpoint(
 @router.post("/assign", status_code=status.HTTP_200_OK)
 async def assign_tags_to_devices(
     assignment: TagAssignment,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Assign multiple tags to multiple devices.
+    Assign tags to devices.
     
-    This endpoint assigns the specified tags to the specified devices.
+    Args:
+        assignment: The tag assignment data
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Assignment results
+        
+    Raises:
+        HTTPException: If any device or tag is not found or user is not authorized
     """
-    result = bulk_add_tags_to_devices(db, assignment.device_ids, assignment.tag_ids)
+    require_scope(current_principal, "write:tags")
     
-    if not result["success"]:
-        # Don't throw an exception, just return the result with failures
-        return result
+    # Check if all tags exist
+    for tag_id in assignment.tag_ids:
+        tag = get_tag(db, tag_id)
+        if not tag:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tag with ID {tag_id} not found"
+            )
     
-    return result
+    # Check if all devices exist and user has access
+    for device_id in assignment.device_ids:
+        device = get_device(db, device_id)
+        if not device:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Device with ID {device_id} not found"
+            )
+        
+        if device.owner_id != current_principal.username:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Not authorized to access device {device_id}"
+            )
+    
+    # Assign tags to devices
+    try:
+        assigned_count = assign_tags(db, assignment.tag_ids, assignment.device_ids)
+        return {
+            "message": f"Successfully assigned {len(assignment.tag_ids)} tags to {len(assignment.device_ids)} devices",
+            "assigned_count": assigned_count
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error assigning tags: {str(e)}"
+        )
 
 @router.post("/unassign", status_code=status.HTTP_200_OK)
 async def unassign_tags_from_devices(
     removal: TagRemoval,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Remove multiple tags from multiple devices.
+    Unassign tags from devices.
     
-    This endpoint removes the specified tags from the specified devices.
+    Args:
+        removal: The tag removal data
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Removal results
+        
+    Raises:
+        HTTPException: If any device is not found or user is not authorized
     """
-    result = bulk_remove_tags_from_devices(db, removal.device_ids, removal.tag_ids)
+    require_scope(current_principal, "write:tags")
     
-    if not result["success"]:
-        # Don't throw an exception, just return the result with failures
-        return result
+    # Check if all devices exist and user has access
+    for device_id in removal.device_ids:
+        device = get_device(db, device_id)
+        if not device:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Device with ID {device_id} not found"
+            )
+        
+        if device.owner_id != current_principal.username:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Not authorized to access device {device_id}"
+            )
     
-    return result 
+    # Unassign tags from devices
+    try:
+        removed_count = unassign_tags(db, removal.tag_ids, removal.device_ids)
+        return {
+            "message": f"Successfully unassigned {len(removal.tag_ids)} tags from {len(removal.device_ids)} devices",
+            "removed_count": removed_count
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error unassigning tags: {str(e)}"
+        )
+
+@router.get("/device/{device_id}", response_model=List[Tag])
+async def get_device_tags(
+    device_id: str,
+    current_principal: UserPrincipal = Depends(get_current_principal),
+    db: Session = Depends(get_db)
+) -> List[Tag]:
+    """
+    Get tags for a device.
+    
+    Args:
+        device_id: The device ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        List[Tag]: List of tags assigned to the device
+        
+    Raises:
+        HTTPException: If the device is not found or user is not authorized
+    """
+    require_scope(current_principal, "read:tags")
+    
+    # Check if device exists and user has access
+    device = get_device(db, device_id)
+    if not device:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Device with ID {device_id} not found"
+        )
+    
+    if device.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this device"
+        )
+    
+    # Get tags for device
+    return get_device_tags(db, device_id) 

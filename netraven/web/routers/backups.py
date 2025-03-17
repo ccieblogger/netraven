@@ -13,7 +13,8 @@ from datetime import datetime
 import uuid
 
 # Import authentication dependencies
-from netraven.web.routers.auth import User, get_current_active_user
+from netraven.web.auth import get_current_principal, UserPrincipal, require_scope
+from netraven.web.models.auth import User
 from netraven.web.database import get_db
 from netraven.web.models.device import Device as DeviceModel
 from netraven.web.models.backup import Backup as BackupModel
@@ -55,23 +56,49 @@ async def list_backups(
     device_id: Optional[str] = None,
     limit: int = Query(10, gt=0, le=100),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> List[Dict[str, Any]]:
     """
-    List backups.
+    List backups with optional filtering by device.
     
-    This endpoint returns a list of backups, optionally filtered by device.
+    Args:
+        device_id: Optional device ID to filter backups
+        limit: Maximum number of backups to return
+        offset: Number of backups to skip
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        List[Dict[str, Any]]: List of backups
     """
-    # Get backups from database
-    backups = get_backups(db, device_id=device_id, skip=offset, limit=limit)
+    require_scope(current_principal, "read:backups")
     
-    # Convert to response model and include device hostnames
-    response_backups = []
+    # Get backups with pagination
+    backups = get_backups(
+        db, 
+        device_id=device_id,
+        limit=limit,
+        offset=offset
+    )
+    
+    # Format backups for response
+    result = []
     for backup in backups:
-        backup_dict = {
+        # Get device hostname if available
+        device_hostname = None
+        if backup.device:
+            device_hostname = backup.device.hostname
+            
+            # Check if user has access to this device
+            if backup.device.owner_id != current_principal.username:
+                continue
+        
+        # Add backup to result
+        result.append({
             "id": backup.id,
             "device_id": backup.device_id,
+            "device_hostname": device_hostname,
             "version": backup.version,
             "file_path": backup.file_path,
             "file_size": backup.file_size,
@@ -80,30 +107,34 @@ async def list_backups(
             "content_hash": backup.content_hash,
             "is_automatic": backup.is_automatic,
             "created_at": backup.created_at,
-            "device_hostname": None,
             "serial_number": backup.serial_number
-        }
-        
-        # Get device hostname if device exists
-        device = get_device(db, backup.device_id)
-        if device:
-            backup_dict["device_hostname"] = device.hostname
-            
-        response_backups.append(backup_dict)
+        })
     
-    return response_backups
+    return result
 
 @router.get("/{backup_id}", response_model=Backup)
 async def get_backup_details(
     backup_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Get backup details.
+    Get details for a specific backup.
     
-    This endpoint returns details for a specific backup.
+    Args:
+        backup_id: The backup ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Backup details
+        
+    Raises:
+        HTTPException: If the backup is not found or user is not authorized
     """
+    require_scope(current_principal, "read:backups")
+    
+    # Get backup from database
     backup = get_backup(db, backup_id)
     if not backup:
         raise HTTPException(
@@ -111,10 +142,23 @@ async def get_backup_details(
             detail=f"Backup with ID {backup_id} not found"
         )
     
-    # Convert to response model
-    backup_dict = {
+    # Check if user has access to the device
+    device = get_device(db, backup.device_id)
+    if device and device.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this backup"
+        )
+    
+    # Format backup for response
+    device_hostname = None
+    if device:
+        device_hostname = device.hostname
+        
+    return {
         "id": backup.id,
         "device_id": backup.device_id,
+        "device_hostname": device_hostname,
         "version": backup.version,
         "file_path": backup.file_path,
         "file_size": backup.file_size,
@@ -123,28 +167,32 @@ async def get_backup_details(
         "content_hash": backup.content_hash,
         "is_automatic": backup.is_automatic,
         "created_at": backup.created_at,
-        "device_hostname": None,
         "serial_number": backup.serial_number
     }
-    
-    # Get device hostname if device exists
-    device = get_device(db, backup.device_id)
-    if device:
-        backup_dict["device_hostname"] = device.hostname
-    
-    return backup_dict
 
 @router.get("/{backup_id}/content", response_model=BackupContent)
 async def get_backup_content(
     backup_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Get backup content.
+    Get the content of a backup.
     
-    This endpoint returns the content of a specific backup.
+    Args:
+        backup_id: The backup ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Backup content
+        
+    Raises:
+        HTTPException: If the backup is not found or user is not authorized
     """
+    require_scope(current_principal, "read:backups")
+    
+    # Get backup from database
     backup = get_backup(db, backup_id)
     if not backup:
         raise HTTPException(
@@ -152,29 +200,31 @@ async def get_backup_content(
             detail=f"Backup with ID {backup_id} not found"
         )
     
-    # Read backup content from file
-    try:
-        with open(backup.file_path, 'r') as f:
-            content = f.read()
-    except FileNotFoundError:
+    # Check if user has access to the device
+    device = get_device(db, backup.device_id)
+    if device and device.owner_id != current_principal.username:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Backup file not found for backup ID {backup_id}"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this backup"
         )
+    
+    # Read backup file content
+    try:
+        with open(backup.file_path, "r") as f:
+            content = f.read()
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error reading backup content: {str(e)}"
+            detail=f"Error reading backup file: {str(e)}"
         )
     
-    # Get device hostname if device exists
+    # Format response
     device_hostname = None
-    device = get_device(db, backup.device_id)
     if device:
         device_hostname = device.hostname
-    
+        
     return {
-        "id": backup_id,
+        "id": backup.id,
         "device_id": backup.device_id,
         "device_hostname": device_hostname,
         "content": content,
@@ -185,89 +235,123 @@ async def get_backup_content(
 async def compare_backups(
     backup1_id: str,
     backup2_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Compare two backups.
     
-    This endpoint compares the content of two backups and returns the differences.
+    Args:
+        backup1_id: First backup ID
+        backup2_id: Second backup ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Comparison results
+        
+    Raises:
+        HTTPException: If backups are not found or user is not authorized
     """
-    # Get both backups
+    require_scope(current_principal, "read:backups")
+    
+    # Get backups from database
     backup1 = get_backup(db, backup1_id)
+    backup2 = get_backup(db, backup2_id)
+    
     if not backup1:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Backup with ID {backup1_id} not found"
         )
     
-    backup2 = get_backup(db, backup2_id)
     if not backup2:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Backup with ID {backup2_id} not found"
         )
     
+    # Check if user has access to the devices
+    device1 = get_device(db, backup1.device_id)
+    device2 = get_device(db, backup2.device_id)
+    
+    if device1 and device1.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Not authorized to access backup {backup1_id}"
+        )
+    
+    if device2 and device2.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Not authorized to access backup {backup2_id}"
+        )
+    
     # Read backup contents
     try:
-        with open(backup1.file_path, 'r') as f:
-            content1 = f.read().splitlines()
-        with open(backup2.file_path, 'r') as f:
-            content2 = f.read().splitlines()
-    except FileNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="One or both backup files not found"
-        )
+        with open(backup1.file_path, "r") as f:
+            content1 = f.read()
+        
+        with open(backup2.file_path, "r") as f:
+            content2 = f.read()
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error reading backup content: {str(e)}"
+            detail=f"Error reading backup files: {str(e)}"
         )
     
-    # Compare lines and find differences
-    differences = []
-    for i, (line1, line2) in enumerate(zip(content1, content2)):
-        if line1 != line2:
-            differences.append({
-                "line": i + 1,
-                "backup1": line1,
-                "backup2": line2
-            })
+    # Compare backups using difflib
+    import difflib
+    diff = difflib.unified_diff(
+        content1.splitlines(),
+        content2.splitlines(),
+        fromfile=f"Backup {backup1_id}",
+        tofile=f"Backup {backup2_id}",
+        lineterm=""
+    )
     
-    # Add any remaining lines if files are different lengths
-    for i, line in enumerate(content1[len(content2):], start=len(content2)):
-        differences.append({
-            "line": i + 1,
-            "backup1": line,
-            "backup2": None
-        })
-    
-    for i, line in enumerate(content2[len(content1):], start=len(content1)):
-        differences.append({
-            "line": i + 1,
-            "backup1": None,
-            "backup2": line
-        })
-    
+    # Format response
     return {
-        "backup1_id": backup1_id,
-        "backup2_id": backup2_id,
-        "differences": differences
+        "backup1": {
+            "id": backup1.id,
+            "device_id": backup1.device_id,
+            "device_hostname": device1.hostname if device1 else None,
+            "version": backup1.version,
+            "created_at": backup1.created_at
+        },
+        "backup2": {
+            "id": backup2.id,
+            "device_id": backup2.device_id,
+            "device_hostname": device2.hostname if device2 else None,
+            "version": backup2.version,
+            "created_at": backup2.created_at
+        },
+        "diff": "\n".join(diff)
     }
 
 @router.post("/{backup_id}/restore", status_code=status.HTTP_202_ACCEPTED)
 async def restore_backup(
     backup_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Restore a backup to a device.
     
-    This endpoint initiates a restore job for a specific backup.
+    Args:
+        backup_id: The backup ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Restoration job status
+        
+    Raises:
+        HTTPException: If the backup is not found or user is not authorized
     """
-    # Get the backup
+    require_scope(current_principal, "write:devices")
+    
+    # Get backup from database
     backup = get_backup(db, backup_id)
     if not backup:
         raise HTTPException(
@@ -275,39 +359,55 @@ async def restore_backup(
             detail=f"Backup with ID {backup_id} not found"
         )
     
-    # Get the device
+    # Check if user has access to the device
     device = get_device(db, backup.device_id)
     if not device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device not found for backup {backup_id}"
+            detail=f"Device with ID {backup.device_id} not found"
+        )
+    
+    if device.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to restore to this device"
         )
     
     # Generate a job ID
     job_id = str(uuid.uuid4())
     
-    # In a real application, this would initiate a background task to restore the backup
-    # For now, just return a success response
+    # In a real implementation, this would queue a job to restore the backup
+    # For now, we'll just return a success response
+    
     return {
-        "message": f"Restore job initiated for device {device.hostname}",
         "job_id": job_id,
+        "status": "queued",
+        "message": f"Restore job queued for backup {backup_id} to device {device.hostname}",
         "backup_id": backup_id,
         "device_id": device.id,
-        "status": "pending"
+        "device_hostname": device.hostname
     }
 
 @router.delete("/{backup_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_backup_endpoint(
     backup_id: str,
-    current_user: User = Depends(get_current_active_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> None:
     """
     Delete a backup.
     
-    This endpoint deletes a specific backup.
+    Args:
+        backup_id: The backup ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Raises:
+        HTTPException: If the backup is not found or user is not authorized
     """
-    # Get the backup
+    require_scope(current_principal, "write:backups")
+    
+    # Get backup from database
     backup = get_backup(db, backup_id)
     if not backup:
         raise HTTPException(
@@ -315,11 +415,18 @@ async def delete_backup_endpoint(
             detail=f"Backup with ID {backup_id} not found"
         )
     
-    # Delete the backup
-    try:
-        delete_backup(db, backup_id)
-    except Exception as e:
+    # Check if user has access to the device
+    device = get_device(db, backup.device_id)
+    if device and device.owner_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this backup"
+        )
+    
+    # Delete backup
+    success = delete_backup(db, backup_id)
+    if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting backup: {str(e)}"
+            detail="Error deleting backup"
         ) 

@@ -6,13 +6,14 @@ This module provides user-related endpoints for the API.
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from netraven.web.database import get_db
 from netraven.web.models.user import User as UserModel
 from netraven.web.schemas.user import User, UserCreate, UserUpdate
 from netraven.web.crud import get_user, get_users, update_user, delete_user
-from netraven.web.routers.auth import get_current_active_user, get_current_admin_user
+from netraven.web.auth import get_current_principal, UserPrincipal, require_scope
+from netraven.web.models.auth import User
 from netraven.core.logging import get_logger
 
 # Create logger
@@ -22,80 +23,141 @@ logger = get_logger("netraven.web.routers.users")
 router = APIRouter(prefix="/api/users")
 
 @router.get("/me", response_model=User)
-async def read_users_me(
-    current_user: UserModel = Depends(get_current_active_user)
-) -> UserModel:
-    """Get current user information."""
-    return current_user
+async def get_current_user_endpoint(
+    current_principal: UserPrincipal = Depends(get_current_principal)
+) -> Dict[str, Any]:
+    """
+    Get the current user.
+    
+    Args:
+        current_principal: The authenticated user
+        
+    Returns:
+        Dict[str, Any]: Current user details
+    """
+    return current_principal.user
 
 @router.get("/", response_model=List[User])
-async def read_users(
-    skip: int = 0, 
-    limit: int = 100,
-    current_user: UserModel = Depends(get_current_admin_user),
+async def list_users(
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
-) -> List[UserModel]:
+) -> List[Dict[str, Any]]:
     """
-    Get all users.
+    List all users.
     
-    This endpoint requires admin privileges.
+    Args:
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        List[Dict[str, Any]]: List of users
     """
-    users = get_users(db, skip=skip, limit=limit)
-    return users
+    require_scope(current_principal, "admin:users")
+    return get_users(db)
 
 @router.get("/{user_id}", response_model=User)
-async def read_user(
+async def get_user_endpoint(
     user_id: str,
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
-) -> UserModel:
+) -> Dict[str, Any]:
     """
-    Get a specific user by ID.
+    Get a user by ID.
     
-    This endpoint requires admin privileges.
+    Args:
+        user_id: The user ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: User details
+        
+    Raises:
+        HTTPException: If the user is not found or current user is not authorized
     """
-    db_user = get_user(db, user_id=user_id)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
+    # Check if user is admin or getting their own profile
+    if not current_principal.has_scope("admin:users") and user_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this user"
+        )
+    
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found"
+        )
+    
+    return user
 
 @router.put("/{user_id}", response_model=User)
 async def update_user_endpoint(
     user_id: str,
-    user: UserUpdate,
-    current_user: UserModel = Depends(get_current_admin_user),
+    user_data: UserUpdate,
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
-) -> UserModel:
+) -> Dict[str, Any]:
     """
     Update a user.
     
-    This endpoint requires admin privileges.
+    Args:
+        user_id: The user ID
+        user_data: The updated user data
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Updated user details
+        
+    Raises:
+        HTTPException: If the user is not found or current user is not authorized
     """
-    db_user = get_user(db, user_id=user_id)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+    # Check if user is admin or updating their own profile
+    if not current_principal.has_scope("admin:users") and user_id != current_principal.username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this user"
+        )
     
-    updated_user = update_user(db, db_user=db_user, user=user)
+    # Check if user exists
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found"
+        )
+    
+    # Update user
+    updated_user = update_user(db, user_id, user_data.dict(exclude_unset=True))
     return updated_user
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user_endpoint(
     user_id: str,
-    current_user: UserModel = Depends(get_current_admin_user),
+    current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
 ) -> None:
     """
     Delete a user.
     
-    This endpoint requires admin privileges.
+    Args:
+        user_id: The user ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Raises:
+        HTTPException: If the user is not found or current user is not authorized
     """
-    db_user = get_user(db, user_id=user_id)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+    require_scope(current_principal, "admin:users")
     
-    # Prevent deleting yourself
-    if db_user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    # Check if user exists
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found"
+        )
     
-    delete_user(db, user_id=user_id)
-    return None 
+    # Delete user
+    delete_user(db, user_id) 
