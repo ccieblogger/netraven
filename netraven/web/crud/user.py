@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from netraven.web.models.user import User
 from netraven.web.schemas.user import UserCreate, UserUpdate
-from netraven.web.auth import get_password_hash
+from netraven.core.auth import get_password_hash
 import logging
 
 logger = logging.getLogger(__name__)

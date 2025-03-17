@@ -5,7 +5,7 @@ This module provides endpoints for managing network devices,
 including listing, adding, updating, and removing devices.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
@@ -29,6 +29,7 @@ from netraven.web.crud import (
     delete_device,
     update_device_backup_status
 )
+from netraven.core.auth import extract_token_from_header
 
 # Create logger
 from netraven.core.logging import get_logger
@@ -262,7 +263,8 @@ async def delete_device_endpoint(
 async def backup_device(
     device_id: str,
     current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None
 ) -> Dict[str, Any]:
     """
     Trigger a backup for a device.
@@ -271,6 +273,7 @@ async def backup_device(
         device_id: The device ID
         current_principal: The authenticated user
         db: Database session
+        request: The FastAPI request object
         
     Returns:
         Dict[str, Any]: Status of the backup request
@@ -288,7 +291,7 @@ async def backup_device(
             detail=f"Device with ID {device_id} not found"
         )
     
-    # Check if user owns the device
+    # Check if user has access to this device
     if device.owner_id != current_principal.username:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -298,29 +301,25 @@ async def backup_device(
     # Generate a job ID
     job_id = str(uuid.uuid4())
     
-    # Import here to avoid circular imports
-    from netraven.jobs.device_logging import start_job_session, log_backup_failure
-    from netraven.web.schemas.backup import BackupCreate
-    from netraven.web.crud import create_backup
-    
-    # Import the gateway client
+    # Import necessary modules for backup
     from netraven.gateway.client import GatewayClient
+    from netraven.web.schemas.backup import BackupCreate
     
     try:
-        # Start a job session
-        session_id = start_job_session(f"Backup job for device {device.hostname}")
-        
         # Log the backup request
         logger.info(f"Backup requested for device {device.hostname} (ID: {device_id})")
         
-        # Get gateway API key from environment
-        gateway_api_key = os.environ.get("GATEWAY_API_KEY", "netraven-api-key")
+        # Get gateway URL from environment
         gateway_url = os.environ.get("GATEWAY_URL", "http://device_gateway:8001")
         
-        # Create gateway client
+        # Get auth token for gateway request - use the token from the current principal
+        auth_header = request.headers.get("Authorization") if request else None
+        token = extract_token_from_header(auth_header)
+        
+        # Create gateway client with the token
         gateway_client = GatewayClient(
             gateway_url=gateway_url,
-            api_key=gateway_api_key,
+            token=token,
             client_id=f"api-{current_principal.username}"
         )
         
@@ -424,7 +423,8 @@ async def backup_device(
 async def check_device_reachability(
     device_id: str,
     current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None
 ) -> Dict[str, Any]:
     """
     Check if a device is reachable.
@@ -433,6 +433,7 @@ async def check_device_reachability(
         device_id: The device ID
         current_principal: The authenticated user
         db: Database session
+        request: The FastAPI request object
         
     Returns:
         Dict[str, Any]: Reachability status
@@ -464,14 +465,17 @@ async def check_device_reachability(
         # Log the reachability check request
         logger.info(f"Reachability check requested for device {device.hostname} (ID: {device_id})")
         
-        # Get gateway API key from environment
-        gateway_api_key = os.environ.get("GATEWAY_API_KEY", "netraven-api-key")
+        # Get gateway URL from environment
         gateway_url = os.environ.get("GATEWAY_URL", "http://device_gateway:8001")
         
-        # Create gateway client
+        # Get auth token for gateway request - use the token from the current principal
+        auth_header = request.headers.get("Authorization") if request else None
+        token = extract_token_from_header(auth_header)
+        
+        # Create gateway client with the token
         gateway_client = GatewayClient(
             gateway_url=gateway_url,
-            api_key=gateway_api_key,
+            token=token,
             client_id=f"api-{current_principal.username}"
         )
         

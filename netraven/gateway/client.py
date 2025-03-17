@@ -20,6 +20,7 @@ class GatewayClient:
         self, 
         gateway_url: str = "http://localhost:8001",
         api_key: Optional[str] = None,
+        token: Optional[str] = None,
         client_id: str = "gateway-client"
     ):
         """
@@ -27,13 +28,17 @@ class GatewayClient:
         
         Args:
             gateway_url: URL of the gateway API
-            api_key: API key for authentication
+            api_key: (Deprecated) API key for authentication
+            token: JWT token for authentication (preferred)
             client_id: Client identifier for logging
         """
         self.gateway_url = gateway_url
         self.api_key = api_key
-        self.token = None
+        self.token = token
         self.client_id = client_id
+        
+        if api_key and not token:
+            logger.warning("Using deprecated api_key parameter. Please use token instead.")
     
     def _get_headers(self) -> Dict[str, str]:
         """
@@ -44,7 +49,10 @@ class GatewayClient:
         """
         headers = {"Content-Type": "application/json"}
         
-        if self.api_key:
+        # Prefer token over api_key if both are provided
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        elif self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         
         return headers
