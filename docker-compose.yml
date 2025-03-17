@@ -9,6 +9,15 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+    environment:
+      - POSTGRES_USER=netraven
+      - POSTGRES_PASSWORD=netraven
+      - POSTGRES_DB=netraven
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netraven"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Backend API service
   api:
@@ -16,17 +25,30 @@ services:
       context: .
       dockerfile: Dockerfile.api
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
       - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
       - TOKEN_EXPIRY_HOURS=${TOKEN_EXPIRY_HOURS:-24}
-      - SETUP_ADMIN_TOKEN=${SETUP_ADMIN_TOKEN:-false}
+      - SETUP_ADMIN_TOKEN=${SETUP_ADMIN_TOKEN:-true}
+      - TOKEN_FILE=/app/tokens.json
+      - TOKEN_STORE_TYPE=database
+      - TOKEN_STORE_DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
     volumes:
       - ./netraven:/app/netraven
+      - token_data:/app/tokens
     ports:
       - "8000:8000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - netraven-network
 
   # Scheduler service
   scheduler:
@@ -55,7 +77,7 @@ services:
       - NETRAVEN_LOGGING_RETENTION_DAYS=30
       - NETRAVEN_LOGGING_USE_DATABASE=true
       - NETRAVEN_LOGGING_LOG_TO_FILE=false
-      - GATEWAY_API_KEY=netraven-scheduler-key
+      - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
       - GATEWAY_URL=http://device_gateway:8001
     depends_on:
       postgres:
@@ -77,10 +99,23 @@ services:
       - "8001:8001"
     volumes:
       - ./netraven:/app/netraven
+      - token_data:/app/tokens
     environment:
       - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
       - GATEWAY_PORT=8001
+      - TOKEN_STORE_TYPE=database
+      - TOKEN_STORE_DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
+      - TOKEN_FILE=/app/tokens.json
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     cap_drop:
       - ALL
     cap_add:
@@ -122,6 +157,7 @@ volumes:
   frontend_node_modules:
   postgres_data:
   logs_data:
+  token_data:
 
 networks:
   netraven-network:

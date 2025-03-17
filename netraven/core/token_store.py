@@ -1,191 +1,330 @@
 """
-Token storage and management for NetRaven authentication.
+Token Store Module for NetRaven.
 
-This module provides functionality to store, retrieve, and manage token metadata,
-enabling features like token revocation and introspection.
+This module provides a unified interface for storing and retrieving tokens,
+with support for different backend storage options (memory, file, database).
 """
 
-import time
+import os
+import json
+import logging
 import threading
-from typing import Dict, Optional, Any, List
-from datetime import datetime, timedelta
-import uuid
+from typing import Dict, List, Optional, Any, Union
+from datetime import datetime
 
 from netraven.core.logging import get_logger
 
-# Setup logger
 logger = get_logger("netraven.core.token_store")
 
 
 class TokenStore:
     """
-    Store for token metadata and revocation management.
+    Token store for managing authentication tokens.
     
-    This class provides an in-memory storage for token metadata with periodic cleanup
-    of expired tokens. For production deployments, consider using a distributed
-    storage backend like Redis.
+    This class provides a unified interface for storing and retrieving tokens,
+    with support for different backend storage options:
+    - Memory: In-memory storage (default, not persistent)
+    - File: JSON file-based storage
+    - Database: PostgreSQL database storage
+    
+    The store maintains metadata about tokens, including:
+    - Token ID
+    - Subject (user or service name)
+    - Type (user, service)
+    - Scopes (permissions)
+    - Creation time
+    - Last used time
+    - Description
     """
     
-    def __init__(self, cleanup_interval: int = 3600):
-        """
-        Initialize the token store.
+    def __init__(self):
+        """Initialize the token store."""
+        self._store_type = os.environ.get("TOKEN_STORE_TYPE", "memory")
+        self._tokens = {}  # In-memory store
+        self._lock = threading.RLock()  # Thread-safe operations
+        self._initialized = False
         
-        Args:
-            cleanup_interval: Interval in seconds for cleanup of expired tokens
-        """
-        self._tokens = {}  # jti -> metadata
-        self._revoked = {}  # jti -> revocation_time
-        self._lock = threading.RLock()
-        self._cleanup_interval = cleanup_interval
+        # File storage settings
+        self._file_path = os.environ.get("TOKEN_STORE_FILE", "/app/token_store.json")
         
-        # Start cleanup thread
-        self._cleanup_thread = threading.Thread(
-            target=self._cleanup_expired_tokens,
-            daemon=True
-        )
-        self._cleanup_thread.start()
+        # Database storage settings
+        self._db_url = os.environ.get("TOKEN_STORE_DATABASE_URL", "")
+        self._db_table = os.environ.get("TOKEN_STORE_TABLE", "token_store")
+        self._db_conn = None
+        
+        logger.info(f"Initialized token store with backend: {self._store_type}")
     
-    def add_token(self, token_id: str, metadata: Dict[str, Any]) -> None:
-        """
-        Add token metadata to store.
-        
-        Args:
-            token_id: Unique token identifier (jti)
-            metadata: Dictionary of token metadata
-        """
-        with self._lock:
-            self._tokens[token_id] = {
-                **metadata,
-                "created_at": datetime.utcnow().isoformat()
-            }
-        logger.debug(f"Token {token_id} added to store")
-    
-    def get_token_metadata(self, token_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get metadata for a token.
-        
-        Args:
-            token_id: Token identifier (jti)
+    def initialize(self):
+        """Initialize the token store backend."""
+        if self._initialized:
+            return
             
-        Returns:
-            Dict with token metadata or None if not found
-        """
         with self._lock:
-            return self._tokens.get(token_id)
-    
-    def is_revoked(self, token_id: str) -> bool:
-        """
-        Check if a token is revoked.
-        
-        Args:
-            token_id: Token identifier (jti)
+            if self._store_type == "file":
+                self._initialize_file_store()
+            elif self._store_type == "database":
+                self._initialize_database_store()
             
-        Returns:
-            True if token is revoked, False otherwise
-        """
-        with self._lock:
-            return token_id in self._revoked
+            self._initialized = True
     
-    def revoke_token(self, token_id: str) -> bool:
-        """
-        Revoke a token.
-        
-        Args:
-            token_id: Token identifier (jti)
+    def _initialize_file_store(self):
+        """Initialize file-based token store."""
+        try:
+            if os.path.exists(self._file_path):
+                with open(self._file_path, "r") as f:
+                    self._tokens = json.load(f)
+                logger.info(f"Loaded {len(self._tokens)} tokens from file store")
+            else:
+                # Create empty store
+                self._tokens = {}
+                with open(self._file_path, "w") as f:
+                    json.dump(self._tokens, f)
+                logger.info("Created new file store for tokens")
+        except Exception as e:
+            logger.error(f"Error initializing file store: {str(e)}")
+            # Fall back to memory store
+            self._store_type = "memory"
+            self._tokens = {}
+    
+    def _initialize_database_store(self):
+        """Initialize database-based token store."""
+        try:
+            import psycopg2
+            from psycopg2.extras import Json
             
-        Returns:
-            True if token was revoked, False if already revoked or not found
-        """
-        with self._lock:
-            if token_id not in self._tokens:
-                logger.warning(f"Attempt to revoke unknown token {token_id}")
-                return False
+            # Connect to database
+            self._db_conn = psycopg2.connect(self._db_url)
+            
+            # Create table if it doesn't exist
+            with self._db_conn.cursor() as cur:
+                cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS {self._db_table} (
+                    token_id VARCHAR(255) PRIMARY KEY,
+                    metadata JSONB NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    last_used TIMESTAMP
+                )
+                """)
+                self._db_conn.commit()
+            
+            logger.info("Initialized database store for tokens")
+            
+            # Load tokens into memory cache
+            self._load_tokens_from_db()
+            
+        except Exception as e:
+            logger.error(f"Error initializing database store: {str(e)}")
+            # Fall back to memory store
+            self._store_type = "memory"
+            self._tokens = {}
+    
+    def _load_tokens_from_db(self):
+        """Load tokens from database into memory cache."""
+        if not self._db_conn:
+            return
+            
+        try:
+            with self._db_conn.cursor() as cur:
+                cur.execute(f"SELECT token_id, metadata FROM {self._db_table}")
+                rows = cur.fetchall()
                 
-            if token_id in self._revoked:
-                logger.warning(f"Token {token_id} already revoked")
-                return False
+                self._tokens = {row[0]: row[1] for row in rows}
+                logger.info(f"Loaded {len(self._tokens)} tokens from database")
                 
-            self._revoked[token_id] = datetime.utcnow().isoformat()
-            logger.info(f"Token {token_id} revoked")
+        except Exception as e:
+            logger.error(f"Error loading tokens from database: {str(e)}")
+    
+    def add_token(self, token_id: str, metadata: Dict[str, Any]) -> bool:
+        """
+        Add a token to the store.
+        
+        Args:
+            token_id: Unique identifier for the token
+            metadata: Dictionary containing token metadata
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        self.initialize()
+        
+        with self._lock:
+            # Add creation timestamp if not present
+            if "created_at" not in metadata:
+                metadata["created_at"] = datetime.utcnow().isoformat()
+            
+            # Store in memory
+            self._tokens[token_id] = metadata
+            
+            # Persist to backend
+            if self._store_type == "file":
+                return self._save_to_file()
+            elif self._store_type == "database":
+                return self._save_to_database(token_id, metadata)
+            
             return True
     
-    def revoke_all_for_subject(self, subject: str) -> int:
+    def get_token(self, token_id: str) -> Optional[Dict[str, Any]]:
         """
-        Revoke all tokens for a specific subject.
+        Get token metadata by ID.
         
         Args:
-            subject: Subject identifier (username or service name)
+            token_id: Unique identifier for the token
             
         Returns:
-            Number of tokens revoked
+            Optional[Dict]: Token metadata or None if not found
         """
-        revoked_count = 0
-        with self._lock:
-            for token_id, metadata in self._tokens.items():
-                if metadata.get("sub") == subject and token_id not in self._revoked:
-                    self._revoked[token_id] = datetime.utcnow().isoformat()
-                    revoked_count += 1
-        
-        if revoked_count > 0:
-            logger.info(f"Revoked {revoked_count} tokens for subject {subject}")
-        return revoked_count
-    
-    def get_active_tokens(self, subject: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Get all active (non-revoked) tokens.
-        
-        Args:
-            subject: Optional subject filter
-            
-        Returns:
-            List of token metadata dictionaries
-        """
-        active_tokens = []
-        with self._lock:
-            for token_id, metadata in self._tokens.items():
-                if token_id not in self._revoked:
-                    if subject is None or metadata.get("sub") == subject:
-                        active_tokens.append({
-                            "token_id": token_id,
-                            **metadata
-                        })
-        return active_tokens
-    
-    def _cleanup_expired_tokens(self) -> None:
-        """
-        Periodically clean up expired tokens.
-        This runs in a background thread.
-        """
-        while True:
-            time.sleep(self._cleanup_interval)
-            try:
-                self._perform_cleanup()
-            except Exception as e:
-                logger.error(f"Error during token cleanup: {str(e)}")
-    
-    def _perform_cleanup(self) -> None:
-        """Perform the actual cleanup of expired tokens."""
-        current_time = datetime.utcnow()
-        removed_count = 0
+        self.initialize()
         
         with self._lock:
-            token_ids = list(self._tokens.keys())
-            for token_id in token_ids:
-                metadata = self._tokens[token_id]
+            # Update last used time
+            if token_id in self._tokens:
+                self._tokens[token_id]["last_used"] = datetime.utcnow().isoformat()
                 
-                # Check if token has explicit expiration time
-                exp_time = metadata.get("exp")
-                if exp_time and current_time.timestamp() > exp_time:
-                    del self._tokens[token_id]
-                    if token_id in self._revoked:
-                        del self._revoked[token_id]
-                    removed_count += 1
+                # Update backend
+                if self._store_type == "database":
+                    self._update_last_used(token_id)
+                elif self._store_type == "file":
+                    self._save_to_file()
+                
+                return self._tokens[token_id]
+            
+            return None
+    
+    def remove_token(self, token_id: str) -> bool:
+        """
+        Remove a token from the store.
         
-        if removed_count > 0:
-            logger.info(f"Cleaned up {removed_count} expired tokens")
+        Args:
+            token_id: Unique identifier for the token
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        self.initialize()
+        
+        with self._lock:
+            if token_id in self._tokens:
+                del self._tokens[token_id]
+                
+                # Update backend
+                if self._store_type == "file":
+                    return self._save_to_file()
+                elif self._store_type == "database":
+                    return self._delete_from_database(token_id)
+                
+                return True
+            
+            return False
+    
+    def list_tokens(self, filter_criteria: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """
+        List tokens, optionally filtered by criteria.
+        
+        Args:
+            filter_criteria: Dictionary of criteria to filter tokens
+            
+        Returns:
+            List[Dict]: List of token metadata matching criteria
+        """
+        self.initialize()
+        
+        with self._lock:
+            if not filter_criteria:
+                return [
+                    {"token_id": token_id, **metadata}
+                    for token_id, metadata in self._tokens.items()
+                ]
+            
+            # Filter tokens based on criteria
+            result = []
+            for token_id, metadata in self._tokens.items():
+                match = True
+                for key, value in filter_criteria.items():
+                    if key not in metadata or metadata[key] != value:
+                        match = False
+                        break
+                
+                if match:
+                    result.append({"token_id": token_id, **metadata})
+            
+            return result
+    
+    def _save_to_file(self) -> bool:
+        """Save tokens to file store."""
+        try:
+            with open(self._file_path, "w") as f:
+                json.dump(self._tokens, f, indent=2)
+            return True
+        except Exception as e:
+            logger.error(f"Error saving tokens to file: {str(e)}")
+            return False
+    
+    def _save_to_database(self, token_id: str, metadata: Dict[str, Any]) -> bool:
+        """Save token to database store."""
+        if not self._db_conn:
+            return False
+            
+        try:
+            import psycopg2
+            from psycopg2.extras import Json
+            
+            with self._db_conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    INSERT INTO {self._db_table} (token_id, metadata)
+                    VALUES (%s, %s)
+                    ON CONFLICT (token_id) 
+                    DO UPDATE SET metadata = %s
+                    """,
+                    (token_id, Json(metadata), Json(metadata))
+                )
+                self._db_conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error saving token to database: {str(e)}")
+            return False
+    
+    def _update_last_used(self, token_id: str) -> bool:
+        """Update last used timestamp in database."""
+        if not self._db_conn:
+            return False
+            
+        try:
+            with self._db_conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    UPDATE {self._db_table}
+                    SET last_used = CURRENT_TIMESTAMP,
+                        metadata = %s
+                    WHERE token_id = %s
+                    """,
+                    (Json(self._tokens[token_id]), token_id)
+                )
+                self._db_conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating last used timestamp: {str(e)}")
+            return False
+    
+    def _delete_from_database(self, token_id: str) -> bool:
+        """Delete token from database."""
+        if not self._db_conn:
+            return False
+            
+        try:
+            with self._db_conn.cursor() as cur:
+                cur.execute(
+                    f"DELETE FROM {self._db_table} WHERE token_id = %s",
+                    (token_id,)
+                )
+                self._db_conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting token from database: {str(e)}")
+            return False
 
 
-# Create a global token store instance
+# Singleton instance
 token_store = TokenStore()
 
 # Export public objects

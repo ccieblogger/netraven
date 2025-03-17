@@ -1,188 +1,237 @@
 """
-Tests for token storage and management.
-
-This module contains tests for the token store functionality.
+Tests for the token store module.
 """
 
-import time
-import pytest
+import os
+import json
+import tempfile
+import unittest
 from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta
 
 from netraven.core.token_store import TokenStore
 
-def test_token_store_initialization():
-    """Test that the token store initializes correctly."""
-    # Create a token store with a shorter cleanup interval for testing
-    with patch("netraven.core.token_store.threading.Thread") as mock_thread:
-        store = TokenStore(cleanup_interval=10)
+
+class TestTokenStore(unittest.TestCase):
+    """Test cases for the TokenStore class."""
+    
+    def setUp(self):
+        """Set up test environment."""
+        # Clear environment variables
+        self.env_patcher = patch.dict('os.environ', {
+            'TOKEN_STORE_TYPE': 'memory',
+            'TOKEN_STORE_FILE': '',
+            'TOKEN_STORE_DATABASE_URL': '',
+        })
+        self.env_patcher.start()
         
-        # Verify store is initialized correctly
-        assert isinstance(store._tokens, dict)
-        assert isinstance(store._revoked, dict)
-        assert store._cleanup_interval == 10
+        # Create a new token store for each test
+        self.token_store = TokenStore()
+    
+    def tearDown(self):
+        """Clean up after tests."""
+        self.env_patcher.stop()
+    
+    def test_memory_store(self):
+        """Test in-memory token store."""
+        # Add a token
+        token_id = "test-token-1"
+        metadata = {
+            "sub": "test-user",
+            "type": "user",
+            "scope": ["read:*"]
+        }
         
-        # Verify cleanup thread was started
-        mock_thread.assert_called_once()
-        mock_thread.return_value.start.assert_called_once()
+        result = self.token_store.add_token(token_id, metadata)
+        self.assertTrue(result)
+        
+        # Get the token
+        token_data = self.token_store.get_token(token_id)
+        self.assertIsNotNone(token_data)
+        self.assertEqual(token_data["sub"], "test-user")
+        self.assertEqual(token_data["type"], "user")
+        self.assertEqual(token_data["scope"], ["read:*"])
+        self.assertIn("created_at", token_data)
+        self.assertIn("last_used", token_data)
+        
+        # List tokens
+        tokens = self.token_store.list_tokens()
+        self.assertEqual(len(tokens), 1)
+        self.assertEqual(tokens[0]["token_id"], token_id)
+        
+        # Filter tokens
+        filtered = self.token_store.list_tokens({"type": "user"})
+        self.assertEqual(len(filtered), 1)
+        
+        filtered = self.token_store.list_tokens({"type": "service"})
+        self.assertEqual(len(filtered), 0)
+        
+        # Remove token
+        result = self.token_store.remove_token(token_id)
+        self.assertTrue(result)
+        
+        # Verify token is gone
+        token_data = self.token_store.get_token(token_id)
+        self.assertIsNone(token_data)
+        
+        tokens = self.token_store.list_tokens()
+        self.assertEqual(len(tokens), 0)
+    
+    def test_file_store(self):
+        """Test file-based token store."""
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False) as temp:
+            temp_path = temp.name
+        
+        try:
+            # Set up file store
+            with patch.dict('os.environ', {
+                'TOKEN_STORE_TYPE': 'file',
+                'TOKEN_STORE_FILE': temp_path
+            }):
+                file_store = TokenStore()
+                
+                # Add a token
+                token_id = "test-token-2"
+                metadata = {
+                    "sub": "test-service",
+                    "type": "service",
+                    "scope": ["admin:*"]
+                }
+                
+                result = file_store.add_token(token_id, metadata)
+                self.assertTrue(result)
+                
+                # Verify file was created with correct content
+                with open(temp_path, 'r') as f:
+                    data = json.load(f)
+                    self.assertIn(token_id, data)
+                    self.assertEqual(data[token_id]["sub"], "test-service")
+                
+                # Create a new store instance to test loading from file
+                file_store2 = TokenStore()
+                file_store2.initialize()
+                
+                # Get the token
+                token_data = file_store2.get_token(token_id)
+                self.assertIsNotNone(token_data)
+                self.assertEqual(token_data["sub"], "test-service")
+                
+                # Remove token
+                result = file_store2.remove_token(token_id)
+                self.assertTrue(result)
+                
+                # Verify file was updated
+                with open(temp_path, 'r') as f:
+                    data = json.load(f)
+                    self.assertNotIn(token_id, data)
+        
+        finally:
+            # Clean up
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+    
+    @patch('psycopg2.connect')
+    def test_database_store(self, mock_connect):
+        """Test database-based token store."""
+        # Mock database connection and cursor
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_connect.return_value = mock_conn
+        
+        # Set up database store
+        with patch.dict('os.environ', {
+            'TOKEN_STORE_TYPE': 'database',
+            'TOKEN_STORE_DATABASE_URL': 'postgresql://user:pass@localhost/db'
+        }):
+            db_store = TokenStore()
+            
+            # Add a token
+            token_id = "test-token-3"
+            metadata = {
+                "sub": "test-api",
+                "type": "service",
+                "scope": ["read:*", "write:*"]
+            }
+            
+            # Mock cursor.fetchall for _load_tokens_from_db
+            mock_cursor.fetchall.return_value = []
+            
+            result = db_store.add_token(token_id, metadata)
+            self.assertTrue(result)
+            
+            # Verify database operations
+            mock_cursor.execute.assert_called()
+            mock_conn.commit.assert_called()
+            
+            # Get the token (should be in memory cache)
+            token_data = db_store.get_token(token_id)
+            self.assertIsNotNone(token_data)
+            self.assertEqual(token_data["sub"], "test-api")
+            
+            # Remove token
+            result = db_store.remove_token(token_id)
+            self.assertTrue(result)
+            
+            # Verify database operations for removal
+            mock_cursor.execute.assert_called()
+            mock_conn.commit.assert_called()
+    
+    def test_list_tokens_with_filter(self):
+        """Test listing tokens with filters."""
+        # Add multiple tokens
+        self.token_store.add_token("token1", {
+            "sub": "user1",
+            "type": "user",
+            "scope": ["read:*"]
+        })
+        
+        self.token_store.add_token("token2", {
+            "sub": "user2",
+            "type": "user",
+            "scope": ["read:*", "write:*"]
+        })
+        
+        self.token_store.add_token("token3", {
+            "sub": "service1",
+            "type": "service",
+            "scope": ["admin:*"]
+        })
+        
+        # List all tokens
+        all_tokens = self.token_store.list_tokens()
+        self.assertEqual(len(all_tokens), 3)
+        
+        # Filter by type
+        user_tokens = self.token_store.list_tokens({"type": "user"})
+        self.assertEqual(len(user_tokens), 2)
+        
+        service_tokens = self.token_store.list_tokens({"type": "service"})
+        self.assertEqual(len(service_tokens), 1)
+        
+        # Filter by subject
+        user1_tokens = self.token_store.list_tokens({"sub": "user1"})
+        self.assertEqual(len(user1_tokens), 1)
+        self.assertEqual(user1_tokens[0]["token_id"], "token1")
+        
+        # Filter by multiple criteria
+        filtered = self.token_store.list_tokens({
+            "type": "user",
+            "sub": "user2"
+        })
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0]["token_id"], "token2")
+    
+    def test_nonexistent_token(self):
+        """Test operations on non-existent tokens."""
+        # Get non-existent token
+        token_data = self.token_store.get_token("nonexistent")
+        self.assertIsNone(token_data)
+        
+        # Remove non-existent token
+        result = self.token_store.remove_token("nonexistent")
+        self.assertFalse(result)
 
 
-def test_add_token():
-    """Test adding a token to the store."""
-    store = TokenStore()
-    token_id = "test-token-id"
-    metadata = {"sub": "test-user", "type": "user"}
-    
-    # Add token to store
-    store.add_token(token_id, metadata)
-    
-    # Verify token was added
-    assert token_id in store._tokens
-    stored_metadata = store._tokens[token_id]
-    assert stored_metadata["sub"] == "test-user"
-    assert stored_metadata["type"] == "user"
-    assert "created_at" in stored_metadata
-
-
-def test_get_token_metadata():
-    """Test retrieving token metadata."""
-    store = TokenStore()
-    token_id = "test-token-id"
-    metadata = {"sub": "test-user", "type": "user"}
-    
-    # Add token to store
-    store.add_token(token_id, metadata)
-    
-    # Retrieve and verify metadata
-    retrieved_metadata = store.get_token_metadata(token_id)
-    assert retrieved_metadata["sub"] == "test-user"
-    assert retrieved_metadata["type"] == "user"
-    
-    # Test retrieving non-existent token
-    assert store.get_token_metadata("non-existent") is None
-
-
-def test_is_revoked():
-    """Test checking if a token is revoked."""
-    store = TokenStore()
-    token_id = "test-token-id"
-    metadata = {"sub": "test-user", "type": "user"}
-    
-    # Add token to store
-    store.add_token(token_id, metadata)
-    
-    # Token should not be revoked initially
-    assert not store.is_revoked(token_id)
-    
-    # Revoke token
-    store._revoked[token_id] = datetime.utcnow().isoformat()
-    
-    # Token should now be revoked
-    assert store.is_revoked(token_id)
-    
-    # Non-existent token should not be considered revoked
-    assert not store.is_revoked("non-existent")
-
-
-def test_revoke_token():
-    """Test revoking a token."""
-    store = TokenStore()
-    token_id = "test-token-id"
-    metadata = {"sub": "test-user", "type": "user"}
-    
-    # Add token to store
-    store.add_token(token_id, metadata)
-    
-    # Revoke token
-    result = store.revoke_token(token_id)
-    
-    # Revocation should succeed
-    assert result is True
-    assert token_id in store._revoked
-    
-    # Attempting to revoke again should fail
-    result = store.revoke_token(token_id)
-    assert result is False
-    
-    # Attempting to revoke non-existent token should fail
-    result = store.revoke_token("non-existent")
-    assert result is False
-
-
-def test_revoke_all_for_subject():
-    """Test revoking all tokens for a subject."""
-    store = TokenStore()
-    
-    # Add multiple tokens for same subject
-    store.add_token("token1", {"sub": "test-user", "type": "user"})
-    store.add_token("token2", {"sub": "test-user", "type": "user"})
-    store.add_token("token3", {"sub": "another-user", "type": "user"})
-    
-    # Revoke all tokens for test-user
-    count = store.revoke_all_for_subject("test-user")
-    
-    # Should have revoked 2 tokens
-    assert count == 2
-    assert store.is_revoked("token1")
-    assert store.is_revoked("token2")
-    assert not store.is_revoked("token3")
-    
-    # Revoking again should return 0
-    count = store.revoke_all_for_subject("test-user")
-    assert count == 0
-
-
-def test_get_active_tokens():
-    """Test retrieving active tokens."""
-    store = TokenStore()
-    
-    # Add multiple tokens
-    store.add_token("token1", {"sub": "user1", "type": "user"})
-    store.add_token("token2", {"sub": "user2", "type": "user"})
-    store.add_token("token3", {"sub": "user1", "type": "user"})
-    
-    # Revoke one token
-    store.revoke_token("token1")
-    
-    # Get all active tokens
-    active_tokens = store.get_active_tokens()
-    assert len(active_tokens) == 2
-    token_ids = [t["token_id"] for t in active_tokens]
-    assert "token2" in token_ids
-    assert "token3" in token_ids
-    assert "token1" not in token_ids
-    
-    # Get active tokens for specific subject
-    active_tokens = store.get_active_tokens(subject="user1")
-    assert len(active_tokens) == 1
-    assert active_tokens[0]["token_id"] == "token3"
-
-
-def test_cleanup_expired_tokens():
-    """Test cleanup of expired tokens."""
-    store = TokenStore()
-    
-    # Add tokens with different expiration times
-    store.add_token("expired", {
-        "sub": "user1",
-        "exp": (datetime.utcnow() - timedelta(hours=1)).timestamp()
-    })
-    store.add_token("not-expired", {
-        "sub": "user1",
-        "exp": (datetime.utcnow() + timedelta(hours=1)).timestamp()
-    })
-    store.add_token("no-expiration", {"sub": "user1"})
-    
-    # Revoke one of the tokens to test revocation cleanup
-    store.revoke_token("expired")
-    
-    # Run cleanup
-    store._perform_cleanup()
-    
-    # Expired token should be removed
-    assert "expired" not in store._tokens
-    assert "expired" not in store._revoked
-    
-    # Non-expired and no-expiration tokens should remain
-    assert "not-expired" in store._tokens
-    assert "no-expiration" in store._tokens 
+if __name__ == '__main__':
+    unittest.main() 
