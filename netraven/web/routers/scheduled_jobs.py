@@ -32,7 +32,7 @@ from netraven.core.logging import get_logger
 from netraven.jobs.scheduler import get_scheduler
 
 # Create router
-router = APIRouter(prefix="/api/scheduled-jobs", tags=["scheduled-jobs"])
+router = APIRouter(prefix="", tags=["scheduled-jobs"])
 
 # Initialize logger
 logger = get_logger("netraven.web.routers.scheduled_jobs")

@@ -32,7 +32,7 @@ from netraven.web.models.auth import (
 logger = get_logger("netraven.web.routers.auth")
 
 # Create router
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(prefix="", tags=["authentication"])
 
 # Security scheme for OpenAPI
 security = HTTPBearer()

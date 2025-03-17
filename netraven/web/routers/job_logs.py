@@ -33,7 +33,7 @@ import os
 from netraven.web.schemas.job_log import JobLog, JobLogEntry, JobLogFilter
 
 # Create router
-router = APIRouter(prefix="/api/job-logs", tags=["job-logs"])
+router = APIRouter(prefix="", tags=["job-logs"])
 
 # Initialize logger
 logger = get_logger("netraven.web.routers.job_logs")

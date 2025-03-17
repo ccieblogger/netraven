@@ -20,7 +20,7 @@ from netraven.core.logging import get_logger
 logger = get_logger("netraven.web.routers.users")
 
 # Create router
-router = APIRouter(prefix="/api/users")
+router = APIRouter(prefix="")
 
 @router.get("/me", response_model=User)
 async def get_current_user_endpoint(

@@ -19,7 +19,7 @@ from netraven.web.auth import get_current_principal, require_scope, Principal, o
 logger = get_logger("netraven.web.routers.gateway")
 
 # Create router
-router = APIRouter(prefix="/gateway", tags=["gateway"])
+router = APIRouter(prefix="", tags=["gateway"])
 
 
 class GatewayMetrics(BaseModel):
