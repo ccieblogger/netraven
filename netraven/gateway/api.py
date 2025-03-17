@@ -31,25 +31,37 @@ gateway_metrics = {
 start_time = datetime.now()
 
 
+@app.route("/health", methods=["GET"])
+def health_check() -> Response:
+    """
+    Health check endpoint.
+    
+    This endpoint does not require authentication.
+    
+    Returns:
+        Response: JSON response with health status
+    """
+    # Update metrics
+    gateway_metrics["request_count"] += 1
+    
+    # Return health status
+    return jsonify({
+        "status": "healthy",
+        "version": "1.0.0",
+        "timestamp": datetime.now().isoformat()
+    })
+
+
 @app.route("/status", methods=["GET"])
 def get_status() -> Response:
     """
     Get the status of the gateway service.
     
-    This endpoint requires authentication with the 'read:gateway' scope.
+    This endpoint does not require authentication.
     
     Returns:
         Response: JSON response with gateway status
     """
-    # Authenticate request
-    token_data = authenticate_request(request.headers)
-    if not token_data:
-        logger.warning("Unauthorized access attempt to status endpoint")
-        return jsonify({
-            "status": "error",
-            "message": "Unauthorized"
-        }), 401
-    
     # Update metrics
     gateway_metrics["request_count"] += 1
     

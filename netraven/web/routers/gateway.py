@@ -44,7 +44,7 @@ async def get_gateway_status(
     Requires authentication with the 'read:gateway' scope.
     """
     try:
-        gateway_url = "http://localhost:8001/status"
+        gateway_url = "http://device_gateway:8001/status"
         
         # Use the same token for calling the gateway if available
         # Otherwise, use the API token for internal communication
@@ -91,7 +91,7 @@ async def get_devices(
     Requires authentication with the 'read:devices' scope.
     """
     try:
-        gateway_url = "http://localhost:8001/devices"
+        gateway_url = "http://device_gateway:8001/devices"
         
         # Use the same token for calling the gateway
         headers = get_authorization_header(get_current_token(request))
@@ -129,7 +129,7 @@ async def get_gateway_metrics(
     Requires authentication with the 'read:metrics' scope.
     """
     try:
-        gateway_url = "http://localhost:8001/metrics"
+        gateway_url = "http://device_gateway:8001/metrics"
         
         # Use the same token for calling the gateway
         headers = get_authorization_header(get_current_token(request))
