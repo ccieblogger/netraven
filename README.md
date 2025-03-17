@@ -1,6 +1,67 @@
-# NetRaven
+# NetRaven Network Management Platform
 
-A Python-based tool for automated backup of Cisco network device configurations to multiple storage destinations.
+NetRaven is a modern network management platform that provides device management, configuration backup, and monitoring capabilities.
+
+## Recent Updates and Fixes
+
+### Authentication and CORS Fixes
+
+- **JWT Import Fix**: Added missing `jwt` import in `netraven/web/auth/__init__.py` to address token generation issues.
+- **JWT Decode Parameter Fix**: Updated all `jwt.decode()` calls to include the required `key` parameter, as it was a required argument in the `python-jose` library.
+- **CORS Configuration**: Enhanced CORS settings in `netraven/web/__init__.py` to explicitly allow frontend origins including localhost and development environments.
+- **Pydantic Compatibility**: Modified the `User` model in `netraven/web/models/auth.py` to use a regular string for the email field instead of `EmailStr` to ensure compatibility with Pydantic 2.4.2.
+- **Frontend Request Format**: Updated the login function in the frontend to send credentials in JSON format rather than form-urlencoded to align with the API's expectations.
+
+### Gateway Connectivity Fixes
+
+- **Container Communication**: Fixed the Gateway API URLs in `netraven/web/routers/gateway.py` to use the service name `device_gateway` instead of `localhost` for proper Docker container communication.
+- **Authentication for Status Endpoints**: Modified Gateway API endpoints (`status`, `metrics`, `config`) to use optional authentication, allowing the frontend to access them without requiring explicit authentication.
+- **Gateway API Endpoints**: Added a new `/config` endpoint to the Gateway API to provide configuration information to the frontend.
+
+### Frontend Component Fixes
+
+- **MainLayout Structure**: Fixed the structure of the `MainLayout.vue` component by adding proper Vue template and script tags, resolving component rendering issues.
+- **Authentication Error Handling**: Improved error handling in the frontend API client to provide better feedback for authentication failures.
+
+## Architecture Overview
+
+NetRaven consists of several microservices that work together:
+
+1. **API Service**: The main backend API built with FastAPI, providing authentication and core functionality.
+2. **Device Gateway**: A service that manages device connections and executes commands on network devices.
+3. **Frontend**: A Vue.js web interface for user interaction.
+4. **PostgreSQL Database**: Stores device information, configurations, and user data.
+5. **Scheduler**: Handles periodic tasks such as device discovery and configuration backups.
+
+## Authentication System
+
+The platform uses a unified JWT-based authentication system:
+
+- JWT tokens are generated upon successful login with username/password
+- Tokens include user permissions as scopes
+- Tokens are validated across microservices using a shared secret
+- Gateway and API services communicate using pass-through authentication
+
+## Development Environment
+
+The project uses Docker Compose for local development. To start the development environment:
+
+```bash
+docker-compose up -d
+```
+
+The following services will be available:
+
+- Frontend: http://localhost:8080
+- API: http://localhost:8000
+- Gateway: http://localhost:8001
+
+## Default Credentials
+
+For development and testing:
+
+- Username: admin
+- Password: NetRaven
 
 ## Description
 
