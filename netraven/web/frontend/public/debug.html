@@ -453,9 +453,9 @@
       fetch(loginUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json'
         },
-        body: new URLSearchParams({
+        body: JSON.stringify({
           username: testCredentials.username,
           password: testCredentials.password
         })

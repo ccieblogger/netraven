@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt
 
 from netraven.core.auth import (
     validate_token,
@@ -287,8 +288,8 @@ def authenticate_user(username: str, password: str) -> Optional[User]:
         Optional[User]: The authenticated user or None
     """
     # In a real implementation, this would verify credentials
-    # For testing purposes, we'll accept 'admin'/'password'
-    if username == "admin" and password == "password":
+    # For testing purposes, we'll accept 'admin'/'NetRaven'
+    if username == "admin" and password == "NetRaven":
         return User(
             username="admin",
             email="admin@example.com",
@@ -316,7 +317,7 @@ def create_user_token(user: User) -> str:
     )
     
     # Store token metadata
-    token_data = jwt.decode(token, options={"verify_signature": False})
+    token_data = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
     token_store.add_token(token_data["jti"], {
         "sub": user.username,
         "type": "user",
@@ -352,7 +353,7 @@ def create_service_token(
     )
     
     # Store token metadata
-    token_data = jwt.decode(token, options={"verify_signature": False})
+    token_data = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
     token_store.add_token(token_data["jti"], {
         "sub": service_name,
         "type": "service",

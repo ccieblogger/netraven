@@ -65,14 +65,13 @@ const apiClient = {
   // Authentication methods
   async login(username, password) {
     try {
-      // Create form data
-      const formData = new URLSearchParams();
-      formData.append('username', username);
-      formData.append('password', password);
-
-      const response = await axios.post(`${browserApiUrl}/api/auth/token`, formData, {
+      // Send JSON data instead of form data for Pydantic 2.x compatibility
+      const response = await axios.post(`${browserApiUrl}/api/auth/token`, {
+        username: username,
+        password: password
+      }, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
         withCredentials: false

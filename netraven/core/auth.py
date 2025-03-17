@@ -264,7 +264,7 @@ def revoke_token(token: str) -> bool:
     """
     try:
         # Decode token without verification to get the token ID
-        payload = jwt.decode(token, options={"verify_signature": False})
+        payload = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
         token_id = payload.get("jti")
         
         if not token_id:

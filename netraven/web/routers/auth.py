@@ -59,7 +59,7 @@ async def login_for_access_token(form_data: TokenRequest):
     token = create_user_token(user)
     
     # Decode token to get expiration
-    token_data = jwt.decode(token, options={"verify_signature": False})
+    token_data = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
     expires_at = None
     if "exp" in token_data:
         expires_at = datetime.fromtimestamp(token_data["exp"])
@@ -97,7 +97,7 @@ async def create_service_access_token(
     )
     
     # Decode token to get expiration
-    token_data = jwt.decode(token, options={"verify_signature": False})
+    token_data = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
     expires_at = None
     if "exp" in token_data:
         expires_at = datetime.fromtimestamp(token_data["exp"])

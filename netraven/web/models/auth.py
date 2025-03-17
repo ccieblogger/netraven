@@ -14,7 +14,7 @@ class User(BaseModel):
     """User model for authentication."""
     
     username: str = Field(..., description="Username for login")
-    email: EmailStr = Field(..., description="User email address")
+    email: str = Field(..., description="User email address")
     permissions: List[str] = Field(default_factory=list, description="Permission scopes")
     is_active: bool = Field(default=True, description="Whether the user is active")
     
