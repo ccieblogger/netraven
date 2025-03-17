@@ -238,18 +238,40 @@ def require_scope(required_scopes: List[str]):
     return dependency
 
 
-def optional_auth() -> Callable:
+def optional_auth(required_scopes: Optional[List[str]] = None) -> Callable:
     """
     Create a dependency that optionally authenticates.
     
+    Args:
+        required_scopes: Optional list of required scopes if authentication is provided
+        
     Returns:
         Callable: FastAPI dependency that optionally authenticates
     """
-    async def dependency(request: Request):
-        try:
-            return await get_current_principal(request)
-        except HTTPException:
+    async def dependency(request: Request, credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)) -> Optional[Principal]:
+        # If no credentials provided, return None
+        if not credentials and not get_token_from_request(request):
             return None
+            
+        try:
+            # Try to authenticate
+            principal = await get_current_principal(request, credentials)
+            
+            # If authentication successful and scopes required, check them
+            if required_scopes and principal:
+                for scope in required_scopes:
+                    if not principal.has_scope(scope):
+                        logger.warning(f"Insufficient permissions for {principal.subject}: missing {scope}")
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Insufficient permissions",
+                        )
+            
+            return principal
+        except HTTPException:
+            # If authentication fails, return None instead of raising an exception
+            return None
+    
     return dependency
 
 
