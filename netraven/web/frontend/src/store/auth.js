@@ -5,6 +5,7 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
     token: localStorage.getItem('access_token') || null,
+    tokenScopes: [],
     loading: false,
     error: null
   }),
@@ -12,7 +13,52 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.token,
     hasUserData: (state) => !!state.user,
-    username: (state) => state.user?.username || 'User'
+    username: (state) => state.user?.username || 'User',
+    isTokenValid: (state) => {
+      if (!state.token) return false
+      
+      try {
+        if (typeof state.token !== 'string' || state.token.split('.').length !== 3) {
+          console.warn('Token has invalid format')
+          return false
+        }
+        
+        const payload = JSON.parse(atob(state.token.split('.')[1]))
+        
+        if (!payload.exp) {
+          console.warn('Token has no expiration')
+          return true
+        }
+        
+        const now = Math.floor(Date.now() / 1000)
+        return now < payload.exp
+      } catch (e) {
+        console.error('Error validating token:', e)
+        return false
+      }
+    },
+    
+    hasPermission: (state) => (permission) => {
+      if (!state.token) return false
+      
+      try {
+        const payload = JSON.parse(atob(state.token.split('.')[1]))
+        
+        if (!payload.scope) {
+          console.warn('Token has no scope property')
+          return false
+        }
+        
+        return payload.scope.includes(permission) || payload.scope.includes('admin:*')
+      } catch (e) {
+        console.error('Error checking token permission:', e)
+        return false
+      }
+    },
+    
+    canManageDevices: (state) => {
+      return state.hasPermission('write:devices')
+    }
   },
   
   actions: {
@@ -26,13 +72,19 @@ export const useAuthStore = defineStore('auth', {
         if (result.success) {
           this.token = result.data.access_token
           
-          // After successful login, fetch the user data
+          try {
+            const payload = JSON.parse(atob(this.token.split('.')[1]))
+            this.tokenScopes = payload.scope || []
+            console.log('Extracted token scopes:', this.tokenScopes)
+          } catch (e) {
+            console.error('Error extracting token scopes:', e)
+            this.tokenScopes = []
+          }
+          
           try {
             await this.fetchCurrentUser()
           } catch (userError) {
             console.error('Failed to fetch user after login:', userError)
-            // Continue with login even if user fetch fails
-            // The user can retry fetching later
           }
           
           return true
@@ -49,14 +101,58 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     
+    validateToken() {
+      if (!this.token) return false
+      
+      const isValid = this.isTokenValid
+      
+      if (!isValid) {
+        console.warn('Token validation failed, clearing token')
+        this.clearAuth()
+        return false
+      }
+      
+      try {
+        const payload = JSON.parse(atob(this.token.split('.')[1]))
+        this.tokenScopes = payload.scope || []
+      } catch (e) {
+        console.error('Error extracting token scopes during validation:', e)
+        this.tokenScopes = []
+      }
+      
+      return true
+    },
+    
+    checkPermission(permission) {
+      if (!this.validateToken()) return false
+      
+      return this.hasPermission(permission)
+    },
+    
+    verifyDeviceManagementPermission() {
+      const hasPermission = this.checkPermission('write:devices')
+      
+      if (!hasPermission) {
+        console.error('User lacks device management permissions')
+        this.error = 'You do not have permission to manage devices'
+      }
+      
+      return hasPermission
+    },
+    
+    clearAuth() {
+      this.user = null
+      this.token = null
+      this.tokenScopes = []
+      localStorage.removeItem('access_token')
+    },
+    
     async fetchCurrentUser() {
       this.loading = true
       this.error = null
       
       try {
-        // Only attempt to fetch if we have a token
-        if (!this.token) {
-          console.warn('Cannot fetch user: No token available')
+        if (!this.validateToken()) {
           this.error = 'Authentication required'
           throw new Error('Authentication required')
         }
@@ -67,16 +163,11 @@ export const useAuthStore = defineStore('auth', {
       } catch (error) {
         console.error('Failed to fetch current user:', error)
         
-        // Handle token invalidation
         if (error.isAuthError || error.response?.status === 401) {
           console.log('Token invalid, clearing user data and token')
-          this.user = null
-          this.token = null
-          localStorage.removeItem('access_token')
+          this.clearAuth()
           this.error = 'Session expired. Please log in again.'
         } else if (error.response?.status === 404) {
-          // If the endpoint doesn't exist, don't treat it as an error
-          // Just set a minimal user object
           console.log('User endpoint not found (404), using minimal user data')
           this.user = { username: 'User' }
           this.error = null
@@ -93,8 +184,7 @@ export const useAuthStore = defineStore('auth', {
     
     logout() {
       apiClient.logout()
-      this.user = null
-      this.token = null
+      this.clearAuth()
       this.error = null
     },
     

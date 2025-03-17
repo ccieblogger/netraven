@@ -383,9 +383,11 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import MainLayout from '../components/MainLayout.vue'
 import { useDeviceStore } from '../store/devices'
+import { useAuthStore } from '../store/auth'
+import { useRouter } from 'vue-router'
 import { tagService } from '@/api/api'
 import TagBadge from '@/components/TagBadge.vue'
 
@@ -398,6 +400,8 @@ export default {
   
   setup() {
     const deviceStore = useDeviceStore()
+    const authStore = useAuthStore()
+    const router = useRouter()
     
     const loading = ref(true)
     const saving = ref(false)
@@ -568,6 +572,21 @@ export default {
       saving.value = true
       errors.value = {}
       
+      // Verify authentication before attempting to save
+      if (!authStore.validateToken()) {
+        console.error('Token validation failed before device save')
+        showAddDeviceModal.value = false
+        router.push('/login')
+        return
+      }
+      
+      // Check device management permissions
+      if (!authStore.verifyDeviceManagementPermission()) {
+        errors.value.general = 'You do not have permission to manage devices'
+        saving.value = false
+        return
+      }
+      
       try {
         console.log('Saving device with data:', deviceForm.value)
         if (editingDevice.value) {
@@ -575,11 +594,41 @@ export default {
         } else {
           await deviceStore.createDevice(deviceForm.value)
         }
-        showAddDeviceModal.value = false
-        resetForm()
+        
+        // Check for errors after save attempt
+        if (deviceStore.error) {
+          errors.value.general = deviceStore.error
+          
+          // Handle authentication errors
+          if (deviceStore.authError) {
+            showAddDeviceModal.value = false
+            setTimeout(() => {
+              router.push('/login')
+            }, 500)
+            return
+          }
+        } else {
+          // Success case
+          showAddDeviceModal.value = false
+          resetForm()
+        }
       } catch (error) {
         console.error('Failed to save device:', error)
         console.error('Error response:', error.response?.data)
+        
+        // Handle authentication errors
+        if (error.isAuthError || error.response?.status === 401) {
+          console.error('Authentication error during device save')
+          errors.value.general = 'Authentication error. Please log in again.'
+          
+          // Redirect to login after a brief delay
+          setTimeout(() => {
+            showAddDeviceModal.value = false
+            router.push('/login')
+          }, 500)
+          return
+        }
+        
         if (error.response?.data?.detail) {
           // Handle validation errors from the API
           if (Array.isArray(error.response.data.detail)) {
@@ -588,11 +637,13 @@ export default {
               const field = err.loc[err.loc.length - 1]
               errors.value[field] = err.msg
             })
-          } else if (typeof error.response.data.detail === 'object') {
-            errors.value = error.response.data.detail
           } else {
-            errors.value = { general: error.response.data.detail }
+            // Single error message
+            errors.value.general = error.response.data.detail
           }
+        } else {
+          // Generic error
+          errors.value.general = 'Failed to save device'
         }
       } finally {
         saving.value = false
@@ -664,6 +715,19 @@ export default {
         checkingReachability.value = null
       }
     }
+    
+    // Add a watcher for authentication errors
+    watch(() => deviceStore.authError, (hasAuthError) => {
+      if (hasAuthError) {
+        console.log('Detected authentication error in device store')
+        showAddDeviceModal.value = false // Close any open modals
+        
+        // Redirect to login if there's an auth error
+        setTimeout(() => {
+          router.push('/login')
+        }, 500)
+      }
+    })
     
     return {
       loading,

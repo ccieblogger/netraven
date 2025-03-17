@@ -17,36 +17,11 @@ const getEnvVariable = (key, defaultValue) => {
   return defaultValue;
 };
 
-// Determine the API URL
-let browserApiUrl = '';
+// Get browserApiUrl based on environment
+let browserApiUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000';
 
-// Get API base URL from environment variables with fallback
-const envApiBaseUrl = getEnvVariable('VITE_API_BASE_URL', null);
-
-// Detect WSL/remote environments by checking for hostname patterns
-const isWsl = window.location.hostname.includes('ubuntu') || 
-              window.location.hostname.includes('wsl') || 
-              window.location.hostname.includes('debian');
-
-console.log('API Configuration:')
-console.log('Browser origin:', window.location.origin)
-console.log('Browser hostname:', window.location.hostname)
-console.log('Is WSL environment:', isWsl)
-console.log('Environment API URL:', envApiBaseUrl)
-
-// Determine the API URL to use
-if (envApiBaseUrl) {
-  // Use environment variable if available
-  browserApiUrl = envApiBaseUrl;
-  console.log('Using configured API URL from environment');
-} else if (isWsl || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-  // Local or WSL environment - use localhost with port 8000
-  browserApiUrl = 'http://localhost:8000';
-  console.log('Using localhost API URL');
-} else {
-  // Production/Docker environment
-  // If we're accessing the frontend from outside Docker via 8080 port
-  // we need to construct the API URL using the same hostname but port 8000
+// If VUE_APP_API_URL is not set, use hostname for dynamic resolution
+if (!process.env.VUE_APP_API_URL) {
   const hostname = window.location.hostname;
   browserApiUrl = `http://${hostname}:8000`;
   console.log('Using production API URL with hostname:', hostname);
@@ -54,11 +29,97 @@ if (envApiBaseUrl) {
 
 console.log('Final API URL:', browserApiUrl);
 
+// Setup Axios interceptors for authentication handling
+axios.interceptors.response.use(
+  response => {
+    // Pass through successful responses
+    return response;
+  },
+  error => {
+    // Handle authentication errors
+    if (error.response && error.response.status === 401) {
+      console.warn('Authentication error intercepted:', error.response.data);
+      
+      // Only clear token if it's explicitly identified as invalid
+      // We don't want to clear tokens for permission-based 401s
+      const isInvalidToken = error.response.data.detail === 'Invalid token' || 
+                            error.response.data.detail === 'Token expired' ||
+                            error.response.data.detail === 'Could not validate credentials';
+      
+      if (isInvalidToken && localStorage.getItem('access_token')) {
+        console.log('Clearing invalid token from localStorage due to 401 response');
+        localStorage.removeItem('access_token');
+      } else {
+        console.log('Authentication error but token not cleared - may be a permissions issue');
+      }
+      
+      // Add a flag to identify this as an auth error for components
+      error.isAuthError = true;
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 // Create API client
 const apiClient = {
   // Get auth header for authenticated requests
   getAuthHeader() {
     const token = localStorage.getItem('access_token');
+    
+    if (!token) {
+      console.warn('No authentication token available');
+      return {};
+    }
+    
+    // Validate basic token format
+    if (typeof token !== 'string' || token.split('.').length !== 3) {
+      console.error('Invalid token format in localStorage');
+      
+      // Clear invalid token
+      localStorage.removeItem('access_token');
+      return {};
+    }
+    
+    try {
+      // Check token expiration
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      
+      if (payload.exp) {
+        const now = Math.floor(Date.now() / 1000);
+        
+        if (now >= payload.exp) {
+          console.warn('Token has expired, clearing from localStorage');
+          localStorage.removeItem('access_token');
+          return {};
+        }
+        
+        // Log token scopes for debugging
+        if (payload.scope) {
+          console.log('Token scopes:', payload.scope);
+          
+          // Enhanced debugging for device operations
+          const currentPath = window.location.pathname;
+          if (currentPath.includes('/devices')) {
+            const hasDevicePermission = payload.scope.includes('write:devices') || 
+                                       payload.scope.includes('admin:*');
+            console.log('Current path includes /devices, has device permission:', hasDevicePermission);
+            
+            if (!hasDevicePermission) {
+              console.warn('Missing device management permission on devices page');
+            }
+          }
+        } else {
+          console.warn('Token payload does not contain scope information');
+        }
+      } else {
+        console.warn('Token does not contain expiration information');
+      }
+    } catch (e) {
+      console.error('Error validating token in getAuthHeader:', e);
+      // Continue with token as is, don't clear it here to avoid potential valid tokens being removed
+    }
+    
     return token ? { Authorization: `Bearer ${token}` } : {};
   },
 
@@ -150,11 +211,72 @@ const apiClient = {
     return response.data;
   },
 
+  // Enhanced device creation method with better error handling
   async createDevice(deviceData) {
-    const response = await axios.post(`${browserApiUrl}/api/devices`, deviceData, {
-      headers: this.getAuthHeader()
-    });
-    return response.data;
+    try {
+      // Get authentication headers
+      const headers = this.getAuthHeader();
+      
+      // Log authentication headers for debugging (safely removing sensitive data)
+      if (headers.Authorization) {
+        const authParts = headers.Authorization.split('.');
+        console.log('Using authorization header with token parts count:', authParts.length);
+        
+        // Log token info if available
+        if (authParts.length === 3) {
+          try {
+            const payload = JSON.parse(atob(authParts[1]));
+            console.log('Token payload contains scopes:', !!payload.scope);
+            console.log('Token subject:', payload.sub);
+            
+            // Check for device management permissions
+            const hasDevicePermission = payload.scope && 
+              (payload.scope.includes('write:devices') || 
+               payload.scope.includes('admin:*'));
+               
+            console.log('Token has device management permission:', hasDevicePermission);
+            
+            if (!hasDevicePermission) {
+              console.error('Token lacks necessary permissions for device management');
+            }
+          } catch (e) {
+            console.error('Error parsing token payload:', e);
+          }
+        }
+      } else {
+        console.error('No Authorization header available for device creation');
+      }
+      
+      // Make the API request
+      console.log('Sending device creation request to:', `${browserApiUrl}/api/devices`);
+      const response = await axios.post(`${browserApiUrl}/api/devices`, deviceData, {
+        headers: headers
+      });
+      
+      console.log('Device created successfully:', response.data);
+      return response.data;
+    } catch (error) {
+      // Enhanced error logging for device creation
+      console.error('Error in device creation:', error.message);
+      
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error details:', error.response.data);
+        
+        // Special handling for authentication errors
+        if (error.response.status === 401) {
+          console.error('Authentication error during device creation. Token may be invalid or insufficient permissions.');
+          
+          // Mark this as an authentication error
+          error.isAuthError = true;
+        }
+      } else if (error.request) {
+        console.error('No response received from server');
+      }
+      
+      // Re-throw for component handling
+      throw error;
+    }
   },
 
   async updateDevice(id, deviceData) {

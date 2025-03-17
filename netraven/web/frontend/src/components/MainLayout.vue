@@ -203,6 +203,20 @@ export default {
             layoutError.value = 'Failed to load user data';
           } else {
             console.log('MainLayout: User endpoint not found (404), continuing without user data');
+            
+            // Create a minimal user object when the endpoint is not available
+            if (hasToken.value) {
+              console.log('Setting minimal user data from token');
+              const token = localStorage.getItem('access_token');
+              try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const username = payload.sub || 'User';
+                authStore.user = { username };
+              } catch (e) {
+                console.error('Error extracting username from token:', e);
+                authStore.user = { username: 'User' };
+              }
+            }
           }
           
           // Don't redirect on initial load to avoid disrupting the current flow

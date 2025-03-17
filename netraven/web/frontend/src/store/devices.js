@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia'
 import { deviceService } from '../api/api'
+import { useAuthStore } from './auth'
 
 export const useDeviceStore = defineStore('devices', {
   state: () => ({
     devices: [],
     currentDevice: null,
     loading: false,
-    error: null
+    error: null,
+    authError: false
   }),
   
   getters: {
@@ -20,11 +22,48 @@ export const useDeviceStore = defineStore('devices', {
   },
   
   actions: {
+    // Reset error state
+    resetError() {
+      this.error = null
+      this.authError = false
+    },
+    
+    // Handle API errors with special handling for auth errors
+    handleApiError(error, operation) {
+      console.error(`Device Store: Error during ${operation}:`, error)
+      
+      // Check for authentication errors
+      if (error.isAuthError || error.response?.status === 401) {
+        console.error(`Authentication error during ${operation}`)
+        this.authError = true
+        this.error = 'Authentication error: Please log in again'
+        
+        // Notify auth store of the issue
+        const authStore = useAuthStore()
+        authStore.clearAuth()
+      } else if (error.response?.data?.detail) {
+        // Use backend error message if available
+        this.error = error.response.data.detail
+      } else {
+        // Generic error message
+        this.error = `Failed to ${operation}`
+      }
+    },
+    
     async fetchDevices() {
       this.loading = true
-      this.error = null
+      this.resetError()
       
       try {
+        // Verify authentication and permissions first
+        const authStore = useAuthStore()
+        if (!authStore.validateToken()) {
+          this.authError = true
+          this.error = 'Authentication required'
+          this.devices = []
+          return []
+        }
+        
         const devices = await deviceService.getDevices()
         
         // Ensure each device has a tags array
@@ -38,8 +77,7 @@ export const useDeviceStore = defineStore('devices', {
         console.log('Device Store: Successfully loaded device data')
         return devices
       } catch (error) {
-        console.error('Device Store: Error fetching devices:', error)
-        this.error = error.response?.data?.detail || 'Failed to fetch devices'
+        this.handleApiError(error, 'fetch devices')
         this.devices = []
         return []
       } finally {
@@ -49,9 +87,17 @@ export const useDeviceStore = defineStore('devices', {
     
     async fetchDevice(id) {
       this.loading = true
-      this.error = null
+      this.resetError()
       
       try {
+        // Verify authentication first
+        const authStore = useAuthStore()
+        if (!authStore.validateToken()) {
+          this.authError = true
+          this.error = 'Authentication required'
+          return null
+        }
+        
         const device = await deviceService.getDevice(id)
         this.currentDevice = device
         
@@ -63,8 +109,7 @@ export const useDeviceStore = defineStore('devices', {
         
         return device
       } catch (error) {
-        console.error(`Device Store: Error fetching device ${id}:`, error)
-        this.error = error.response?.data?.detail || `Failed to fetch device ${id}`
+        this.handleApiError(error, `fetch device ${id}`)
         return null
       } finally {
         this.loading = false
@@ -73,18 +118,31 @@ export const useDeviceStore = defineStore('devices', {
     
     async createDevice(deviceData) {
       this.loading = true
-      this.error = null
+      this.resetError()
       
       try {
         console.log('Creating device with data:', deviceData)
+        
+        // Verify authentication and permissions first
+        const authStore = useAuthStore()
+        if (!authStore.validateToken()) {
+          this.authError = true
+          this.error = 'Authentication required'
+          return null
+        }
+        
+        // Verify device management permissions
+        if (!authStore.verifyDeviceManagementPermission()) {
+          this.error = 'You do not have permission to create devices'
+          return null
+        }
+        
         const newDevice = await deviceService.createDevice(deviceData)
         console.log('Device created:', newDevice)
         this.devices.push(newDevice)
         return newDevice
       } catch (error) {
-        console.error('Error creating device:', error)
-        console.error('Error response:', error.response?.data)
-        this.error = error.response?.data?.detail || 'Failed to create device'
+        this.handleApiError(error, 'create device')
         return null
       } finally {
         this.loading = false
@@ -93,9 +151,17 @@ export const useDeviceStore = defineStore('devices', {
     
     async updateDevice(id, deviceData) {
       this.loading = true
-      this.error = null
+      this.resetError()
       
       try {
+        // Verify authentication first
+        const authStore = useAuthStore()
+        if (!authStore.validateToken()) {
+          this.authError = true
+          this.error = 'Authentication required'
+          return null
+        }
+        
         const updatedDevice = await deviceService.updateDevice(id, deviceData)
         
         // Update the device in the devices array
@@ -111,8 +177,7 @@ export const useDeviceStore = defineStore('devices', {
         
         return updatedDevice
       } catch (error) {
-        console.error(`Device Store: Error updating device ${id}:`, error)
-        this.error = error.response?.data?.detail || `Failed to update device ${id}`
+        this.handleApiError(error, `update device ${id}`)
         return null
       } finally {
         this.loading = false
@@ -121,9 +186,17 @@ export const useDeviceStore = defineStore('devices', {
     
     async deleteDevice(id) {
       this.loading = true
-      this.error = null
+      this.resetError()
       
       try {
+        // Verify authentication first
+        const authStore = useAuthStore()
+        if (!authStore.validateToken()) {
+          this.authError = true
+          this.error = 'Authentication required'
+          return false
+        }
+        
         await deviceService.deleteDevice(id)
         
         // Remove the device from the devices array
@@ -136,8 +209,7 @@ export const useDeviceStore = defineStore('devices', {
         
         return true
       } catch (error) {
-        console.error(`Device Store: Error deleting device ${id}:`, error)
-        this.error = error.response?.data?.detail || `Failed to delete device ${id}`
+        this.handleApiError(error, `delete device ${id}`)
         return false
       } finally {
         this.loading = false
@@ -146,14 +218,21 @@ export const useDeviceStore = defineStore('devices', {
     
     async backupDevice(id) {
       this.loading = true
-      this.error = null
+      this.resetError()
       
       try {
+        // Verify authentication first
+        const authStore = useAuthStore()
+        if (!authStore.validateToken()) {
+          this.authError = true
+          this.error = 'Authentication required'
+          return null
+        }
+        
         const result = await deviceService.backupDevice(id)
         return result
       } catch (error) {
-        console.error(`Device Store: Error backing up device ${id}:`, error)
-        this.error = error.response?.data?.detail || `Failed to backup device ${id}`
+        this.handleApiError(error, `backup device ${id}`)
         return null
       } finally {
         this.loading = false
@@ -162,9 +241,17 @@ export const useDeviceStore = defineStore('devices', {
     
     async checkDeviceReachability(id) {
       this.loading = true
-      this.error = null
+      this.resetError()
       
       try {
+        // Verify authentication first
+        const authStore = useAuthStore()
+        if (!authStore.validateToken()) {
+          this.authError = true
+          this.error = 'Authentication required'
+          return null
+        }
+        
         const result = await deviceService.checkDeviceReachability(id)
         
         // Update the device in the devices array
@@ -180,8 +267,7 @@ export const useDeviceStore = defineStore('devices', {
         
         return result
       } catch (error) {
-        console.error(`Device Store: Error checking device reachability ${id}:`, error)
-        this.error = error.response?.data?.detail || `Failed to check device reachability ${id}`
+        this.handleApiError(error, `check device reachability ${id}`)
         return null
       } finally {
         this.loading = false

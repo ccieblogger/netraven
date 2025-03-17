@@ -26,6 +26,8 @@
 
 <script>
 import { ref, onErrorCaptured, onMounted } from 'vue'
+import { useAuthStore } from './store/auth'
+import { useRouter } from 'vue-router'
 
 export default {
   name: 'App',
@@ -33,6 +35,8 @@ export default {
   setup() {
     const appError = ref(null)
     const isInitializing = ref(true)
+    const authStore = useAuthStore()
+    const router = useRouter()
     
     // Simple error handler
     onErrorCaptured((err, instance, info) => {
@@ -51,9 +55,43 @@ export default {
       return false; // Don't propagate app-level errors
     })
     
-    // Simple initialization
-    onMounted(() => {
+    // Enhanced initialization with token validation
+    onMounted(async () => {
       console.log('App: Component mounted, initializing...')
+      
+      // Check token validity on startup
+      try {
+        if (localStorage.getItem('access_token')) {
+          console.log('App: Found token in localStorage, validating...')
+          
+          // Validate token and handle invalid case
+          if (!authStore.validateToken()) {
+            console.log('App: Token validation failed on startup')
+            
+            // If not on login page, redirect to login
+            if (router.currentRoute.value.path !== '/login') {
+              console.log('App: Redirecting to login due to invalid token')
+              router.push('/login')
+            }
+          } else {
+            console.log('App: Token validation successful')
+            
+            // If token is valid, ensure we have user data
+            if (!authStore.hasUserData) {
+              try {
+                console.log('App: Fetching user data on startup')
+                await authStore.fetchCurrentUser()
+              } catch (err) {
+                console.error('App: Failed to fetch user data on startup:', err)
+                // Continue even if user fetch fails
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('App: Error during token validation:', e)
+        // Continue application initialization even if token validation fails
+      }
       
       // Brief delay to ensure CSS and resources are loaded
       setTimeout(() => {
