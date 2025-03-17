@@ -91,7 +91,7 @@ async def list_devices(
         if current_principal.is_admin:
             return get_devices(db) 
         else:
-            return get_devices(db, owner_id=current_principal.username)
+            return get_devices(db, owner_id=current_principal.id)
     except Exception as e:
         logger.exception(f"Error listing devices: {str(e)}")
         raise HTTPException(
@@ -119,14 +119,23 @@ async def get_device_endpoint(
     Raises:
         HTTPException: If the device is not found
     """
-    require_scope(current_principal, "read:devices")
+    # Check permissions using has_scope method directly
+    if not current_principal.is_admin and not current_principal.has_scope("read:devices"):
+        logger.warning(f"Insufficient permissions for {current_principal.username}: missing read:devices scope")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to read devices",
+        )
+    
     device = get_device(db, device_id)
     if not device:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Device with ID {device_id} not found"
         )
-    if device.owner_id != current_principal.username:
+    
+    # Check if user is admin or owns the device
+    if not current_principal.is_admin and device.owner_id != current_principal.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this device"
@@ -150,29 +159,21 @@ async def create_device_endpoint(
     Returns:
         DeviceModel: The created device
     """
-    require_scope(current_principal, "write:devices")
+    # Check if user has proper permissions
+    if not current_principal.is_admin and not current_principal.has_scope("write:devices"):
+        logger.warning(f"Insufficient permissions for {current_principal.username}: missing write:devices scope")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to create devices",
+        )
     
-    # Generate a UUID for the device
-    device_id = str(uuid.uuid4())
-    
-    # Create device data
-    device_data = {
-        "id": device_id,
-        "hostname": device.hostname,
-        "device_type": device.device_type,
-        "ip_address": device.ip_address,
-        "description": device.description,
-        "port": device.port,
-        "username": device.username,
-        "password": device.password,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
-    }
-    
-    logger.info(f"Creating device: {device.hostname}")
+    # Get the user ID from the user object
+    user_id = current_principal.id
+    logger.info(f"Creating device: {device.hostname} by user {current_principal.username} (ID: {user_id})")
     
     try:
-        new_device = create_device(db, device_data, current_principal.username)
+        # Create device with the current user ID as owner
+        new_device = create_device(db, device, user_id)
         logger.info(f"Device created successfully: {new_device.hostname}")
         return new_device
     except Exception as e:
@@ -204,7 +205,13 @@ async def update_device_endpoint(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    require_scope(current_principal, "write:devices")
+    # Check if user has proper permissions
+    if not current_principal.is_admin and not current_principal.has_scope("write:devices"):
+        logger.warning(f"Insufficient permissions for {current_principal.username}: missing write:devices scope")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to update devices",
+        )
     
     # Check if device exists
     existing_device = get_device(db, device_id)
@@ -215,7 +222,7 @@ async def update_device_endpoint(
         )
     
     # Check if user owns the device
-    if existing_device.owner_id != current_principal.username:
+    if not current_principal.is_admin and existing_device.owner_id != current_principal.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update this device"
@@ -223,7 +230,9 @@ async def update_device_endpoint(
     
     # Update device
     try:
-        updated_device = update_device(db, device_id, device.dict(exclude_unset=True))
+        # Use model_dump instead of dict for Pydantic v2 compatibility
+        update_data = device.model_dump(exclude_unset=True) if hasattr(device, 'model_dump') else device.dict(exclude_unset=True)
+        updated_device = update_device(db, device_id, update_data)
         return updated_device
     except Exception as e:
         logger.error(f"Error updating device: {str(e)}")
@@ -249,7 +258,13 @@ async def delete_device_endpoint(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    require_scope(current_principal, "write:devices")
+    # Check if user has proper permissions
+    if not current_principal.is_admin and not current_principal.has_scope("write:devices"):
+        logger.warning(f"Insufficient permissions for {current_principal.username}: missing write:devices scope")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to delete devices",
+        )
     
     # Check if device exists
     existing_device = get_device(db, device_id)
@@ -260,7 +275,7 @@ async def delete_device_endpoint(
         )
     
     # Check if user owns the device
-    if existing_device.owner_id != current_principal.username:
+    if not current_principal.is_admin and existing_device.owner_id != current_principal.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to delete this device"
@@ -298,7 +313,13 @@ async def backup_device(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    require_scope(current_principal, "write:backups")
+    # Check if user has proper permissions
+    if not current_principal.is_admin and not current_principal.has_scope("write:backups"):
+        logger.warning(f"Insufficient permissions for {current_principal.username}: missing write:backups scope")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to backup devices",
+        )
     
     # Check if device exists
     device = get_device(db, device_id)
@@ -309,7 +330,7 @@ async def backup_device(
         )
     
     # Check if user has access to this device
-    if device.owner_id != current_principal.username:
+    if not current_principal.is_admin and device.owner_id != current_principal.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to backup this device"
@@ -458,7 +479,13 @@ async def check_device_reachability(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    require_scope(current_principal, "read:devices")
+    # Check if user has proper permissions
+    if not current_principal.is_admin and not current_principal.has_scope("read:devices"):
+        logger.warning(f"Insufficient permissions for {current_principal.username}: missing read:devices scope")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to check device reachability",
+        )
     
     # Check if device exists
     device = get_device(db, device_id)
@@ -469,7 +496,7 @@ async def check_device_reachability(
         )
     
     # Check if user owns the device
-    if device.owner_id != current_principal.username:
+    if not current_principal.is_admin and device.owner_id != current_principal.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to check this device"

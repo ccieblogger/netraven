@@ -40,11 +40,17 @@ app.add_middleware(
         "http://127.0.0.1:8080",
         "http://0.0.0.0:8080",
         "http://localhost:3000",
-        "http://127.0.0.1:3000"
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://frontend:8080",  # Docker service name
+        "http://api:8000",       # Docker service name
+        "*"                      # Allow all origins in development
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Type", "Authorization"]
 )
 
 # Register startup events
@@ -62,6 +68,20 @@ async def startup_event():
         logger.info("Authentication tokens initialized")
     except Exception as e:
         logger.error(f"Error initializing authentication tokens: {str(e)}")
+    
+    # Create default admin user if it doesn't exist
+    try:
+        from netraven.web.database import SessionLocal
+        from netraven.web.startup import ensure_default_admin
+        
+        db = SessionLocal()
+        try:
+            ensure_default_admin(db)
+            logger.info("Default admin user initialization complete")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error ensuring default admin user: {str(e)}")
     
     logger.info("Web service started")
 

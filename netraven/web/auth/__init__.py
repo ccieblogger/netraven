@@ -60,7 +60,7 @@ class UserPrincipal(Principal):
         super().__init__(user.username, user.permissions, "user")
         self.user = user
         self.is_admin = user.is_active and ("admin:*" in user.permissions)
-        self.id = user.username  # Add id attribute for compatibility
+        self.id = user.id if hasattr(user, 'id') else user.username  # Use real ID if available
         
     @property
     def username(self) -> str:
@@ -99,8 +99,7 @@ async def get_user(username: str, scopes: List[str]) -> UserPrincipal:
     """
     Get a user by username.
     
-    This would typically query a database for user information.
-    For simplicity, we're creating a dummy user with the given scopes.
+    This fetches the user from the database if possible, otherwise creates a dummy user.
     
     Args:
         username: The username to lookup
@@ -109,8 +108,25 @@ async def get_user(username: str, scopes: List[str]) -> UserPrincipal:
     Returns:
         UserPrincipal: The user principal
     """
-    # In a real implementation, this would query the database
-    # For now, we'll create a dummy user with the given scopes
+    # Try to get the user from the database
+    try:
+        from netraven.web.database import SessionLocal
+        from netraven.web.crud import get_user_by_username
+        
+        db = SessionLocal()
+        try:
+            db_user = get_user_by_username(db, username)
+            if db_user:
+                # Use the real user but with the scopes from the token
+                db_user.permissions = scopes
+                return UserPrincipal(db_user)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Error getting user from database: {str(e)}")
+        logger.warning("Falling back to dummy user")
+    
+    # Fallback to a dummy user with the given scopes if DB query fails
     user = User(
         username=username,
         email=f"{username}@example.com",

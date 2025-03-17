@@ -83,7 +83,7 @@ def create_device(db: Session, device: DeviceCreate, owner_id: str) -> Device:
     
     Args:
         db: Database session
-        device: Device creation data
+        device: Device creation data (Pydantic model)
         owner_id: ID of the user who owns the device
         
     Returns:
@@ -101,7 +101,7 @@ def create_device(db: Session, device: DeviceCreate, owner_id: str) -> Device:
         username=device.username,
         password=device.password,
         description=device.description,
-        enabled=device.enabled,
+        enabled=device.enabled if hasattr(device, 'enabled') else True,
         owner_id=owner_id,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
@@ -118,14 +118,14 @@ def create_device(db: Session, device: DeviceCreate, owner_id: str) -> Device:
         logger.error(f"Error creating device: {e}")
         raise
 
-def update_device(db: Session, device_id: str, device_update: DeviceUpdate) -> Optional[Device]:
+def update_device(db: Session, device_id: str, device_update: dict) -> Optional[Device]:
     """
     Update an existing device.
     
     Args:
         db: Database session
         device_id: ID of the device to update
-        device_update: Device update data
+        device_update: Device update data as dict
         
     Returns:
         Updated Device object if successful, None if device not found
@@ -137,11 +137,8 @@ def update_device(db: Session, device_id: str, device_update: DeviceUpdate) -> O
         logger.warning(f"Device with id {device_id} not found")
         return None
     
-    # Update device data
-    update_data = device_update.model_dump(exclude_unset=True)
-    
     # Update the fields
-    for key, value in update_data.items():
+    for key, value in device_update.items():
         setattr(db_device, key, value)
     
     # Always update the updated_at timestamp
