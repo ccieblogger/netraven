@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 
 from netraven.core.logging import get_logger
-from netraven.core.auth import get_authorization_header
+from netraven.core.auth import get_authorization_header, extract_token_from_header
 from netraven.web.auth import get_current_principal, require_scope, Principal, optional_auth
 
 # Setup logger
@@ -32,7 +32,8 @@ class GatewayMetrics(BaseModel):
 
 @router.get("/status")
 async def get_gateway_status(
-    principal: Principal = Depends(require_scope(["read:gateway"]))
+    request: Request,
+    principal: Optional[Principal] = Depends(optional_auth(["read:gateway"]))
 ):
     """
     Get the status of the gateway service.
@@ -45,9 +46,11 @@ async def get_gateway_status(
     try:
         gateway_url = "http://device_gateway:8001/status"
         
-        # Use the same token for calling the gateway
-        # In a production environment, consider using service tokens for internal communication
-        headers = get_authorization_header(get_current_token())
+        # Use the same token for calling the gateway if available
+        # Otherwise, use the API token for internal communication
+        headers = {}
+        if principal:
+            headers = get_authorization_header(get_current_token(request))
         
         logger.debug(f"Calling gateway status endpoint: {gateway_url}")
         response = requests.get(gateway_url, headers=headers, timeout=10.0)
@@ -77,13 +80,13 @@ async def get_gateway_status(
 
 @router.get("/devices")
 async def get_devices(
+    request: Request,
     principal: Principal = Depends(require_scope(["read:devices"]))
 ):
     """
-    Get a list of connected devices.
+    Get a list of devices connected to the gateway.
     
-    This endpoint queries the device gateway service for a list of
-    currently connected devices and their status.
+    This endpoint queries the device gateway service for connected devices.
     
     Requires authentication with the 'read:devices' scope.
     """
@@ -91,21 +94,21 @@ async def get_devices(
         gateway_url = "http://device_gateway:8001/devices"
         
         # Use the same token for calling the gateway
-        headers = get_authorization_header(get_current_token())
+        headers = get_authorization_header(get_current_token(request))
         
         logger.debug(f"Calling gateway devices endpoint: {gateway_url}")
-        response = requests.get(gateway_url, headers=headers, timeout=10.0)
+        response = requests.get(gateway_url, headers=headers)
         
-        if response.status_code == 200:
-            return response.json()
-        else:
-            logger.warning(f"Gateway returned status code {response.status_code}")
+        if response.status_code != 200:
+            logger.error(f"Gateway returned error: {response.status_code} - {response.text}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Gateway returned status code {response.status_code}"
+                detail=f"Gateway service error: {response.status_code}"
             )
-    except Exception as e:
-        logger.exception(f"Error fetching devices: {str(e)}")
+            
+        return response.json()
+    except requests.RequestException as e:
+        logger.error(f"Error communicating with gateway: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Error communicating with gateway: {str(e)}"
@@ -114,39 +117,37 @@ async def get_devices(
 
 @router.get("/metrics", response_model=GatewayMetrics)
 async def get_gateway_metrics(
+    request: Request,
     principal: Principal = Depends(require_scope(["read:metrics"]))
 ):
     """
     Get gateway metrics.
     
-    This endpoint returns metrics for the device gateway service,
-    including request counts, error counts, and device statistics.
+    This endpoint queries the device gateway service for metrics on
+    requests, errors, device connections, and commands executed.
     
     Requires authentication with the 'read:metrics' scope.
     """
     try:
         gateway_url = "http://device_gateway:8001/metrics"
-        headers = get_authorization_header(get_current_token())
+        
+        # Use the same token for calling the gateway
+        headers = get_authorization_header(get_current_token(request))
         
         logger.debug(f"Calling gateway metrics endpoint: {gateway_url}")
-        response = requests.get(gateway_url, headers=headers, timeout=10.0)
+        response = requests.get(gateway_url, headers=headers)
         
-        if response.status_code == 200:
-            data = response.json()
-            return GatewayMetrics(
-                request_count=data.get("request_count", 0),
-                error_count=data.get("error_count", 0),
-                device_connections=data.get("device_connections", 0),
-                commands_executed=data.get("commands_executed", 0)
-            )
-        else:
-            logger.warning(f"Gateway returned status code {response.status_code}")
+        if response.status_code != 200:
+            logger.error(f"Gateway returned error: {response.status_code} - {response.text}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Gateway returned status code {response.status_code}"
+                detail=f"Gateway service error: {response.status_code}"
             )
-    except Exception as e:
-        logger.exception(f"Error fetching gateway metrics: {str(e)}")
+            
+        metrics_data = response.json()
+        return GatewayMetrics(**metrics_data)
+    except requests.RequestException as e:
+        logger.error(f"Error communicating with gateway: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Error communicating with gateway: {str(e)}"
@@ -154,16 +155,30 @@ async def get_gateway_metrics(
 
 
 # Helper function to extract current token from request context
-def get_current_token() -> str:
+def get_current_token(request: Request) -> str:
     """
     Get the current token from request context.
     
-    In a real implementation, this would extract the token from the request context.
-    For now, we're using a placeholder API key.
+    This extracts the token from the Authorization header in the request.
     
+    Args:
+        request: The FastAPI request object
+        
     Returns:
-        str: The current token or API key
+        str: The current token
+        
+    Raises:
+        HTTPException: If no token is found
     """
-    # This is a placeholder - in a real app, this would extract the token
-    # from the request context using something like httpx.AsyncClient context vars
-    return "netraven-api-key" 
+    auth_header = request.headers.get("Authorization")
+    token = extract_token_from_header(auth_header)
+    
+    if not token:
+        logger.warning(f"No token found in request to {request.url}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return token 
