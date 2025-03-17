@@ -19,6 +19,7 @@ from netraven.web.database import get_db
 from netraven.web.models.device import Device as DeviceModel
 from netraven.web.models.backup import Backup as BackupModel
 from netraven.web.crud import get_backups, get_backup, create_backup, delete_backup, get_device
+from netraven.core.logging import get_logger
 
 # Create router
 router = APIRouter(prefix="", tags=["backups"])
@@ -72,14 +73,12 @@ async def list_backups(
     Returns:
         List[Dict[str, Any]]: List of backups
     """
-    require_scope(current_principal, "read:backups")
-    
     # Get backups with pagination
     backups = get_backups(
         db, 
         device_id=device_id,
         limit=limit,
-        offset=offset
+        skip=offset
     )
     
     # Format backups for response
@@ -91,7 +90,7 @@ async def list_backups(
             device_hostname = backup.device.hostname
             
             # Check if user has access to this device
-            if backup.device.owner_id != current_principal.username:
+            if not current_principal.is_admin and backup.device.owner_id != current_principal.username:
                 continue
         
         # Add backup to result

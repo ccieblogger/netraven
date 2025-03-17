@@ -47,7 +47,13 @@ async def list_tags(
     Returns:
         List[Tag]: List of tags
     """
-    require_scope(current_principal, "read:tags")
+    # Reading tags requires read:tags scope
+    if "read:tags" not in current_principal.scopes and "read:*" not in current_principal.scopes and "admin:*" not in current_principal.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access tags"
+        )
+        
     return get_tags(db)
 
 @router.post("", response_model=Tag, status_code=status.HTTP_201_CREATED)
@@ -110,7 +116,13 @@ async def get_tag_endpoint(
     Raises:
         HTTPException: If the tag is not found
     """
-    require_scope(current_principal, "read:tags")
+    # Reading tags requires read:tags scope
+    if "read:tags" not in current_principal.scopes and "read:*" not in current_principal.scopes and "admin:*" not in current_principal.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access tags"
+        )
+        
     tag = get_tag(db, tag_id)
     if not tag:
         raise HTTPException(

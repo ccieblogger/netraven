@@ -302,6 +302,88 @@ Authentication events should be logged for security purposes:
    - Compliance with security best practices
    - Better debugging for authentication issues
 
+### Comprehensive API Endpoint Testing
+
+The application would benefit from comprehensive automated API endpoint testing to ensure continued functionality of all endpoints. This would involve:
+
+1. **Implement PyTest-Based API Tests**:
+   - Create a comprehensive test suite for all API endpoints
+   - Test both positive and negative cases (success, unauthorized, validation failures)
+   - Verify correct response formats and status codes
+
+2. **Test API Authentication**:
+   - Test token acquisition with valid and invalid credentials
+   - Test endpoint access with valid, invalid, and expired tokens
+   - Test authorization with different user permissions
+
+3. **Implementation Plan**:
+   - Create a dedicated `tests/api` directory
+   - Add test fixtures for authentication, database setup/teardown
+   - Implement test cases for each endpoint category
+
+4. **Sample Implementation**:
+   ```python
+   # tests/api/test_auth.py
+   import pytest
+   import requests
+   
+   @pytest.fixture
+   def api_url():
+       return "http://localhost:8000/api"
+   
+   @pytest.fixture
+   def admin_token(api_url):
+       response = requests.post(
+           f"{api_url}/auth/token",
+           json={"username": "admin", "password": "NetRaven"}
+       )
+       return response.json()["access_token"]
+   
+   def test_login_success(api_url):
+       response = requests.post(
+           f"{api_url}/auth/token",
+           json={"username": "admin", "password": "NetRaven"}
+       )
+       assert response.status_code == 200
+       assert "access_token" in response.json()
+   
+   def test_login_failure(api_url):
+       response = requests.post(
+           f"{api_url}/auth/token",
+           json={"username": "admin", "password": "wrong-password"}
+       )
+       assert response.status_code == 401
+   
+   def test_users_endpoint(api_url, admin_token):
+       response = requests.get(
+           f"{api_url}/users",
+           headers={"Authorization": f"Bearer {admin_token}"}
+       )
+       assert response.status_code == 200
+       assert isinstance(response.json(), list)
+   
+   def test_tags_endpoint(api_url, admin_token):
+       response = requests.get(
+           f"{api_url}/tags",
+           headers={"Authorization": f"Bearer {admin_token}"}
+       )
+       assert response.status_code == 200
+       assert isinstance(response.json(), list)
+   ```
+
+5. **Continuous Integration**:
+   - Add automated API tests to the CI/CD pipeline
+   - Run tests against a containerized test environment
+   - Generate test reports for review
+
+6. **Benefits**:
+   - Early detection of API regressions
+   - Documentation of expected API behavior
+   - Confidence in making changes to the codebase
+   - Reduced manual testing effort
+
+This enhancement would significantly improve the reliability and maintainability of the NetRaven API.
+
 ## Development Guidelines
 
 ### Change Implementation Process
@@ -449,6 +531,105 @@ Document clear requirements for customer deployment:
 3. **Container connectivity**: Use service names not localhost
 4. **Authentication failures**: Check token format and expiration
 5. **Vue.js component errors**: Ensure proper template/script structure
+
+## API Endpoint Verification
+
+### Authentication Token Acquisition
+```bash
+# Get authentication token
+TOKEN=$(curl -s -L -X POST -H "Content-Type: application/json" -d '{"username":"admin", "password":"NetRaven"}' http://localhost:8000/api/auth/token | jq -r '.access_token')
+```
+
+### Health Check Endpoint
+```bash
+# Verify the health check endpoint
+curl -s -L http://localhost:8000/api/health | jq
+```
+
+### User Endpoints
+```bash
+# List all users
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/users | jq
+
+# Get current user
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/users/me | jq
+```
+
+### Device Endpoints
+```bash
+# List all devices
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/devices | jq
+```
+
+### Tag Endpoints
+```bash
+# List all tags
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/tags | jq
+```
+
+### Tag Rules Endpoints
+```bash
+# List all tag rules
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/tag-rules | jq
+```
+
+### Backup Endpoints
+```bash
+# List all backups
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/backups | jq
+```
+
+### Job Logs Endpoints
+```bash
+# List all job logs
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/job-logs | jq
+```
+
+### Scheduled Jobs Endpoints
+```bash
+# List all scheduled jobs
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/scheduled-jobs | jq
+```
+
+### Gateway Endpoints
+```bash
+# Get gateway status
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/gateway/status | jq
+```
+
+### Combined Verification
+```bash
+# Verify all endpoints in a single command
+TOKEN=$(curl -s -L -X POST -H "Content-Type: application/json" -d '{"username":"admin", "password":"NetRaven"}' http://localhost:8000/api/auth/token | jq -r '.access_token') && \
+echo -e "\nUsers:" && \
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/users | jq -c && \
+echo -e "\nDevices:" && \
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/devices | jq -c && \
+echo -e "\nBackups:" && \
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/backups | jq -c && \
+echo -e "\nTags:" && \
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/tags | jq -c && \
+echo -e "\nTag Rules:" && \
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/tag-rules | jq -c && \
+echo -e "\nJob Logs:" && \
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/job-logs | jq -c && \
+echo -e "\nScheduled Jobs:" && \
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/scheduled-jobs | jq -c && \
+echo -e "\nGateway Status:" && \
+curl -s -L -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/gateway/status | jq -c
+```
+
+### Container Status Verification
+```bash
+# Check the status of all containers
+docker-compose ps
+```
+
+### Log Examination
+```bash
+# Check API logs for specific endpoints
+docker logs netraven-api-1 2>&1 | grep -A 20 "GET /api/users"
+```
 
 ## Contributing
 

@@ -52,7 +52,11 @@ async def list_users(
     Returns:
         List[Dict[str, Any]]: List of users
     """
-    require_scope(current_principal, "admin:users")
+    if not current_principal.has_scope("admin:users"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to list users"
+        )
     return get_users(db)
 
 @router.get("/{user_id}", response_model=User)
@@ -149,7 +153,11 @@ async def delete_user_endpoint(
     Raises:
         HTTPException: If the user is not found or current user is not authorized
     """
-    require_scope(current_principal, "admin:users")
+    if not current_principal.has_scope("admin:users"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete users"
+        )
     
     # Check if user exists
     user = get_user(db, user_id)

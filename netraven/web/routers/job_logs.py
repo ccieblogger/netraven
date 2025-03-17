@@ -72,23 +72,26 @@ async def list_job_logs(
     Returns:
         List[job_log_schemas.JobLog]: List of job logs
     """
-    require_scope(current_principal, "read:logs")
+    # Create filter params
+    filter_params = job_log_schemas.JobLogFilter(
+        device_id=device_id,
+        status=status,
+        job_type=job_type
+    )
     
     # Get job logs from database
     job_logs = get_job_logs(
         db, 
-        device_id=device_id,
-        status=status,
-        job_type=job_type,
+        skip=offset,
         limit=limit,
-        offset=offset
+        filter_params=filter_params
     )
     
     # Format job logs for response
     result = []
     for job_log in job_logs:
         # Check if user has access to this device
-        if job_log.device and job_log.device.owner_id != current_principal.username:
+        if job_log.device and not current_principal.is_admin and job_log.device.owner_id != current_principal.username:
             continue
             
         result.append(job_log)

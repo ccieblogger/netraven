@@ -43,7 +43,13 @@ async def list_tag_rules(
     
     This endpoint returns a list of all tag rules with optional pagination and filtering.
     """
-    require_scope(current_principal, "read:tag_rules")
+    # Reading tag rules requires read:tag_rules scope
+    if "read:tag_rules" not in current_principal.scopes and "read:*" not in current_principal.scopes and "admin:*" not in current_principal.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access tag rules"
+        )
+        
     return get_tag_rules(db, skip=skip, limit=limit, tag_id=tag_id)
 
 @router.post("", response_model=TagRule, status_code=status.HTTP_201_CREATED)
@@ -71,7 +77,13 @@ async def get_tag_rule_endpoint(
     
     This endpoint returns details for a specific tag rule.
     """
-    require_scope(current_principal, "read:tag_rules")
+    # Reading tag rules requires read:tag_rules scope
+    if "read:tag_rules" not in current_principal.scopes and "read:*" not in current_principal.scopes and "admin:*" not in current_principal.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access tag rules"
+        )
+        
     rule = get_tag_rule(db, rule_id)
     if not rule:
         raise HTTPException(
@@ -164,7 +176,13 @@ async def test_tag_rule_endpoint(
     
     This endpoint tests a tag rule against devices without actually applying it.
     """
-    require_scope(current_principal, "read:tag_rules")
+    # Testing tag rules requires read:tag_rules scope
+    if "read:tag_rules" not in current_principal.scopes and "read:*" not in current_principal.scopes and "admin:*" not in current_principal.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to test tag rules"
+        )
+        
     # Test the rule
     result = test_rule(db, rule_test.rule_criteria.dict())
     return result 

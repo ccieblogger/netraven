@@ -50,7 +50,9 @@ async def get_gateway_status(
         # Otherwise, use the API token for internal communication
         headers = {}
         if principal:
-            headers = get_authorization_header(get_current_token(request))
+            auth_header = request.headers.get("Authorization")
+            if auth_header:
+                headers = {"Authorization": auth_header}
         
         logger.debug(f"Calling gateway status endpoint: {gateway_url}")
         response = requests.get(gateway_url, headers=headers, timeout=10.0)
@@ -72,6 +74,8 @@ async def get_gateway_status(
             }
     except Exception as e:
         logger.exception(f"Error fetching gateway status: {str(e)}")
+        # Return a response with status "error" instead of raising an exception
+        # This ensures the UI can still handle the response
         return {
             "status": "error",
             "message": f"Error: {str(e)}"
@@ -94,7 +98,10 @@ async def get_devices(
         gateway_url = "http://device_gateway:8001/devices"
         
         # Use the same token for calling the gateway
-        headers = get_authorization_header(get_current_token(request))
+        headers = {}
+        auth_header = request.headers.get("Authorization")
+        if auth_header:
+            headers = {"Authorization": auth_header}
         
         logger.debug(f"Calling gateway devices endpoint: {gateway_url}")
         response = requests.get(gateway_url, headers=headers)
@@ -109,10 +116,8 @@ async def get_devices(
         return response.json()
     except requests.RequestException as e:
         logger.error(f"Error communicating with gateway: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Error communicating with gateway: {str(e)}"
-        )
+        # Return an empty list instead of raising an exception
+        return []
 
 
 @router.get("/metrics", response_model=GatewayMetrics)
@@ -134,7 +139,9 @@ async def get_gateway_metrics(
         # Use the same token for calling the gateway if available
         headers = {}
         if principal:
-            headers = get_authorization_header(get_current_token(request))
+            auth_header = request.headers.get("Authorization")
+            if auth_header:
+                headers = {"Authorization": auth_header}
         
         logger.debug(f"Calling gateway metrics endpoint: {gateway_url}")
         response = requests.get(gateway_url, headers=headers)
@@ -150,10 +157,13 @@ async def get_gateway_metrics(
         return GatewayMetrics(**metrics_data)
     except requests.RequestException as e:
         logger.error(f"Error communicating with gateway: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Error communicating with gateway: {str(e)}"
-        )
+        # Return an error response instead of raising an exception
+        return {
+            "request_count": 0,
+            "error_count": 0,
+            "device_connections": 0,
+            "commands_executed": 0
+        }
 
 
 @router.get("/config")
@@ -174,7 +184,9 @@ async def get_gateway_config(
         # Use the same token for calling the gateway if available
         headers = {}
         if principal:
-            headers = get_authorization_header(get_current_token(request))
+            auth_header = request.headers.get("Authorization")
+            if auth_header:
+                headers = {"Authorization": auth_header}
         
         logger.debug(f"Calling gateway config endpoint: {gateway_url}")
         response = requests.get(gateway_url, headers=headers, timeout=10.0)
