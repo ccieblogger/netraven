@@ -22,7 +22,8 @@ from netraven.web.schemas.tag import (
 from netraven.web.crud import (
     get_tags, get_tag, get_tag_by_name, create_tag, update_tag, delete_tag,
     get_tags_for_device, get_devices_for_tag, add_tag_to_device, remove_tag_from_device,
-    bulk_add_tags_to_devices, bulk_remove_tags_from_devices
+    bulk_add_tags_to_devices, bulk_remove_tags_from_devices,
+    get_device
 )
 
 # Create logger
@@ -76,7 +77,12 @@ async def create_tag_endpoint(
     Raises:
         HTTPException: If a tag with the same name already exists
     """
-    require_scope(current_principal, "write:tags")
+    # Check permission directly instead of using require_scope
+    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to create tags"
+        )
     
     # Check if tag with same name already exists
     existing_tag = get_tag_by_name(db, tag.name)
@@ -88,9 +94,12 @@ async def create_tag_endpoint(
     
     # Create tag
     try:
-        new_tag = create_tag(db, tag.dict())
+        logger.info(f"Attempting to create tag: {tag.name} with color: {tag.color}")
+        new_tag = create_tag(db, tag)
+        logger.info(f"Successfully created tag: {new_tag.name} (ID: {new_tag.id})")
         return new_tag
     except Exception as e:
+        logger.error(f"Error creating tag: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error creating tag: {str(e)}"
@@ -153,7 +162,12 @@ async def update_tag_endpoint(
     Raises:
         HTTPException: If the tag is not found or a tag with the same name already exists
     """
-    require_scope(current_principal, "write:tags")
+    # Check permission directly instead of using require_scope
+    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to update tags"
+        )
     
     # Check if tag exists
     tag = get_tag(db, tag_id)
@@ -174,7 +188,7 @@ async def update_tag_endpoint(
     
     # Update tag
     try:
-        updated_tag = update_tag(db, tag_id, tag_data.dict(exclude_unset=True))
+        updated_tag = update_tag(db, tag_id, tag_data.model_dump(exclude_unset=True))
         if not updated_tag:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -204,7 +218,12 @@ async def delete_tag_endpoint(
     Raises:
         HTTPException: If the tag is not found
     """
-    require_scope(current_principal, "write:tags")
+    # Check permission directly instead of using require_scope
+    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to delete tags"
+        )
     
     # Check if tag exists
     tag = get_tag(db, tag_id)
@@ -297,7 +316,12 @@ async def assign_tags_to_devices(
     Raises:
         HTTPException: If any device or tag is not found or user is not authorized
     """
-    require_scope(current_principal, "write:tags")
+    # Check permission directly instead of using require_scope
+    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to assign tags"
+        )
     
     # Check if all tags exist
     for tag_id in assignment.tag_ids:
@@ -325,7 +349,7 @@ async def assign_tags_to_devices(
     
     # Assign tags to devices
     try:
-        assigned_count = assign_tags(db, assignment.tag_ids, assignment.device_ids)
+        assigned_count = bulk_add_tags_to_devices(db, assignment.tag_ids, assignment.device_ids)
         return {
             "message": f"Successfully assigned {len(assignment.tag_ids)} tags to {len(assignment.device_ids)} devices",
             "assigned_count": assigned_count
@@ -356,7 +380,12 @@ async def unassign_tags_from_devices(
     Raises:
         HTTPException: If any device is not found or user is not authorized
     """
-    require_scope(current_principal, "write:tags")
+    # Check permission directly instead of using require_scope
+    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to unassign tags"
+        )
     
     # Check if all devices exist and user has access
     for device_id in removal.device_ids:
@@ -375,7 +404,7 @@ async def unassign_tags_from_devices(
     
     # Unassign tags from devices
     try:
-        removed_count = unassign_tags(db, removal.tag_ids, removal.device_ids)
+        removed_count = bulk_remove_tags_from_devices(db, removal.tag_ids, removal.device_ids)
         return {
             "message": f"Successfully unassigned {len(removal.tag_ids)} tags from {len(removal.device_ids)} devices",
             "removed_count": removed_count
@@ -387,7 +416,7 @@ async def unassign_tags_from_devices(
         )
 
 @router.get("/device/{device_id}", response_model=List[Tag])
-async def get_device_tags(
+async def get_device_tags_endpoint(
     device_id: str,
     current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
@@ -406,7 +435,12 @@ async def get_device_tags(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    require_scope(current_principal, "read:tags")
+    # Check permission directly instead of using require_scope
+    if not current_principal.has_scope("read:tags") and not current_principal.has_scope("read:*") and not current_principal.has_scope("admin:*"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to read tags"
+        )
     
     # Check if device exists and user has access
     device = get_device(db, device_id)
@@ -416,11 +450,5 @@ async def get_device_tags(
             detail=f"Device with ID {device_id} not found"
         )
     
-    if device.owner_id != current_principal.username:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this device"
-        )
-    
     # Get tags for device
-    return get_device_tags(db, device_id) 
+    return get_tags_for_device(db, device_id) 
