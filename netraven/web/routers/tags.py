@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 
 # Import authentication dependencies
-from netraven.web.auth import get_current_principal, UserPrincipal, require_scope
+from netraven.web.auth import (
+    get_current_principal, 
+    UserPrincipal, 
+    require_scope,
+    check_tag_access,
+    check_device_access
+)
 from netraven.web.models.auth import User
 from netraven.web.database import get_db
 
@@ -28,7 +34,7 @@ from netraven.web.crud import (
 
 # Create logger
 from netraven.core.logging import get_logger
-logger = get_logger(__name__)
+logger = get_logger("netraven.web.routers.tags")
 
 # Create router
 router = APIRouter(prefix="", tags=["tags"])
@@ -48,14 +54,27 @@ async def list_tags(
     Returns:
         List[Tag]: List of tags
     """
-    # Reading tags requires read:tags scope
-    if "read:tags" not in current_principal.scopes and "read:*" not in current_principal.scopes and "admin:*" not in current_principal.scopes:
+    # Check permission using standardized pattern
+    if not current_principal.has_scope("read:tags") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=tags, scope=read:tags, reason=insufficient_permissions")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access tags"
+            detail="Insufficient permissions: read:tags required"
         )
-        
-    return get_tags(db)
+    
+    try:
+        # Get all tags
+        tags = get_tags(db)
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=tags, scope=read:tags, count={len(tags)}")
+        return tags
+    except Exception as e:
+        logger.exception(f"Error listing tags: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error listing tags: {str(e)}"
+        )
 
 @router.post("", response_model=Tag, status_code=status.HTTP_201_CREATED)
 async def create_tag_endpoint(
@@ -77,29 +96,37 @@ async def create_tag_endpoint(
     Raises:
         HTTPException: If a tag with the same name already exists
     """
-    # Check permission directly instead of using require_scope
-    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
+    # Check permission using standardized pattern
+    if not current_principal.has_scope("write:tags") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=tags, scope=write:tags, reason=insufficient_permissions")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to create tags"
+            detail="Insufficient permissions: write:tags required"
         )
     
-    # Check if tag with same name already exists
-    existing_tag = get_tag_by_name(db, tag.name)
-    if existing_tag:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Tag with name '{tag.name}' already exists"
-        )
-    
-    # Create tag
     try:
-        logger.info(f"Attempting to create tag: {tag.name} with color: {tag.color}")
+        # Check if tag with same name already exists
+        existing_tag = get_tag_by_name(db, tag.name)
+        if existing_tag:
+            logger.warning(f"Tag creation failed: user={current_principal.username}, " 
+                         f"name={tag.name}, reason=duplicate_name")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tag with name '{tag.name}' already exists"
+            )
+        
+        # Create tag
+        logger.info(f"Creating tag: {tag.name} with color: {tag.color}")
         new_tag = create_tag(db, tag)
-        logger.info(f"Successfully created tag: {new_tag.name} (ID: {new_tag.id})")
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=tag:{new_tag.id}, scope=write:tags, action=create")
         return new_tag
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
-        logger.error(f"Error creating tag: {str(e)}", exc_info=True)
+        logger.exception(f"Error creating tag: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error creating tag: {str(e)}"
@@ -125,19 +152,14 @@ async def get_tag_endpoint(
     Raises:
         HTTPException: If the tag is not found
     """
-    # Reading tags requires read:tags scope
-    if "read:tags" not in current_principal.scopes and "read:*" not in current_principal.scopes and "admin:*" not in current_principal.scopes:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access tags"
-        )
-        
-    tag = get_tag(db, tag_id)
-    if not tag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tag with ID {tag_id} not found"
-        )
+    # Using our permission check function
+    tag = check_tag_access(
+        principal=current_principal,
+        tag_id_or_obj=tag_id,
+        required_scope="read:tags",
+        db=db
+    )
+    
     return tag
 
 @router.put("/{tag_id}", response_model=Tag)
@@ -162,40 +184,36 @@ async def update_tag_endpoint(
     Raises:
         HTTPException: If the tag is not found or a tag with the same name already exists
     """
-    # Check permission directly instead of using require_scope
-    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to update tags"
-        )
-    
-    # Check if tag exists
-    tag = get_tag(db, tag_id)
-    if not tag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tag with ID {tag_id} not found"
-        )
-    
-    # Check if tag with same name already exists (if name is being updated)
-    if tag_data.name and tag_data.name != tag.name:
-        existing_tag = get_tag_by_name(db, tag_data.name)
-        if existing_tag:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Tag with name '{tag_data.name}' already exists"
-            )
-    
-    # Update tag
     try:
-        updated_tag = update_tag(db, tag_id, tag_data.model_dump(exclude_unset=True))
-        if not updated_tag:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error updating tag"
-            )
+        # Using our permission check function
+        tag = check_tag_access(
+            principal=current_principal,
+            tag_id_or_obj=tag_id,
+            required_scope="write:tags",
+            db=db
+        )
+        
+        # Check if tag with same name already exists (if name is being updated)
+        if tag_data.name and tag_data.name != tag.name:
+            existing_tag = get_tag_by_name(db, tag_data.name)
+            if existing_tag:
+                logger.warning(f"Tag update failed: user={current_principal.username}, " 
+                             f"id={tag_id}, name={tag_data.name}, reason=duplicate_name")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Tag with name '{tag_data.name}' already exists"
+                )
+        
+        # Update tag
+        updated_tag = update_tag(db, tag_id, tag_data)
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=tag:{updated_tag.id}, scope=write:tags, action=update")
         return updated_tag
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
+        logger.exception(f"Error updating tag: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error updating tag: {str(e)}"
@@ -218,30 +236,30 @@ async def delete_tag_endpoint(
     Raises:
         HTTPException: If the tag is not found
     """
-    # Check permission directly instead of using require_scope
-    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to delete tags"
-        )
-    
-    # Check if tag exists
-    tag = get_tag(db, tag_id)
-    if not tag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tag with ID {tag_id} not found"
-        )
-    
-    # Delete tag
     try:
+        # Using our permission check function
+        tag = check_tag_access(
+            principal=current_principal,
+            tag_id_or_obj=tag_id,
+            required_scope="write:tags",
+            db=db
+        )
+        
+        # Delete tag
         success = delete_tag(db, tag_id)
         if not success:
+            logger.error(f"Error deleting tag {tag_id}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error deleting tag"
             )
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=tag:{tag.id}, scope=write:tags, action=delete")
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
+        logger.exception(f"Error deleting tag: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error deleting tag: {str(e)}"
@@ -260,41 +278,57 @@ async def get_devices_for_tag_endpoint(
     
     This endpoint returns a list of all devices with a specific tag.
     """
-    # Check if tag exists
-    tag = get_tag(db, tag_id)
-    if not tag:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tag with ID {tag_id} not found"
+    try:
+        # Using our permission check function
+        tag = check_tag_access(
+            principal=current_principal,
+            tag_id_or_obj=tag_id,
+            required_scope="read:tags",
+            db=db
         )
-    
-    # Get devices with this tag
-    devices = get_devices_for_tag(db, tag_id, skip=skip, limit=limit)
-    
-    # Convert devices to dictionary representation
-    device_dicts = []
-    for device in devices:
-        device_dicts.append({
-            "id": device.id,
-            "hostname": device.hostname,
-            "ip_address": device.ip_address,
-            "device_type": device.device_type,
-            "description": device.description
-        })
-    
-    # Create response
-    response = {
-        "id": tag.id,
-        "name": tag.name,
-        "description": tag.description,
-        "color": tag.color,
-        "created_at": tag.created_at,
-        "updated_at": tag.updated_at,
-        "device_count": len(device_dicts),
-        "devices": device_dicts
-    }
-    
-    return response
+        
+        # Get devices with this tag - filter by ownership for non-admin users
+        if current_principal.is_admin:
+            devices = get_devices_for_tag(db, tag_id, skip=skip, limit=limit)
+        else:
+            devices = get_devices_for_tag(db, tag_id, skip=skip, limit=limit, owner_id=current_principal.id)
+        
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=tag:{tag.id}, scope=read:tags, device_count={len(devices)}")
+        
+        # Convert devices to dictionary representation
+        device_dicts = []
+        for device in devices:
+            device_dicts.append({
+                "id": device.id,
+                "hostname": device.hostname,
+                "ip_address": device.ip_address,
+                "device_type": device.device_type,
+                "description": device.description
+            })
+        
+        # Create response
+        response = {
+            "id": tag.id,
+            "name": tag.name,
+            "description": tag.description,
+            "color": tag.color,
+            "created_at": tag.created_at,
+            "updated_at": tag.updated_at,
+            "device_count": len(device_dicts),
+            "devices": device_dicts
+        }
+        
+        return response
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching devices for tag: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching devices for tag: {str(e)}"
+        )
 
 @router.post("/assign", status_code=status.HTTP_200_OK)
 async def assign_tags_to_devices(
@@ -316,45 +350,49 @@ async def assign_tags_to_devices(
     Raises:
         HTTPException: If any device or tag is not found or user is not authorized
     """
-    # Check permission directly instead of using require_scope
-    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
+    # Check permission using standardized pattern
+    if not current_principal.has_scope("write:tags") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=tags, scope=write:tags, reason=insufficient_permissions")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to assign tags"
+            detail="Insufficient permissions: write:tags required"
         )
     
-    # Check if all tags exist
-    for tag_id in assignment.tag_ids:
-        tag = get_tag(db, tag_id)
-        if not tag:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Tag with ID {tag_id} not found"
-            )
-    
-    # Check if all devices exist and user has access
-    for device_id in assignment.device_ids:
-        device = get_device(db, device_id)
-        if not device:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Device with ID {device_id} not found"
+    try:
+        # Check if all tags exist using our permission check function
+        for tag_id in assignment.tag_ids:
+            check_tag_access(
+                principal=current_principal,
+                tag_id_or_obj=tag_id,
+                required_scope="write:tags",
+                db=db
             )
         
-        if device.owner_id != current_principal.username:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Not authorized to access device {device_id}"
+        # Check if all devices exist and user has access using our device permission check
+        for device_id in assignment.device_ids:
+            check_device_access(
+                principal=current_principal,
+                device_id_or_obj=device_id,
+                required_scope="write:devices",
+                db=db
             )
-    
-    # Assign tags to devices
-    try:
+        
+        # Assign tags to devices
         assigned_count = bulk_add_tags_to_devices(db, assignment.tag_ids, assignment.device_ids)
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=tags, scope=write:tags, action=assign, "
+                  f"tag_count={len(assignment.tag_ids)}, device_count={len(assignment.device_ids)}")
+        
         return {
             "message": f"Successfully assigned {len(assignment.tag_ids)} tags to {len(assignment.device_ids)} devices",
             "assigned_count": assigned_count
         }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
+        logger.exception(f"Error assigning tags: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error assigning tags: {str(e)}"
@@ -380,36 +418,40 @@ async def unassign_tags_from_devices(
     Raises:
         HTTPException: If any device is not found or user is not authorized
     """
-    # Check permission directly instead of using require_scope
-    if not current_principal.has_scope("write:tags") and not current_principal.has_scope("write:*") and not current_principal.has_scope("admin:*"):
+    # Check permission using standardized pattern
+    if not current_principal.has_scope("write:tags") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=tags, scope=write:tags, reason=insufficient_permissions")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to unassign tags"
+            detail="Insufficient permissions: write:tags required"
         )
     
-    # Check if all devices exist and user has access
-    for device_id in removal.device_ids:
-        device = get_device(db, device_id)
-        if not device:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Device with ID {device_id} not found"
+    try:
+        # Check if all devices exist and user has access using our device permission check
+        for device_id in removal.device_ids:
+            check_device_access(
+                principal=current_principal,
+                device_id_or_obj=device_id,
+                required_scope="write:devices",
+                db=db
             )
         
-        if device.owner_id != current_principal.username:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Not authorized to access device {device_id}"
-            )
-    
-    # Unassign tags from devices
-    try:
+        # Unassign tags from devices
         removed_count = bulk_remove_tags_from_devices(db, removal.tag_ids, removal.device_ids)
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=tags, scope=write:tags, action=unassign, "
+                  f"tag_count={len(removal.tag_ids)}, device_count={len(removal.device_ids)}")
+        
         return {
             "message": f"Successfully unassigned {len(removal.tag_ids)} tags from {len(removal.device_ids)} devices",
             "removed_count": removed_count
         }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
+        logger.exception(f"Error unassigning tags: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error unassigning tags: {str(e)}"
@@ -435,20 +477,36 @@ async def get_device_tags_endpoint(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    # Check permission directly instead of using require_scope
-    if not current_principal.has_scope("read:tags") and not current_principal.has_scope("read:*") and not current_principal.has_scope("admin:*"):
+    # First check permission for read:tags
+    if not current_principal.has_scope("read:tags") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=tags, scope=read:tags, reason=insufficient_permissions")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to read tags"
+            detail="Insufficient permissions: read:tags required"
         )
     
-    # Check if device exists and user has access
-    device = get_device(db, device_id)
-    if not device:
+    try:
+        # Also check if user has access to the device using our device permission check
+        device = check_device_access(
+            principal=current_principal,
+            device_id_or_obj=device_id,
+            required_scope="read:devices",
+            db=db
+        )
+        
+        # Get tags for device
+        tags = get_tags_for_device(db, device_id)
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=device:{device_id}, scope=read:tags, tag_count={len(tags)}")
+        
+        return tags
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching tags for device: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device with ID {device_id} not found"
-        )
-    
-    # Get tags for device
-    return get_tags_for_device(db, device_id) 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching tags for device: {str(e)}"
+        ) 

@@ -198,7 +198,8 @@ def get_devices_for_tag(
     db: Session, 
     tag_id: str,
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
+    owner_id: Optional[str] = None
 ) -> List[Device]:
     """
     Get all devices with a specific tag.
@@ -208,16 +209,23 @@ def get_devices_for_tag(
         tag_id: Tag ID
         skip: Number of records to skip
         limit: Maximum number of records to return
+        owner_id: Optional owner ID to filter by
         
     Returns:
         List of devices with the specified tag
     """
-    return db.query(Device).join(
+    query = db.query(Device).join(
         device_tags,
         device_tags.c.device_id == Device.id
     ).filter(
         device_tags.c.tag_id == tag_id
-    ).offset(skip).limit(limit).all()
+    )
+    
+    # Add owner filter if provided
+    if owner_id:
+        query = query.filter(Device.owner_id == owner_id)
+    
+    return query.offset(skip).limit(limit).all()
 
 def add_tag_to_device(
     db: Session, 

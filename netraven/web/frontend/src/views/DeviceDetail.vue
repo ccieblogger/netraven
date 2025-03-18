@@ -583,11 +583,14 @@ export default {
     const backupDevice = async () => {
       backingUp.value = true
       try {
-        await deviceStore.backupDevice(deviceId.value)
+        console.log('Starting device backup process for:', deviceId.value)
+        const result = await deviceStore.backupDevice(deviceId.value)
+        console.log('Backup result:', result)
         await deviceStore.fetchDevice(deviceId.value)
         await backupStore.fetchBackups({ device_id: deviceId.value })
       } catch (error) {
         console.error('Error backing up device:', error)
+        console.error('Error details:', error.response?.data || 'No detailed error information')
       } finally {
         backingUp.value = false
       }

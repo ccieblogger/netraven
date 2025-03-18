@@ -15,7 +15,7 @@ import logging
 import os
 
 # Import authentication dependencies
-from netraven.web.auth import get_current_principal, UserPrincipal, require_scope
+from netraven.web.auth import get_current_principal, UserPrincipal, require_scope, check_device_access
 from netraven.web.models.auth import User
 from netraven.web.database import get_db
 from netraven.web.models.device import Device as DeviceModel
@@ -79,19 +79,27 @@ async def list_devices(
     Returns:
         List[DeviceModel]: List of devices
     """
-    # Instead of calling require_scope directly, check scope manually
-    if not current_principal.has_scope("read:devices"):
+    # Check if user has read:devices scope
+    if not current_principal.has_scope("read:devices") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=devices, scope=read:devices, reason=insufficient_permissions")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions. Missing read:devices scope.",
+            detail="Insufficient permissions: read:devices required"
         )
     
     try:
         # If user is admin, show all devices, otherwise just their own
         if current_principal.is_admin:
-            return get_devices(db) 
+            devices = get_devices(db)
+            logger.info(f"Access granted: user={current_principal.username}, " 
+                      f"resource=devices, scope=read:devices, count={len(devices)}")
+            return devices
         else:
-            return get_devices(db, owner_id=current_principal.id)
+            devices = get_devices(db, owner_id=current_principal.id)
+            logger.info(f"Access granted: user={current_principal.username}, " 
+                      f"resource=devices, scope=read:devices, filtered=owner, count={len(devices)}")
+            return devices
     except Exception as e:
         logger.exception(f"Error listing devices: {str(e)}")
         raise HTTPException(
@@ -119,27 +127,14 @@ async def get_device_endpoint(
     Raises:
         HTTPException: If the device is not found
     """
-    # Check permissions using has_scope method directly
-    if not current_principal.is_admin and not current_principal.has_scope("read:devices"):
-        logger.warning(f"Insufficient permissions for {current_principal.username}: missing read:devices scope")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to read devices",
-        )
+    # Use the utility function to check permissions and get the device
+    device = check_device_access(
+        principal=current_principal,
+        device_id_or_obj=device_id,
+        required_scope="read:devices",
+        db=db
+    )
     
-    device = get_device(db, device_id)
-    if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device with ID {device_id} not found"
-        )
-    
-    # Check if user is admin or owns the device
-    if not current_principal.is_admin and device.owner_id != current_principal.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this device"
-        )
     return device
 
 @router.post("/", response_model=Device, status_code=status.HTTP_201_CREATED)
@@ -160,21 +155,22 @@ async def create_device_endpoint(
         DeviceModel: The created device
     """
     # Check if user has proper permissions
-    if not current_principal.is_admin and not current_principal.has_scope("write:devices"):
-        logger.warning(f"Insufficient permissions for {current_principal.username}: missing write:devices scope")
+    if not current_principal.has_scope("write:devices") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=devices, scope=write:devices, reason=insufficient_permissions")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to create devices",
+            detail="Insufficient permissions: write:devices required"
         )
     
     # Get the user ID from the user object
     user_id = current_principal.id
-    logger.info(f"Creating device: {device.hostname} by user {current_principal.username} (ID: {user_id})")
     
     try:
         # Create device with the current user ID as owner
         new_device = create_device(db, device, user_id)
-        logger.info(f"Device created successfully: {new_device.hostname}")
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=device:{new_device.id}, scope=write:devices, action=create, hostname={device.hostname}")
         return new_device
     except Exception as e:
         logger.error(f"Error creating device: {str(e)}")
@@ -205,34 +201,21 @@ async def update_device_endpoint(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    # Check if user has proper permissions
-    if not current_principal.is_admin and not current_principal.has_scope("write:devices"):
-        logger.warning(f"Insufficient permissions for {current_principal.username}: missing write:devices scope")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to update devices",
-        )
-    
-    # Check if device exists
-    existing_device = get_device(db, device_id)
-    if not existing_device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device with ID {device_id} not found"
-        )
-    
-    # Check if user owns the device
-    if not current_principal.is_admin and existing_device.owner_id != current_principal.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this device"
-        )
+    # Use the utility function to check permissions and get the device
+    existing_device = check_device_access(
+        principal=current_principal,
+        device_id_or_obj=device_id,
+        required_scope="write:devices",
+        db=db
+    )
     
     # Update device
     try:
         # Use model_dump instead of dict for Pydantic v2 compatibility
         update_data = device.model_dump(exclude_unset=True) if hasattr(device, 'model_dump') else device.dict(exclude_unset=True)
         updated_device = update_device(db, device_id, update_data)
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=device:{device_id}, scope=write:devices, action=update")
         return updated_device
     except Exception as e:
         logger.error(f"Error updating device: {str(e)}")
@@ -258,32 +241,20 @@ async def delete_device_endpoint(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    # Check if user has proper permissions
-    if not current_principal.is_admin and not current_principal.has_scope("write:devices"):
-        logger.warning(f"Insufficient permissions for {current_principal.username}: missing write:devices scope")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to delete devices",
-        )
-    
-    # Check if device exists
-    existing_device = get_device(db, device_id)
-    if not existing_device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device with ID {device_id} not found"
-        )
-    
-    # Check if user owns the device
-    if not current_principal.is_admin and existing_device.owner_id != current_principal.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete this device"
-        )
+    # Use the utility function to check permissions and get the device
+    existing_device = check_device_access(
+        principal=current_principal,
+        device_id_or_obj=device_id,
+        required_scope="write:devices",
+        db=db
+    )
     
     # Delete device
     try:
+        hostname = existing_device.hostname
         delete_device(db, device_id)
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=device:{device_id}, scope=write:devices, action=delete, hostname={hostname}")
     except Exception as e:
         logger.error(f"Error deleting device: {str(e)}")
         raise HTTPException(
@@ -294,18 +265,18 @@ async def delete_device_endpoint(
 @router.post("/{device_id}/backup", status_code=status.HTTP_202_ACCEPTED)
 async def backup_device(
     device_id: str,
+    request: Request,
     current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Trigger a backup for a device.
     
     Args:
         device_id: The device ID
+        request: The FastAPI request object
         current_principal: The authenticated user
         db: Database session
-        request: The FastAPI request object
         
     Returns:
         Dict[str, Any]: Status of the backup request
@@ -313,28 +284,17 @@ async def backup_device(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    # Check if user has proper permissions
-    if not current_principal.is_admin and not current_principal.has_scope("write:backups"):
-        logger.warning(f"Insufficient permissions for {current_principal.username}: missing write:backups scope")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to backup devices",
-        )
+    # Use the utility function to check permissions and get the device
+    device = check_device_access(
+        principal=current_principal,
+        device_id_or_obj=device_id,
+        required_scope="write:backups",
+        db=db
+    )
     
-    # Check if device exists
-    device = get_device(db, device_id)
-    if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device with ID {device_id} not found"
-        )
-    
-    # Check if user has access to this device
-    if not current_principal.is_admin and device.owner_id != current_principal.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to backup this device"
-        )
+    # Log access grant
+    logger.info(f"Access granted: user={current_principal.username}, " 
+              f"resource=device:{device_id}, scope=write:backups, action=backup")
     
     # Generate a job ID
     job_id = str(uuid.uuid4())
@@ -342,17 +302,49 @@ async def backup_device(
     # Import necessary modules for backup
     from netraven.gateway.client import GatewayClient
     from netraven.web.schemas.backup import BackupCreate
+    from netraven.web.schemas.job_log import JobLogCreate
+    from netraven.web.models.job_log import JobLog
     
     try:
+        # Create a job log entry in the database
+        job_log = JobLog(
+            id=job_id,
+            session_id=job_id,  # Use job_id as session_id for simplicity
+            job_type="device_backup",
+            status="running",
+            start_time=datetime.utcnow(),
+            device_id=device_id,
+            created_by=current_principal.id,  # Use ID not username
+            job_data={"device_hostname": device.hostname, "device_ip": device.ip_address}
+        )
+        db.add(job_log)
+        try:
+            db.commit()
+        except Exception as db_error:
+            db.rollback()  # Roll back the transaction on error
+            logger.error(f"Database error creating job log: {str(db_error)}")
+            return {
+                "message": f"Backup job for device {device.hostname} failed to start: Database error",
+                "job_id": job_id,
+                "device_id": device_id,
+                "status": "error",
+                "error": str(db_error)
+            }
+        
         # Log the backup request
-        logger.info(f"Backup requested for device {device.hostname} (ID: {device_id})")
+        logger.info(f"Backup job created for device {device.hostname} (ID: {device_id})")
         
         # Get gateway URL from environment
         gateway_url = os.environ.get("GATEWAY_URL", "http://device_gateway:8001")
         
         # Get auth token for gateway request - use the token from the current principal
-        auth_header = request.headers.get("Authorization") if request else None
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            logger.warning(f"No Authorization header in request for device backup {device_id}")
+            
         token = extract_token_from_header(auth_header)
+        if not token:
+            logger.warning(f"Failed to extract token from Authorization header for device backup {device_id}")
         
         # Create gateway client with the token
         gateway_client = GatewayClient(
@@ -421,6 +413,18 @@ async def backup_device(
             # Update device backup status
             update_device_backup_status(db, device_id, "success")
             
+            # Update job log status
+            job_log.status = "completed"
+            job_log.end_time = datetime.utcnow()
+            job_log.result_message = f"Backup completed for device {device.hostname}"
+            job_log.job_data = {
+                **job_log.job_data,
+                "backup_id": backup.id,
+                "file_path": filepath,
+                "file_size": len(config)
+            }
+            db.commit()
+            
             # Update response with success
             return {
                 "message": f"Backup completed for device {device.hostname}",
@@ -431,7 +435,17 @@ async def backup_device(
             }
         else:
             # Update device backup status
-            update_device_backup_status(db, device_id, "error")
+            try:
+                update_device_backup_status(db, device_id, "error")
+                
+                # Update job log status
+                job_log.status = "failed"
+                job_log.end_time = datetime.utcnow()
+                job_log.result_message = f"Backup failed: {backup_result.get('message', 'Unknown error')}"
+                db.commit()
+            except Exception as db_error:
+                db.rollback()
+                logger.error(f"Error updating job status: {str(db_error)}")
             
             error_message = backup_result.get("message", "Unknown error")
             logger.error(f"Backup failed for device {device.hostname}: {error_message}")
@@ -444,14 +458,25 @@ async def backup_device(
             }
         
     except Exception as e:
-        logger.exception(f"Error executing backup job for {device.hostname}: {e}")
+        # Update device backup status (errors)
+        try:
+            update_device_backup_status(db, device_id, "error")
+            
+            # Update job log status if it exists
+            db.query(JobLog).filter(JobLog.id == job_id).update({
+                "status": "failed",
+                "end_time": datetime.utcnow(),
+                "result_message": f"Backup failed with error: {str(e)}"
+            })
+            db.commit()
+        except Exception as db_error:
+            db.rollback()
+            logger.error(f"Error updating job status: {str(db_error)}")
         
-        # Update device backup status
-        update_device_backup_status(db, device_id, "error")
+        logger.exception(f"Error during backup process for device {device.hostname}: {str(e)}")
         
-        # Return a response with the job ID
         return {
-            "message": f"Backup job for device {device.hostname} failed with error: {str(e)}",
+            "message": f"Backup job for device {device.hostname} failed with exception: {str(e)}",
             "job_id": job_id,
             "device_id": device_id,
             "status": "error"
@@ -460,18 +485,18 @@ async def backup_device(
 @router.post("/{device_id}/reachability", status_code=status.HTTP_200_OK)
 async def check_device_reachability(
     device_id: str,
+    request: Request,
     current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Check if a device is reachable.
     
     Args:
         device_id: The device ID
+        request: The FastAPI request object
         current_principal: The authenticated user
         db: Database session
-        request: The FastAPI request object
         
     Returns:
         Dict[str, Any]: Reachability status
@@ -479,42 +504,33 @@ async def check_device_reachability(
     Raises:
         HTTPException: If the device is not found or user is not authorized
     """
-    # Check if user has proper permissions
-    if not current_principal.is_admin and not current_principal.has_scope("read:devices"):
-        logger.warning(f"Insufficient permissions for {current_principal.username}: missing read:devices scope")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to check device reachability",
-        )
+    # Use the utility function to check permissions and get the device
+    device = check_device_access(
+        principal=current_principal,
+        device_id_or_obj=device_id,
+        required_scope="read:devices",
+        db=db
+    )
     
-    # Check if device exists
-    device = get_device(db, device_id)
-    if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Device with ID {device_id} not found"
-        )
-    
-    # Check if user owns the device
-    if not current_principal.is_admin and device.owner_id != current_principal.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to check this device"
-        )
+    # Log access grant
+    logger.info(f"Access granted: user={current_principal.username}, " 
+              f"resource=device:{device_id}, scope=read:devices, action=check_reachability")
     
     # Import the gateway client
     from netraven.gateway.client import GatewayClient
     
     try:
-        # Log the reachability check request
-        logger.info(f"Reachability check requested for device {device.hostname} (ID: {device_id})")
-        
         # Get gateway URL from environment
         gateway_url = os.environ.get("GATEWAY_URL", "http://device_gateway:8001")
         
         # Get auth token for gateway request - use the token from the current principal
-        auth_header = request.headers.get("Authorization") if request else None
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            logger.warning(f"No Authorization header in request for device reachability check {device_id}")
+            
         token = extract_token_from_header(auth_header)
+        if not token:
+            logger.warning(f"Failed to extract token from Authorization header for device reachability check {device_id}")
         
         # Create gateway client with the token
         gateway_client = GatewayClient(
@@ -532,61 +548,31 @@ async def check_device_reachability(
             port=device.port
         )
         
-        # Check if the reachability check was successful
-        if reachability_result["status"] == "success" and reachability_result.get("data"):
-            # Extract data from the gateway response
-            reachability_data = reachability_result["data"]
-            reachable = reachability_data.get("reachable", False)
-            icmp_reachable = reachability_data.get("icmp_reachable", False)
-            ssh_reachable = reachability_data.get("ssh_reachable", False)
-            
-            # Update the device's reachability status in the database
-            device.last_reachability_check = datetime.utcnow()
-            device.is_reachable = reachable
-            db.commit()
-            
-            logger.info(f"Reachability check for device {device.hostname}: {'Reachable' if reachable else 'Unreachable'}")
-            
-            # Return the reachability status
+        # Check if the reachability check was successful and return appropriate response
+        if reachability_result["status"] == "success":
+            logger.info(f"Device {device.hostname} (ID: {device_id}) is reachable")
             return {
+                "message": f"Device {device.hostname} is reachable",
                 "device_id": device_id,
-                "hostname": device.hostname,
-                "ip_address": device.ip_address,
-                "reachable": reachable,
-                "icmp_reachable": icmp_reachable,
-                "ssh_reachable": ssh_reachable,
-                "details": reachability_data
+                "status": "success",
+                "reachable": True,
+                "details": reachability_result.get("data", {})
             }
         else:
             error_message = reachability_result.get("message", "Unknown error")
-            logger.error(f"Reachability check failed for device {device.hostname}: {error_message}")
-            
-            # Update the device's reachability status in the database
-            device.last_reachability_check = datetime.utcnow()
-            device.is_reachable = False
-            db.commit()
-            
+            logger.warning(f"Device {device.hostname} (ID: {device_id}) is not reachable: {error_message}")
             return {
+                "message": f"Device {device.hostname} is not reachable: {error_message}",
                 "device_id": device_id,
-                "hostname": device.hostname,
-                "ip_address": device.ip_address,
+                "status": "error",
                 "reachable": False,
-                "error": error_message
+                "details": reachability_result.get("data", {})
             }
-        
     except Exception as e:
-        logger.exception(f"Error checking reachability for {device.hostname}: {e}")
-        
-        # Update the device's reachability status in the database
-        device.last_reachability_check = datetime.utcnow()
-        device.is_reachable = False
-        db.commit()
-        
-        # Return a response with the error
+        logger.exception(f"Error checking reachability for device {device.hostname}: {str(e)}")
         return {
+            "message": f"Error checking reachability for device {device.hostname}: {str(e)}",
             "device_id": device_id,
-            "hostname": device.hostname,
-            "ip_address": device.ip_address,
-            "reachable": False,
-            "error": str(e)
+            "status": "error",
+            "reachable": False
         } 

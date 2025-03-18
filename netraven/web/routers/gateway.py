@@ -43,6 +43,10 @@ async def get_gateway_status(
     
     Requires authentication with the 'read:gateway' scope.
     """
+    # Log access if principal is provided
+    if principal:
+        logger.info(f"Access granted: user={principal.username}, resource=gateway, scope=read:gateway, action=status")
+    
     try:
         gateway_url = "http://device_gateway:8001/status"
         
@@ -94,6 +98,9 @@ async def get_devices(
     
     Requires authentication with the 'read:devices' scope.
     """
+    # Log access granted
+    logger.info(f"Access granted: user={principal.username}, resource=gateway:devices, scope=read:devices, action=list")
+    
     try:
         gateway_url = "http://device_gateway:8001/devices"
         
@@ -133,6 +140,10 @@ async def get_gateway_metrics(
     
     Requires authentication with the 'read:metrics' scope.
     """
+    # Log access if principal is provided
+    if principal:
+        logger.info(f"Access granted: user={principal.username}, resource=gateway:metrics, scope=read:metrics, action=get")
+    
     try:
         gateway_url = "http://device_gateway:8001/metrics"
         
@@ -178,6 +189,10 @@ async def get_gateway_config(
     
     Requires authentication with the 'read:gateway' scope.
     """
+    # Log access if principal is provided
+    if principal:
+        logger.info(f"Access granted: user={principal.username}, resource=gateway:config, scope=read:gateway, action=get")
+    
     try:
         gateway_url = "http://device_gateway:8001/config"
         

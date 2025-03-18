@@ -229,9 +229,13 @@ export const useDeviceStore = defineStore('devices', {
           return null
         }
         
+        console.log(`DeviceStore: Initiating backup for device ${id}`)
         const result = await deviceService.backupDevice(id)
+        console.log(`DeviceStore: Backup initiated successfully for device ${id}`, result)
         return result
       } catch (error) {
+        console.error(`DeviceStore: Error during backup for device ${id}:`, error)
+        console.error(`DeviceStore: Error response:`, error.response?.data)
         this.handleApiError(error, `backup device ${id}`)
         return null
       } finally {

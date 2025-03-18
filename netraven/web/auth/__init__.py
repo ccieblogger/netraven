@@ -25,6 +25,9 @@ from netraven.core.logging import get_logger
 from netraven.core.config import get_config
 from netraven.web.models.auth import User, ServiceAccount
 
+# Remove the circular import from here
+# from netraven.web.auth.permissions import check_device_access
+
 # Setup logger
 logger = get_logger("netraven.web.auth")
 
@@ -39,6 +42,19 @@ TOKEN_EXPIRY_HOURS = int(os.environ.get("TOKEN_EXPIRY_HOURS", config.get("auth",
 TOKEN_SECRET_KEY = os.environ.get("TOKEN_SECRET_KEY", "default-secret-key")
 TOKEN_ALGORITHM = os.environ.get("TOKEN_ALGORITHM", "HS256")
 
+# Re-export the permission function - we'll add it later after UserPrincipal is defined
+__all__ = [
+    "get_current_principal", 
+    "require_scope", 
+    "optional_auth",
+    "check_device_access", 
+    "check_backup_access",
+    "check_tag_access",
+    "check_tag_rule_access",
+    "check_job_log_access",
+    "check_user_access",
+    "check_scheduled_job_access"
+]
 
 class Principal:
     """Base class for authentication principals (users or services)."""
@@ -431,4 +447,26 @@ def create_service_token(
         "created_at": datetime.utcnow().isoformat()
     })
     
-    return token 
+    return token
+
+# Import after UserPrincipal is defined to avoid circular imports
+from netraven.web.auth.permissions import (
+    check_device_access,
+    check_backup_access,
+    check_tag_access,
+    check_tag_rule_access,
+    check_job_log_access,
+    check_user_access,
+    check_scheduled_job_access
+)
+
+# Add to __all__ after import
+__all__.extend([
+    "check_device_access",
+    "check_backup_access", 
+    "check_tag_access",
+    "check_tag_rule_access",
+    "check_job_log_access",
+    "check_user_access",
+    "check_scheduled_job_access"
+]) 

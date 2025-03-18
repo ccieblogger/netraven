@@ -12,7 +12,12 @@ from netraven.web.database import get_db
 from netraven.web.models.user import User as UserModel
 from netraven.web.schemas.user import User, UserCreate, UserUpdate
 from netraven.web.crud import get_user, get_users, update_user, delete_user
-from netraven.web.auth import get_current_principal, UserPrincipal, require_scope
+from netraven.web.auth import (
+    get_current_principal, 
+    UserPrincipal, 
+    require_scope,
+    check_user_access
+)
 from netraven.web.models.auth import User
 from netraven.core.logging import get_logger
 
@@ -52,12 +57,17 @@ async def list_users(
     Returns:
         List[Dict[str, Any]]: List of users
     """
-    if not current_principal.has_scope("admin:users"):
+    if not current_principal.has_scope("admin:users") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=users, scope=admin:users, reason=insufficient_permissions")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to list users"
+            detail="Insufficient permissions: admin:users required"
         )
-    return get_users(db)
+    
+    users = get_users(db)
+    logger.info(f"Access granted: user={current_principal.username}, resource=users, scope=admin:users")
+    return users
 
 @router.get("/{user_id}", response_model=User)
 async def get_user_endpoint(
@@ -79,19 +89,14 @@ async def get_user_endpoint(
     Raises:
         HTTPException: If the user is not found or current user is not authorized
     """
-    # Check if user is admin or getting their own profile
-    if not current_principal.has_scope("admin:users") and user_id != current_principal.username:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this user"
-        )
-    
-    user = get_user(db, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID {user_id} not found"
-        )
+    # Use check_user_access to handle permission checks
+    user = check_user_access(
+        principal=current_principal,
+        user_id_or_obj=user_id,
+        required_scope="admin:users",
+        db=db,
+        allow_self_access=True
+    )
     
     return user
 
@@ -117,23 +122,18 @@ async def update_user_endpoint(
     Raises:
         HTTPException: If the user is not found or current user is not authorized
     """
-    # Check if user is admin or updating their own profile
-    if not current_principal.has_scope("admin:users") and user_id != current_principal.username:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this user"
-        )
-    
-    # Check if user exists
-    user = get_user(db, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID {user_id} not found"
-        )
+    # Use check_user_access to handle permission checks
+    existing_user = check_user_access(
+        principal=current_principal,
+        user_id_or_obj=user_id,
+        required_scope="admin:users",
+        db=db,
+        allow_self_access=True
+    )
     
     # Update user
     updated_user = update_user(db, user_id, user_data.dict(exclude_unset=True))
+    logger.info(f"User {user_id} updated by {current_principal.username}")
     return updated_user
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -153,19 +153,15 @@ async def delete_user_endpoint(
     Raises:
         HTTPException: If the user is not found or current user is not authorized
     """
-    if not current_principal.has_scope("admin:users"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete users"
-        )
-    
-    # Check if user exists
-    user = get_user(db, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID {user_id} not found"
-        )
+    # Use check_user_access to handle permission checks, but don't allow self-access
+    existing_user = check_user_access(
+        principal=current_principal,
+        user_id_or_obj=user_id,
+        required_scope="admin:users",
+        db=db,
+        allow_self_access=False  # Users shouldn't delete themselves
+    )
     
     # Delete user
-    delete_user(db, user_id) 
+    delete_user(db, user_id)
+    logger.info(f"User {user_id} deleted by {current_principal.username}") 
