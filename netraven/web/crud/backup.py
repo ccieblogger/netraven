@@ -74,13 +74,14 @@ def get_backups(
     # Apply pagination
     return query.offset(skip).limit(limit).all()
 
-def create_backup(db: Session, backup: BackupCreate) -> Backup:
+def create_backup(db: Session, backup: BackupCreate, serial_number: Optional[str] = None) -> Backup:
     """
     Create a new backup.
     
     Args:
         db: Database session
         backup: Backup creation data
+        serial_number: Optional serial number of the device
         
     Returns:
         Created Backup object
@@ -97,7 +98,7 @@ def create_backup(db: Session, backup: BackupCreate) -> Backup:
         comment=backup.comment,
         is_automatic=backup.is_automatic,
         device_id=backup.device_id,
-        serial_number=backup.serial_number,
+        serial_number=serial_number,
         created_at=datetime.utcnow()
     )
     

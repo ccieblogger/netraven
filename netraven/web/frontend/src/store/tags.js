@@ -124,59 +124,10 @@ export const useTagStore = defineStore('tags', {
       try {
         console.log(`Fetching tags for device ${deviceId}`)
         
-        // Make sure we have all available tags loaded first
-        if (this.tags.length === 0) {
-          console.log('No tags loaded yet, fetching all tags first')
-          await this.fetchTags()
-          console.log('Tags after fetchTags:', this.tags)
-        }
-        
-        // Get all tags
-        const allTags = this.tags
-        console.log('All available tags:', allTags)
-        console.log('Number of tags:', allTags.length)
-        
-        // Create a batch of promises to check each tag in parallel
-        const deviceTags = []
-        const deviceTagPromises = []
-        
-        console.log('Creating promises to check each tag...')
-        for (const tag of allTags) {
-          console.log(`Creating promise for tag ${tag.id} (${tag.name})`)
-          deviceTagPromises.push(
-            tagService.getDevicesForTag(tag.id)
-              .then(devices => {
-                console.log(`Got devices for tag ${tag.id}:`, devices)
-                if (devices && devices.devices) {
-                  console.log(`Checking if device ${deviceId} is in the list of devices for tag ${tag.id}`)
-                  const deviceFound = devices.devices.some(device => {
-                    console.log(`Comparing device.id (${device.id}) with deviceId (${deviceId})`)
-                    return device.id === deviceId
-                  })
-                  
-                  if (deviceFound) {
-                    console.log(`Tag ${tag.id} (${tag.name}) is assigned to device ${deviceId}`)
-                    deviceTags.push(tag)
-                  } else {
-                    console.log(`Tag ${tag.id} (${tag.name}) is NOT assigned to device ${deviceId}`)
-                  }
-                } else {
-                  console.log(`No devices property found in response for tag ${tag.id}`)
-                }
-              })
-              .catch(error => {
-                console.error(`Error checking if device ${deviceId} has tag ${tag.id}:`, error)
-              })
-          )
-        }
-        
-        console.log(`Created ${deviceTagPromises.length} promises, waiting for all to resolve...`)
-        // Wait for all promises to resolve
-        await Promise.all(deviceTagPromises)
-        
-        console.log(`All promises resolved`)
-        console.log(`Final deviceTags for device ${deviceId}:`, deviceTags)
-        console.log(`Number of device tags found: ${deviceTags.length}`)
+        // Instead of checking each tag for the device,
+        // use the device/{deviceId}/tags endpoint directly
+        const deviceTags = await tagService.getTagsForDevice(deviceId)
+        console.log(`Got tags for device ${deviceId}:`, deviceTags)
         
         // Update our local cache
         this.deviceTags[deviceId] = deviceTags

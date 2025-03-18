@@ -585,7 +585,7 @@ export default {
       try {
         await deviceStore.backupDevice(deviceId.value)
         await deviceStore.fetchDevice(deviceId.value)
-        await backupStore.fetchBackupsByDevice(deviceId.value)
+        await backupStore.fetchBackups({ device_id: deviceId.value })
       } catch (error) {
         console.error('Error backing up device:', error)
       } finally {

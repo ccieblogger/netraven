@@ -400,6 +400,13 @@ const apiClient = {
     return response.data;
   },
 
+  async getTagsForDevice(deviceId) {
+    const response = await axios.get(`${browserApiUrl}/api/tags/device/${deviceId}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
   async assignTagsToDevices(deviceIds, tagIds) {
     const response = await axios.post(
       `${browserApiUrl}/api/tags/assign`,
@@ -661,6 +668,18 @@ export const scheduledJobsService = {
   deleteScheduledJob: (id) => apiClient.deleteScheduledJob(id),
   runScheduledJob: (id) => apiClient.runScheduledJob(id),
   toggleScheduledJob: (id, enabled) => apiClient.toggleScheduledJob(id, enabled)
+}
+
+export const tagService = {
+  getTags: (params) => apiClient.getTags(params),
+  getTag: (id) => apiClient.getTag(id),
+  createTag: (tagData) => apiClient.createTag(tagData),
+  updateTag: (id, tagData) => apiClient.updateTag(id, tagData),
+  deleteTag: (id) => apiClient.deleteTag(id),
+  getDevicesForTag: (id, params) => apiClient.getDevicesForTag(id, params),
+  getTagsForDevice: (deviceId) => apiClient.getTagsForDevice(deviceId),
+  assignTagsToDevices: (deviceIds, tagIds) => apiClient.assignTagsToDevices(deviceIds, tagIds),
+  removeTagsFromDevices: (deviceIds, tagIds) => apiClient.removeTagsFromDevices(deviceIds, tagIds)
 }
 
 export default apiClient 

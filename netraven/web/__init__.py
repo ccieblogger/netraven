@@ -45,12 +45,12 @@ app.add_middleware(
         "http://127.0.0.1:8000",
         "http://frontend:8080",  # Docker service name
         "http://api:8000",       # Docker service name
-        "*"                      # Allow all origins in development
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Type", "Authorization"]
+    expose_headers=["Content-Type", "Authorization"],
+    max_age=86400  # 24 hours cache for preflight requests
 )
 
 # Register startup events

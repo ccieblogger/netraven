@@ -111,6 +111,20 @@ def create_device(db: Session, device: DeviceCreate, owner_id: str) -> Device:
         db.add(db_device)
         db.commit()
         db.refresh(db_device)
+        
+        # Add default tag to the device
+        from netraven.web.database import DEFAULT_TAG_ID
+        from netraven.web.crud.tag import add_tag_to_device, get_tag
+        
+        # Check if default tag exists
+        default_tag = get_tag(db, DEFAULT_TAG_ID)
+        if default_tag:
+            # Add default tag to device
+            add_tag_to_device(db, db_device.id, DEFAULT_TAG_ID)
+            logger.info(f"Added default tag to device: {db_device.hostname}")
+        else:
+            logger.warning(f"Could not add default tag to device: {db_device.hostname} (default tag not found)")
+        
         logger.info(f"Device created successfully: {db_device.hostname}")
         return db_device
     except Exception as e:

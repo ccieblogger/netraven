@@ -283,16 +283,20 @@ async def get_current_principal(
         )
 
 
-def require_scope(required_scopes: List[str]):
+def require_scope(required_scopes: Union[str, List[str]]):
     """
     Create a dependency that requires specific scopes.
     
     Args:
-        required_scopes: List of required scopes
+        required_scopes: Either a single scope as a string or a list of required scopes
         
     Returns:
         Callable: FastAPI dependency that checks scopes
     """
+    # Convert to list if a single string was provided
+    if isinstance(required_scopes, str):
+        required_scopes = [required_scopes]
+        
     async def dependency(principal: Principal = Depends(get_current_principal)):
         for scope in required_scopes:
             if not principal.has_scope(scope):
