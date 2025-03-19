@@ -4,7 +4,7 @@ Pydantic models for the Device Gateway API.
 This module defines the data models used for API requests and responses.
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Dict, Optional, List, Any, Union
 
 
@@ -36,7 +36,7 @@ class DeviceConnectionRequest(BaseModel):
     key_file: Optional[str] = Field(None, description="Path to SSH key file")
     timeout: int = Field(60, description="Connection timeout in seconds")
     
-    @validator('device_type')
+    @field_validator('device_type')
     def validate_device_type(cls, v):
         """Validate device type."""
         valid_types = ['cisco_ios', 'cisco_nxos', 'juniper', 'arista_eos', 'generic']
@@ -49,7 +49,7 @@ class DeviceCommandRequest(DeviceConnectionRequest):
     """Device command request model."""
     command: str = Field(..., description="Command to execute on the device")
     
-    @validator('command')
+    @field_validator('command')
     def validate_command(cls, v):
         """Validate command."""
         valid_commands = ['get_running_config', 'get_serial_number', 'get_os_info']

@@ -42,10 +42,10 @@ class TagWithDevices(Tag):
 # Tag assignment schemas
 class TagAssignment(BaseModel):
     """Schema for assigning tags to devices."""
-    device_ids: List[str] = Field(..., min_items=1)
-    tag_ids: List[str] = Field(..., min_items=1)
+    device_ids: List[str] = Field(..., min_length=1)
+    tag_ids: List[str] = Field(..., min_length=1)
 
 class TagRemoval(BaseModel):
     """Schema for removing tags from devices."""
-    device_ids: List[str] = Field(..., min_items=1)
-    tag_ids: List[str] = Field(..., min_items=1) 
+    device_ids: List[str] = Field(..., min_length=1)
+    tag_ids: List[str] = Field(..., min_length=1) 

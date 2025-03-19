@@ -4,7 +4,7 @@ Tag rule schemas for the NetRaven web interface.
 This module provides Pydantic models for tag rule-related API requests and responses.
 """
 
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 import json
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
@@ -36,7 +36,7 @@ class TagRuleBase(BaseModel):
         ..., description="Rule criteria for tag assignment"
     )
 
-    @validator("rule_criteria", pre=True)
+    @field_validator("rule_criteria", mode="before")
     def validate_rule_criteria(cls, v):
         """Validate and convert rule_criteria from JSON string if needed."""
         if isinstance(v, str):
@@ -58,7 +58,7 @@ class TagRuleUpdate(BaseModel):
     rule_criteria: Optional[Union[RuleCondition, RuleOperator]] = None
     tag_id: Optional[str] = None
 
-    @validator("rule_criteria", pre=True)
+    @field_validator("rule_criteria", mode="before")
     def validate_rule_criteria(cls, v):
         """Validate and convert rule_criteria from JSON string if needed."""
         if isinstance(v, str):
@@ -87,7 +87,7 @@ class TagRuleTest(BaseModel):
         ..., description="Rule criteria to test"
     )
     
-    @validator("rule_criteria", pre=True)
+    @field_validator("rule_criteria", mode="before")
     def validate_rule_criteria(cls, v):
         """Validate and convert rule_criteria from JSON string if needed."""
         if isinstance(v, str):

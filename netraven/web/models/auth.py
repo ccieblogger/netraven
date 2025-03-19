@@ -6,7 +6,7 @@ like User and ServiceAccount.
 """
 
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from datetime import datetime
 
 
@@ -18,8 +18,8 @@ class User(BaseModel):
     permissions: List[str] = Field(default_factory=list, description="Permission scopes")
     is_active: bool = Field(default=True, description="Whether the user is active")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "username": "admin",
                 "email": "admin@example.com",
@@ -27,6 +27,7 @@ class User(BaseModel):
                 "is_active": True
             }
         }
+    )
 
 
 class ServiceAccount(BaseModel):
@@ -37,8 +38,8 @@ class ServiceAccount(BaseModel):
     is_active: bool = Field(default=True, description="Whether the service account is active")
     description: Optional[str] = Field(None, description="Description of the service account")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "name": "monitoring-service",
                 "permissions": ["read:metrics", "read:logs"],
@@ -46,6 +47,7 @@ class ServiceAccount(BaseModel):
                 "description": "Service account for monitoring system"
             }
         }
+    )
 
 
 class TokenRequest(BaseModel):
@@ -54,13 +56,14 @@ class TokenRequest(BaseModel):
     username: str = Field(..., description="Username")
     password: str = Field(..., description="Password")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "username": "admin",
                 "password": "password"
             }
         }
+    )
 
 
 class TokenResponse(BaseModel):
@@ -70,14 +73,15 @@ class TokenResponse(BaseModel):
     token_type: str = Field(default="bearer", description="Token type")
     expires_at: Optional[datetime] = Field(None, description="Token expiration time")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "token_type": "bearer",
                 "expires_at": "2023-06-01T12:00:00Z"
             }
         }
+    )
 
 
 class ServiceTokenRequest(BaseModel):
@@ -88,8 +92,8 @@ class ServiceTokenRequest(BaseModel):
     description: Optional[str] = Field(None, description="Description of the token")
     expires_in_days: Optional[int] = Field(None, description="Days until token expiration (null for non-expiring)")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "service_name": "monitoring-service",
                 "scopes": ["read:metrics", "read:logs"],
@@ -97,6 +101,7 @@ class ServiceTokenRequest(BaseModel):
                 "expires_in_days": 30
             }
         }
+    )
 
 
 class TokenMetadata(BaseModel):
@@ -109,8 +114,8 @@ class TokenMetadata(BaseModel):
     created_by: Optional[str] = Field(None, description="User who created the token")
     expires_at: Optional[datetime] = Field(None, description="Token expiration time")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra = {
             "example": {
                 "token_id": "550e8400-e29b-41d4-a716-446655440000",
                 "subject": "monitoring-service",
@@ -119,4 +124,5 @@ class TokenMetadata(BaseModel):
                 "created_by": "admin",
                 "expires_at": "2023-06-01T12:00:00Z"
             }
-        } 
+        }
+    ) 
