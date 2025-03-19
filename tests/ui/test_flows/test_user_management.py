@@ -1,24 +1,24 @@
 """
 Tests for user management functionality.
 """
-import pytest
 import uuid
+import pytest
 from playwright.sync_api import expect
 from tests.ui.pages.user_page import UserPage
 
 @pytest.fixture
-def user_page(authenticated_page, app_config):
-    """Return a UserPage instance with an authenticated page."""
-    return UserPage(authenticated_page, app_config)
+def user_page(page, authenticated_page, app_config):
+    """Returns an instance of UserPage."""
+    return UserPage(authenticated_page, app_config["ui_url"])
 
 @pytest.fixture
 def test_user_data():
-    """Generate test user data with unique identifiers."""
+    """Generate unique test user data."""
     unique_id = str(uuid.uuid4())[:8]
     return {
-        "username": f"test-user-{unique_id}",
-        "email": f"test-user-{unique_id}@example.com",
-        "password": "TestPassword123!",
+        "username": f"testuser_{unique_id}",
+        "email": f"testuser_{unique_id}@example.com",
+        "password": "Test@12345"
     }
 
 def test_view_users_list(user_page):

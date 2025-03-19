@@ -1,9 +1,10 @@
 """
 Tests for rate limiting functionality.
 """
-import pytest
 import time
+import pytest
 from playwright.sync_api import expect
+from tests.ui.pages.login_page import LoginPage
 from tests.ui.pages.auth_page import AuthPage
 
 @pytest.fixture

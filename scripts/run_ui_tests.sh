@@ -1,62 +1,62 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# This script runs UI tests in the NetRaven test environment
-# Following container-based testing practices from DEVELOPER.md
+# Script to run UI tests in a Docker container
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+set -e
 
-echo -e "${GREEN}Running NetRaven UI tests in container...${NC}"
+# Directory of this script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Project root directory (parent of script directory)
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
-# Make sure we're in the project root directory
-cd "$(dirname "$0")/.."
+# Default values
+TEST_PATH="tests/ui"
+REPORT_DIR="test-artifacts"
+CONTAINER_NAME="netraven-test-runner"
 
-# Check if the test environment is running and in test mode
-ENV_STATUS=$(docker exec netraven-api-1 env | grep NETRAVEN_ENV || echo "CONTAINER_NOT_RUNNING")
+# Process arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -p|--path)
+      TEST_PATH="$2"
+      shift 2
+      ;;
+    -r|--report)
+      REPORT_DIR="$2"
+      shift 2
+      ;;
+    -h|--help)
+      echo "Usage: $0 [options]"
+      echo "Options:"
+      echo "  -p, --path PATH      Path to test directory or file (default: tests/ui)"
+      echo "  -r, --report DIR     Directory for test reports (default: test-artifacts)"
+      echo "  -h, --help           Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
 
-if [[ "$ENV_STATUS" != *"test"* ]]; then
-    echo -e "${RED}Error: Test environment is not running or not in test mode.${NC}"
-    echo -e "${YELLOW}Please run: ./scripts/build_test_env.sh${NC}"
-    exit 1
-fi
+cd "$PROJECT_ROOT"
 
-# Prepare test artifacts directory (will be mounted to the container)
-mkdir -p test-artifacts
-chmod 777 test-artifacts
+# Ensure the report directory exists
+mkdir -p "$REPORT_DIR"
 
-# Determine test path and options
-TEST_PATH=${1:-"tests/ui"}
-shift
-TEST_OPTIONS="$@"
+echo "Building test runner container..."
+docker build -t netraven-test-runner -f Dockerfile.tests .
 
-# Run the tests within the container
-echo -e "${YELLOW}Running tests: $TEST_PATH${NC}"
-docker exec netraven-api-1 python -m pytest $TEST_PATH -v $TEST_OPTIONS
+echo "Running UI tests in container..."
+docker run --rm \
+  --name "$CONTAINER_NAME" \
+  --network netraven_netraven-network \
+  -v "$PROJECT_ROOT/$REPORT_DIR:/app/$REPORT_DIR" \
+  netraven-test-runner \
+  python -m pytest "$TEST_PATH" \
+    --html="/$REPORT_DIR/report.html" \
+    --self-contained-html \
+    -v
 
-# Capture the exit code
-TEST_EXIT_CODE=$?
-
-# Display results
-if [ $TEST_EXIT_CODE -eq 0 ]; then
-    echo -e "${GREEN}All tests passed!${NC}"
-else
-    echo -e "${RED}Tests failed with exit code $TEST_EXIT_CODE${NC}"
-    
-    # Check for screenshots from failed tests
-    if [ -d "test-artifacts" ] && [ "$(ls -A test-artifacts)" ]; then
-        echo -e "${YELLOW}Screenshots from failed tests:${NC}"
-        ls -la test-artifacts
-    fi
-fi
-
-# Provide helpful instructions
-echo -e "\n${GREEN}Useful commands:${NC}"
-echo -e "${YELLOW}View test artifacts:${NC}"
-echo "ls -la test-artifacts/"
-echo -e "${YELLOW}View API logs:${NC}"
-echo "docker-compose logs api"
-
-exit $TEST_EXIT_CODE 
+echo "Tests completed. Report saved to $REPORT_DIR/report.html" 

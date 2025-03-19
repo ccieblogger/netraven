@@ -14,11 +14,14 @@ services:
       - ADMIN_TEST_USER=admin
       - ADMIN_TEST_PASSWORD=NetRaven
       - TEST_TIMEOUT=10000
+      - NETRAVEN_CONFIG=/app/config.test.yml
     volumes:
       # Mount the test artifacts directory for sharing test results
       - ./test-artifacts:/app/test-artifacts
       # Mount the tests directory for easier development and debugging
       - ./tests:/app/tests
+      # Mount the test config file
+      - ./config.test.yml:/app/config.test.yml
 
   device_gateway:
     build:
@@ -26,6 +29,9 @@ services:
         - NETRAVEN_ENV=test
     environment:
       - NETRAVEN_ENV=test
+      - NETRAVEN_CONFIG=/app/config.test.yml
+    volumes:
+      - ./config.test.yml:/app/config.test.yml
 
   frontend:
     build:
@@ -35,5 +41,9 @@ services:
       - NETRAVEN_ENV=test
 
   scheduler:
+    command: bash -c "apt-get update && apt-get install -y gcc python3-dev && pip install pyyaml sqlalchemy psycopg2-binary && cd /app && python -m netraven.jobs.scheduler"
     environment:
-      - NETRAVEN_ENV=test 
+      - NETRAVEN_ENV=test
+      - NETRAVEN_CONFIG=/app/config.test.yml
+    volumes:
+      - ./config.test.yml:/app/config.test.yml 
