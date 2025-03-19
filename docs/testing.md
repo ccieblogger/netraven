@@ -50,7 +50,6 @@ docker exec netraven-api-1 python -m pytest
 # Run specific test categories
 docker exec netraven-api-1 python -m pytest tests/unit
 docker exec netraven-api-1 python -m pytest tests/integration
-docker exec netraven-api-1 python -m pytest tests/ui
 
 # Run tests with verbose output
 docker exec netraven-api-1 python -m pytest -v tests/unit
@@ -121,28 +120,6 @@ def test_device_creation(app_config, api_token):
     assert response.status_code == 200
     data = response.json()
     assert data["hostname"] == device_data["hostname"]
-```
-
-### UI Tests
-
-UI tests verify the functionality of the frontend application:
-
-- Located in `tests/ui/`
-- Use Playwright for browser automation
-- Test user interactions and workflows
-- Verify the UI behaves as expected
-
-Example UI test:
-
-```python
-def test_login_success(page):
-    """Test successful login."""
-    login_page = LoginPage(page)
-    dashboard_page = login_page.login("admin", "NetRaven")
-    
-    # Verify we're redirected to the dashboard
-    assert dashboard_page.is_displayed()
-    assert page.url.endswith("/dashboard")
 ```
 
 ## Testing Auth and User Management Features
@@ -345,9 +322,6 @@ Common test fixtures are defined in `tests/conftest.py`:
 
 - `app_config`: Configuration for test environment
 - `api_token`: Valid API token for authenticated tests
-- `authenticated_page`: Playwright page with authenticated user
-
-For UI-specific fixtures, see `tests/ui/conftest.py`.
 
 ## Test Utilities
 

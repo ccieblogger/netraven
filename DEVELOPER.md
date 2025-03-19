@@ -10,6 +10,114 @@ Key product principles:
 - All changes must be reflected in the source code and container setup files
 - The product must be consistent and reproducible across all customer installations
 
+## Testing Guidelines
+
+### Testing Philosophy
+
+NetRaven follows a "test as you develop" approach:
+- **All changes require tests**: Every feature addition, enhancement, or bug fix must include appropriate tests
+- **Tests are updated with code**: When modifying existing functionality, corresponding tests must be updated
+- **Testing is non-negotiable**: Changes without proper test coverage will not be accepted
+
+### Enhanced Single Environment Testing
+
+NetRaven uses an enhanced single environment approach for testing:
+
+- We maintain a single Docker-based environment configuration that is identical to what customers receive
+- The `NETRAVEN_ENV=test` environment variable activates test mode
+- When in test mode, containers include additional test dependencies and configurations
+- This approach ensures that what we test is exactly what customers receive, with minimal differences
+
+### Test Types and Requirements
+
+1. **Unit Tests**:
+   - Required for all new functions and methods
+   - Focus on testing individual components in isolation
+   - Located in `tests/unit` directory
+   - Run with `docker exec netraven-api-1 python -m pytest tests/unit`
+
+2. **Integration Tests**:
+   - Required for functionality involving multiple components
+   - Focus on component interactions (e.g., API + Database)
+   - Located in `tests/integration` directory
+   - Run with `docker exec netraven-api-1 python -m pytest tests/integration`
+
+3. **UI Tests**:
+   - Required for all user-facing functionality
+   - Must cover all CRUD operations for each resource type
+   - Located in `tests/ui` directory
+   - Run with `docker exec netraven-api-1 python -m pytest tests/ui`
+
+### Running Tests in Development
+
+To set up and run the test environment:
+
+```bash
+# Build and start containers in test mode
+./scripts/build_test_env.sh
+
+# Alternatively, manually set up the test environment
+export NETRAVEN_ENV=test
+docker-compose build --no-cache api
+docker-compose up -d
+
+# Run tests within the container
+docker exec netraven-api-1 python -m pytest
+
+# Run specific test types within the container
+docker exec netraven-api-1 python -m pytest tests/unit
+docker exec netraven-api-1 python -m pytest tests/integration
+docker exec netraven-api-1 python -m pytest tests/ui
+```
+
+### Test-Driven Workflow
+
+1. **For bug fixes**:
+   - First, write a failing test that reproduces the bug
+   - Fix the bug so the test passes
+   - Verify no regressions in other tests
+
+2. **For new features**:
+   - Write tests describing the expected behavior
+   - Implement the feature until tests pass
+   - Add UI tests for any user-facing components
+
+3. **For refactoring**:
+   - Ensure comprehensive tests exist before refactoring
+   - Run tests after each significant change
+   - No functionality changes should be made without tests
+
+### Test Coverage Requirements
+
+- Unit tests: 90%+ coverage for business logic
+- API endpoints: 100% coverage for all endpoints and methods
+- UI flows: Complete CRUD coverage for all resources
+
+### Adding Test Dependencies
+
+To add new test dependencies:
+
+1. Add them to `test-requirements.txt`
+2. Rebuild the test environment: `./scripts/build_test_env.sh`
+
+### Common Testing Mistakes
+
+1. **Running Tests Outside Containers**:
+   - ❌ **Incorrect**: Running `python -m pytest` directly on the host
+   - ✅ **Correct**: Running `docker exec netraven-api-1 python -m pytest` within the container
+
+2. **Installing Dependencies Locally**:
+   - ❌ **Incorrect**: `pip install pytest pytest-playwright` on the host
+   - ✅ **Correct**: Add dependencies to `test-requirements.txt` and rebuild
+
+3. **Forgetting Test Environment Variable**:
+   - ❌ **Incorrect**: `docker-compose up -d` without environment variable
+   - ✅ **Correct**: `NETRAVEN_ENV=test docker-compose up -d`
+
+4. **Manual Container Modifications**:
+   - ❌ **Incorrect**: `docker exec -it netraven-api-1 pip install pytest`
+   - ✅ **Correct**: Update `test-requirements.txt` and rebuild
+
 ## Deployment Model
 
 ### Single Environment Approach
@@ -205,6 +313,12 @@ The API Router refactoring that was previously identified as a future optimizati
    - API structure is more intuitive for frontend consumers
    - Enhanced security with proper scope validation
 
+5. **Benefits**:
+   - Early detection of API regressions
+   - Documentation of expected API behavior
+   - Confidence in making changes to the codebase
+   - Reduced manual testing effort
+
 ## Current State of the Application
 
 ### Authentication System
@@ -371,12 +485,7 @@ The application would benefit from comprehensive automated API endpoint testing 
        assert isinstance(response.json(), list)
    ```
 
-5. **Continuous Integration**:
-   - Add automated API tests to the CI/CD pipeline
-   - Run tests against a containerized test environment
-   - Generate test reports for review
-
-6. **Benefits**:
+5. **Benefits**:
    - Early detection of API regressions
    - Documentation of expected API behavior
    - Confidence in making changes to the codebase
@@ -654,7 +763,7 @@ When contributing to NetRaven, follow these guidelines:
 4. **Review Process**:
    - Submit a pull request for review
    - Address all review comments
-   - Ensure CI/CD pipelines pass
+   - Ensure all tests pass before submitting
 
 5. **Deployment Consideration**:
    - Consider how your changes affect the deployment model
