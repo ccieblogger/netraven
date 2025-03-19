@@ -13,6 +13,7 @@ PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 TEST_PATH="tests/ui"
 REPORT_DIR="test-artifacts"
 API_CONTAINER="netraven-api-1"
+TEST_CONTAINER="netraven-test-runner"
 
 # Process arguments
 while [[ $# -gt 0 ]]; do
@@ -42,40 +43,33 @@ done
 
 cd "$PROJECT_ROOT"
 
-# Check if the test environment is running
-if ! docker ps | grep -q "$API_CONTAINER"; then
-  echo "Error: Docker environment is not running. Please start it with:"
-  echo "./scripts/build_test_env.sh"
-  exit 1
-fi
-
 # Ensure the report directory exists
 mkdir -p "$REPORT_DIR"
 chmod 777 "$REPORT_DIR"
 
-# Install Playwright browsers in the API container
-echo "Installing Playwright browsers in $API_CONTAINER..."
-docker exec "$API_CONTAINER" bash -c "cd /app && playwright install chromium --with-deps"
+# Check if the test environment is running
+if ! docker ps | grep -q "$API_CONTAINER"; then
+  echo "Warning: Docker environment is not running. Please start it with:"
+  echo "./scripts/build_test_env.sh"
+  echo "Continuing with test runner only..."
+fi
 
-# Update imports in test files if needed
-echo "Fixing imports in test files..."
-docker exec "$API_CONTAINER" bash -c "cd /app && python -c \"
-import os
-for root, dirs, files in os.walk('tests/ui'):
-    for file in files:
-        if file.endswith('.py') and not file == '__init__.py':
-            filepath = os.path.join(root, file)
-            with open(filepath, 'r') as f:
-                content = f.read()
-            if '../pages' in content:
-                print(f'Fixing imports in {filepath}')
-                content = content.replace('../pages', 'tests.ui.pages')
-                with open(filepath, 'w') as f:
-                    f.write(content)
-\""
+# Build the test container with all dependencies
+echo "Building test runner container..."
+docker build -t "$TEST_CONTAINER" -f Dockerfile.tests .
 
 # Run the tests
-echo "Running UI tests in $API_CONTAINER..."
-docker exec "$API_CONTAINER" bash -c "cd /app && python -m pytest $TEST_PATH --html=\"/$REPORT_DIR/report.html\" --self-contained-html -v"
+echo "Running UI tests in dedicated container..."
+docker run --rm \
+  --name "$TEST_CONTAINER" \
+  --network netraven_netraven-network \
+  -v "$PROJECT_ROOT/$REPORT_DIR:/app/$REPORT_DIR" \
+  "$TEST_CONTAINER" \
+  python -m pytest "$TEST_PATH" --html="/$REPORT_DIR/report.html" --self-contained-html -v
 
-echo "Tests completed. Report saved to $REPORT_DIR/report.html" 
+TEST_EXIT_CODE=$?
+
+echo "Tests completed with exit code $TEST_EXIT_CODE."
+echo "Report saved to $REPORT_DIR/report.html"
+
+exit $TEST_EXIT_CODE 
