@@ -1,3 +1,5 @@
+version: '3'
+
 services:
   # PostgreSQL database service
   postgres:
@@ -13,7 +15,7 @@ services:
       - POSTGRES_DB=netraven
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U netraven"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
     networks:
@@ -24,31 +26,29 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+      args:
+        - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
-      - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
-      - TOKEN_EXPIRY_HOURS=${TOKEN_EXPIRY_HOURS:-24}
-      - SETUP_ADMIN_TOKEN=${SETUP_ADMIN_TOKEN:-true}
-      - TOKEN_FILE=/app/tokens.json
-      - TOKEN_STORE_TYPE=database
-      - TOKEN_STORE_DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
-      - NETRAVEN_CONFIG=/app/config.yml
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USER=netraven
+      - POSTGRES_PASSWORD=netraven
+      - POSTGRES_DB=netraven
+      - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
+      - GATEWAY_URL=http://device_gateway:8001
     volumes:
-      - ./netraven:/app/netraven
-      - token_data:/app/tokens
-      - ./config.yml:/app/config.yml
+      - api-data:/app/data
+      - ./test-artifacts:/app/test-artifacts
     ports:
       - "8000:8000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 3
-      start_period: 20s
     networks:
       - netraven-network
 
@@ -56,31 +56,13 @@ services:
   scheduler:
     image: python:3.10-slim
     volumes:
-      - .:/app
+      - ./netraven:/app/netraven
       - logs_data:/app/logs
     working_dir: /app
-    command: >
-      bash -c "cd /app && \
-      apt-get update && \
-      apt-get install -y postgresql-client curl && \
-      pip install -e . && \
-      pip install psycopg2-binary schedule email-validator requests sqlalchemy pydantic python-jose python-multipart prometheus-client pyjwt && \
-      python scripts/run_scheduler.py --check-interval 60 --sync-interval 300 --log-level INFO --use-gateway"
+    command: bash -c "cd /app && python -m netraven.scheduler.main"
     environment:
-      - PYTHONPATH=/app
-      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
-      - NETRAVEN_WEB_DB_TYPE=postgres
-      - NETRAVEN_WEB_DB_HOST=postgres
-      - NETRAVEN_WEB_DB_PORT=5432
-      - NETRAVEN_WEB_DB_NAME=netraven
-      - NETRAVEN_WEB_DB_USER=netraven
-      - NETRAVEN_WEB_DB_PASSWORD=netraven
-      - NETRAVEN_CONFIG=/app/config.yml
-      - NETRAVEN_LOGGING_RETENTION_DAYS=30
-      - NETRAVEN_LOGGING_USE_DATABASE=true
-      - NETRAVEN_LOGGING_LOG_TO_FILE=false
-      - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
-      - GATEWAY_URL=http://device_gateway:8001
+      - API_URL=http://api:8000
+      - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,6 +79,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.gateway
+      args:
+        - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     ports:
       - "8001:8001"
     volumes:
@@ -104,22 +88,17 @@ services:
       - token_data:/app/tokens
       - ./config.yml:/app/config.yml
     environment:
-      - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
-      - GATEWAY_PORT=8001
-      - TOKEN_STORE_TYPE=database
-      - TOKEN_STORE_DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
-      - TOKEN_FILE=/app/tokens.json
-      - NETRAVEN_CONFIG=/app/config.yml
+      - API_URL=http://api:8000
+      - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 3
-      start_period: 20s
     cap_drop:
       - ALL
     cap_add:
@@ -134,6 +113,8 @@ services:
     build:
       context: ./netraven/web/frontend
       dockerfile: Dockerfile
+      args:
+        - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     volumes:
       - ./netraven/web/frontend:/app
       # Use a named volume for node_modules to prevent overwriting
@@ -144,14 +125,13 @@ services:
       - api
       - device_gateway
     environment:
-      - VUE_APP_API_URL=http://localhost:8000
-      - VUE_APP_GATEWAY_URL=http://localhost:8001
+      - API_URL=http://api:8000
+      - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     healthcheck:
-      test: ["CMD", "ps", "aux", "|", "grep", "node"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
       retries: 3
-      start_period: 40s
     # Non-root user for security
     user: "1001:1001"
     networks:
@@ -162,6 +142,7 @@ volumes:
   postgres_data:
   logs_data:
   token_data:
+  api-data:
 
 networks:
   netraven-network:
