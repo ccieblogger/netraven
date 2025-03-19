@@ -1,22 +1,30 @@
 """
-Scheduled job schemas for the NetRaven web interface.
+Pydantic schemas for scheduled jobs.
 
-This module provides Pydantic models for scheduled job-related API requests and responses.
+This module provides the Pydantic schemas for scheduled job creation, update,
+and response objects.
 """
 
-from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any, List
+from pydantic import BaseModel, Field
 from datetime import datetime
 
+from netraven.web.constants import JobTypeEnum, ScheduleTypeEnum
+
 class ScheduledJobBase(BaseModel):
-    """Base scheduled job schema with common attributes."""
+    """Base model for scheduled jobs with common fields."""
     name: str = Field(..., min_length=1, max_length=255)
-    device_id: str = Field(..., min_length=36, max_length=36)
-    schedule_type: str = Field(..., min_length=1, max_length=50)
-    schedule_time: Optional[str] = Field(None, min_length=5, max_length=5)
-    schedule_interval: Optional[int] = Field(None, gt=0)
-    schedule_day: Optional[str] = Field(None, min_length=1, max_length=10)
+    device_id: str
+    job_type: JobTypeEnum = JobTypeEnum.BACKUP
+    schedule_type: ScheduleTypeEnum
     enabled: bool = True
+    
+    # New scheduling fields
+    start_datetime: Optional[datetime] = None
+    recurrence_day: Optional[str] = None  # Day of week/month for recurrence
+    recurrence_month: Optional[str] = None  # Month for yearly recurrence
+    recurrence_time: Optional[str] = None  # HH:MM format
+    
     job_data: Optional[Dict[str, Any]] = None
 
 class ScheduledJobCreate(ScheduledJobBase):
@@ -24,52 +32,56 @@ class ScheduledJobCreate(ScheduledJobBase):
     pass
 
 class ScheduledJobUpdate(BaseModel):
-    """Schema for updating a scheduled job."""
+    """Schema for updating an existing scheduled job."""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    schedule_type: Optional[str] = Field(None, min_length=1, max_length=50)
-    schedule_time: Optional[str] = Field(None, min_length=5, max_length=5)
-    schedule_interval: Optional[int] = Field(None, gt=0)
-    schedule_day: Optional[str] = Field(None, min_length=1, max_length=10)
+    device_id: Optional[str] = None
+    job_type: Optional[JobTypeEnum] = None
+    schedule_type: Optional[ScheduleTypeEnum] = None
     enabled: Optional[bool] = None
+    
+    # New scheduling fields
+    start_datetime: Optional[datetime] = None
+    recurrence_day: Optional[str] = None
+    recurrence_month: Optional[str] = None
+    recurrence_time: Optional[str] = None
+    
     job_data: Optional[Dict[str, Any]] = None
 
-class ScheduledJob(ScheduledJobBase):
-    """Schema for scheduled job information returned by API."""
+class ScheduledJobInDB(ScheduledJobBase):
+    """Schema for a scheduled job as stored in the database."""
     id: str
+    created_by: str
     created_at: datetime
     updated_at: datetime
     last_run: Optional[datetime] = None
     next_run: Optional[datetime] = None
-    created_by: str
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        """Pydantic config for the model."""
+        from_attributes = True
 
-class ScheduledJobWithDevice(ScheduledJob):
-    """Schema for scheduled job information with device details."""
-    device_hostname: str
-    device_ip: str
-    device_type: str
+class ScheduledJobWithDetails(ScheduledJobInDB):
+    """Schema for a scheduled job with related details."""
+    device_name: Optional[str] = None
+    device_type: Optional[str] = None
+    username: Optional[str] = None  # Username of the creator
 
-    model_config = ConfigDict(from_attributes=True)
+# Define an alias for backward compatibility with existing code
+ScheduledJob = ScheduledJobInDB
 
-class ScheduledJobWithUser(ScheduledJob):
-    """Schema for scheduled job information with user details."""
-    username: str
-    user_full_name: Optional[str] = None
+class ScheduledJobList(BaseModel):
+    """Schema for a list of scheduled jobs."""
+    jobs: List[ScheduledJobWithDetails]
+    total: int
 
-    model_config = ConfigDict(from_attributes=True)
-
-class ScheduledJobComplete(ScheduledJobWithDevice, ScheduledJobWithUser):
-    """Schema for complete scheduled job information with device and user details."""
-    model_config = ConfigDict(from_attributes=True)
+class ScheduledJobToggle(BaseModel):
+    """Schema for toggling a scheduled job's enabled status."""
+    enabled: bool = Field(..., description="Whether the job should be enabled")
 
 class ScheduledJobFilter(BaseModel):
     """Schema for filtering scheduled jobs."""
     device_id: Optional[str] = None
-    schedule_type: Optional[str] = None
+    schedule_type: Optional[ScheduleTypeEnum] = None
+    job_type: Optional[JobTypeEnum] = None
     enabled: Optional[bool] = None
-    created_by: Optional[str] = None
-
-class ScheduledJobToggle(BaseModel):
-    """Schema for toggling a scheduled job."""
-    enabled: bool = Field(...) 
+    created_by: Optional[str] = None 

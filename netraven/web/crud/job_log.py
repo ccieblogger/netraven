@@ -136,8 +136,7 @@ def get_job_log_with_details(db: Session, log_id: str) -> Optional[Dict[str, Any
         Device.hostname.label("device_hostname"),
         Device.ip_address.label("device_ip"),
         Device.device_type.label("device_type"),
-        User.username.label("username"),
-        User.full_name.label("user_full_name")
+        User.username.label("username")
     ).outerjoin(
         Device, JobLog.device_id == Device.id
     ).join(
@@ -149,15 +148,14 @@ def get_job_log_with_details(db: Session, log_id: str) -> Optional[Dict[str, Any
     if not result:
         return None
     
-    job_log, device_hostname, device_ip, device_type, username, user_full_name = result
+    job_log, device_hostname, device_ip, device_type, username = result
     
     return {
         **job_log.__dict__,
         "device_hostname": device_hostname,
         "device_ip": device_ip,
         "device_type": device_type,
-        "username": username,
-        "user_full_name": user_full_name
+        "username": username
     }
 
 def delete_job_log(db: Session, log_id: str) -> bool:

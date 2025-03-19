@@ -457,7 +457,7 @@ async def unassign_tags_from_devices(
             detail=f"Error unassigning tags: {str(e)}"
         )
 
-@router.get("/device/{device_id}", response_model=List[Tag])
+@router.get("/devices/{device_id}", response_model=List[Tag])
 async def get_device_tags_endpoint(
     device_id: str,
     current_principal: UserPrincipal = Depends(get_current_principal),
@@ -509,4 +509,136 @@ async def get_device_tags_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching tags for device: {str(e)}"
+        )
+
+@router.post("/devices/{device_id}/tags/{tag_id}", status_code=status.HTTP_200_OK)
+async def assign_tag_to_device_endpoint(
+    device_id: str,
+    tag_id: str,
+    current_principal: UserPrincipal = Depends(get_current_principal),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Assign a tag to a device.
+    
+    Args:
+        device_id: The device ID
+        tag_id: The tag ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Result of the operation
+        
+    Raises:
+        HTTPException: If the device or tag is not found or user doesn't have access
+    """
+    try:
+        # Check device access
+        device = check_device_access(
+            principal=current_principal,
+            device_id_or_obj=device_id,
+            required_scope="write:devices",
+            db=db
+        )
+        
+        # Check tag access
+        tag = check_tag_access(
+            principal=current_principal,
+            tag_id_or_obj=tag_id,
+            required_scope="read:tags",
+            db=db
+        )
+        
+        # Assign tag to device
+        success = add_tag_to_device(db, device_id, tag_id)
+        
+        if success:
+            logger.info(f"Access granted: user={current_principal.username}, " 
+                      f"resource=device:{device_id}, tag:{tag_id}, scope=write:devices, action=assign_tag")
+            return {
+                "success": True,
+                "message": f"Tag '{tag.name}' assigned to device '{device.hostname}'"
+            }
+        else:
+            logger.warning(f"Tag assignment failed: user={current_principal.username}, " 
+                         f"device_id={device_id}, tag_id={tag_id}, reason=assignment_failed")
+            return {
+                "success": False,
+                "message": "Failed to assign tag to device"
+            }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception(f"Error assigning tag to device: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error assigning tag to device: {str(e)}"
+        )
+
+@router.delete("/devices/{device_id}/tags/{tag_id}", status_code=status.HTTP_200_OK)
+async def remove_tag_from_device_endpoint(
+    device_id: str,
+    tag_id: str,
+    current_principal: UserPrincipal = Depends(get_current_principal),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Remove a tag from a device.
+    
+    Args:
+        device_id: The device ID
+        tag_id: The tag ID
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Result of the operation
+        
+    Raises:
+        HTTPException: If the device or tag is not found or user doesn't have access
+    """
+    try:
+        # Check device access
+        device = check_device_access(
+            principal=current_principal,
+            device_id_or_obj=device_id,
+            required_scope="write:devices",
+            db=db
+        )
+        
+        # Check tag access
+        tag = check_tag_access(
+            principal=current_principal,
+            tag_id_or_obj=tag_id,
+            required_scope="read:tags",
+            db=db
+        )
+        
+        # Remove tag from device
+        success = remove_tag_from_device(db, device_id, tag_id)
+        
+        if success:
+            logger.info(f"Access granted: user={current_principal.username}, " 
+                      f"resource=device:{device_id}, tag:{tag_id}, scope=write:devices, action=remove_tag")
+            return {
+                "success": True,
+                "message": f"Tag '{tag.name}' removed from device '{device.hostname}'"
+            }
+        else:
+            logger.warning(f"Tag removal failed: user={current_principal.username}, " 
+                         f"device_id={device_id}, tag_id={tag_id}, reason=removal_failed")
+            return {
+                "success": False,
+                "message": "Failed to remove tag from device or tag was not assigned"
+            }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception(f"Error removing tag from device: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error removing tag from device: {str(e)}"
         ) 

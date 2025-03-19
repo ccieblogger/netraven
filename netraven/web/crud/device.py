@@ -132,14 +132,14 @@ def create_device(db: Session, device: DeviceCreate, owner_id: str) -> Device:
         logger.error(f"Error creating device: {e}")
         raise
 
-def update_device(db: Session, device_id: str, device_update: dict) -> Optional[Device]:
+def update_device(db: Session, device_id: str, device_update) -> Optional[Device]:
     """
     Update an existing device.
     
     Args:
         db: Database session
         device_id: ID of the device to update
-        device_update: Device update data as dict
+        device_update: Device update data as dict or DeviceUpdate
         
     Returns:
         Updated Device object if successful, None if device not found
@@ -151,9 +151,19 @@ def update_device(db: Session, device_id: str, device_update: dict) -> Optional[
         logger.warning(f"Device with id {device_id} not found")
         return None
     
+    # Handle both dict and DeviceUpdate objects
+    update_data = device_update
+    if hasattr(device_update, "model_dump"):
+        # It's a Pydantic model, convert to dict
+        update_data = device_update.model_dump(exclude_unset=True)
+    elif hasattr(device_update, "dict"):
+        # For older Pydantic versions
+        update_data = device_update.model_dump(exclude_unset=True)  # Updated to model_dump
+    
     # Update the fields
-    for key, value in device_update.items():
-        setattr(db_device, key, value)
+    for key, value in update_data.items():
+        if value is not None:  # Only update fields that are provided
+            setattr(db_device, key, value)
     
     # Always update the updated_at timestamp
     db_device.updated_at = datetime.utcnow()

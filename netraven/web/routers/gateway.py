@@ -71,18 +71,24 @@ async def get_gateway_status(
                 "metrics": data.get("metrics", {})
             }
         else:
-            logger.warning(f"Gateway returned status code {response.status_code}")
+            logger.warning(f"Gateway service returned non-200 status: code={response.status_code}, body={response.text[:100]}")
             return {
                 "status": "error",
-                "message": f"Gateway returned {response.status_code}"
+                "message": f"Gateway returned status code {response.status_code}"
             }
-    except Exception as e:
-        logger.exception(f"Error fetching gateway status: {str(e)}")
-        # Return a response with status "error" instead of raising an exception
-        # This ensures the UI can still handle the response
+    except requests.RequestException as e:
+        # Standardized error handling for request exceptions
+        logger.error(f"Error connecting to gateway service: {str(e)}")
         return {
             "status": "error",
-            "message": f"Error: {str(e)}"
+            "message": f"Error connecting to gateway: {str(e)}"
+        }
+    except Exception as e:
+        # Standardized error handling for other exceptions
+        logger.exception(f"Unexpected error fetching gateway status: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Unexpected error: {str(e)}"
         }
 
 
@@ -98,10 +104,10 @@ async def get_devices(
     
     Requires authentication with the 'read:devices' scope.
     """
-    # Log access granted
-    logger.info(f"Access granted: user={principal.username}, resource=gateway:devices, scope=read:devices, action=list")
-    
     try:
+        # Log access granted
+        logger.info(f"Access granted: user={principal.username}, resource=gateway:devices, scope=read:devices, action=list")
+        
         gateway_url = "http://device_gateway:8001/devices"
         
         # Use the same token for calling the gateway
@@ -111,20 +117,33 @@ async def get_devices(
             headers = {"Authorization": auth_header}
         
         logger.debug(f"Calling gateway devices endpoint: {gateway_url}")
-        response = requests.get(gateway_url, headers=headers)
+        response = requests.get(gateway_url, headers=headers, timeout=10.0)
         
         if response.status_code != 200:
-            logger.error(f"Gateway returned error: {response.status_code} - {response.text}")
+            logger.error(f"Gateway returned error: {response.status_code} - {response.text[:100]}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Gateway service error: {response.status_code}"
             )
-            
+                
         return response.json()
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except requests.RequestException as e:
+        # Standardized error handling for request exceptions
         logger.error(f"Error communicating with gateway: {str(e)}")
-        # Return an empty list instead of raising an exception
-        return []
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error communicating with gateway: {str(e)}"
+        )
+    except Exception as e:
+        # Standardized error handling for other exceptions
+        logger.exception(f"Unexpected error retrieving devices: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error retrieving devices: {str(e)}"
+        )
 
 
 @router.get("/metrics", response_model=GatewayMetrics)
@@ -140,11 +159,11 @@ async def get_gateway_metrics(
     
     Requires authentication with the 'read:metrics' scope.
     """
-    # Log access if principal is provided
-    if principal:
-        logger.info(f"Access granted: user={principal.username}, resource=gateway:metrics, scope=read:metrics, action=get")
-    
     try:
+        # Log access if principal is provided
+        if principal:
+            logger.info(f"Access granted: user={principal.username}, resource=gateway:metrics, scope=read:metrics, action=get")
+        
         gateway_url = "http://device_gateway:8001/metrics"
         
         # Use the same token for calling the gateway if available
@@ -155,26 +174,39 @@ async def get_gateway_metrics(
                 headers = {"Authorization": auth_header}
         
         logger.debug(f"Calling gateway metrics endpoint: {gateway_url}")
-        response = requests.get(gateway_url, headers=headers)
+        response = requests.get(gateway_url, headers=headers, timeout=10.0)
         
         if response.status_code != 200:
-            logger.error(f"Gateway returned error: {response.status_code} - {response.text}")
+            logger.error(f"Gateway returned error: {response.status_code} - {response.text[:100]}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Gateway service error: {response.status_code}"
             )
-            
+                
         metrics_data = response.json()
         return GatewayMetrics(**metrics_data)
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except requests.RequestException as e:
+        # Standardized error handling for request exceptions
         logger.error(f"Error communicating with gateway: {str(e)}")
-        # Return an error response instead of raising an exception
-        return {
-            "request_count": 0,
-            "error_count": 0,
-            "device_connections": 0,
-            "commands_executed": 0
-        }
+        # Return default metrics instead of raising an exception for better user experience
+        return GatewayMetrics(
+            request_count=0,
+            error_count=0,
+            device_connections=0,
+            commands_executed=0
+        )
+    except Exception as e:
+        # Standardized error handling for other exceptions
+        logger.exception(f"Unexpected error retrieving metrics: {str(e)}")
+        return GatewayMetrics(
+            request_count=0,
+            error_count=0,
+            device_connections=0,
+            commands_executed=0
+        )
 
 
 @router.get("/config")
@@ -189,11 +221,11 @@ async def get_gateway_config(
     
     Requires authentication with the 'read:gateway' scope.
     """
-    # Log access if principal is provided
-    if principal:
-        logger.info(f"Access granted: user={principal.username}, resource=gateway:config, scope=read:gateway, action=get")
-    
     try:
+        # Log access if principal is provided
+        if principal:
+            logger.info(f"Access granted: user={principal.username}, resource=gateway:config, scope=read:gateway, action=get")
+        
         gateway_url = "http://device_gateway:8001/config"
         
         # Use the same token for calling the gateway if available
@@ -206,19 +238,27 @@ async def get_gateway_config(
         logger.debug(f"Calling gateway config endpoint: {gateway_url}")
         response = requests.get(gateway_url, headers=headers, timeout=10.0)
         
-        if response.status_code == 200:
-            return response.json()
-        else:
-            logger.warning(f"Gateway returned status code {response.status_code}")
+        if response.status_code != 200:
+            logger.error(f"Gateway returned error: {response.status_code} - {response.text[:100]}")
             return {
                 "status": "error",
-                "message": f"Gateway returned {response.status_code}"
+                "message": f"Gateway service error: {response.status_code}"
             }
-    except Exception as e:
-        logger.exception(f"Error fetching gateway config: {str(e)}")
+                
+        return response.json()
+    except requests.RequestException as e:
+        # Standardized error handling for request exceptions
+        logger.error(f"Error communicating with gateway: {str(e)}")
         return {
             "status": "error",
-            "message": f"Error: {str(e)}"
+            "message": f"Error communicating with gateway: {str(e)}"
+        }
+    except Exception as e:
+        # Standardized error handling for other exceptions
+        logger.exception(f"Unexpected error retrieving configuration: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Unexpected error: {str(e)}"
         }
 
 

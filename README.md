@@ -56,6 +56,35 @@ The following services will be available:
 - API: http://localhost:8000
 - Gateway: http://localhost:8001
 
+## Testing
+
+### Running Tests
+
+NetRaven includes comprehensive tests for all functionality:
+
+```bash
+# Install test dependencies
+pip install -r test-requirements.txt
+playwright install  # For UI tests
+
+# Run tests (with the application running in test mode)
+NETRAVEN_ENV=test docker-compose up -d
+pytest
+
+# Run specific test categories
+pytest tests/unit
+pytest tests/integration
+pytest tests/ui
+```
+
+### Test Categories
+
+- **Unit Tests**: Test individual functions and methods
+- **Integration Tests**: Test API endpoints and database interactions
+- **UI Tests**: End-to-end tests of the frontend using Playwright
+
+See [Testing Guide](docs/testing.md) for more details on writing and running tests.
+
 ## Default Credentials
 
 For development and testing:

@@ -63,7 +63,7 @@ DEFAULT_CONFIG = {
                 "path": "data/netraven.db"
             },
             "postgres": {
-                "host": "localhost",
+                "host": "postgres",
                 "port": 5432,
                 "database": "netraven",
                 "user": "netraven",
@@ -86,6 +86,42 @@ DEFAULT_CONFIG = {
         }
     }
 }
+
+# Test environment specific configuration
+TEST_CONFIG_OVERRIDES = {
+    "web": {
+        "authentication": {
+            "token_expiration": 3600,  # Shorter expiration for tests (1 hour)
+        },
+        "debug": True
+    },
+    "logging": {
+        "level": "DEBUG",
+        "file": {
+            "enabled": False  # Disable file logging in tests
+        }
+    }
+}
+
+
+def get_env():
+    """
+    Get the current environment.
+    
+    Returns:
+        Environment name as string (production, development, test)
+    """
+    return os.environ.get("NETRAVEN_ENV", "production").lower()
+
+
+def is_test_env():
+    """
+    Check if running in test environment.
+    
+    Returns:
+        True if in test environment, False otherwise
+    """
+    return get_env() in ("test", "testing")
 
 
 def get_default_config_path() -> str:
@@ -162,6 +198,10 @@ def load_config(config_path: Optional[str] = None) -> Tuple[Dict[str, Any], Dict
         config_path = get_default_config_path()
     
     config = DEFAULT_CONFIG.copy()
+    
+    # Apply test configuration overrides if in test environment
+    if is_test_env():
+        config = merge_configs(config, TEST_CONFIG_OVERRIDES)
     
     # Override with environment variables
     storage_type = os.environ.get("NETRAVEN_STORAGE_TYPE")

@@ -14,6 +14,13 @@ services:
       - ADMIN_TEST_USER=admin
       - ADMIN_TEST_PASSWORD=NetRaven
       - TEST_TIMEOUT=10000
+      # Ensure PostgreSQL is used for test environment
+      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USER=netraven
+      - POSTGRES_PASSWORD=netraven
+      - POSTGRES_DB=netraven
+      - NETRAVEN_WEB_DATABASE_TYPE=postgres
     volumes:
       # Mount the test artifacts directory for sharing test results
       - ./test-artifacts:/app/test-artifacts

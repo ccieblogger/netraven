@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from netraven.web.database import get_db
 from netraven.web.models.user import User as UserModel
-from netraven.web.schemas.user import User, UserCreate, UserUpdate
+from netraven.web.schemas.user import User, UserCreate, UserUpdate, ChangePassword, UpdateNotificationPreferences
 from netraven.web.crud import get_user, get_users, update_user, delete_user, create_user, get_user_by_username, get_user_by_email
 from netraven.web.auth import (
     get_current_principal, 
@@ -20,14 +20,14 @@ from netraven.web.auth import (
     check_user_access,
     optional_auth
 )
-from netraven.web.models.auth import User
+from netraven.web.models.auth import User as UserAuth
 from netraven.core.logging import get_logger
 
 # Create logger
 logger = get_logger("netraven.web.routers.users")
 
 # Create router
-router = APIRouter(prefix="")
+router = APIRouter(prefix="", tags=["users"])
 
 @router.get("/me", response_model=User)
 async def get_current_user_endpoint(
@@ -371,4 +371,74 @@ async def register_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error registering user: {str(e)}"
-        ) 
+        )
+
+@router.patch("/{user_id}/notification-preferences")
+async def update_notification_preferences(
+    user_id: str,
+    preferences: UpdateNotificationPreferences,
+    current_user: UserPrincipal = Depends(get_current_principal),
+    db: Session = Depends(get_db)
+):
+    """
+    Update the notification preferences for a user.
+    
+    Args:
+        user_id: ID of the user to update
+        preferences: New notification preferences
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        Updated user information
+    """
+    # Check if the user has permission to update this user's preferences
+    if not current_user.is_admin and current_user.id != user_id:
+        logger.warning(f"User {current_user.username} attempted to update notification preferences for user {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to update this user's notification preferences"
+        )
+    
+    # Get the user
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {user_id} not found"
+        )
+    
+    # Update notification preferences
+    # Initialize if not already set
+    if not user.notification_preferences:
+        user.notification_preferences = {
+            "email_notifications": True,
+            "email_on_job_completion": True,
+            "email_on_job_failure": True,
+            "notification_frequency": "immediate"
+        }
+    
+    # Update each preference if provided
+    if preferences.email_notifications is not None:
+        user.notification_preferences["email_notifications"] = preferences.email_notifications
+    
+    if preferences.email_on_job_completion is not None:
+        user.notification_preferences["email_on_job_completion"] = preferences.email_on_job_completion
+    
+    if preferences.email_on_job_failure is not None:
+        user.notification_preferences["email_on_job_failure"] = preferences.email_on_job_failure
+    
+    if preferences.notification_frequency is not None:
+        user.notification_preferences["notification_frequency"] = preferences.notification_frequency
+    
+    # Save changes
+    db.commit()
+    
+    logger.info(f"Updated notification preferences for user {user.username}")
+    
+    # Return updated user
+    return {
+        "id": user.id,
+        "username": user.username,
+        "notification_preferences": user.notification_preferences
+    } 

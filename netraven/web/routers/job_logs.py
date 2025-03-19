@@ -3,6 +3,7 @@ Job logs router for the NetRaven web interface.
 
 This module provides endpoints for managing job logs, including listing,
 retrieving, and deleting logs, as well as configuring retention policies.
+It also provides access to the job tracking service for real-time job monitoring.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body, Path
@@ -37,6 +38,7 @@ from netraven.core.logging import get_logger
 from netraven.core.config import load_config, get_default_config_path
 import os
 from netraven.web.schemas.job_log import JobLog, JobLogEntry, JobLogFilter
+from netraven.web.services.job_tracking_service import get_job_tracking_service
 
 # Create router
 router = APIRouter(prefix="", tags=["job-logs"])
@@ -47,6 +49,9 @@ logger = get_logger("netraven.web.routers.job_logs")
 # Load configuration
 config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
 config, _ = load_config(config_path)
+
+# Get job tracking service
+job_tracking_service = get_job_tracking_service()
 
 # Note on job_data field:
 # The job_data field in the JobLog model uses PostgreSQL's JSONB type for storing
@@ -78,7 +83,7 @@ async def list_job_logs(
     Returns:
         List[job_log_schemas.JobLog]: List of job logs
     """
-    # Check if user has read:job_logs scope
+    # Standardized permission check
     if not current_principal.has_scope("read:job_logs") and not current_principal.is_admin:
         logger.warning(f"Access denied: user={current_principal.username}, " 
                      f"resource=job_logs, scope=read:job_logs, reason=insufficient_permissions")
@@ -113,10 +118,15 @@ async def list_job_logs(
             # Add log to result
             result.append(job_log)
         
+        # Standardized access granted log
         logger.info(f"Access granted: user={current_principal.username}, " 
                   f"resource=job_logs, scope=read:job_logs, count={len(result)}")
         return result
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
+        # Standardized error handling
         logger.exception(f"Error listing job logs: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -147,7 +157,7 @@ async def get_job_log(
     Raises:
         HTTPException: If the job log is not found or user is not authorized
     """
-    # Use our permission check function to check access and get the job log
+    # Use standardized resource access check
     job_log = check_job_log_access(
         principal=current_principal,
         log_id_or_obj=job_log_id,
@@ -190,6 +200,7 @@ async def get_job_log(
         else:
             job_log_dict["entries"] = []
         
+        # Standardized access granted log
         logger.info(f"Access granted: user={current_principal.username}, " 
                   f"resource=job_log:{job_log_id}, scope=read:job_logs, include_entries={include_entries}")
         return job_log_dict
@@ -197,6 +208,7 @@ async def get_job_log(
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        # Standardized error handling
         logger.exception(f"Error retrieving job log: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -227,7 +239,7 @@ async def get_job_log_entries_endpoint(
     Raises:
         HTTPException: If the job log is not found or user is not authorized
     """
-    # Use our permission check function to check access and get the job log
+    # Use standardized resource access check
     job_log = check_job_log_access(
         principal=current_principal,
         log_id_or_obj=job_log_id,
@@ -239,6 +251,7 @@ async def get_job_log_entries_endpoint(
         # Get entries
         entries = get_job_log_entries(db, job_log_id, limit=limit, offset=offset)
         
+        # Standardized access granted log
         logger.info(f"Access granted: user={current_principal.username}, " 
                   f"resource=job_log:{job_log_id}, scope=read:job_logs, action=get_entries, count={len(entries)}")
         return entries
@@ -246,6 +259,7 @@ async def get_job_log_entries_endpoint(
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        # Standardized error handling
         logger.exception(f"Error retrieving job log entries: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -269,7 +283,17 @@ async def delete_job_log_endpoint(
     Raises:
         HTTPException: If the job log is not found or user is not authorized
     """
-    # Use our permission check function to check access and get the job log
+    # Check if user has proper permissions (write:job_logs or admin)
+    if not current_principal.has_scope("write:job_logs") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=job_log:{job_log_id}, scope=write:job_logs, action=delete, "
+                     f"reason=insufficient_permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions: write:job_logs required"
+        )
+    
+    # Check if job log exists and user has access
     job_log = check_job_log_access(
         principal=current_principal,
         log_id_or_obj=job_log_id,
@@ -278,14 +302,17 @@ async def delete_job_log_endpoint(
     )
     
     try:
-        # Delete the job log
+        # Delete job log
         delete_job_log(db, job_log_id)
+        
+        # Standardized access granted log
         logger.info(f"Access granted: user={current_principal.username}, " 
                   f"resource=job_log:{job_log_id}, scope=write:job_logs, action=delete")
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
+        # Standardized error handling
         logger.exception(f"Error deleting job log: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -299,26 +326,52 @@ async def update_retention_policy(
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Update the job log retention policy.
+    Update retention policy for job logs.
     
     Args:
-        retention_policy: The retention policy update
+        retention_policy: The updated retention policy
         current_principal: The authenticated user
         db: Database session
         
     Returns:
         Dict[str, Any]: Updated retention policy
+        
+    Raises:
+        HTTPException: If user is not authorized
     """
-    require_scope(current_principal, "admin:settings")
+    # Standardized permission check (admin or write:job_logs)
+    if not current_principal.has_scope("write:job_logs") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=job_logs:retention, scope=write:job_logs, "
+                     f"reason=insufficient_permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions: write:job_logs required"
+        )
     
-    # Update retention policy
-    # In a real implementation, this would update a configuration in the database
-    # For now, we'll just return a success response
-    
-    return {
-        "message": "Retention policy updated successfully",
-        "retention_days": retention_policy.retention_days
-    }
+    try:
+        # Apply retention policy and delete old logs
+        deleted_count = delete_job_logs_by_retention_policy(db, retention_policy.default_retention_days)
+        
+        # Standardized access granted log
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=job_logs:retention, scope=write:job_logs, "
+                  f"action=update, deleted_count={deleted_count}")
+        return {
+            "default_retention_days": retention_policy.default_retention_days,
+            "deleted_count": deleted_count,
+            "message": f"{deleted_count} logs deleted based on retention policy"
+        }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Standardized error handling
+        logger.exception(f"Error updating retention policy: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating retention policy: {str(e)}"
+        )
 
 @router.post("/cleanup", status_code=status.HTTP_200_OK)
 async def cleanup_job_logs(
@@ -327,24 +380,203 @@ async def cleanup_job_logs(
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Clean up old job logs.
+    Clean up job logs by deleting logs older than a specified number of days.
     
     Args:
-        days: Number of days to keep logs (optional)
+        days: Number of days to keep logs (defaults to 30)
         current_principal: The authenticated user
         db: Database session
         
     Returns:
         Dict[str, Any]: Cleanup results
+        
+    Raises:
+        HTTPException: If user is not authorized
     """
-    require_scope(current_principal, "admin:logs")
+    # Standardized permission check (admin or write:job_logs)
+    if not current_principal.has_scope("write:job_logs") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=job_logs:cleanup, scope=write:job_logs, "
+                     f"reason=insufficient_permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions: write:job_logs required"
+        )
     
-    # Clean up job logs
-    # In a real implementation, this would delete logs older than the specified days
-    # For now, we'll just return a success response
+    try:
+        # Default to 30 days if not specified
+        days = days or 30
+        
+        # Delete old logs
+        deleted_count = delete_old_job_logs(db, days)
+        
+        # Standardized access granted log
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=job_logs:cleanup, scope=write:job_logs, "
+                  f"action=cleanup, days={days}, deleted_count={deleted_count}")
+        return {
+            "days": days,
+            "deleted_count": deleted_count,
+            "message": f"{deleted_count} logs older than {days} days deleted"
+        }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Standardized error handling
+        logger.exception(f"Error cleaning up job logs: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error cleaning up job logs: {str(e)}"
+        )
+
+# New endpoints for job tracking and monitoring
+
+@router.get("/active", response_model=List[Dict[str, Any]])
+async def list_active_jobs(
+    current_principal: UserPrincipal = Depends(get_current_principal),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    List all currently active jobs.
     
-    return {
-        "message": "Job logs cleanup initiated",
-        "retention_days": days or 30,
-        "status": "success"
-    } 
+    Args:
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        List[Dict[str, Any]]: List of active jobs
+    """
+    # Standardized permission check
+    if not current_principal.has_scope("read:job_logs") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=active_jobs, scope=read:job_logs, reason=insufficient_permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions: read:job_logs required"
+        )
+    
+    try:
+        # Get active jobs from job tracking service
+        active_jobs = []
+        
+        # Convert active jobs to list of dictionaries with permission filtering
+        for job_id, job_info in job_tracking_service.active_jobs.items():
+            # Check if user has access to this job
+            user_id = job_info.get("user_id")
+            if not current_principal.is_admin and user_id != current_principal.id:
+                # For regular users, only show their own jobs
+                continue
+                
+            # Add device and job names for better context
+            device_name = "Unknown"
+            job_name = "Unknown"
+            
+            # Get device info if available
+            device_id = job_info.get("device_id")
+            if device_id:
+                from netraven.web.crud.device import get_device
+                device = get_device(db, device_id)
+                if device:
+                    device_name = device.name
+            
+            # Get job info if it's a scheduled job
+            scheduled_job_id = job_info.get("scheduled_job_id")
+            if scheduled_job_id:
+                from netraven.web.crud.scheduled_job import get_scheduled_job
+                scheduled_job = get_scheduled_job(db, scheduled_job_id)
+                if scheduled_job:
+                    job_name = scheduled_job.name
+            
+            # Get the job log for more details
+            job_log = db.query(JobLogModel).filter(JobLogModel.id == job_id).first()
+            
+            # Create job info dictionary
+            job_dict = {
+                "id": job_id,
+                "session_id": job_info.get("session_id"),
+                "job_type": job_info.get("job_type"),
+                "device_id": device_id,
+                "device_name": device_name,
+                "user_id": user_id,
+                "start_time": job_info.get("start_time"),
+                "retry_count": job_info.get("retry_count", 0),
+                "scheduled_job_id": scheduled_job_id,
+                "scheduled_job_name": job_name,
+                "status": job_log.status if job_log else "running"
+            }
+            
+            active_jobs.append(job_dict)
+        
+        # Standardized access granted log
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=active_jobs, scope=read:job_logs, count={len(active_jobs)}")
+        
+        return active_jobs
+    except Exception as e:
+        # Standardized error handling
+        logger.exception(f"Error listing active jobs: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error listing active jobs: {str(e)}"
+        )
+
+@router.get("/statistics", response_model=Dict[str, Any])
+async def get_job_statistics(
+    time_period: str = Query("day", description="Time period for statistics (day, week, month)"),
+    current_principal: UserPrincipal = Depends(get_current_principal),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Get statistics about job executions.
+    
+    Args:
+        time_period: Time period to get statistics for (day, week, month)
+        current_principal: The authenticated user
+        db: Database session
+        
+    Returns:
+        Dict[str, Any]: Job statistics
+    """
+    # Standardized permission check
+    if not current_principal.has_scope("read:job_logs") and not current_principal.is_admin:
+        logger.warning(f"Access denied: user={current_principal.username}, " 
+                     f"resource=job_statistics, scope=read:job_logs, reason=insufficient_permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions: read:job_logs required"
+        )
+    
+    try:
+        # Validate time period
+        if time_period not in ["day", "week", "month"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid time period. Must be one of: day, week, month"
+            )
+        
+        # Get job statistics from job tracking service
+        statistics = job_tracking_service.get_job_statistics(time_period)
+        
+        # For non-admin users, filter statistics to only include their jobs
+        if not current_principal.is_admin:
+            # This would be a more complex implementation
+            # For now, we'll just add a note that user-specific filtering
+            # is not implemented yet
+            statistics["note"] = "User-specific filtering not implemented yet"
+        
+        # Standardized access granted log
+        logger.info(f"Access granted: user={current_principal.username}, " 
+                  f"resource=job_statistics, scope=read:job_logs, time_period={time_period}")
+        
+        return statistics
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Standardized error handling
+        logger.exception(f"Error getting job statistics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting job statistics: {str(e)}"
+        ) 

@@ -11,9 +11,9 @@ from datetime import datetime
 class JobLogEntryBase(BaseModel):
     """Base job log entry schema with common attributes."""
     timestamp: datetime = Field(...)
-    level: str = Field(..., min_length=1, max_length=20)
-    category: Optional[str] = Field(None, min_length=1, max_length=50)
-    message: str = Field(...)
+    level: str = Field(..., min_length=1, max_length=50)
+    category: Optional[str] = None
+    message: str = Field(..., min_length=1)
     details: Optional[Dict[str, Any]] = None
 
 class JobLogEntryCreate(JobLogEntryBase):
@@ -31,17 +31,20 @@ class JobLogBase(BaseModel):
     """Base job log schema with common attributes."""
     session_id: str = Field(..., min_length=36, max_length=36)
     job_type: str = Field(..., min_length=1, max_length=50)
-    status: str = Field(..., min_length=1, max_length=20)
+    status: str = Field(..., min_length=1, max_length=50)
     start_time: datetime = Field(...)
     end_time: Optional[datetime] = None
+    result_code: Optional[int] = None
     result_message: Optional[str] = None
+    device_id: Optional[str] = None
     job_data: Optional[Dict[str, Any]] = None
-    retention_days: Optional[int] = Field(None, ge=1, le=3650)  # Max 10 years
+    retention_days: Optional[int] = Field(default=30, ge=1, le=365)
 
 class JobLogCreate(JobLogBase):
     """Schema for creating a new job log."""
-    device_id: Optional[str] = Field(None, min_length=36, max_length=36)
-    created_by: str = Field(..., min_length=1, max_length=36)
+    id: Optional[str] = None
+    session_id: Optional[str] = None
+    created_by: Optional[str] = None
 
 class JobLogUpdate(BaseModel):
     """Schema for updating a job log."""
@@ -54,7 +57,7 @@ class JobLogUpdate(BaseModel):
 class JobLog(JobLogBase):
     """Schema for job log information returned by API."""
     id: str
-    device_id: Optional[str] = None
+    session_id: str
     created_by: str
 
     model_config = ConfigDict(from_attributes=True)
@@ -69,20 +72,23 @@ class JobLogWithDevice(JobLog):
     """Schema for job log information with device details."""
     device_hostname: Optional[str] = None
     device_ip: Optional[str] = None
+    device_type: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 class JobLogWithUser(JobLog):
-    """Schema for job log information with user details."""
+    """
+    Schema for job log information with user details.
+    
+    Simplified to include only the username field for consistency and to avoid
+    attribute access issues with non-existent fields.
+    """
     username: str
-    user_full_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-class JobLogComplete(JobLogWithDevice, JobLogWithUser):
-    """Schema for complete job log information with device and user details."""
-    entries: List[JobLogEntry] = []
-
+class JobLogComplete(JobLogWithDevice, JobLogWithUser, JobLogWithEntries):
+    """Schema for complete job log information with device, user, and entries."""
     model_config = ConfigDict(from_attributes=True)
 
 class RetentionPolicyUpdate(BaseModel):
@@ -95,7 +101,6 @@ class JobLogFilter(BaseModel):
     device_id: Optional[str] = None
     job_type: Optional[str] = None
     status: Optional[str] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
     created_by: Optional[str] = None
-    session_id: Optional[str] = None 
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None 

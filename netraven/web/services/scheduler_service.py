@@ -7,6 +7,7 @@ integrating the BackupScheduler with database-backed scheduled jobs.
 """
 
 import logging
+import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -23,6 +24,12 @@ from netraven.web.models.scheduled_job import ScheduledJob
 from netraven.web.crud.device import get_device
 from netraven.web.database import get_db
 from netraven.web.schemas.scheduled_job import ScheduledJobFilter
+from netraven.web.services.job_tracking_service import (
+    get_job_tracking_service,
+    JOB_STATUS_COMPLETED,
+    JOB_STATUS_FAILED,
+    JOB_STATUS_RUNNING
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -40,6 +47,7 @@ class SchedulerService:
         self.scheduler = get_scheduler()
         self.db_session = next(get_db())
         self.job_map = {}  # Maps database job IDs to scheduler job IDs
+        self.job_tracking_service = get_job_tracking_service()
     
     def load_jobs_from_db(self) -> int:
         """
@@ -63,18 +71,17 @@ class SchedulerService:
                     logger.warning(f"Device {job.device_id} not found for job {job.id}")
                     continue
                 
-                # Schedule the job
-                scheduler_job_id = self.scheduler.schedule_backup(
+                # Schedule the job with new architecture
+                scheduler_job_id = self.scheduler.schedule_job(
+                    job_id=job.id,
                     device_id=device.id,
-                    host=device.hostname,
-                    username=device.username,
-                    password=device.password,
-                    device_type=device.device_type,
+                    job_type=job.job_type,
                     schedule_type=job.schedule_type,
-                    schedule_time=job.schedule_time,
-                    schedule_interval=job.schedule_interval,
-                    schedule_day=job.schedule_day,
-                    job_name=job.name
+                    start_datetime=job.start_datetime,
+                    recurrence_time=job.recurrence_time,
+                    recurrence_day=job.recurrence_day,
+                    recurrence_month=job.recurrence_month,
+                    job_data=job.job_data
                 )
                 
                 # Map database job ID to scheduler job ID
@@ -114,18 +121,17 @@ class SchedulerService:
                         logger.warning(f"Device {job.device_id} not found for job {job.id}")
                         continue
                     
-                    # Schedule the job
-                    scheduler_job_id = self.scheduler.schedule_backup(
+                    # Schedule the job with new architecture
+                    scheduler_job_id = self.scheduler.schedule_job(
+                        job_id=job.id,
                         device_id=device.id,
-                        host=device.hostname,
-                        username=device.username,
-                        password=device.password,
-                        device_type=device.device_type,
+                        job_type=job.job_type,
                         schedule_type=job.schedule_type,
-                        schedule_time=job.schedule_time,
-                        schedule_interval=job.schedule_interval,
-                        schedule_day=job.schedule_day,
-                        job_name=job.name
+                        start_datetime=job.start_datetime,
+                        recurrence_time=job.recurrence_time,
+                        recurrence_day=job.recurrence_day,
+                        recurrence_month=job.recurrence_month,
+                        job_data=job.job_data
                     )
                     
                     # Map database job ID to scheduler job ID
@@ -178,34 +184,112 @@ class SchedulerService:
                 logger.warning(f"Device {job.device_id} not found for job {job_id}")
                 return False
             
-            # Run the job
-            from netraven.jobs.device_connector import backup_device_config
-            from netraven.jobs.device_logging import start_job_session, end_job_session, log_backup_failure
-            
-            session_id = start_job_session(f"Manual run: {job.name}", user_id or job.created_by)
-            try:
-                logger.info(f"Running job {job_id} for device {device.hostname}")
-                result = backup_device_config(
-                    device_id=device.id,
-                    host=device.hostname,
-                    username=device.username,
-                    password=device.password,
-                    device_type=device.device_type,
-                    user_id=user_id or job.created_by
-                )
-                
-                # Update last run time
-                update_job_last_run(self.db_session, job_id)
-                
-                end_job_session(session_id, result)
-                return result
-            except Exception as e:
-                logger.exception(f"Error running job {job_id}: {e}")
-                log_backup_failure(device.id, str(e), session_id)
-                end_job_session(session_id, False)
+            # Run the job based on job_type
+            if job.job_type == "backup":
+                return self._run_backup_job(job, device, user_id)
+            else:
+                logger.error(f"Unsupported job type: {job.job_type}")
                 return False
+                
         except Exception as e:
             logger.exception(f"Error running job {job_id}: {e}")
+            return False
+    
+    def _run_backup_job(self, job: ScheduledJob, device: Any, user_id: Optional[str] = None) -> bool:
+        """
+        Run a backup job.
+        
+        Args:
+            job: Job record
+            device: Device record
+            user_id: User ID for logging (optional)
+            
+        Returns:
+            bool: True if backup was successful, False otherwise
+        """
+        from netraven.jobs.device_connector import backup_device_config
+        
+        # Generate a unique job execution ID
+        execution_id = str(uuid.uuid4())
+        
+        # Start job tracking
+        job_data = {
+            "job_name": job.name,
+            "device_name": device.name,
+            "scheduled_job_id": job.id
+        }
+        
+        job_log, session_id = self.job_tracking_service.start_job_tracking(
+            job_id=execution_id,
+            job_type=job.job_type,
+            device_id=device.id,
+            user_id=user_id or job.created_by,
+            scheduled_job_id=job.id,
+            job_data=job_data
+        )
+        
+        try:
+            logger.info(f"Running backup job {job.id} for device {device.name}")
+            
+            # Add log entry for starting
+            self.job_tracking_service.add_job_log_entry(
+                job_log_id=execution_id,
+                level="INFO",
+                category="backup_job",
+                message=f"Starting backup for device {device.name}",
+                details={"device_id": device.id, "hostname": getattr(device, 'hostname', device.name)}
+            )
+            
+            result = backup_device_config(
+                device_id=device.id,
+                host=device.hostname if hasattr(device, 'hostname') else device.name,
+                username=device.username,
+                password=device.password,
+                device_type=device.device_type,
+                user_id=user_id or job.created_by
+            )
+            
+            # Update last run time
+            update_job_last_run(self.db_session, job.id)
+            
+            # Update job status
+            if result:
+                self.job_tracking_service.update_job_status(
+                    job_id=execution_id,
+                    status=JOB_STATUS_COMPLETED,
+                    result_message="Backup completed successfully",
+                    send_notification=True
+                )
+            else:
+                self.job_tracking_service.update_job_status(
+                    job_id=execution_id,
+                    status=JOB_STATUS_FAILED,
+                    result_message="Backup failed",
+                    send_notification=True
+                )
+            
+            return result
+        except Exception as e:
+            error_message = f"Error running backup job {job.id}: {str(e)}"
+            logger.exception(error_message)
+            
+            # Log the error
+            self.job_tracking_service.add_job_log_entry(
+                job_log_id=execution_id,
+                level="ERROR",
+                category="backup_job",
+                message=error_message,
+                details={"exception": str(e)}
+            )
+            
+            # Update job status
+            self.job_tracking_service.update_job_status(
+                job_id=execution_id,
+                status=JOB_STATUS_FAILED,
+                result_message=error_message,
+                send_notification=True
+            )
+            
             return False
     
     def check_due_jobs(self) -> int:
@@ -248,16 +332,18 @@ class SchedulerService:
             self.scheduler.stop()
 
 # Singleton instance
-_service_instance = None
+_scheduler_service = None
 
 def get_scheduler_service() -> SchedulerService:
     """
-    Get the singleton scheduler service instance.
+    Get the scheduler service singleton instance.
     
     Returns:
         SchedulerService: Scheduler service instance
     """
-    global _service_instance
-    if _service_instance is None:
-        _service_instance = SchedulerService()
-    return _service_instance 
+    global _scheduler_service
+    
+    if _scheduler_service is None:
+        _scheduler_service = SchedulerService()
+    
+    return _scheduler_service 

@@ -8,7 +8,7 @@ deleting records, as well as other database manipulation functions.
 # Import CRUD operations from submodules
 from netraven.web.crud.user import get_user, get_users, get_user_by_email, get_user_by_username, create_user, update_user, delete_user, update_user_last_login
 from netraven.web.crud.device import get_device, get_devices, create_device, update_device, delete_device, update_device_backup_status
-from netraven.web.crud.backup import get_backup, get_backups, create_backup, delete_backup
+from netraven.web.crud.backup import get_backup, get_backups, create_backup, delete_backup, get_backup_content
 
 # Import tag CRUD operations
 from netraven.web.crud.tag import (

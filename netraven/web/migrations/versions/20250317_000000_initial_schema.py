@@ -146,17 +146,19 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
     
-    # Create scheduled_jobs table
+    # Create scheduled_jobs table with enhanced scheduling capabilities
     op.create_table(
         'scheduled_jobs',
         sa.Column('id', sa.String(length=36), nullable=False),
         sa.Column('name', sa.String(length=100), nullable=False),
         sa.Column('device_id', sa.String(length=36), nullable=False),
+        sa.Column('job_type', sa.String(length=50), nullable=False, server_default='backup'),
         sa.Column('schedule_type', sa.String(length=50), nullable=False),
-        sa.Column('schedule_time', sa.String(length=5), nullable=True),
-        sa.Column('schedule_interval', sa.Integer(), nullable=True),
-        sa.Column('schedule_day', sa.String(length=10), nullable=True),
-        sa.Column('enabled', sa.Boolean(), nullable=False, default=True),
+        sa.Column('start_datetime', sa.DateTime(), nullable=True),
+        sa.Column('recurrence_day', sa.String(length=50), nullable=True),
+        sa.Column('recurrence_month', sa.String(length=50), nullable=True),
+        sa.Column('recurrence_time', sa.String(length=5), nullable=True),
+        sa.Column('enabled', sa.Boolean(), nullable=False, server_default=sa.text('true')),
         sa.Column('last_run', sa.DateTime(), nullable=True),
         sa.Column('next_run', sa.DateTime(), nullable=True),
         sa.Column('created_by', sa.String(length=36), nullable=False),
@@ -204,7 +206,8 @@ def upgrade() -> None:
     op.create_index('ix_job_log_entries_level', 'job_log_entries', ['level'])
     op.create_index('ix_job_log_entries_category', 'job_log_entries', ['category'])
     
-    op.create_index('ix_scheduled_jobs_job_type', 'scheduled_jobs', ['schedule_type'])
+    op.create_index('ix_scheduled_jobs_schedule_type', 'scheduled_jobs', ['schedule_type'])
+    op.create_index('ix_scheduled_jobs_job_type', 'scheduled_jobs', ['job_type'])
     op.create_index('ix_scheduled_jobs_is_enabled', 'scheduled_jobs', ['enabled'])
     op.create_index('ix_scheduled_jobs_next_run', 'scheduled_jobs', ['next_run'])
     op.create_index('ix_scheduled_jobs_device_id', 'scheduled_jobs', ['device_id'])

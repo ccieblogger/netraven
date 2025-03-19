@@ -97,7 +97,7 @@ def create_tag_rule(
         Created tag rule
     """
     # Convert rule criteria to JSON string
-    rule_criteria_json = json.dumps(rule.rule_criteria.dict())
+    rule_criteria_json = json.dumps(rule.rule_criteria.model_dump())
     
     db_rule = TagRule(
         id=str(uuid.uuid4()),
@@ -143,7 +143,7 @@ def update_tag_rule(
     if rule.is_active is not None:
         db_rule.is_active = rule.is_active
     if rule.rule_criteria is not None:
-        db_rule.rule_criteria = json.dumps(rule.rule_criteria.dict())
+        db_rule.rule_criteria = json.dumps(rule.rule_criteria.model_dump())
     if rule.tag_id is not None:
         db_rule.tag_id = rule.tag_id
     

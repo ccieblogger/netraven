@@ -1,0 +1,25 @@
+[run]
+source = netraven
+omit =
+    */venv/*
+    */migrations/*
+    */tests/*
+    */setup.py
+    */conftest.py
+    */__init__.py
+    */docs/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    raise ImportError
+    except ImportError
+    def main()
+    if TYPE_CHECKING:
+
+[html]
+directory = coverage_html_report 

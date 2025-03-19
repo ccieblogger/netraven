@@ -633,53 +633,67 @@ const apiClient = {
   }
 }
 
-// Create individual service objects that use the main apiClient
+// Export services
+export default apiClient;
+
+// Individual service exports with domain-specific methods
 export const deviceService = {
-  getDevices: () => apiClient.getDevices(),
-  getDevice: (id) => apiClient.getDevice(id),
-  createDevice: (deviceData) => apiClient.createDevice(deviceData),
-  updateDevice: (id, deviceData) => apiClient.updateDevice(id, deviceData),
-  deleteDevice: (id) => apiClient.deleteDevice(id),
-  backupDevice: (id) => apiClient.backupDevice(id),
-  checkDeviceReachability: (id) => apiClient.checkDeviceReachability(id)
-}
-
-export const backupService = {
-  getBackups: (params) => apiClient.getBackups(params),
-  getBackup: (id) => apiClient.getBackup(id),
-  getBackupContent: (id) => apiClient.getBackupContent(id),
-  compareBackups: (backup1Id, backup2Id) => apiClient.compareBackups(backup1Id, backup2Id),
-  restoreBackup: (id) => apiClient.restoreBackup(id),
-  deleteBackup: (id) => apiClient.deleteBackup(id)
-}
-
-export const jobLogsService = {
-  getJobLogs: (params) => apiClient.getJobLogs(params),
-  getJobLog: (id, includeEntries) => apiClient.getJobLog(id, includeEntries),
-  getJobLogEntries: (id, params) => apiClient.getJobLogEntries(id, params),
-  deleteJobLog: (id) => apiClient.deleteJobLog(id)
-}
-
-export const scheduledJobsService = {
-  getScheduledJobs: (params) => apiClient.getScheduledJobs(params),
-  getScheduledJob: (id) => apiClient.getScheduledJob(id),
-  createScheduledJob: (jobData) => apiClient.createScheduledJob(jobData),
-  updateScheduledJob: (id, jobData) => apiClient.updateScheduledJob(id, jobData),
-  deleteScheduledJob: (id) => apiClient.deleteScheduledJob(id),
-  runScheduledJob: (id) => apiClient.runScheduledJob(id),
-  toggleScheduledJob: (id, enabled) => apiClient.toggleScheduledJob(id, enabled)
-}
+  getDevices: apiClient.getDevices.bind(apiClient),
+  getDevice: apiClient.getDevice.bind(apiClient),
+  createDevice: apiClient.createDevice.bind(apiClient),
+  updateDevice: apiClient.updateDevice.bind(apiClient),
+  deleteDevice: apiClient.deleteDevice.bind(apiClient),
+  backupDevice: apiClient.backupDevice.bind(apiClient),
+  checkReachability: apiClient.checkDeviceReachability.bind(apiClient)
+};
 
 export const tagService = {
-  getTags: (params) => apiClient.getTags(params),
-  getTag: (id) => apiClient.getTag(id),
-  createTag: (tagData) => apiClient.createTag(tagData),
-  updateTag: (id, tagData) => apiClient.updateTag(id, tagData),
-  deleteTag: (id) => apiClient.deleteTag(id),
-  getDevicesForTag: (id, params) => apiClient.getDevicesForTag(id, params),
-  getTagsForDevice: (deviceId) => apiClient.getTagsForDevice(deviceId),
-  assignTagsToDevices: (deviceIds, tagIds) => apiClient.assignTagsToDevices(deviceIds, tagIds),
-  removeTagsFromDevices: (deviceIds, tagIds) => apiClient.removeTagsFromDevices(deviceIds, tagIds)
-}
+  getTags: apiClient.getTags.bind(apiClient),
+  getTag: apiClient.getTag.bind(apiClient),
+  createTag: apiClient.createTag.bind(apiClient),
+  updateTag: apiClient.updateTag.bind(apiClient),
+  deleteTag: apiClient.deleteTag.bind(apiClient),
+  getDevicesForTag: apiClient.getDevicesForTag.bind(apiClient),
+  getTagsForDevice: apiClient.getTagsForDevice.bind(apiClient),
+  assignTagsToDevices: apiClient.assignTagsToDevices.bind(apiClient),
+  removeTagsFromDevices: apiClient.removeTagsFromDevices.bind(apiClient)
+};
 
-export default apiClient 
+// Add the missing tagRuleService
+export const tagRuleService = {
+  getTagRules: apiClient.getTagRules.bind(apiClient),
+  getTagRule: apiClient.getTagRule.bind(apiClient),
+  createTagRule: apiClient.createTagRule.bind(apiClient),
+  updateTagRule: apiClient.updateTagRule.bind(apiClient),
+  deleteTagRule: apiClient.deleteTagRule.bind(apiClient),
+  applyTagRule: apiClient.applyTagRule.bind(apiClient),
+  testRule: apiClient.testRule.bind(apiClient)
+};
+
+export const backupService = {
+  getBackups: apiClient.getBackups.bind(apiClient),
+  getBackup: apiClient.getBackup.bind(apiClient),
+  getBackupContent: apiClient.getBackupContent.bind(apiClient),
+  compareBackups: apiClient.compareBackups.bind(apiClient),
+  restoreBackup: apiClient.restoreBackup.bind(apiClient),
+  deleteBackup: apiClient.deleteBackup.bind(apiClient)
+};
+
+export const jobLogsService = {
+  getJobLogs: apiClient.getJobLogs.bind(apiClient),
+  getJobLog: apiClient.getJobLog.bind(apiClient),
+  getJobLogEntries: apiClient.getJobLogEntries.bind(apiClient),
+  deleteJobLog: apiClient.deleteJobLog.bind(apiClient),
+  updateRetentionPolicy: apiClient.updateRetentionPolicy.bind(apiClient),
+  cleanupJobLogs: apiClient.cleanupJobLogs.bind(apiClient)
+};
+
+export const scheduledJobsService = {
+  getScheduledJobs: apiClient.getScheduledJobs.bind(apiClient),
+  getScheduledJob: apiClient.getScheduledJob.bind(apiClient),
+  createScheduledJob: apiClient.createScheduledJob.bind(apiClient),
+  updateScheduledJob: apiClient.updateScheduledJob.bind(apiClient),
+  deleteScheduledJob: apiClient.deleteScheduledJob.bind(apiClient),
+  runScheduledJob: apiClient.runScheduledJob.bind(apiClient),
+  toggleScheduledJob: apiClient.toggleScheduledJob.bind(apiClient)
+}; 

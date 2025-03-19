@@ -15,7 +15,8 @@ class ScheduledJob(Base):
     """
     SQLAlchemy model for scheduled backup jobs.
     
-    This model represents a scheduled backup job in the database.
+    This model represents a scheduled backup job in the database with enhanced
+    scheduling capabilities including various recurrence patterns.
     """
     
     __tablename__ = "scheduled_jobs"
@@ -23,10 +24,20 @@ class ScheduledJob(Base):
     id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     device_id = Column(String(36), ForeignKey("devices.id"), nullable=False)
-    schedule_type = Column(String(50), nullable=False)  # daily, weekly, interval
-    schedule_time = Column(String(5), nullable=True)  # HH:MM format for daily/weekly
-    schedule_interval = Column(Integer, nullable=True)  # minutes for interval
-    schedule_day = Column(String(10), nullable=True)  # day of week for weekly
+    
+    # Job type field
+    job_type = Column(String(50), nullable=False, default="backup")  # "backup" or future types
+    
+    # Enhanced schedule fields
+    schedule_type = Column(String(50), nullable=False)  # "immediate", "one_time", "daily", "weekly", "monthly", "yearly"
+    start_datetime = Column(DateTime, nullable=True)  # When the schedule should start
+    
+    # Recurrence fields
+    recurrence_day = Column(String(50), nullable=True)  # Day of week/month for recurrence
+    recurrence_month = Column(String(50), nullable=True)  # Month for yearly recurrence
+    recurrence_time = Column(String(5), nullable=True)  # HH:MM format
+    
+    # Standard fields
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

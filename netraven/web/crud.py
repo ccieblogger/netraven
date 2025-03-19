@@ -44,7 +44,6 @@ def create_user(db: Session, user: user_schemas.UserCreate, password_hash: str) 
         username=user.username,
         email=user.email,
         password_hash=password_hash,
-        full_name=user.full_name,
         is_active=user.is_active,
         is_admin=user.is_admin
     )
@@ -114,24 +113,30 @@ def update_user(db: Session, user_id: str, user: user_schemas.UserUpdate) -> Opt
     Args:
         db: Database session
         user_id: User ID
-        user: User update data
+        user: Updated user data
         
     Returns:
-        Updated user if found, None otherwise
+        Updated user or None if not found
     """
     db_user = get_user(db, user_id)
-    if db_user is None:
+    if not db_user:
         return None
-        
-    # Update user fields
-    update_data = user.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        if key != "password" and value is not None:  # Handle password separately
-            setattr(db_user, key, value)
-            
+    
+    # Update fields if provided
+    update_data = user.model_dump(exclude_unset=True)
+    
+    # Hash password if provided
+    if "password" in update_data and update_data["password"]:
+        update_data["password_hash"] = get_password_hash(update_data["password"])
+        del update_data["password"]
+    
+    # Update fields
+    for field, value in update_data.items():
+        setattr(db_user, field, value)
+    
     db.commit()
     db.refresh(db_user)
-    logger.info(f"Updated user: {db_user.username}")
+    
     return db_user
 
 def update_user_password(db: Session, user_id: str, password_hash: str) -> Optional[User]:
@@ -305,7 +310,7 @@ def update_device(db: Session, device_id: str, device: device_schemas.DeviceUpda
         return None
         
     # Update device fields
-    update_data = device.dict(exclude_unset=True)
+    update_data = device.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         if value is not None:
             setattr(db_device, key, value)
@@ -433,6 +438,9 @@ def get_backups(
     db: Session, 
     device_id: Optional[str] = None, 
     status: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    is_automatic: Optional[bool] = None,
     skip: int = 0, 
     limit: int = 100
 ) -> List[Backup]:
@@ -443,12 +451,19 @@ def get_backups(
         db: Database session
         device_id: Optional device ID to filter by
         status: Optional status to filter by
+        start_date: Optional start date for filtering backups
+        end_date: Optional end date for filtering backups
+        is_automatic: Optional flag to filter automatic vs. manual backups
         skip: Number of records to skip
         limit: Maximum number of records to return
         
     Returns:
         List of backups
     """
+    logger.debug(f"Getting backups with filters: device_id={device_id}, status={status}, " 
+                 f"start_date={start_date}, end_date={end_date}, is_automatic={is_automatic}, "
+                 f"skip={skip}, limit={limit}")
+    
     query = db.query(Backup)
     
     # Apply filters
@@ -457,6 +472,16 @@ def get_backups(
         
     if status is not None:
         query = query.filter(Backup.status == status)
+    
+    if is_automatic is not None:
+        query = query.filter(Backup.is_automatic == is_automatic)
+    
+    # Date filtering
+    if start_date is not None:
+        query = query.filter(Backup.created_at >= start_date)
+    
+    if end_date is not None:
+        query = query.filter(Backup.created_at <= end_date)
     
     # Order by created_at descending (newest first)
     query = query.order_by(Backup.created_at.desc())
@@ -768,25 +793,36 @@ def get_job_log_with_details(
     if not db_job_log:
         return None
     
-    # Create a complete job log object
-    complete_job_log = job_log_schemas.JobLogComplete.model_validate(db_job_log)
+    # Create a result dictionary to avoid attribute access issues
+    result = {}
+    
+    # Copy job log fields
+    for key, value in db_job_log.__dict__.items():
+        if not key.startswith('_'):
+            result[key] = value
     
     # Add device details if available
     if db_job_log.device:
-        complete_job_log.device_hostname = db_job_log.device.hostname
-        complete_job_log.device_ip = db_job_log.device.ip_address
+        result["device_hostname"] = db_job_log.device.hostname
+        result["device_ip"] = db_job_log.device.ip_address
+        result["device_type"] = db_job_log.device.device_type
+    else:
+        result["device_hostname"] = "Unknown"
+        result["device_ip"] = "Unknown"
+        result["device_type"] = "Unknown"
     
     # Add user details
     if db_job_log.user:
-        complete_job_log.username = db_job_log.user.username
-        complete_job_log.user_full_name = db_job_log.user.full_name
+        result["username"] = db_job_log.user.username
+    else:
+        result["username"] = "Unknown"
     
     # Add entries if requested
     if include_entries:
         entries = get_job_log_entries(db=db, job_log_id=job_log_id, limit=entry_limit)
-        complete_job_log.entries = [job_log_schemas.JobLogEntry.model_validate(entry) for entry in entries]
+        result["entries"] = [entry.__dict__ for entry in entries]
     
-    return complete_job_log
+    return result
 
 def delete_old_job_logs(db: Session, days: int) -> int:
     """
@@ -840,4 +876,32 @@ def delete_job_logs_by_retention_policy(db: Session) -> int:
     
     db.commit()
     logger.info(f"Deleted {count} job logs based on retention policy")
-    return count 
+    return count
+
+def update_device_settings(db: Session, device_id: str, device: device_schemas.DeviceUpdate) -> Optional[Device]:
+    """
+    Update device settings.
+    
+    Args:
+        db: Database session
+        device_id: Device ID
+        device: Updated device settings
+        
+    Returns:
+        Updated device settings
+    """
+    db_device = get_device(db, device_id)
+    if not db_device:
+        return None
+    
+    # Update fields if provided
+    update_data = device.model_dump(exclude_unset=True)
+    
+    # Update fields
+    for field, value in update_data.items():
+        setattr(db_device, field, value)
+    
+    db.commit()
+    db.refresh(db_device)
+    
+    return db_device 

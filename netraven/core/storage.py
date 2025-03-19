@@ -9,6 +9,7 @@ This module provides a unified interface for storing backups in different locati
 """
 
 import os
+import hashlib
 from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, BinaryIO
@@ -24,6 +25,18 @@ except ImportError:
     BOTO3_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+def hash_content(content: str) -> str:
+    """
+    Calculate a SHA256 hash of the content.
+    
+    Args:
+        content: The content to hash
+        
+    Returns:
+        str: The hexadecimal digest of the hash
+    """
+    return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
 class StorageBackend(ABC):
     """Abstract base class for storage backends."""
