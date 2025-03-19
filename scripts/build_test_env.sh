@@ -11,15 +11,10 @@ NC='\033[0m' # No Color
 echo -e "${GREEN}Building and running NetRaven in test mode...${NC}"
 
 # Parse command line arguments
-RUN_UI_TESTS=false
 TEST_PATH="tests"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --ui)
-            RUN_UI_TESTS=true
-            shift
-            ;;
         --path)
             TEST_PATH="$2"
             shift 2
@@ -96,26 +91,16 @@ if [[ "$CONTAINER_ENV" != *"test"* ]]; then
 fi
 echo -e "${GREEN}Container environment is correctly set to test mode.${NC}"
 
-# Run tests based on command line arguments
-if [ "$RUN_UI_TESTS" = true ]; then
-    echo -e "${YELLOW}Running UI tests...${NC}"
-    # Use the run_ui_tests.sh script to run the tests
-    ./scripts/run_ui_tests.sh $TEST_PATH
-else
-    echo -e "${GREEN}NetRaven test environment is running!${NC}"
-    echo -e "${YELLOW}To run tests, use: ./scripts/run_ui_tests.sh${NC}"
-    echo -e "${YELLOW}For UI tests: ./scripts/run_ui_tests.sh tests/ui${NC}"
-    echo -e "${YELLOW}To view logs: docker-compose logs -f api${NC}"
-    echo -e "${YELLOW}To stop the environment: docker-compose down${NC}"
-fi
-
 # Provide helpful command examples
-echo -e "\n${GREEN}Example commands:${NC}"
+echo -e "\n${GREEN}NetRaven test environment is running!${NC}"
+echo -e "\n${GREEN}Example commands to run tests:${NC}"
 echo -e "${YELLOW}Run all tests:${NC}"
-echo "./scripts/run_ui_tests.sh"
+echo "docker exec netraven-api-1 python -m pytest"
 echo -e "${YELLOW}Run UI tests:${NC}"
-echo "./scripts/run_ui_tests.sh tests/ui -v"
+echo "docker exec netraven-api-1 python -m pytest tests/ui -v"
 echo -e "${YELLOW}Run specific test:${NC}"
-echo "./scripts/run_ui_tests.sh tests/ui/test_flows/test_login.py -v"
+echo "docker exec netraven-api-1 python -m pytest tests/ui/test_flows/test_login.py -v"
 echo -e "${YELLOW}View test artifacts:${NC}"
-echo "ls -la test-artifacts/" 
+echo "ls -la test-artifacts/"
+echo -e "${YELLOW}To view logs: docker-compose logs -f api${NC}"
+echo -e "${YELLOW}To stop the environment: docker-compose down${NC}" 
