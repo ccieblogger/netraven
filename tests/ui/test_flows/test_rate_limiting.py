@@ -4,7 +4,6 @@ Tests for rate limiting functionality.
 import pytest
 import time
 from playwright.sync_api import expect
-from ..pages.login_page import LoginPage
 from tests.ui.pages.auth_page import AuthPage
 
 @pytest.fixture
