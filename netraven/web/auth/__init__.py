@@ -18,7 +18,8 @@ from netraven.core.auth import (
     extract_token_from_header,
     has_required_scopes,
     create_token,
-    AuthError
+    AuthError,
+    verify_password
 )
 from netraven.core.token_store import token_store
 from netraven.core.logging import get_logger
@@ -373,16 +374,66 @@ def authenticate_user(username: str, password: str) -> Optional[User]:
     Returns:
         Optional[User]: The authenticated user or None
     """
-    # In a real implementation, this would verify credentials
-    # For testing purposes, we'll accept 'admin'/'NetRaven'
-    if username == "admin" and password == "NetRaven":
-        return User(
-            username="admin",
-            email="admin@example.com",
-            permissions=["admin:*", "read:devices", "write:devices", "read:*", "write:*"],
-            is_active=True
-        )
-    return None
+    # Get database session
+    try:
+        from netraven.web.database import SessionLocal
+        from netraven.web.crud import get_user_by_username
+        
+        db = SessionLocal()
+        try:
+            # Find user in database
+            db_user = get_user_by_username(db, username)
+            
+            if not db_user:
+                logger.warning(f"Authentication failed: username={username}, reason=user_not_found")
+                return None
+                
+            # Check password
+            if not verify_password(password, db_user.password_hash):
+                logger.warning(f"Authentication failed: username={username}, reason=invalid_password")
+                return None
+                
+            # Check if user is active
+            if not db_user.is_active:
+                logger.warning(f"Authentication failed: username={username}, reason=user_inactive")
+                return None
+                
+            # Update last login timestamp
+            from netraven.web.crud import update_user_last_login
+            update_user_last_login(db, db_user.id)
+            
+            # Get user permissions (could be based on roles or other factors)
+            permissions = []
+            if db_user.is_admin:
+                permissions = ["admin:*", "read:*", "write:*"]
+            else:
+                # Basic permissions for regular users
+                permissions = ["read:devices", "write:devices"]
+                
+            # Return user model
+            return User(
+                username=db_user.username,
+                email=db_user.email,
+                permissions=permissions,
+                is_active=db_user.is_active
+            )
+        finally:
+            db.close()
+    except Exception as e:
+        logger.exception(f"Error during authentication: {str(e)}")
+        
+        # Fallback to hardcoded admin for development environments
+        if os.environ.get("NETRAVEN_ENV", "").lower() in ("dev", "development", "test", "testing"):
+            if username == "admin" and password == "NetRaven":
+                logger.warning("Using fallback hardcoded admin authentication")
+                return User(
+                    username="admin",
+                    email="admin@example.com",
+                    permissions=["admin:*", "read:devices", "write:devices", "read:*", "write:*"],
+                    is_active=True
+                )
+                
+        return None
 
 
 def create_user_token(user: User) -> str:
