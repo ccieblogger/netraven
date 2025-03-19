@@ -1,213 +1,470 @@
 # NetRaven Troubleshooting Guide
 
-This guide provides solutions to common issues you might encounter when working with NetRaven, as well as instructions for verifying that different components are working correctly.
-
-## Table of Contents
-
-- [Authentication Issues](#authentication-issues)
-  - [Creating an Admin User](#creating-an-admin-user)
-  - [Testing Authentication](#testing-authentication)
-  - [Using Authentication Tokens](#using-authentication-tokens)
-- [API Issues](#api-issues)
-- [Database Issues](#database-issues)
-- [Docker Issues](#docker-issues)
+This guide provides solutions for common issues you might encounter when using NetRaven.
 
 ## Authentication Issues
 
-### Creating an Admin User
+### Invalid Credentials
 
-If you're having trouble logging in or need to reset admin credentials, you can use the built-in script to create or update the admin user:
+**Symptom**: Unable to log in with "Invalid credentials" error message.
 
-```bash
-# Create a new admin user with default credentials
-python3 scripts/create_admin_user.py
+**Possible causes and solutions**:
 
-# Update an existing admin user (use --force flag)
-python3 scripts/create_admin_user.py --force
+1. **Incorrect username or password**
+   - Double-check that you're using the correct username and password
+   - Ensure caps lock is not enabled
+   - Try resetting your password using the "Forgot Password" feature
 
-# Specify custom credentials
-python3 scripts/create_admin_user.py --username myadmin --password mysecretpw --email admin@example.com --force
-```
+2. **Account locked due to too many failed attempts**
+   - Wait 15 minutes and try again
+   - Contact your administrator to reset the rate limiting counter
 
-By default, this creates an admin user with these credentials:
-- Username: `admin`
-- Password: `adminpassword`
-- Email: `admin@example.com`
+3. **Expired account**
+   - Contact your administrator to reactivate your account
 
-### Testing Authentication
+### Token Issues
 
-To verify that authentication is working correctly, you can use curl to test the login endpoint:
+**Symptom**: Authenticated requests fail with "Token expired" or "Invalid token" errors.
 
-```bash
-# Attempt to login with admin credentials
-curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=adminpassword" \
-  http://localhost:8000/api/auth/token
-```
+**Possible causes and solutions**:
 
-A successful response should look like:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer"
-}
-```
+1. **Token has expired**
+   - Use the token refresh endpoint (`/api/auth/refresh`) to obtain a new token
+   - If refresh fails, log in again to obtain a completely new token
 
-If you get `{"detail":"Incorrect username or password"}`, check that:
-1. You've created an admin user using the script above
-2. The database file exists and is properly configured
-3. You're using the correct credentials
+2. **Malformed token**
+   - Ensure you're sending the token in the correct format: `Authorization: Bearer <token>`
+   - Check that the token is properly encoded and hasn't been truncated
 
-### Using Authentication Tokens
+3. **Token has been revoked**
+   - Log in again to obtain a new token
+   - Check with your administrator if your access has been restricted
 
-Once you have a token, you can use it to access protected endpoints:
+### Permission Issues
 
-```bash
-# Store the token in a variable
-TOKEN=$(curl -s -X POST -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=adminpassword" \
-  http://localhost:8000/api/auth/token | grep -o '"access_token":"[^"]*' | sed 's/"access_token":"//') 
+**Symptom**: "Insufficient permissions" or "Access denied" errors when accessing certain resources.
 
-# Use the token to get user information
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/auth/users/me
+**Possible causes and solutions**:
 
-# Use the token to access devices
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/devices
+1. **Missing required scope**
+   - Check the API documentation for required scopes for each endpoint
+   - Contact your administrator to grant additional scopes if needed
 
-# Use the token to access backups
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/backups
-```
+2. **Resource ownership restriction**
+   - You may only have access to resources you own or were explicitly granted access to
+   - Contact the resource owner or administrator to request access
 
-If you get `{"detail":"Could not validate credentials"}`, the token might be:
-1. Expired (tokens have a default expiration of 24 hours)
-2. Invalid or malformed
-3. Missing the "Bearer" prefix
+## Backup Storage Issues
 
-## API Issues
+### Backup Content Not Found
 
-*This section will be populated with common API troubleshooting steps.*
+**Symptom**: Unable to retrieve backup content with "Backup content not found" error.
+
+**Possible causes and solutions**:
+
+1. **Incorrect file path**
+   - Verify the backup record in the database has the correct file path
+   - Check if the storage backend configuration has changed
+
+2. **Storage backend unavailable**
+   - Check connectivity to the storage backend (S3, local filesystem)
+   - Verify storage backend credentials and permissions
+
+3. **File deleted outside of application**
+   - If the file was deleted directly from storage rather than through the API, the database record might still exist
+   - Restore the file from a backup or mark the backup as unavailable
+
+### Content Hash Mismatch
+
+**Symptom**: "Content hash mismatch" warning when retrieving backup content.
+
+**Possible causes and solutions**:
+
+1. **Corrupted file**
+   - The file might have been corrupted during storage or transmission
+   - Try to restore from an earlier backup
+
+2. **File modified outside of application**
+   - If the file was modified directly in storage, the hash will no longer match
+   - Restore the file from a backup or update the hash in the database
+
+### Storage Capacity Issues
+
+**Symptom**: "No space left on device" or similar storage errors.
+
+**Possible causes and solutions**:
+
+1. **Local storage full**
+   - Free up disk space
+   - Configure a shorter retention period
+   - Move to a storage backend with more capacity
+
+2. **S3 bucket limits**
+   - Check S3 bucket quotas and limits
+   - Contact your AWS administrator to increase limits if needed
+
+## Device Connection Issues
+
+### Device Unreachable
+
+**Symptom**: Cannot connect to device with "Device unreachable" error.
+
+**Possible causes and solutions**:
+
+1. **Network connectivity**
+   - Verify network connectivity between the NetRaven server and the device
+   - Check firewall rules that might be blocking connections
+   - Ensure the device is powered on and operational
+
+2. **Incorrect device IP or hostname**
+   - Verify the device IP address or hostname is correct
+   - Try pinging the device from the NetRaven server
+
+3. **SSH/NETCONF port not open**
+   - Verify the required ports are open on the device (SSH: 22, NETCONF: 830)
+   - Check device configuration to ensure these services are enabled
+
+### Authentication Failed
+
+**Symptom**: Cannot authenticate to device with "Authentication failed" error.
+
+**Possible causes and solutions**:
+
+1. **Incorrect credentials**
+   - Verify the username and password are correct for the device
+   - Ensure the credential has the required privileges on the device
+
+2. **SSH key issues**
+   - Verify the SSH key is valid and has been properly added to the device
+   - Check if the key has expired or been revoked
+
+3. **Account locked on device**
+   - Some devices lock accounts after multiple failed login attempts
+   - Try accessing the device directly to unlock the account
+
+### Command Execution Timeout
+
+**Symptom**: Device command execution times out.
+
+**Possible causes and solutions**:
+
+1. **Device overloaded**
+   - The device might be CPU-constrained or have high memory utilization
+   - Try again later or during a maintenance window
+
+2. **Command taking too long**
+   - Some commands take longer to execute than the default timeout
+   - Increase the timeout setting for that specific device
+
+3. **Unstable connection**
+   - Network instability might cause timeouts
+   - Check for packet loss or high latency between NetRaven and the device
+
+## API Rate Limiting Issues
+
+### Too Many Requests
+
+**Symptom**: Receiving "429 Too Many Requests" error responses.
+
+**Possible causes and solutions**:
+
+1. **Exceeding API rate limits**
+   - Reduce the frequency of API calls
+   - Implement backoff and retry strategies in your client
+   - Cache responses where appropriate
+
+2. **Login attempt limits**
+   - Wait for the rate limit window to reset (typically 15 minutes)
+   - Ensure credentials are correct to avoid triggering rate limiting
+
+3. **IP-based rate limiting**
+   - If multiple users share the same IP, consider changing your network configuration
+   - Contact your administrator to adjust rate limit settings if needed
 
 ## Database Issues
 
-### PostgreSQL Connection Issues
+### Connection Issues
 
-If you're having trouble connecting to the PostgreSQL database:
+**Symptom**: Application logs show database connection errors.
+
+**Possible causes and solutions**:
+
+1. **Database server down**
+   - Verify the database server is running
+   - Check network connectivity to the database server
+
+2. **Connection pool exhaustion**
+   - Too many concurrent connections might exhaust the connection pool
+   - Adjust connection pool settings or optimize queries to release connections faster
+
+3. **Authentication issues**
+   - Verify database credentials are correct
+   - Check if database user accounts are locked or expired
+
+### Performance Issues
+
+**Symptom**: Slow API responses, timeouts, or high server load.
+
+**Possible causes and solutions**:
+
+1. **Missing indexes**
+   - Check if appropriate indexes are created for common queries
+   - Add indexes to frequently queried columns
+
+2. **Complex queries**
+   - Optimize complex queries that might be causing performance issues
+   - Consider denormalizing data for performance-critical paths
+
+3. **Database server resources**
+   - Check if the database server has sufficient CPU, memory, and disk I/O
+   - Consider scaling up the database server resources
+
+## Job Execution Issues
+
+### Failed Jobs
+
+**Symptom**: Background jobs failing or not completing.
+
+**Possible causes and solutions**:
+
+1. **Worker process crashed**
+   - Check logs for worker process errors
+   - Restart worker processes if needed
+
+2. **Resource constraints**
+   - Check if the worker has sufficient memory and CPU resources
+   - Adjust job concurrency settings to prevent resource exhaustion
+
+3. **External dependency failures**
+   - Jobs might fail due to external dependencies (storage, devices, etc.)
+   - Check connectivity and access to external dependencies
+
+### Stuck Jobs
+
+**Symptom**: Jobs remain in "running" state for an extended period.
+
+**Possible causes and solutions**:
+
+1. **Worker process died without updating job status**
+   - Implement job timeouts that automatically mark jobs as failed after a period
+   - Add job monitoring to detect and recover stuck jobs
+
+2. **Deadlocks or infinite loops**
+   - Review job code for potential deadlocks or infinite loops
+   - Implement circuit breakers for resource-intensive operations
+
+3. **External process hanging**
+   - Set timeouts for external process calls
+   - Implement proper error handling for external processes
+
+## Container and Deployment Issues
+
+### Container Startup Failures
+
+**Symptom**: Docker containers fail to start or restart repeatedly.
+
+**Possible causes and solutions**:
+
+1. **Missing environment variables**
+   - Check if all required environment variables are defined
+   - Verify `.env` file is present and correctly formatted
+
+2. **Port conflicts**
+   - Ensure no other services are using the same ports
+   - Change port mappings in docker-compose.yml if needed
+
+3. **Volume permission issues**
+   - Check permissions on mounted volumes
+   - Ensure the container user has appropriate permissions
+
+### Database Migration Issues
+
+**Symptom**: Application fails to start with database migration errors.
+
+**Possible causes and solutions**:
+
+1. **Schema version mismatch**
+   - Ensure all containers are running the same application version
+   - Run database migrations manually if needed
+
+2. **Incompatible migrations**
+   - Check migration logs for specific errors
+   - Restore database from backup and apply migrations incrementally
+
+3. **Database connection issues during migration**
+   - Ensure stable database connection during migration process
+   - Increase migration timeout settings
+
+## Testing Environment Issues
+
+### Test Failures
+
+**Symptom**: Unit or integration tests failing.
+
+**Possible causes and solutions**:
+
+1. **Environment configuration**
+   - Ensure test environment is configured correctly
+   - Check that test-specific settings are applied
+
+2. **Test data issues**
+   - Verify test fixtures and data are correct
+   - Ensure database is properly seeded for tests
+
+3. **Code changes breaking tests**
+   - Review recent code changes that might have broken tests
+   - Update tests to match new code behavior if appropriate
+
+### Test Performance Issues
+
+**Symptom**: Tests take too long to run.
+
+**Possible causes and solutions**:
+
+1. **Inefficient tests**
+   - Identify slow tests and optimize them
+   - Consider using test doubles (mocks, stubs) for external dependencies
+
+2. **Too many integration tests**
+   - Balance unit tests (fast) with integration tests (slower)
+   - Run different test suites in parallel
+
+3. **Resource constraints**
+   - Ensure sufficient resources for test environment
+   - Consider containerized testing for isolation and reproducibility
+
+## Diagnostic Tools
+
+### Server Logs
+
+Access server logs to diagnose issues:
 
 ```bash
-# Check if the PostgreSQL container is running
-docker ps | grep postgres
+# View API server logs
+docker-compose logs api
 
-# Check PostgreSQL logs for errors
-docker logs netraven-postgres-1
+# Follow logs in real-time
+docker-compose logs -f api
 
-# Test the PostgreSQL connection directly
-docker exec -it netraven-postgres-1 psql -U netraven -d netraven -c "SELECT 1"
+# View logs for a specific time period
+docker-compose logs --since=1h api
 ```
 
-If the connection fails, check:
-1. The PostgreSQL container is running (`docker compose ps`)
-2. The PostgreSQL credentials in the `config.yml` file match those in `docker-compose.yml`
-3. The `DATABASE_URL` environment variable in the API service configuration
-4. Network connectivity between containers (they should be on the same Docker network)
+### Database Inspection
 
-### Data Persistence Issues
-
-To verify data is being properly persisted:
+Connect to the database for diagnostics:
 
 ```bash
-# List all devices directly from the database
-docker exec -it netraven-postgres-1 psql -U netraven -d netraven -c "SELECT hostname, ip_address, device_type FROM netraven.devices"
+# Connect to PostgreSQL database
+docker-compose exec db psql -U netraven -d netraven
 
-# Compare with API response
-curl -s -X GET http://localhost:8000/api/devices -H "Authorization: Bearer $TOKEN" | jq
+# Check active connections
+SELECT * FROM pg_stat_activity;
+
+# Check table sizes
+SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) 
+FROM pg_catalog.pg_statio_user_tables 
+ORDER BY pg_total_relation_size(relid) DESC;
 ```
 
-If the API shows different data than the database:
-1. The API might be using demo/mock data instead of the real database
-2. The API might be using a different database than expected
-3. Caching issues might be present (restart the API container)
+### Storage Diagnostics
 
-### Demo Mode vs Real Database
-
-NetRaven may use demo mode for testing, which doesn't persist changes to the database. To verify you're using the real database:
+Check storage backend status:
 
 ```bash
-# Add a device via the API
-curl -s -X POST http://localhost:8000/api/devices \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"hostname": "test-device", "device_type": "cisco_ios", "ip_address": "192.168.1.100", "description": "Test Device", "port": 22, "username": "admin", "password": "test123"}' | jq
+# Local storage stats
+docker-compose exec api python -c "from netraven.core.storage import get_storage_backend; from netraven.core.config import get_config; print(get_storage_backend(get_config()).get_status())"
 
-# Check if it appears in the database
-docker exec -it netraven-postgres-1 psql -U netraven -d netraven -c "SELECT hostname, ip_address FROM netraven.devices WHERE hostname='test-device'"
-
-# Update the device via the API
-DEVICE_ID=$(curl -s -X GET http://localhost:8000/api/devices -H "Authorization: Bearer $TOKEN" | jq -r '.[] | select(.hostname=="test-device") | .id')
-curl -s -X PUT http://localhost:8000/api/devices/$DEVICE_ID \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"hostname": "test-device-updated", "device_type": "cisco_ios", "ip_address": "192.168.1.100", "description": "Updated Test Device", "port": 22}' | jq
-
-# Check if the update appears in the database
-docker exec -it netraven-postgres-1 psql -U netraven -d netraven -c "SELECT hostname, description FROM netraven.devices WHERE ip_address='192.168.1.100'"
+# Verify a backup's content hash
+docker-compose exec api python -c "from netraven.core.backup import retrieve_backup_content, hash_content; content = retrieve_backup_content('path/to/backup.txt'); print(hash_content(content))"
 ```
 
-If changes via the API don't appear in the database, check:
-1. The router implementation in `netraven/web/routers/devices.py` for hardcoded demo data
-2. The database connection configuration in `netraven/web/database.py`
-3. That you're restarting the API container after making code changes
+### API Diagnostics
 
-### Database Schema and Migration Issues
-
-To check the database schema:
+Test API endpoints directly:
 
 ```bash
-# List all tables in the database
-docker exec -it netraven-postgres-1 psql -U netraven -d netraven -c "\dt netraven.*"
+# Check API health endpoint
+curl http://localhost:8000/api/health | jq
 
-# Examine a specific table's schema
-docker exec -it netraven-postgres-1 psql -U netraven -d netraven -c "\d netraven.devices"
+# Test API with authentication
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8000/api/users | jq
 ```
 
-If tables are missing:
-1. Verify the initialization SQL script is being executed
-2. Check the logs for database initialization errors
-3. Restart the application and check logs for database model registration issues
+## Architecture-Specific Troubleshooting
 
-### PostgreSQL Configuration Issues
+### High Availability Setup Issues
 
-To verify PostgreSQL extensions and configuration:
+If you're running NetRaven in a high-availability configuration:
 
-```bash
-# Check installed extensions
-docker exec -it netraven-postgres-1 psql -U netraven -d netraven -c "\dx"
+1. **Load balancer issues**
+   - Verify load balancer health checks are passing
+   - Check if session persistence is configured correctly for authenticated sessions
 
-# Check database schemas
-docker exec -it netraven-postgres-1 psql -U netraven -d netraven -c "\dn"
+2. **Shared storage issues**
+   - Ensure shared storage is accessible from all nodes
+   - Check permissions and mount points
 
-# Check PostgreSQL version
-docker exec -it netraven-postgres-1 psql -U netraven -d netraven -c "SELECT version()"
-```
+3. **Database replication issues**
+   - Verify database replication is working correctly
+   - Check for replication lag or broken replication
 
-Make sure the required extensions (uuid-ossp, pgcrypto) are installed.
+### Advanced Debugging Techniques
 
-### Reset Database (if needed)
+For difficult-to-diagnose issues:
 
-To reset the database and start fresh:
+1. **Enable debug logging**
+   - Set `LOG_LEVEL=DEBUG` in your environment
+   - Restart the affected service
 
-```bash
-# Stop all containers
-docker compose down
+2. **Profile API performance**
+   - Use tools like `py-spy` to profile Python performance
+   - Check for slow database queries or external calls
 
-# Remove the PostgreSQL volume
-docker volume rm netraven_postgres_data
+3. **Memory leak investigation**
+   - Monitor container memory usage over time
+   - Use tools like `tracemalloc` to track Python memory allocations
 
-# Start the containers again
-docker compose up -d
-```
+## Getting Support
 
-This will fully reset the database, so use with caution!
+If you're unable to resolve an issue using this guide:
 
-## Docker Issues
+1. **Search the documentation**
+   - The full documentation might have more specific information about your issue
 
-*This section will be populated with common Docker deployment troubleshooting steps.* 
+2. **Check known issues**
+   - The GitHub repository might have known issues documented
+
+3. **Community support**
+   - Post questions in the community forums or discussion groups
+
+4. **Professional support**
+   - Contact the NetRaven team for professional support options
+
+Remember to provide the following when seeking support:
+
+- NetRaven version
+- Environment details (OS, container version, etc.)
+- Detailed description of the issue
+- Steps to reproduce
+- Relevant logs or error messages
+
+## Preventative Measures
+
+To avoid common issues:
+
+1. **Regular backups**
+   - Maintain regular backups of the database and configuration
+   - Test backup restoration procedures
+
+2. **Monitoring**
+   - Set up monitoring for services, database, and storage
+   - Configure alerts for critical failures
+
+3. **Update strategy**
+   - Develop a strategy for applying updates safely
+   - Test updates in a staging environment before production
+
+4. **Documentation**
+   - Maintain documentation of your specific deployment
+   - Document any customizations or configuration changes 
