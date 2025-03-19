@@ -1,11 +1,9 @@
-version: '3'
-
 services:
   # PostgreSQL database service
   postgres:
     image: postgres:14-alpine
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - postgres-data:/var/lib/postgresql/data/
     ports:
       - "5432:5432"
     restart: unless-stopped
@@ -28,14 +26,14 @@ services:
       dockerfile: Dockerfile.api
       args:
         - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
+      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
       - POSTGRES_HOST=postgres
       - POSTGRES_USER=netraven
       - POSTGRES_PASSWORD=netraven
       - POSTGRES_DB=netraven
+      - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
+      - TOKEN_EXPIRY_HOURS=${TOKEN_EXPIRY_HOURS:-24}
       - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
       - GATEWAY_URL=http://device_gateway:8001
     volumes:
@@ -139,7 +137,7 @@ services:
 
 volumes:
   frontend_node_modules:
-  postgres_data:
+  postgres-data:
   logs_data:
   token_data:
   api-data:

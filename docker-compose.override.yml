@@ -1,5 +1,3 @@
-version: '3'
-
 # This file contains overrides for test environment
 # It is automatically loaded by docker-compose when present
 
