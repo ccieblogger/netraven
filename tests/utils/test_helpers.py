@@ -8,6 +8,7 @@ import requests
 import json
 import time
 from typing import Dict, Any, Optional, List
+from fastapi.testclient import TestClient
 
 
 def generate_unique_name(prefix: str = "test") -> str:
@@ -237,4 +238,64 @@ def get_all_resources(api_url: str, token: str, resource_type: str) -> List[Dict
     if response.status_code != 200:
         raise Exception(f"Failed to get {resource_type}: {response.text}")
     
-    return response.json() 
+    return response.json()
+
+
+def get_auth_headers(client: TestClient, username: str, password: str) -> dict:
+    """
+    Get authentication headers (with JWT token) for the given user.
+    
+    Args:
+        client: FastAPI TestClient instance
+        username: Username for authentication
+        password: Password for authentication
+        
+    Returns:
+        dict: Headers dictionary with Authorization Bearer token
+    """
+    # Get token
+    response = client.post(
+        "/api/auth/token",
+        json={"username": username, "password": password}
+    )
+    
+    # Verify success
+    if response.status_code != 200:
+        raise ValueError(f"Authentication failed: {response.status_code} - {response.text}")
+    
+    # Extract token
+    token_data = response.json()
+    token = token_data["access_token"]
+    
+    # Return headers
+    return {"Authorization": f"Bearer {token}"}
+
+
+def create_test_job_data(device_id: int, schedule_type: str = "daily") -> dict:
+    """
+    Create test job data for scheduled job creation.
+    
+    Args:
+        device_id: Device ID to assign the job to
+        schedule_type: Type of schedule (immediate, one_time, daily, weekly, etc.)
+        
+    Returns:
+        dict: Job data for API request
+    """
+    return {
+        "name": "Test Backup Job",
+        "job_type": "BACKUP",
+        "schedule_type": schedule_type,
+        "device_id": device_id,
+        "parameters": {
+            "path": "/backup",
+            "filename": "config.bak"
+        },
+        "is_active": True,
+        "schedule_parameters": {
+            "hour": 3,
+            "minute": 0,
+            "day_of_week": 1 if schedule_type == "weekly" else None,
+            "day_of_month": 1 if schedule_type == "monthly" else None,
+        }
+    } 

@@ -4,84 +4,64 @@ Database initialization utilities for tests.
 This module provides functions to initialize and reset the database for testing.
 """
 import os
+from typing import Generator
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import NullPool
 
-from netraven.db.models import Base, User
-from netraven.db.session import get_db
-from netraven.core.config import load_config, is_test_env
+from netraven.web.db import Base, get_db
+from netraven.web.models import user, device, job_log, scheduled_job, tag, tag_rule
+
+# Set test database URL - use in-memory SQLite for tests
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite:///./test.db")
+
+# Create test engine with appropriate parameters
+engine = create_engine(
+    TEST_DATABASE_URL, 
+    connect_args={"check_same_thread": False} if TEST_DATABASE_URL.startswith("sqlite") else {},
+    poolclass=NullPool  # Don't pool connections for tests
+)
+
+# Create test session factory
+TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_test_db_url():
-    """Get the database URL for testing."""
-    config = load_config()
-    return config["database"]["url"]
-
-
-def init_test_db():
-    """Initialize the test database with required tables and initial data."""
-    if not is_test_env():
-        raise RuntimeError("This function should only be called in the test environment")
+def get_test_db_session() -> Generator[Session, None, None]:
+    """
+    Get a test database session.
     
-    # Get database URL from config
-    db_url = get_test_db_url()
-    
-    # Create engine and session
-    engine = create_engine(db_url)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    
-    # Create all tables
-    Base.metadata.drop_all(bind=engine)
+    This function creates tables if they don't exist, then yields a
+    session which is automatically closed after use.
+    """
+    # Create tables if they don't exist
     Base.metadata.create_all(bind=engine)
     
-    # Create initial test data
-    db = SessionLocal()
+    # Create a fresh session
+    db = TestSessionLocal()
     try:
-        # Create test admin user
-        admin_user = User(
-            username="testadmin",
-            email="testadmin@example.com",
-            full_name="Test Admin",
-            is_active=True,
-            permissions=["admin:*", "read:*", "write:*"]
-        )
-        admin_user.set_password("testpassword")
-        
-        # Create regular test user
-        regular_user = User(
-            username="testuser",
-            email="testuser@example.com",
-            full_name="Test User",
-            is_active=True,
-            permissions=["read:devices", "write:devices"]
-        )
-        regular_user.set_password("testpassword")
-        
-        db.add(admin_user)
-        db.add(regular_user)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise e
+        yield db
     finally:
         db.close()
 
 
-def reset_test_db():
-    """Reset the test database to a clean state."""
-    if not is_test_env():
-        raise RuntimeError("This function should only be called in the test environment")
+def reset_test_database() -> None:
+    """
+    Reset the test database by dropping and recreating all tables.
     
-    init_test_db()
+    This is useful for ensuring tests start with a clean database.
+    """
+    # Drop all tables
+    Base.metadata.drop_all(bind=engine)
+    
+    # Create tables again
+    Base.metadata.create_all(bind=engine)
 
 
-def get_test_db():
-    """Get a database session for testing."""
-    if not is_test_env():
-        raise RuntimeError("This function should only be called in the test environment")
+def override_get_db() -> Generator[Session, None, None]:
+    """
+    Override the get_db dependency for FastAPI tests.
     
-    db = next(get_db())
-    try:
-        yield db
-    finally:
-        db.close() 
+    This is used to replace the normal database dependency with the test database
+    in FastAPI TestClient tests.
+    """
+    return get_test_db_session() 

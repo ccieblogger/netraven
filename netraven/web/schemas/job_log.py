@@ -7,6 +7,15 @@ This module provides Pydantic models for job log-related API requests and respon
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
+from enum import Enum
+
+class JobStatus(str, Enum):
+    """Job status enum."""
+    QUEUED = "queued"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELED = "canceled"
 
 class JobLogEntryBase(BaseModel):
     """Base job log entry schema with common attributes."""

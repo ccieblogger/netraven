@@ -434,7 +434,7 @@ def validate_schedule_parameters(schedule_type: ScheduleTypeEnum, job_data: Unio
                 detail="Recurrence month (e.g., 'january') is required for yearly schedules"
             )
 
-def create_merged_job_data(job: ScheduledJob, job_data: scheduled_job_schemas.ScheduledJobUpdate) -> Any:
+def create_merged_job_data(job: ScheduledJobModel, job_data: scheduled_job_schemas.ScheduledJobUpdate) -> Any:
     """
     Create a merged object with both existing and updated values for validation.
     

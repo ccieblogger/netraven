@@ -17,7 +17,7 @@ from netraven.web.models.job_log import JobLog, JobLogEntry
 from netraven.web.models.scheduled_job import ScheduledJob
 from netraven.web.crud.device import get_device
 from netraven.web.services.notification_service import get_notification_service
-from netraven.web.crud.user import get_user_by_id
+from netraven.web.crud.user import get_user
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -186,7 +186,7 @@ class JobTrackingService:
             if send_notification and status in [JOB_STATUS_COMPLETED, JOB_STATUS_FAILED]:
                 try:
                     # Get user info
-                    user = get_user_by_id(self.db_session, job_log.created_by)
+                    user = get_user(self.db_session, job_log.created_by)
                     
                     # Get device info
                     device = None
