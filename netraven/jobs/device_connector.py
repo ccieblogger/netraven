@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
 import uuid
 import logging
+import random
 
 from netraven.core.device_comm import DeviceConnector as CoreDeviceConnector
 from netraven.jobs.device_logging import (
@@ -29,7 +30,7 @@ from netraven.jobs.device_logging import (
     log_backup_start,
     log_device_info,
 )
-from netraven.core.config import load_config, get_default_config_path, get_storage_path
+from netraven.core.config import load_config, get_default_config_path, get_storage_path, get_config
 from netraven.core.logging import get_logger
 
 # Configure logging
@@ -56,7 +57,8 @@ class JobDeviceConnector:
         timeout: int = 30,
         alt_passwords: Optional[List[str]] = None,
         session_id: Optional[str] = None,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        max_retries: Optional[int] = None
     ):
         """
         Initialize the JobDeviceConnector.
@@ -74,7 +76,11 @@ class JobDeviceConnector:
             alt_passwords: List of alternative passwords to try
             session_id: Session ID for logging (generated if not provided)
             user_id: User ID for database logging
+            max_retries: Maximum number of connection attempts (default: from config)
         """
+        # Load config for default values
+        config = get_config()
+        
         # Store parameters
         self.device_id = device_id
         self.host = host
@@ -84,8 +90,14 @@ class JobDeviceConnector:
         self.port = port
         self.use_keys = use_keys
         self.key_file = key_file
-        self.timeout = timeout
+        self.timeout = config.get("device", {}).get("connection", {}).get("timeout", timeout)
         self.alt_passwords = alt_passwords or []
+        
+        # Use max_retries from parameter, config, or default to 3
+        if max_retries is not None:
+            self.max_retries = max_retries
+        else:
+            self.max_retries = config.get("device", {}).get("connection", {}).get("max_retries", 3)
         
         # Create or use session ID
         if session_id is None:
@@ -95,6 +107,31 @@ class JobDeviceConnector:
         
         # Register device
         register_device(device_id, host, self.device_type, self.session_id)
+        
+        # Prepare advanced connection parameters for Netmiko
+        self.conn_params = {
+            "host": host,
+            "username": username,
+            "password": password,
+            "device_type": device_type if device_type else "autodetect",
+            "port": port,
+            "use_keys": use_keys,
+            "key_file": key_file,
+            # Additional Netmiko parameters for better connection handling
+            "timeout": timeout,  # Connection timeout (replaces conn_timeout)
+            "auth_timeout": timeout,  # Authentication timeout
+            "banner_timeout": min(timeout, 15),  # Banner timeout (max 15s)
+            "session_timeout": timeout * 2,  # Session timeout longer than connect
+            "keepalive": 30,  # Enable keepalive to prevent timeouts
+            "read_timeout_override": timeout + 5,
+            "fast_cli": False,  # More reliable, though slower
+            "global_delay_factor": 1,  # Base delay factor for all operations
+            "verbose": True  # Enable verbose logging for troubleshooting
+        }
+        
+        # Add alt_passwords if provided
+        if alt_passwords:
+            self.conn_params["alt_passwords"] = alt_passwords
         
         # Create core connector (but don't connect yet)
         self.connector = CoreDeviceConnector(
@@ -119,27 +156,76 @@ class JobDeviceConnector:
         
     def connect(self) -> bool:
         """
-        Connect to the device with enhanced logging.
+        Connect to the device with enhanced logging and retry mechanism.
         
         Returns:
             bool: True if connection was successful, False otherwise
         """
         log_device_connect(self.device_id, self.session_id)
         
-        try:
-            result = self.connector.connect()
-            
-            if result:
-                log_device_connect_success(self.device_id, self.session_id)
-                self._connected = True
-            else:
-                log_device_connect_failure(self.device_id, "Connection failed", self.session_id)
+        # Set up retry parameters
+        max_attempts = self.max_retries
+        base_delay = 1  # Base delay in seconds
+        backoff_factor = 2  # Exponential backoff multiplier
+        
+        logger.info(f"Connecting to device {self.host} with retry configuration: max_attempts={max_attempts}")
+        
+        # Tell the connector to use our enhanced connection parameters
+        self.connector.connection_params = self.conn_params
+        
+        # Implement retry logic
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.debug(f"Connection attempt {attempt}/{max_attempts} to {self.host}")
                 
-            return result
-        except Exception as e:
-            log_device_connect_failure(self.device_id, str(e), self.session_id)
-            return False
-            
+                # Attempt connection
+                result = self.connector.connect()
+                
+                if result:
+                    log_device_connect_success(self.device_id, self.session_id)
+                    self._connected = True
+                    return True
+                
+                # If connection fails but doesn't raise an exception, log and retry
+                logger.warning(f"Connection attempt {attempt}/{max_attempts} to {self.host} failed")
+                
+                # If this was the last attempt, break out of the loop
+                if attempt >= max_attempts:
+                    break
+                
+                # Calculate delay with randomized jitter (±10%)
+                delay = base_delay * (backoff_factor ** (attempt - 1))
+                jitter = delay * 0.1 * (2 * random.random() - 1)  # ±10% jitter
+                sleep_time = max(0, delay + jitter)
+                
+                logger.debug(f"Waiting {sleep_time:.2f}s before next connection attempt to {self.host}")
+                time.sleep(sleep_time)
+                
+            except Exception as e:
+                # If the exception is fatal or this is the last attempt, propagate it
+                if attempt >= max_attempts:
+                    error_msg = f"Connection error on attempt {attempt}/{max_attempts}: {str(e)}"
+                    log_device_connect_failure(self.device_id, error_msg, self.session_id)
+                    logger.error(f"Device {self.host}: {error_msg}")
+                    return False
+                
+                # Otherwise log and retry
+                logger.warning(f"Connection attempt {attempt}/{max_attempts} to {self.host} failed: {str(e)}")
+                
+                # Calculate delay with randomized jitter (±10%)
+                delay = base_delay * (backoff_factor ** (attempt - 1))
+                jitter = delay * 0.1 * (2 * random.random() - 1)  # ±10% jitter
+                sleep_time = max(0, delay + jitter)
+                
+                logger.debug(f"Waiting {sleep_time:.2f}s before next connection attempt to {self.host}")
+                time.sleep(sleep_time)
+        
+        # If we got here, all attempts failed
+        error_msg = f"Connection failed after {max_attempts} attempts"
+        log_device_connect_failure(self.device_id, error_msg, self.session_id)
+        logger.error(f"Device {self.host}: {error_msg}")
+        return False
+        
     def disconnect(self) -> bool:
         """
         Disconnect from the device with logging.

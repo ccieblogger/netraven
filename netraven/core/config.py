@@ -30,6 +30,13 @@ DEFAULT_CONFIG = {
             "author_email": "netraven@example.com"
         }
     },
+    "device": {
+        "connection": {
+            "max_retries": 3,
+            "initial_retry_delay": 1,
+            "timeout": 30
+        }
+    },
     "logging": {
         "level": "INFO",
         "directory": "logs",

@@ -129,13 +129,14 @@ def register_device(device_id: str, hostname: str, device_type: str,
     
     logger.info(f"[Session: {session_id}] Registered device: {hostname} ({device_type})")
 
-def log_device_connect(device_id: str, session_id: Optional[str] = None) -> None:
+def log_device_connect(device_id: str, session_id: Optional[str] = None, message: Optional[str] = None) -> None:
     """
     Log a device connection attempt.
     
     Args:
         device_id: Device ID
         session_id: Optional session ID
+        message: Optional additional context (e.g., retry information)
     """
     session_id = session_id or _current_job_session
     
@@ -148,7 +149,11 @@ def log_device_connect(device_id: str, session_id: Optional[str] = None) -> None
         logger.warning(f"No device info for connection: {device_id}")
         return
     
-    logger.info(f"[Session: {session_id}] Connecting to device: {device_info.get('hostname', device_id)}")
+    log_msg = f"[Session: {session_id}] Connecting to device: {device_info.get('hostname', device_id)}"
+    if message:
+        log_msg += f" - {message}"
+    
+    logger.info(log_msg)
 
 def log_device_connect_success(device_id: str, session_id: Optional[str] = None) -> None:
     """

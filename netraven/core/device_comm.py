@@ -115,6 +115,9 @@ class DeviceConnector:
         self.last_error = None
         self.detected_device_type = None
         
+        # Default connection parameters - can be overridden
+        self.connection_params = None
+        
         # Validate connection parameters
         self._validate_parameters()
         
@@ -238,6 +241,21 @@ class DeviceConnector:
             logger.error(f"Cannot connect to {self.host}: Host is not reachable")
             return False
         
+        # If we're using connection_params, we'll use those directly
+        if self.connection_params:
+            logger.debug(f"Using provided connection parameters for {self.host}")
+            # If device_type isn't specified in connection_params but we have one set, use it
+            if not self.connection_params.get("device_type") and self.device_type:
+                self.connection_params["device_type"] = self.device_type
+            
+            # Try to connect with the provided parameters
+            if self._try_connect():
+                return True
+            else:
+                return False
+                
+        # Otherwise, proceed with auto-detection and standard connection
+        
         # Auto-detect device type if not provided
         if not self.device_type:
             logger.debug(f"Auto-detecting device type for {self.host}")
@@ -266,6 +284,9 @@ class DeviceConnector:
         else:
             device_info["password"] = self.password
         
+        # Store the connection info for use in _try_connect
+        self.connection_info = device_info
+            
         # Check SSH host key
         hostkey_ok, hostkey_error = self._check_ssh_hostkey()
         if not hostkey_ok:
@@ -283,11 +304,15 @@ class DeviceConnector:
             
             for alt_password in self.alt_passwords:
                 self.password = alt_password
+                # Update password in connection info
+                self.connection_info["password"] = alt_password
                 if self._try_connect():
                     return True
             
             # Restore original password
             self.password = original_password
+            if not self.use_keys:
+                self.connection_info["password"] = original_password
         
         logger.error(f"Failed to connect to {self.host} after all attempts")
         return False
@@ -301,7 +326,29 @@ class DeviceConnector:
         """
         try:
             logger.debug(f"Attempting connection to {self.host}")
-            self._connection = ConnectHandler(**self.connection_info)
+            
+            # Use connection_params if available, otherwise use connection_info
+            conn_params = self.connection_params or getattr(self, 'connection_info', {})
+            
+            if not conn_params:
+                # If neither is available, construct basic parameters
+                conn_params = {
+                    "device_type": self.device_type,
+                    "host": self.host,
+                    "username": self.username,
+                    "port": self.port,
+                    "timeout": self.timeout
+                }
+                
+                if self.use_keys:
+                    conn_params["use_keys"] = True
+                    if self.key_file:
+                        conn_params["key_file"] = self.key_file
+                else:
+                    conn_params["password"] = self.password
+            
+            # Initialize Netmiko connection
+            self._connection = ConnectHandler(**conn_params)
             self._connected = True
             logger.info(f"Successfully connected to {self.host}")
             return True
