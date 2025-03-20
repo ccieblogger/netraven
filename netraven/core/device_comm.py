@@ -58,6 +58,7 @@ except ImportError:
 # Import internal modules
 from netraven.core.logging import get_logger
 from netraven.core.config import get_storage_path, get_backup_filename_format
+from netraven.core.credential_store import get_credential_store
 
 # Create logger
 logger = get_logger(__name__)
@@ -80,7 +81,8 @@ class DeviceConnector:
         use_keys: bool = False,
         key_file: Optional[str] = None,
         timeout: int = 30,
-        alt_passwords: Optional[List[str]] = None
+        alt_passwords: Optional[List[str]] = None,
+        credential_id: Optional[str] = None
     ):
         """
         Initialize the device connector with connection parameters.
@@ -95,6 +97,7 @@ class DeviceConnector:
             key_file: Path to the SSH key file (if use_keys is True)
             timeout: Connection timeout in seconds (default: 30)
             alt_passwords: List of alternative passwords to try if the primary fails
+            credential_id: ID of the credential in the credential store (if using credential store)
         """
         if not NETMIKO_AVAILABLE:
             raise ImportError("Netmiko is required for DeviceConnector")
@@ -108,6 +111,7 @@ class DeviceConnector:
         self.key_file = key_file
         self.timeout = timeout
         self.alt_passwords = alt_passwords or []
+        self.credential_id = credential_id
         
         # Connection state
         self._connection = None
@@ -485,6 +489,198 @@ class DeviceConnector:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit the context manager."""
         self.disconnect()
+
+    def _try_connect_with_credential_store(self, tag_id: str) -> bool:
+        """
+        Try connecting using credentials from the credential store.
+        
+        This method retrieves credentials associated with a tag and
+        attempts connections in order of priority until successful.
+        
+        Args:
+            tag_id: The tag ID to retrieve credentials for
+            
+        Returns:
+            bool: True if connection was successful, False otherwise
+        """
+        try:
+            # Get credential store
+            credential_store = get_credential_store()
+            
+            # Get credentials for the tag
+            credentials = credential_store.get_credentials_by_tag(tag_id)
+            
+            if not credentials:
+                logger.warning(f"No credentials found for tag {tag_id}")
+                return False
+            
+            # Try credentials in order of priority
+            for cred in credentials:
+                try:
+                    logger.debug(f"Trying credential '{cred['name']}' (ID: {cred['id']}) for {self.host}")
+                    
+                    # Create connection parameters
+                    device_params = {
+                        "device_type": self.device_type or "autodetect",
+                        "host": self.host,
+                        "username": cred["username"],
+                        "password": cred["password"],
+                        "port": self.port,
+                        "timeout": self.timeout,
+                        "session_timeout": self.timeout * 2,
+                        "auth_timeout": self.timeout,
+                        "banner_timeout": min(self.timeout, 15),
+                        "fast_cli": False
+                    }
+                    
+                    if cred["use_keys"]:
+                        device_params["use_keys"] = True
+                        if cred["key_file"]:
+                            device_params["key_file"] = cred["key_file"]
+                    
+                    # Add any additional parameters from connection_params if set
+                    if self.connection_params:
+                        for key, value in self.connection_params.items():
+                            if key not in device_params:
+                                device_params[key] = value
+                    
+                    # Try to connect
+                    logger.debug(f"Connecting to {self.host} with credential '{cred['name']}'")
+                    self._connection = ConnectHandler(**device_params)
+                    self._connected = True
+                    
+                    # Update credential status
+                    credential_store.update_credential_status(cred["id"], tag_id, success=True)
+                    
+                    logger.info(f"Successfully connected to {self.host} with credential '{cred['name']}'")
+                    return True
+                    
+                except (NetMikoAuthenticationException, SSHException) as e:
+                    # Authentication failed, try next credential
+                    logger.warning(f"Authentication failed for {self.host} with credential '{cred['name']}': {str(e)}")
+                    credential_store.update_credential_status(cred["id"], tag_id, success=False)
+                    continue
+                    
+                except Exception as e:
+                    # Other error (network, timeout, etc.)
+                    logger.error(f"Error connecting to {self.host} with credential '{cred['name']}': {str(e)}")
+                    credential_store.update_credential_status(cred["id"], tag_id, success=False)
+                    self.last_error = str(e)
+                    return False
+            
+            # If we get here, all credentials failed
+            logger.error(f"All credentials for tag {tag_id} failed to connect to {self.host}")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error using credential store: {str(e)}")
+            self.last_error = f"Credential store error: {str(e)}"
+            return False
+            
+    def connect_with_tag(self, tag_id: str) -> bool:
+        """
+        Connect to the device using credentials associated with a tag.
+        
+        This method retrieves credentials from the credential store based
+        on the provided tag and attempts to connect with each credential
+        in order of priority until successful.
+        
+        Args:
+            tag_id: The tag ID to use for retrieving credentials
+            
+        Returns:
+            bool: True if connected successfully, False otherwise
+        """
+        logger.debug(f"Connecting to {self.host} using credentials for tag {tag_id}")
+        
+        # Check if host is reachable before attempting to connect
+        if not self._check_host_reachability():
+            logger.error(f"Cannot connect to {self.host}: Host is not reachable")
+            return False
+        
+        # Try to connect using credentials from the store
+        return self._try_connect_with_credential_store(tag_id)
+            
+    def connect_with_credential_id(self, credential_id: str) -> bool:
+        """
+        Connect to the device using a specific credential from the store.
+        
+        This method retrieves a credential by ID from the credential store
+        and attempts to connect with it.
+        
+        Args:
+            credential_id: The ID of the credential to use
+            
+        Returns:
+            bool: True if connected successfully, False otherwise
+        """
+        logger.debug(f"Connecting to {self.host} using credential ID {credential_id}")
+        
+        # Check if host is reachable before attempting to connect
+        if not self._check_host_reachability():
+            logger.error(f"Cannot connect to {self.host}: Host is not reachable")
+            return False
+        
+        try:
+            # Get credential store
+            credential_store = get_credential_store()
+            
+            # Get credential
+            cred = credential_store.get_credential(credential_id)
+            
+            if not cred:
+                logger.error(f"Credential with ID {credential_id} not found")
+                self.last_error = f"Credential with ID {credential_id} not found"
+                return False
+            
+            # Create connection parameters
+            device_params = {
+                "device_type": self.device_type or "autodetect",
+                "host": self.host,
+                "username": cred["username"],
+                "password": cred["password"],
+                "port": self.port,
+                "timeout": self.timeout,
+                "session_timeout": self.timeout * 2,
+                "auth_timeout": self.timeout,
+                "banner_timeout": min(self.timeout, 15),
+                "fast_cli": False
+            }
+            
+            if cred["use_keys"]:
+                device_params["use_keys"] = True
+                if cred["key_file"]:
+                    device_params["key_file"] = cred["key_file"]
+            
+            # Add any additional parameters from connection_params if set
+            if self.connection_params:
+                for key, value in self.connection_params.items():
+                    if key not in device_params:
+                        device_params[key] = value
+            
+            # Try to connect
+            logger.debug(f"Connecting to {self.host} with credential '{cred['name']}'")
+            self._connection = ConnectHandler(**device_params)
+            self._connected = True
+            
+            # Update credential status
+            credential_store.update_credential_status(credential_id, success=True)
+            
+            logger.info(f"Successfully connected to {self.host} with credential '{cred['name']}'")
+            return True
+            
+        except (NetMikoAuthenticationException, SSHException) as e:
+            # Authentication failed
+            logger.error(f"Authentication failed for {self.host} with credential ID {credential_id}: {str(e)}")
+            credential_store.update_credential_status(credential_id, success=False)
+            self.last_error = str(e)
+            return False
+            
+        except Exception as e:
+            # Other error
+            logger.error(f"Error connecting to {self.host} with credential ID {credential_id}: {str(e)}")
+            self.last_error = str(e)
+            return False
 
 def backup_device_config(
     host: str,

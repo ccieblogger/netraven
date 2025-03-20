@@ -32,6 +32,7 @@ from netraven.jobs.device_logging import (
 )
 from netraven.core.config import load_config, get_default_config_path, get_storage_path, get_config
 from netraven.core.logging import get_logger
+from netraven.core.credential_store import get_credential_store
 
 # Configure logging
 logger = get_logger(__name__)
@@ -48,7 +49,7 @@ class JobDeviceConnector:
         self,
         device_id: str,
         host: str,
-        username: str,
+        username: Optional[str] = None,
         password: Optional[str] = None,
         device_type: Optional[str] = None,
         port: int = 22,
@@ -58,7 +59,9 @@ class JobDeviceConnector:
         alt_passwords: Optional[List[str]] = None,
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
-        max_retries: Optional[int] = None
+        max_retries: Optional[int] = None,
+        credential_id: Optional[str] = None,
+        tag_id: Optional[str] = None
     ):
         """
         Initialize the JobDeviceConnector.
@@ -66,8 +69,8 @@ class JobDeviceConnector:
         Args:
             device_id: Unique identifier for the device
             host: Device hostname or IP address
-            username: Username for authentication
-            password: Password for authentication (optional if using keys)
+            username: Username for authentication (optional if using credential store)
+            password: Password for authentication (optional if using credential store)
             device_type: Device type (auto-detected if not specified)
             port: SSH port number (default: 22)
             use_keys: Whether to use SSH key authentication (default: False)
@@ -77,6 +80,8 @@ class JobDeviceConnector:
             session_id: Session ID for logging (generated if not provided)
             user_id: User ID for database logging
             max_retries: Maximum number of connection attempts (default: from config)
+            credential_id: ID of credential to use from credential store
+            tag_id: Tag ID to use for retrieving credentials from the store
         """
         # Load config for default values
         config = get_config()
@@ -92,6 +97,8 @@ class JobDeviceConnector:
         self.key_file = key_file
         self.timeout = config.get("device", {}).get("connection", {}).get("timeout", timeout)
         self.alt_passwords = alt_passwords or []
+        self.credential_id = credential_id
+        self.tag_id = tag_id
         
         # Use max_retries from parameter, config, or default to 3
         if max_retries is not None:
@@ -111,12 +118,8 @@ class JobDeviceConnector:
         # Prepare advanced connection parameters for Netmiko
         self.conn_params = {
             "host": host,
-            "username": username,
-            "password": password,
-            "device_type": device_type if device_type else "autodetect",
             "port": port,
-            "use_keys": use_keys,
-            "key_file": key_file,
+            "device_type": device_type if device_type else "autodetect",
             # Additional Netmiko parameters for better connection handling
             "timeout": timeout,  # Connection timeout (replaces conn_timeout)
             "auth_timeout": timeout,  # Authentication timeout
@@ -129,21 +132,32 @@ class JobDeviceConnector:
             "verbose": True  # Enable verbose logging for troubleshooting
         }
         
-        # Add alt_passwords if provided
-        if alt_passwords:
-            self.conn_params["alt_passwords"] = alt_passwords
+        # Add credentials to connection params if not using credential store
+        if not (credential_id or tag_id):
+            self.conn_params["username"] = username
+            self.conn_params["password"] = password
+            
+            if use_keys:
+                self.conn_params["use_keys"] = True
+                if key_file:
+                    self.conn_params["key_file"] = key_file
+                    
+            # Add alt_passwords if provided
+            if alt_passwords:
+                self.conn_params["alt_passwords"] = alt_passwords
         
         # Create core connector (but don't connect yet)
         self.connector = CoreDeviceConnector(
             host=host,
-            username=username,
+            username=username if username else "placeholder",  # We'll use actual credentials from store if needed
             password=password,
             device_type=device_type,
             port=port,
             use_keys=use_keys,
             key_file=key_file,
             timeout=timeout,
-            alt_passwords=alt_passwords
+            alt_passwords=alt_passwords,
+            credential_id=credential_id
         )
         
         # Track connection state
@@ -157,6 +171,11 @@ class JobDeviceConnector:
     def connect(self) -> bool:
         """
         Connect to the device with enhanced logging and retry mechanism.
+        
+        This method implements a robust connection strategy:
+        1. If credential_id is provided, it attempts to connect with that specific credential
+        2. If tag_id is provided, it attempts to connect using credentials for that tag
+        3. Otherwise, it uses the provided username/password with retry logic
         
         Returns:
             bool: True if connection was successful, False otherwise
@@ -173,7 +192,49 @@ class JobDeviceConnector:
         # Tell the connector to use our enhanced connection parameters
         self.connector.connection_params = self.conn_params
         
-        # Implement retry logic
+        # Case 1: Use specific credential from store
+        if self.credential_id:
+            try:
+                logger.debug(f"Attempting to connect to {self.host} using credential ID {self.credential_id}")
+                
+                if self.connector.connect_with_credential_id(self.credential_id):
+                    log_device_connect_success(self.device_id, self.session_id)
+                    self._connected = True
+                    return True
+                
+                logger.error(f"Failed to connect to {self.host} using credential ID {self.credential_id}")
+                error_msg = self.connector.last_error or "Connection failed with credential from store"
+                log_device_connect_failure(self.device_id, error_msg, self.session_id)
+                return False
+                
+            except Exception as e:
+                error_msg = f"Error connecting with credential ID {self.credential_id}: {str(e)}"
+                logger.error(error_msg)
+                log_device_connect_failure(self.device_id, error_msg, self.session_id)
+                return False
+        
+        # Case 2: Use tag-based credentials
+        elif self.tag_id:
+            try:
+                logger.debug(f"Attempting to connect to {self.host} using credentials for tag {self.tag_id}")
+                
+                if self.connector.connect_with_tag(self.tag_id):
+                    log_device_connect_success(self.device_id, self.session_id)
+                    self._connected = True
+                    return True
+                
+                logger.error(f"Failed to connect to {self.host} using credentials for tag {self.tag_id}")
+                error_msg = self.connector.last_error or "Connection failed with all tag credentials"
+                log_device_connect_failure(self.device_id, error_msg, self.session_id)
+                return False
+                
+            except Exception as e:
+                error_msg = f"Error connecting with tag {self.tag_id}: {str(e)}"
+                logger.error(error_msg)
+                log_device_connect_failure(self.device_id, error_msg, self.session_id)
+                return False
+        
+        # Case 3: Use provided username/password with retry logic
         for attempt in range(1, max_attempts + 1):
             try:
                 logger.debug(f"Connection attempt {attempt}/{max_attempts} to {self.host}")
@@ -419,13 +480,15 @@ def check_device_connectivity(host: str, port: int = 22, timeout: int = 5) -> Tu
 def backup_device_config(
     device_id: str,
     host: str,
-    username: str,
-    password: str,
+    username: Optional[str] = None,
+    password: Optional[str] = None,
     device_type: Optional[str] = None,
     port: int = 22,
     use_keys: bool = False,
     key_file: Optional[str] = None,
     session_id: Optional[str] = None,
+    credential_id: Optional[str] = None,
+    tag_id: Optional[str] = None,
 ) -> bool:
     """
     Backup device configuration.
@@ -433,13 +496,15 @@ def backup_device_config(
     Args:
         device_id: Device ID
         host: Device hostname or IP address
-        username: Username for authentication
-        password: Password for authentication
+        username: Username for authentication (optional if using credential store)
+        password: Password for authentication (optional if using credential store)
         device_type: Device type (auto-detected if not provided)
         port: SSH port (default: 22)
         use_keys: Whether to use key-based authentication (default: False)
         key_file: Path to SSH key file (if use_keys is True)
         session_id: Job session ID for logging (optional)
+        credential_id: ID of credential to use from credential store (optional)
+        tag_id: Tag ID to use for retrieving credentials from the store (optional)
         
     Returns:
         bool: True if backup was successful, False otherwise
@@ -455,6 +520,19 @@ def backup_device_config(
             log_backup_failure(session_id, device_id, error)
         return False
     
+    # Validate authentication method
+    if not any([
+        (username is not None),  # Username/password auth
+        use_keys,               # SSH key auth
+        credential_id is not None,  # Specific credential from store
+        tag_id is not None      # Tag-based credentials
+    ]):
+        error_msg = "No authentication method provided. Please provide username/password, SSH key, credential ID, or tag ID."
+        logger.error(error_msg)
+        if session_id:
+            log_backup_failure(session_id, device_id, error_msg)
+        return False
+    
     # Create device connector
     device = JobDeviceConnector(
         device_id=device_id,
@@ -466,7 +544,9 @@ def backup_device_config(
         use_keys=use_keys,
         key_file=key_file,
         session_id=session_id,
-        user_id=None
+        user_id=None,
+        credential_id=credential_id,
+        tag_id=tag_id
     )
     
     try:

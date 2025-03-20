@@ -4,7 +4,7 @@ Device model for the NetRaven web interface.
 This module provides the SQLAlchemy model for network device data.
 """
 
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, Boolean
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, Boolean, JSON
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
@@ -17,7 +17,8 @@ class Device(Base):
     Device model representing network devices.
     
     This model stores information about network devices including
-    connection details and credentials.
+    connection details and credentials. Credentials can be stored
+    directly or retrieved from the credential store based on tags.
     """
     __tablename__ = "devices"
     
@@ -26,9 +27,10 @@ class Device(Base):
     ip_address = Column(String(45), nullable=False, index=True)  # IPv6 addresses can be up to 45 chars
     device_type = Column(String(50), nullable=False, index=True)  # cisco_ios, juniper_junos, etc.
     port = Column(Integer, default=22)
-    username = Column(String(64), nullable=False)
-    password = Column(String(128), nullable=False)  # This should be encrypted in a real app
+    username = Column(String(64), nullable=True)  # Optional if using tag-based credentials
+    password = Column(String(128), nullable=True)  # Optional if using tag-based credentials
     description = Column(Text, nullable=True)
+    credential_tag_ids = Column(JSON, nullable=True)  # Store tag IDs for credential retrieval
     last_backup_at = Column(DateTime, nullable=True)
     last_backup_status = Column(String(20), nullable=True)  # success, failure, pending
     enabled = Column(Boolean, default=True)

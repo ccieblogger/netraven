@@ -101,81 +101,88 @@ def create_device(db: Session, device: DeviceCreate, owner_id: str) -> Device:
         username=device.username,
         password=device.password,
         description=device.description,
-        enabled=device.enabled if hasattr(device, 'enabled') else True,
+        enabled=device.enabled,
         owner_id=owner_id,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        credential_tag_ids=device.tag_ids
     )
     
     try:
         db.add(db_device)
         db.commit()
         db.refresh(db_device)
-        
-        # Add default tag to the device
-        from netraven.web.database import DEFAULT_TAG_ID
-        from netraven.web.crud.tag import add_tag_to_device, get_tag
-        
-        # Check if default tag exists
-        default_tag = get_tag(db, DEFAULT_TAG_ID)
-        if default_tag:
-            # Add default tag to device
-            add_tag_to_device(db, db_device.id, DEFAULT_TAG_ID)
-            logger.info(f"Added default tag to device: {db_device.hostname}")
-        else:
-            logger.warning(f"Could not add default tag to device: {db_device.hostname} (default tag not found)")
-        
-        logger.info(f"Device created successfully: {db_device.hostname}")
+        logger.info(f"Device created successfully: {db_device.id}")
         return db_device
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"IntegrityError creating device: {str(e)}")
+        raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error creating device: {e}")
+        logger.exception(f"Error creating device: {str(e)}")
         raise
 
-def update_device(db: Session, device_id: str, device_update) -> Optional[Device]:
+def update_device(db: Session, device_id: str, device_update: DeviceUpdate) -> Optional[Device]:
     """
     Update an existing device.
     
     Args:
         db: Database session
         device_id: ID of the device to update
-        device_update: Device update data as dict or DeviceUpdate
+        device_update: Device update data (Pydantic model)
         
     Returns:
-        Updated Device object if successful, None if device not found
+        Updated Device object, or None if device not found
     """
     logger.info(f"Updating device with id: {device_id}")
     
+    # Get existing device
     db_device = get_device(db, device_id)
     if not db_device:
-        logger.warning(f"Device with id {device_id} not found")
+        logger.warning(f"Device not found: {device_id}")
         return None
     
-    # Handle both dict and DeviceUpdate objects
-    update_data = device_update
-    if hasattr(device_update, "model_dump"):
-        # It's a Pydantic model, convert to dict
-        update_data = device_update.model_dump(exclude_unset=True)
-    elif hasattr(device_update, "dict"):
-        # For older Pydantic versions
-        update_data = device_update.model_dump(exclude_unset=True)  # Updated to model_dump
+    # Update fields that are provided
+    if device_update.hostname is not None:
+        db_device.hostname = device_update.hostname
     
-    # Update the fields
-    for key, value in update_data.items():
-        if value is not None:  # Only update fields that are provided
-            setattr(db_device, key, value)
+    if device_update.ip_address is not None:
+        db_device.ip_address = device_update.ip_address
     
-    # Always update the updated_at timestamp
+    if device_update.device_type is not None:
+        db_device.device_type = device_update.device_type
+    
+    if device_update.port is not None:
+        db_device.port = device_update.port
+    
+    if device_update.username is not None:
+        db_device.username = device_update.username
+    
+    if device_update.password is not None:
+        db_device.password = device_update.password
+    
+    if device_update.description is not None:
+        db_device.description = device_update.description
+    
+    if device_update.enabled is not None:
+        db_device.enabled = device_update.enabled
+    
+    if device_update.tag_ids is not None:
+        db_device.credential_tag_ids = device_update.tag_ids
+    
     db_device.updated_at = datetime.utcnow()
     
     try:
         db.commit()
         db.refresh(db_device)
-        logger.info(f"Device updated successfully: {db_device.hostname}")
+        logger.info(f"Device updated successfully: {device_id}")
         return db_device
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"IntegrityError updating device: {str(e)}")
+        raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error updating device: {e}")
+        logger.exception(f"Error updating device: {str(e)}")
         raise
 
 def update_device_backup_status(

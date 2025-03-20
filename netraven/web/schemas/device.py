@@ -28,9 +28,50 @@ class DeviceBase(BaseModel):
         return v
 
 class DeviceCreate(DeviceBase):
-    """Schema for creating a new device."""
-    username: str = Field(..., min_length=1, max_length=64)
-    password: str = Field(..., min_length=1, max_length=128)
+    """
+    Schema for creating a new device.
+    
+    Either username/password or tag_ids should be provided for authentication.
+    If tag_ids are provided, credentials will be retrieved from the credential
+    store based on the tags.
+    """
+    username: Optional[str] = Field(None, min_length=1, max_length=64)
+    password: Optional[str] = Field(None, min_length=1, max_length=128)
+    tag_ids: Optional[List[str]] = Field(None, description="List of tag IDs to use for credential retrieval")
+    
+    @field_validator('tag_ids', 'username', 'password')
+    def validate_authentication_method(cls, v, info):
+        """Validate that either username/password or tag_ids are provided."""
+        # We'll check the combined fields during model validation
+        return v
+    
+    @field_validator('tag_ids')
+    def validate_tag_ids(cls, v, info):
+        """Validate the tag_ids field."""
+        # Allow None but not empty list
+        if v is not None and len(v) == 0:
+            raise ValueError("tag_ids cannot be an empty list")
+        return v
+    
+    model_config = ConfigDict(validate_default=True)
+    
+    @classmethod
+    def model_validate(cls, obj, *args, **kwargs):
+        """Validate that at least one authentication method is provided."""
+        model = super().model_validate(obj, *args, **kwargs)
+        
+        # Check if at least one authentication method is provided
+        has_username_password = model.username is not None and model.password is not None
+        has_tag_ids = model.tag_ids is not None and len(model.tag_ids) > 0
+        
+        if not (has_username_password or has_tag_ids):
+            # Create a more informative error message
+            raise ValueError(
+                "Either username/password or tag_ids must be provided. "
+                "If using tag_ids, make sure the tags are associated with credentials."
+            )
+        
+        return model
 
 class DeviceUpdate(BaseModel):
     """Schema for updating an existing device."""
@@ -42,6 +83,7 @@ class DeviceUpdate(BaseModel):
     password: Optional[str] = Field(None, min_length=1, max_length=128)
     description: Optional[str] = None
     enabled: Optional[bool] = None
+    tag_ids: Optional[List[str]] = Field(None, description="List of tag IDs to use for credential retrieval")
     
     @field_validator('ip_address')
     def validate_ip_address(cls, v):
