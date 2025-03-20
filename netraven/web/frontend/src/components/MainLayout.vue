@@ -31,6 +31,8 @@
           <div class="hidden md:flex space-x-4">
             <router-link to="/devices" class="hover:text-blue-200 transition">Devices</router-link>
             <router-link to="/backups" class="hover:text-blue-200 transition">Backups</router-link>
+            <router-link to="/credentials" class="hover:text-blue-200 transition">Credentials</router-link>
+            <router-link to="/credentials/dashboard" class="hover:text-blue-200 transition">Credential Dashboard</router-link>
             <router-link to="/tags" class="hover:text-blue-200 transition">Tags</router-link>
             <router-link to="/tag-rules" class="hover:text-blue-200 transition">Tag Rules</router-link>
             <router-link to="/job-logs" class="hover:text-blue-200 transition">Job Logs</router-link>
@@ -66,6 +68,8 @@
       <div class="container mx-auto px-4 py-2 flex justify-between">
         <router-link to="/devices" class="hover:text-blue-200 transition">Devices</router-link>
         <router-link to="/backups" class="hover:text-blue-200 transition">Backups</router-link>
+        <router-link to="/credentials" class="hover:text-blue-200 transition">Creds</router-link>
+        <router-link to="/credentials/dashboard" class="hover:text-blue-200 transition">Stats</router-link>
         <router-link to="/tags" class="hover:text-blue-200 transition">Tags</router-link>
         <router-link to="/tag-rules" class="hover:text-blue-200 transition">Rules</router-link>
         <router-link to="/job-logs" class="hover:text-blue-200 transition">Logs</router-link>

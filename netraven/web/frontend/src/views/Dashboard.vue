@@ -235,8 +235,8 @@
           <router-link to="/devices" class="bg-green-50 hover:bg-green-100 p-4 rounded border border-green-200 text-center">
             <div class="font-medium text-green-700">Backup All Devices</div>
           </router-link>
-          <router-link to="/backups" class="bg-purple-50 hover:bg-purple-100 p-4 rounded border border-purple-200 text-center">
-            <div class="font-medium text-purple-700">Compare Backups</div>
+          <router-link to="/credentials/dashboard" class="bg-orange-50 hover:bg-orange-100 p-4 rounded border border-orange-200 text-center">
+            <div class="font-medium text-orange-700">Credential Performance</div>
           </router-link>
           <router-link to="/scheduled-jobs" class="bg-yellow-50 hover:bg-yellow-100 p-4 rounded border border-yellow-200 text-center">
             <div class="font-medium text-yellow-700">Manage Scheduled Jobs</div>

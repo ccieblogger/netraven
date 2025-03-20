@@ -1,10 +1,10 @@
 """
-Pydantic schemas for the NetRaven web interface.
+Schemas for the NetRaven API.
 
-This package contains Pydantic models that define the shape of request
-and response data for the NetRaven API endpoints.
+This package contains Pydantic schemas for API request and response validation.
 """
 
-# Import schemas to make them available when importing the package
-from netraven.web.schemas import job_log
-from netraven.web.schemas import scheduled_job 
+from netraven.web.schemas import device, user, tag, tag_rule
+from netraven.web.schemas import backup, job_log, scheduled_job, credential
+
+__all__ = ['device', 'user', 'tag', 'tag_rule', 'backup', 'job_log', 'scheduled_job', 'credential'] 

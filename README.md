@@ -4,6 +4,13 @@ NetRaven is a modern network management platform that provides device management
 
 ## Recent Updates and Fixes
 
+### Phase 5: API and UI Integration
+
+- **Credential Management System**: Enhanced credential management with a new Pinia store for state management
+- **Credential Dashboard**: Added a dedicated dashboard with statistics about credential usage and performance
+- **API Endpoints**: Implemented new endpoints for credential statistics and tag associations
+- **Credential Store Integration**: Improved integration between the credential store and device authentication
+
 ### Authentication and CORS Fixes
 
 - **JWT Import Fix**: Added missing `jwt` import in `netraven/web/auth/__init__.py` to address token generation issues.

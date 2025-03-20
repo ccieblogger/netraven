@@ -14,6 +14,8 @@ import ScheduledJobList from '../views/ScheduledJobList.vue'
 import Login from '../views/Login.vue'
 import RouteTest from '../views/RouteTest.vue'
 import GatewayDashboard from '../views/GatewayDashboard.vue'
+import CredentialList from '../views/CredentialList.vue'
+import CredentialDashboard from '../views/CredentialDashboard.vue'
 
 // Define routes
 const routes = [
@@ -59,6 +61,18 @@ const routes = [
     path: '/tag-rules',
     name: 'TagRules',
     component: TagRuleList,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/credentials',
+    name: 'Credentials',
+    component: CredentialList,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/credentials/dashboard',
+    name: 'CredentialDashboard',
+    component: CredentialDashboard,
     meta: { requiresAuth: true }
   },
   {

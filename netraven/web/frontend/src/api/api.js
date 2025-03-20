@@ -630,7 +630,295 @@ const apiClient = {
       console.error('Error getting gateway config:', error);
       return { error: error.message };
     }
-  }
+  },
+
+  // =========================================================
+  // Credential API methods
+  // =========================================================
+  
+  /**
+   * Get all credentials
+   * @param {Object} params - Query parameters
+   * @param {number} [params.skip=0] - Number of records to skip
+   * @param {number} [params.limit=100] - Maximum number of records to return
+   * @param {boolean} [params.includeTags=true] - Whether to include tag information
+   * @returns {Promise<Array>} List of credentials
+   */
+  getCredentials: async (params = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params.skip !== undefined) queryParams.append('skip', params.skip);
+      if (params.limit !== undefined) queryParams.append('limit', params.limit);
+      if (params.includeTags !== undefined) queryParams.append('include_tags', params.includeTags);
+      
+      const response = await axios.get(`${browserApiUrl}/api/credentials/?${queryParams.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching credentials:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Get a credential by ID
+   * @param {string} id - Credential ID
+   * @param {boolean} [includeTags=true] - Whether to include tag information
+   * @returns {Promise<Object>} Credential details
+   */
+  getCredential: async (id, includeTags = true) => {
+    try {
+      const response = await axios.get(`${browserApiUrl}/api/credentials/${id}?include_tags=${includeTags}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching credential ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Create a new credential
+   * @param {Object} credential - Credential data
+   * @returns {Promise<Object>} Created credential
+   */
+  createCredential: async (credential) => {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/credentials/`, credential);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating credential:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Update a credential
+   * @param {string} id - Credential ID
+   * @param {Object} credential - Updated credential data
+   * @returns {Promise<Object>} Updated credential
+   */
+  updateCredential: async (id, credential) => {
+    try {
+      const response = await axios.put(`${browserApiUrl}/api/credentials/${id}`, credential);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating credential ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Delete a credential
+   * @param {string} id - Credential ID
+   * @returns {Promise<void>}
+   */
+  deleteCredential: async (id) => {
+    try {
+      await axios.delete(`${browserApiUrl}/api/credentials/${id}`);
+    } catch (error) {
+      console.error(`Error deleting credential ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Get credentials by tag ID
+   * @param {string} tagId - Tag ID
+   * @returns {Promise<Array>} List of credentials
+   */
+  getCredentialsByTag: async (tagId) => {
+    try {
+      const response = await axios.get(`${browserApiUrl}/api/credentials/tag/${tagId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching credentials for tag ${tagId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Associate a credential with a tag
+   * @param {Object} association - Association data
+   * @param {string} association.credentialId - Credential ID
+   * @param {string} association.tagId - Tag ID
+   * @param {number} [association.priority=0] - Priority
+   * @returns {Promise<Object>} Association details
+   */
+  associateCredentialWithTag: async (association) => {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/credentials/tag`, {
+        credential_id: association.credentialId,
+        tag_id: association.tagId,
+        priority: association.priority || 0
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error associating credential with tag:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Remove a credential from a tag
+   * @param {string} credentialId - Credential ID
+   * @param {string} tagId - Tag ID
+   * @returns {Promise<void>}
+   */
+  removeCredentialFromTag: async (credentialId, tagId) => {
+    try {
+      await axios.delete(`${browserApiUrl}/api/credentials/tag/${credentialId}/${tagId}`);
+    } catch (error) {
+      console.error(`Error removing credential ${credentialId} from tag ${tagId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Test a credential against a device
+   * @param {string} credentialId - Credential ID
+   * @param {Object} [testData] - Test parameters
+   * @param {string} [testData.deviceId] - Device ID
+   * @param {string} [testData.hostname] - Device hostname
+   * @param {string} [testData.deviceType] - Device type
+   * @param {number} [testData.port=22] - Device port
+   * @returns {Promise<Object>} Test result
+   */
+  testCredential: async (credentialId, testData = {}) => {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/credentials/test/${credentialId}`, {
+        device_id: testData.deviceId,
+        hostname: testData.hostname,
+        device_type: testData.deviceType,
+        port: testData.port || 22
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error testing credential ${credentialId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Associate multiple credentials with multiple tags
+   * @param {Object} bulkOperation - Bulk operation data
+   * @param {Array<string>} bulkOperation.credentialIds - Credential IDs
+   * @param {Array<string>} bulkOperation.tagIds - Tag IDs
+   * @param {number} [priority=0] - Priority for the associations
+   * @returns {Promise<Object>} Operation results
+   */
+  bulkAssociateCredentialsWithTags: async (bulkOperation, priority = 0) => {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/credentials/bulk/tag?priority=${priority}`, {
+        credential_ids: bulkOperation.credentialIds,
+        tag_ids: bulkOperation.tagIds
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error associating credentials with tags in bulk:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Remove multiple credentials from multiple tags
+   * @param {Object} bulkOperation - Bulk operation data
+   * @param {Array<string>} bulkOperation.credentialIds - Credential IDs
+   * @param {Array<string>} bulkOperation.tagIds - Tag IDs
+   * @returns {Promise<Object>} Operation results
+   */
+  bulkRemoveCredentialsFromTags: async (bulkOperation) => {
+    try {
+      const response = await axios.delete(`${browserApiUrl}/api/credentials/bulk/tag`, {
+        data: {
+          credential_ids: bulkOperation.credentialIds,
+          tag_ids: bulkOperation.tagIds
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error removing credentials from tags in bulk:', error);
+      throw error;
+    }
+  },
+
+  // Credential methods
+  async getCredentials(params = {}) {
+    const response = await axios.get(`${browserApiUrl}/api/credentials`, {
+      headers: this.getAuthHeader(),
+      params
+    });
+    return response.data;
+  },
+
+  async getCredential(id) {
+    const response = await axios.get(`${browserApiUrl}/api/credentials/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async createCredential(credentialData) {
+    const response = await axios.post(`${browserApiUrl}/api/credentials`, credentialData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async updateCredential(id, credentialData) {
+    const response = await axios.put(`${browserApiUrl}/api/credentials/${id}`, credentialData, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async deleteCredential(id) {
+    const response = await axios.delete(`${browserApiUrl}/api/credentials/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  async testCredential(id, testParams) {
+    const response = await axios.post(`${browserApiUrl}/api/credentials/${id}/test`, testParams, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  // New credential tag association methods
+  async addTagsToCredential(credentialId, tagIds) {
+    const response = await axios.post(
+      `${browserApiUrl}/api/credentials/${credentialId}/tags`,
+      { tag_ids: tagIds },
+      { headers: this.getAuthHeader() }
+    );
+    return response.data;
+  },
+
+  async removeTagsFromCredential(credentialId, tagIds) {
+    const response = await axios.delete(
+      `${browserApiUrl}/api/credentials/${credentialId}/tags`,
+      { 
+        headers: this.getAuthHeader(),
+        data: { tag_ids: tagIds }
+      }
+    );
+    return response.data;
+  },
+
+  async getTagsForCredential(credentialId) {
+    const response = await axios.get(`${browserApiUrl}/api/credentials/${credentialId}/tags`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+
+  // Credential stats and dashboard
+  async getCredentialStats() {
+    const response = await axios.get(`${browserApiUrl}/api/credentials/stats`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
 }
 
 // Export services

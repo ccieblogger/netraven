@@ -35,4 +35,11 @@ from netraven.web.crud.scheduled_job import (
     get_scheduled_jobs, get_scheduled_job, get_scheduled_job_with_details,
     create_scheduled_job, update_scheduled_job, delete_scheduled_job,
     toggle_scheduled_job, update_job_last_run, get_due_jobs
+)
+
+# Import credential CRUD operations
+from netraven.web.crud.credential import (
+    get_credentials, get_credential, create_credential, update_credential, delete_credential,
+    get_credentials_by_tag, associate_credential_with_tag, remove_credential_from_tag,
+    test_credential, bulk_associate_credentials_with_tags, bulk_remove_credentials_from_tags
 ) 
