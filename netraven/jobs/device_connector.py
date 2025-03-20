@@ -29,6 +29,7 @@ from netraven.jobs.device_logging import (
     log_backup_failure,
     log_backup_start,
     log_device_info,
+    log_credential_usage,
 )
 from netraven.core.config import load_config, get_default_config_path, get_storage_path, get_config
 from netraven.core.logging import get_logger
@@ -197,6 +198,21 @@ class JobDeviceConnector:
             try:
                 logger.debug(f"Attempting to connect to {self.host} using credential ID {self.credential_id}")
                 
+                # Log credential usage attempt in job logs
+                credential_store = get_credential_store()
+                credential = credential_store.get_credential(self.credential_id)
+                if credential:
+                    log_credential_usage(
+                        self.device_id,
+                        self.session_id,
+                        credential_id=self.credential_id,
+                        credential_name=credential.name,
+                        username=credential.username,
+                        success_count=credential.success_count,
+                        failure_count=credential.failure_count,
+                        attempt_type="specific"
+                    )
+                
                 if self.connector.connect_with_credential_id(self.credential_id):
                     log_device_connect_success(self.device_id, self.session_id)
                     self._connected = True
@@ -218,7 +234,36 @@ class JobDeviceConnector:
             try:
                 logger.debug(f"Attempting to connect to {self.host} using credentials for tag {self.tag_id}")
                 
+                # Log tag-based credential usage attempt
+                credential_store = get_credential_store()
+                credentials = credential_store.get_credentials_by_tag(self.tag_id)
+                if credentials:
+                    log_credential_usage(
+                        self.device_id,
+                        self.session_id,
+                        tag_id=self.tag_id,
+                        credential_count=len(credentials),
+                        attempt_type="tag-based"
+                    )
+                
                 if self.connector.connect_with_tag(self.tag_id):
+                    # Get the credential that was successful
+                    successful_credential_id = self.connector.last_successful_credential_id
+                    if successful_credential_id:
+                        credential = credential_store.get_credential(successful_credential_id)
+                        if credential:
+                            log_credential_usage(
+                                self.device_id,
+                                self.session_id,
+                                credential_id=successful_credential_id,
+                                credential_name=credential.name,
+                                username=credential.username,
+                                success_count=credential.success_count,
+                                failure_count=credential.failure_count,
+                                attempt_type="successful",
+                                priority=self.connector.last_successful_priority
+                            )
+                    
                     log_device_connect_success(self.device_id, self.session_id)
                     self._connected = True
                     return True

@@ -10,6 +10,8 @@ import os
 import json
 import logging
 from datetime import timedelta
+import sys
+import subprocess
 
 from netraven.core.auth import create_token
 from netraven.core.token_store import token_store
@@ -143,5 +145,42 @@ def setup_initial_tokens():
     print("You can generate new tokens using the API or web interface")
 
 
+def setup_credential_store():
+    """
+    Initialize the credential store.
+    
+    This function creates the credential store database and populates it with
+    default credentials for different device types.
+    """
+    logger.info("Initializing credential store...")
+    
+    try:
+        # Import the setup_credential_store script from the scripts directory
+        scripts_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "scripts")
+        sys.path.insert(0, scripts_path)
+        
+        # Check if the script exists
+        setup_script_path = os.path.join(scripts_path, "setup_credential_store.py")
+        if not os.path.exists(setup_script_path):
+            logger.warning(f"Credential store setup script not found at {setup_script_path}")
+            return
+        
+        # Run the script as a subprocess to ensure clean execution
+        logger.info(f"Running credential store setup script: {setup_script_path}")
+        result = subprocess.run([sys.executable, setup_script_path], check=True)
+        
+        if result.returncode == 0:
+            logger.info("Credential store initialization completed successfully")
+        else:
+            logger.error(f"Credential store initialization failed with return code {result.returncode}")
+            
+    except Exception as e:
+        logger.error(f"Error initializing credential store: {str(e)}")
+
+
 if __name__ == "__main__":
-    setup_initial_tokens() 
+    # Initialize authentication tokens
+    setup_initial_tokens()
+    
+    # Initialize credential store
+    setup_credential_store() 

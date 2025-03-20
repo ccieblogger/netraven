@@ -356,19 +356,18 @@ def log_backup_failure(device_id: str, error: str,
     logger.error(f"[Session: {session_id}] Backup failed for device: {device_info.get('hostname', device_id)}, "
                 f"error: {error}")
 
-def log_device_info(device_id: str, info_type: str, info_data: Dict[str, Any], 
-                   session_id: Optional[str] = None) -> None:
+def log_device_info(session_id: str, device_id: str, serial_number: Optional[str] = None, 
+                  os_version: Optional[str] = None, os_model: Optional[str] = None) -> None:
     """
     Log device information collected during a job.
     
     Args:
+        session_id: Session ID
         device_id: Device ID
-        info_type: Type of information (e.g., 'os', 'serial', 'version')
-        info_data: Dictionary containing the collected information
-        session_id: Optional session ID
+        serial_number: Device serial number (optional)
+        os_version: Operating system version (optional)
+        os_model: Operating system model (optional)
     """
-    session_id = session_id or _current_job_session
-    
     if not session_id:
         logger.warning(f"No active job session for device info: {device_id}")
         return
@@ -378,11 +377,72 @@ def log_device_info(device_id: str, info_type: str, info_data: Dict[str, Any],
         logger.warning(f"No device info for device info logging: {device_id}")
         return
     
+    # Create info data dictionary
+    info_data = {}
+    if serial_number:
+        info_data["serial_number"] = serial_number
+    if os_version:
+        info_data["os_version"] = os_version
+    if os_model:
+        info_data["os_model"] = os_model
+    
     # Format the info data for logging
     info_str = ", ".join([f"{k}: {v}" for k, v in info_data.items()])
     
-    logger.info(f"[Session: {session_id}] Collected {info_type} info from device: {device_info.get('hostname', device_id)}, "
+    logger.info(f"[Session: {session_id}] Collected system info from device: {device_info.get('hostname', device_id)}, "
                f"data: {info_str}")
+
+def log_credential_usage(device_id: str, session_id: str, credential_id: Optional[str] = None,
+                      credential_name: Optional[str] = None, username: Optional[str] = None,
+                      success_count: Optional[int] = None, failure_count: Optional[int] = None,
+                      attempt_type: str = "specific", tag_id: Optional[str] = None,
+                      credential_count: Optional[int] = None, priority: Optional[int] = None) -> None:
+    """
+    Log credential usage during device connections.
+    
+    Args:
+        device_id: Device ID
+        session_id: Session ID
+        credential_id: Credential ID (optional)
+        credential_name: Credential name (optional)
+        username: Username from credential (optional)
+        success_count: Number of successful connections (optional)
+        failure_count: Number of failed connections (optional)
+        attempt_type: Type of connection attempt (specific, tag-based, successful)
+        tag_id: Tag ID for tag-based connections (optional)
+        credential_count: Number of credentials associated with tag (optional)
+        priority: Priority of the credential that worked (optional)
+    """
+    if not session_id:
+        logger.warning(f"No active job session for credential usage: {device_id}")
+        return
+    
+    device_info = _get_device_info(device_id, session_id)
+    if not device_info:
+        logger.warning(f"No device info for credential usage: {device_id}")
+        return
+    
+    hostname = device_info.get('hostname', device_id)
+    
+    if attempt_type == "tag-based" and tag_id:
+        logger.info(f"[Session: {session_id}] Using tag-based credentials for device: {hostname}, "
+                   f"tag ID: {tag_id}, available credentials: {credential_count}")
+    elif attempt_type == "specific" and credential_id:
+        success_info = ""
+        if success_count is not None and failure_count is not None:
+            success_rate = 0
+            if success_count + failure_count > 0:
+                success_rate = (success_count / (success_count + failure_count)) * 100
+            success_info = f", success rate: {success_rate:.1f}% ({success_count}/{success_count + failure_count})"
+            
+        logger.info(f"[Session: {session_id}] Using specific credential for device: {hostname}, "
+                   f"credential: {credential_name} (ID: {credential_id}), username: {username}{success_info}")
+    elif attempt_type == "successful" and credential_id:
+        priority_info = f", priority: {priority}" if priority is not None else ""
+        logger.info(f"[Session: {session_id}] Successfully connected to device: {hostname} "
+                   f"using credential: {credential_name} (ID: {credential_id}), username: {username}{priority_info}")
+    else:
+        logger.info(f"[Session: {session_id}] Credential usage for device: {hostname}, type: {attempt_type}")
 
 def _get_device_info(device_id: str, session_id: str) -> Optional[Dict[str, Any]]:
     """
