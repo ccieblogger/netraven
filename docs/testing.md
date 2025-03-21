@@ -122,6 +122,61 @@ def test_device_creation(app_config, api_token):
     assert data["hostname"] == device_data["hostname"]
 ```
 
+### UI Component Testing
+
+UI components should be tested through API-driven integration tests rather than through browser automation tools:
+
+- **Do NOT use browser automation tools** like Playwright, Selenium, or Cypress
+  - These tools have proven to be too complex and slow for our testing needs
+  - They introduce too many dependencies and environmental inconsistencies
+  - They often require additional system packages that complicate container setup
+
+- **Instead, use API-based testing for UI functionality:**
+  - Test Admin UI functionality by making API calls that would be triggered by UI interactions
+  - Verify API responses contain the correct data that would be displayed in the UI
+  - Test all input validation rules through API parameter validation
+  - Check authorization controls through API endpoint access tests
+  - Test workflow sequences by making multiple API calls in the correct order
+
+For example, instead of automating clicks on the Admin Settings UI, test the API endpoints that the UI would call:
+
+```python
+def test_admin_settings_update(app_config, admin_token):
+    """Test updating admin settings through the API."""
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    
+    # Get current settings
+    response = requests.get(
+        f"{app_config['api_url']}/api/admin-settings/security",
+        headers=headers
+    )
+    assert response.status_code == 200
+    current_settings = response.json()
+    
+    # Update a setting
+    update_data = current_settings.copy()
+    update_data["password_min_length"] = 10
+    
+    response = requests.put(
+        f"{app_config['api_url']}/api/admin-settings/security",
+        headers=headers,
+        json=update_data
+    )
+    assert response.status_code == 200
+    updated_settings = response.json()
+    assert updated_settings["password_min_length"] == 10
+    
+    # Verify persistence
+    response = requests.get(
+        f"{app_config['api_url']}/api/admin-settings/security",
+        headers=headers
+    )
+    persisted_settings = response.json()
+    assert persisted_settings["password_min_length"] == 10
+```
+
+This approach tests the same functionality that the UI would use, while being much faster, more reliable, and less dependent on specific UI implementations.
+
 ## Testing Auth and User Management Features
 
 The authentication and user management features have specific testing requirements and utilities.

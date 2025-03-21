@@ -106,10 +106,11 @@
    - ✓ Test settings changes and their effects on system behavior
 
 3. **Admin UI Testing**
-   - Test settings form validation
-   - Verify settings persistence across sessions
-   - Test admin-only access restrictions
-   - Verify settings affect system as expected
+   - Test settings form validation through API endpoints
+   - Verify settings persistence using API-driven tests
+   - Test admin-only access restrictions via API authorization checks
+   - Verify settings effects on system behavior through API response validation
+   - Note: UI testing will use API-driven approaches instead of browser automation tools
 
 4. **Performance and Load Testing - COMPLETED**
    - ✓ Test re-encryption performance with large credential sets
@@ -133,15 +134,6 @@
 - [x] Add `/api/keys` endpoints for key management
 - [x] Implement key backup/restore endpoints
 - [x] Add proper scope validation for all endpoints
-
-### Test Implementation Details
-- [x] Convert `scripts/test_key_rotation.py` to proper PyTest format
-- [x] Add integration tests for key rotation API in `tests/integration/`
-- [x] Add tests for credential API endpoints
-- [ ] Create UI tests for key management interface
-- [x] Add tests for admin settings API
-- [ ] Add tests for admin settings UI
-- [ ] Ensure all new endpoints have minimum 90% test coverage
 
 ## Dependencies and Requirements
 - Current key rotation module in `netraven/core/key_rotation.py`
@@ -204,8 +196,8 @@
 - [x] Add tests for admin settings API
 - [x] Add tests for admin settings effects on system behavior
 - [x] Add performance and load tests
-- [ ] Create UI tests for key management interface
-- [ ] Add tests for admin settings UI
+- [ ] Create API-driven tests for key management UI functionality
+- [ ] Add API-driven tests for admin settings UI functionality
 - [ ] Ensure all new endpoints have minimum 90% test coverage 
 
 ### Phase 4: Security Enhancements
