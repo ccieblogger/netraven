@@ -17,6 +17,7 @@ import RouteTest from '../views/RouteTest.vue'
 import GatewayDashboard from '../views/GatewayDashboard.vue'
 import CredentialList from '../views/CredentialList.vue'
 import CredentialDashboard from '../views/CredentialDashboard.vue'
+import CredentialAnalytics from '../views/CredentialAnalytics.vue'
 import KeyManagement from '@/views/KeyManagement.vue'
 
 // Define routes
@@ -75,6 +76,12 @@ const routes = [
     path: '/credentials/dashboard',
     name: 'CredentialDashboard',
     component: CredentialDashboard,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/credentials/analytics',
+    name: 'CredentialAnalytics',
+    component: CredentialAnalytics,
     meta: { requiresAuth: true }
   },
   {

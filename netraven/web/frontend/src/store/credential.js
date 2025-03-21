@@ -10,7 +10,11 @@ export const useCredentialStore = defineStore('credential', {
     filters: {},
     testResults: null,
     tagAssociations: {},
-    dashboardStats: null
+    dashboardStats: null,
+    enhancedStats: null,
+    tagStats: {},
+    smartCredentials: {},
+    reencryptStatus: null
   }),
   
   getters: {
@@ -226,35 +230,26 @@ export const useCredentialStore = defineStore('credential', {
       this.error = null
       
       try {
-        // First get all credentials
-        await this.fetchCredentials()
+        // Get enhanced stats from API
+        this.enhancedStats = await apiClient.getCredentialStats()
         
-        // Calculate some stats
-        const totalCredentials = this.credentials.length
-        const totalSuccess = this.credentials.reduce((sum, c) => sum + c.success_count, 0)
-        const totalFailure = this.credentials.reduce((sum, c) => sum + c.failure_count, 0)
+        // Keep backward compatibility with existing code
+        const totalCredentials = this.enhancedStats.total_count
+        const totalSuccess = this.enhancedStats.success_count || 0
+        const totalFailure = this.enhancedStats.failure_count || 0
         
+        // Calculate legacy stats for backward compatibility
         const successRate = totalSuccess + totalFailure > 0 
-          ? (totalSuccess / (totalSuccess + totalFailure) * 100).toFixed(1) 
-          : 0
+          ? ((totalSuccess / (totalSuccess + totalFailure)) * 100).toFixed(1) 
+          : '0.0'
           
-        // Group by device type (based on tags)
+        // Get device types from tags
         const deviceTypes = {}
-        this.credentials.forEach(credential => {
-          if (credential.tags) {
-            credential.tags.forEach(tag => {
-              if (!deviceTypes[tag.name]) {
-                deviceTypes[tag.name] = {
-                  count: 0,
-                  success: 0,
-                  failure: 0
-                }
-              }
-              
-              deviceTypes[tag.name].count++
-              deviceTypes[tag.name].success += tag.success_count || 0
-              deviceTypes[tag.name].failure += tag.failure_count || 0
-            })
+        this.enhancedStats.tag_stats?.forEach(tag => {
+          deviceTypes[tag.name] = {
+            count: tag.credential_count || 0,
+            success: tag.success_count || 0,
+            failure: tag.failure_count || 0
           }
         })
         
@@ -264,8 +259,8 @@ export const useCredentialStore = defineStore('credential', {
           totalFailure,
           successRate,
           deviceTypes,
-          mostSuccessful: this.getMostSuccessfulCredentials,
-          leastSuccessful: this.getLeastSuccessfulCredentials
+          mostSuccessful: this.enhancedStats.top_performers || [],
+          leastSuccessful: this.enhancedStats.poor_performers || []
         }
         
         return this.dashboardStats
@@ -273,6 +268,97 @@ export const useCredentialStore = defineStore('credential', {
         console.error('Error fetching dashboard stats:', error)
         this.error = error.message || 'Failed to fetch dashboard stats'
         return null
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    async fetchTagCredentialStats(tagId) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const stats = await apiClient.getTagCredentialStats(tagId)
+        this.tagStats[tagId] = stats
+        return stats
+      } catch (error) {
+        console.error(`Error fetching tag credential stats for ${tagId}:`, error)
+        this.error = error.message || 'Failed to fetch tag credential stats'
+        return null
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    async getSmartCredentialsForTag(tagId, limit = 5) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await apiClient.getSmartCredentialsForTag(tagId, limit)
+        this.smartCredentials[tagId] = response
+        return response
+      } catch (error) {
+        console.error(`Error fetching smart credentials for tag ${tagId}:`, error)
+        this.error = error.message || 'Failed to fetch smart credentials'
+        return null
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    async optimizeCredentialPriorities(tagId) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const result = await apiClient.optimizeCredentialPriorities(tagId)
+        
+        // Refresh credentials for this tag
+        await this.fetchCredentialsByTag(tagId)
+        
+        return result
+      } catch (error) {
+        console.error(`Error optimizing credential priorities for tag ${tagId}:`, error)
+        this.error = error.message || 'Failed to optimize credential priorities'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    async reencryptCredentials(batchSize = 100) {
+      this.loading = true
+      this.error = null
+      this.reencryptStatus = { 
+        inProgress: true, 
+        message: 'Re-encryption started...',
+        progress: 0
+      }
+      
+      try {
+        const result = await apiClient.reencryptCredentials(batchSize)
+        
+        this.reencryptStatus = {
+          inProgress: false,
+          success: result.success,
+          message: result.message,
+          details: result.details
+        }
+        
+        return result
+      } catch (error) {
+        console.error('Error during credential re-encryption:', error)
+        this.error = error.message || 'Failed to re-encrypt credentials'
+        
+        this.reencryptStatus = {
+          inProgress: false,
+          success: false,
+          message: 'Re-encryption failed',
+          error: error.message
+        }
+        
+        throw error
       } finally {
         this.loading = false
       }

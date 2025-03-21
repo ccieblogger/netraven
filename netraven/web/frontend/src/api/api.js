@@ -919,6 +919,140 @@ const apiClient = {
     });
     return response.data;
   },
+  
+  async getTagCredentialStats(tagId) {
+    const response = await axios.get(`${browserApiUrl}/api/credentials/stats/tag/${tagId}`, {
+      headers: this.getAuthHeader()
+    });
+    return response.data;
+  },
+  
+  async getSmartCredentialsForTag(tagId, limit = 5) {
+    const response = await axios.post(`${browserApiUrl}/api/credentials/smart-select`, 
+      { tag_id: tagId, limit: limit }, 
+      { headers: this.getAuthHeader() }
+    );
+    return response.data;
+  },
+  
+  async optimizeCredentialPriorities(tagId) {
+    const response = await axios.post(`${browserApiUrl}/api/credentials/optimize-priorities/${tagId}`, 
+      {}, 
+      { headers: this.getAuthHeader() }
+    );
+    return response.data;
+  },
+  
+  async reencryptCredentials(batchSize = 100) {
+    const response = await axios.post(`${browserApiUrl}/api/credentials/reencrypt`, 
+      {},
+      { 
+        headers: this.getAuthHeader(),
+        params: { batch_size: batchSize }
+      }
+    );
+    return response.data;
+  },
+
+  // Key management API methods
+  async getKeys() {
+    try {
+      const response = await axios.get(`${browserApiUrl}/api/keys`, {
+        headers: this.getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching keys:', error);
+      throw error;
+    }
+  },
+
+  async getKey(id) {
+    try {
+      const response = await axios.get(`${browserApiUrl}/api/keys/${id}`, {
+        headers: this.getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching key ${id}:`, error);
+      throw error;
+    }
+  },
+
+  async createKey(keyData = {}) {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/keys`, keyData, {
+        headers: {
+          ...this.getAuthHeader(),
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating key:', error);
+      throw error;
+    }
+  },
+
+  async activateKey(keyData) {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/keys/activate`, keyData, {
+        headers: {
+          ...this.getAuthHeader(),
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error activating key:', error);
+      throw error;
+    }
+  },
+
+  async rotateKeys(rotateData = {}) {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/keys/rotate`, rotateData, {
+        headers: {
+          ...this.getAuthHeader(),
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error rotating keys:', error);
+      throw error;
+    }
+  },
+
+  async createKeyBackup(backupData) {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/keys/backup`, backupData, {
+        headers: {
+          ...this.getAuthHeader(),
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error creating key backup:', error);
+      throw error;
+    }
+  },
+
+  async restoreKeys(restoreData) {
+    try {
+      const response = await axios.post(`${browserApiUrl}/api/keys/restore`, restoreData, {
+        headers: {
+          ...this.getAuthHeader(),
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error restoring keys:', error);
+      throw error;
+    }
+  },
 }
 
 // Export services

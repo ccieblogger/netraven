@@ -63,6 +63,47 @@
           Gateway
         </router-link>
         
+        <!-- Credentials Section -->
+        <div class="mt-4 pt-4 border-t border-gray-700">
+          <div class="px-4 py-2 text-gray-400 text-sm">Credentials</div>
+          <router-link 
+            to="/credentials" 
+            class="block px-4 py-2 hover:bg-gray-700"
+            :class="{ 'bg-gray-700': $route.path === '/credentials' }"
+          >
+            <div class="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Manage Credentials
+            </div>
+          </router-link>
+          <router-link 
+            to="/credentials/dashboard" 
+            class="block px-4 py-2 hover:bg-gray-700"
+            :class="{ 'bg-gray-700': $route.path === '/credentials/dashboard' }"
+          >
+            <div class="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Basic Dashboard
+            </div>
+          </router-link>
+          <router-link 
+            to="/credentials/analytics" 
+            class="block px-4 py-2 hover:bg-gray-700"
+            :class="{ 'bg-gray-700': $route.path === '/credentials/analytics' }"
+          >
+            <div class="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Advanced Analytics
+            </div>
+          </router-link>
+        </div>
+        
         <!-- Admin Section -->
         <div v-if="isAdmin" class="mt-4 pt-4 border-t border-gray-700">
           <div class="px-4 py-2 text-gray-400 text-sm">Administration</div>

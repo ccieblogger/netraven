@@ -88,21 +88,33 @@ class CredentialBulkOperation(BaseModel):
 
 class CredentialStats(BaseModel):
     """Schema for credential statistics."""
-    total_credentials: int = Field(..., description="Total number of credentials in the system")
-    total_success_count: int = Field(..., description="Total number of successful authentications")
-    total_failure_count: int = Field(..., description="Total number of failed authentication attempts")
+    total_count: int = Field(..., description="Total number of credentials in the system")
+    active_count: int = Field(..., description="Number of credentials used in the last 30 days")
     success_rate: float = Field(..., description="Overall success rate as a percentage")
+    failure_rate: float = Field(..., description="Overall failure rate as a percentage")
     
-    # Most/least successful credentials
-    most_successful: List[Dict[str, Any]] = Field([], description="List of most successful credentials")
-    least_successful: List[Dict[str, Any]] = Field([], description="List of least successful credentials")
+    # Top and poor performers
+    top_performers: List[Dict[str, Any]] = Field([], description="List of top performing credentials (highest success rate)")
+    poor_performers: List[Dict[str, Any]] = Field([], description="List of poor performing credentials (highest failure rate)")
+
+class TagCredentialStats(BaseModel):
+    """Schema for credential statistics for a specific tag."""
+    tag_id: str = Field(..., description="ID of the tag")
+    total_count: int = Field(..., description="Total number of credentials for this tag")
+    active_count: int = Field(..., description="Number of credentials used in the last 30 days")
+    success_rate: float = Field(..., description="Overall success rate as a percentage")
+    failure_rate: float = Field(..., description="Overall failure rate as a percentage")
     
-    # Breakdown by device type
-    device_type_breakdown: List[Dict[str, Any]] = Field([], description="Breakdown of credential success by device type")
-    
-    # Recent activity
-    recent_failures: List[Dict[str, Any]] = Field([], description="Recent authentication failures")
-    recent_successes: List[Dict[str, Any]] = Field([], description="Recent authentication successes")
-    
-    # Usage over time (last 30 days)
-    usage_over_time: Dict[str, Any] = Field({}, description="Credential usage data over time") 
+    # Top and poor performers for this tag
+    top_performers: List[Dict[str, Any]] = Field([], description="List of top performing credentials for this tag")
+    poor_performers: List[Dict[str, Any]] = Field([], description="List of poor performing credentials for this tag")
+
+class SmartCredentialRequest(BaseModel):
+    """Schema for requesting smart credential selection."""
+    tag_id: str = Field(..., description="ID of the tag to get credentials for")
+    limit: int = Field(5, description="Maximum number of credentials to return")
+
+class SmartCredentialResponse(BaseModel):
+    """Schema for smart credential selection response."""
+    credentials: List[Dict[str, Any]] = Field(..., description="List of ranked credentials")
+    explanation: Dict[str, Any] = Field({}, description="Explanation of the ranking algorithm and factors") 
