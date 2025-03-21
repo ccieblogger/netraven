@@ -56,6 +56,46 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     
+    hasRole: (state) => (role) => {
+      if (!state.token) return false
+      
+      try {
+        // First check if user has admin role via scope
+        const payload = JSON.parse(atob(state.token.split('.')[1]))
+        
+        // Admin role check
+        if (role === 'admin' && payload.scope && 
+            (payload.scope.includes('admin:*') || payload.scope.includes('admin'))) {
+          return true
+        }
+        
+        // Check if roles are directly in the token
+        if (payload.roles && Array.isArray(payload.roles)) {
+          return payload.roles.includes(role)
+        }
+        
+        // Check if roles are in the user object
+        if (state.user && state.user.roles && Array.isArray(state.user.roles)) {
+          return state.user.roles.includes(role)
+        }
+        
+        // Special case for admin role - check for admin scopes
+        if (role === 'admin' && payload.scope) {
+          // If any scope starts with 'admin:', user has admin role
+          if (typeof payload.scope === 'string') {
+            return payload.scope.split(' ').some(s => s.startsWith('admin:'))
+          } else if (Array.isArray(payload.scope)) {
+            return payload.scope.some(s => s.startsWith('admin:'))
+          }
+        }
+        
+        return false
+      } catch (e) {
+        console.error('Error checking user role:', e)
+        return false
+      }
+    },
+    
     canManageDevices: (state) => {
       return state.hasPermission('write:devices')
     }

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../store/auth'
 
 // Import views
 import Dashboard from '../views/Dashboard.vue'
@@ -16,6 +17,7 @@ import RouteTest from '../views/RouteTest.vue'
 import GatewayDashboard from '../views/GatewayDashboard.vue'
 import CredentialList from '../views/CredentialList.vue'
 import CredentialDashboard from '../views/CredentialDashboard.vue'
+import KeyManagement from '@/views/KeyManagement.vue'
 
 // Define routes
 const routes = [
@@ -111,6 +113,15 @@ const routes = [
     name: 'RouteTest',
     component: RouteTest,
     meta: { requiresAuth: false }
+  },
+  {
+    path: '/keys',
+    name: 'KeyManagement',
+    component: KeyManagement,
+    meta: {
+      requiresAuth: true,
+      adminOnly: true
+    }
   }
 ]
 
@@ -142,16 +153,25 @@ router.beforeEach((to, from, next) => {
   
   if (!token) {
     console.log('Router: No token found, redirecting to login');
-    // Store the intended destination to redirect after login
-    const redirectPath = to.path !== '/' ? to.fullPath : undefined;
-    return next({
-      path: '/login',
-      query: redirectPath ? { redirect: redirectPath } : {}
-    });
+    // Save the intended route to redirect after login
+    localStorage.setItem('redirect_after_login', to.fullPath);
+    return next('/login');
   }
   
-  // User has token, allow navigation
-  next();
+  // Check if route requires admin role
+  const adminOnly = to.matched.some(record => record.meta.adminOnly);
+  
+  // If route requires admin privileges, verify user role
+  if (adminOnly) {
+    const authStore = useAuthStore();
+    
+    if (!authStore.hasRole('admin')) {
+      console.log('Router: User is not an admin, access denied');
+      return next('/');  // Redirect to dashboard
+    }
+  }
+  
+  return next();
 });
 
 export default router 
