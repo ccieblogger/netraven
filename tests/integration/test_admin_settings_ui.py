@@ -15,7 +15,8 @@ import json
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from netraven.web.app import app
+# Import the app correctly based on the project structure
+from netraven.web.main import app
 from netraven.web.auth.jwt import create_access_token
 from netraven.web.models.admin_settings import AdminSetting
 from netraven.web.crud.admin_settings import initialize_default_settings
