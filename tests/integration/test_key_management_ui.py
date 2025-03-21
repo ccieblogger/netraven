@@ -17,8 +17,8 @@ import base64
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-# Import the app correctly based on the project structure
-from netraven.web.main import app
+# Correct import path for the app
+from netraven.web.app import app
 from netraven.web.auth.jwt import create_access_token
 from netraven.core.key_rotation import KeyRotationManager
 from netraven.core.credential_store import CredentialStore, get_credential_store
