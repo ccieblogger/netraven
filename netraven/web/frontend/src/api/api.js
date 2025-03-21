@@ -1053,6 +1053,84 @@ const apiClient = {
       throw error;
     }
   },
+
+  // Admin Settings methods
+  async getAdminSettings() {
+    const response = await axios.get(`${browserApiUrl}/api/admin-settings`, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async getAdminSettingsByCategory() {
+    const response = await axios.get(`${browserApiUrl}/api/admin-settings/categories`, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async getAdminSetting(id) {
+    const response = await axios.get(`${browserApiUrl}/api/admin-settings/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async getAdminSettingByKey(key) {
+    const response = await axios.get(`${browserApiUrl}/api/admin-settings/key/${key}`, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async createAdminSetting(settingData) {
+    const response = await axios.post(`${browserApiUrl}/api/admin-settings`, settingData, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async updateAdminSetting(id, settingData) {
+    const response = await axios.put(`${browserApiUrl}/api/admin-settings/${id}`, settingData, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async updateAdminSettingValue(key, valueData) {
+    const response = await axios.put(`${browserApiUrl}/api/admin-settings/key/${key}/value`, valueData, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async deleteAdminSetting(id) {
+    const response = await axios.delete(`${browserApiUrl}/api/admin-settings/${id}`, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async initializeAdminSettings() {
+    const response = await axios.post(`${browserApiUrl}/api/admin-settings/initialize`, {}, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async applyAdminSetting(id) {
+    const response = await axios.post(`${browserApiUrl}/api/admin-settings/apply/${id}`, {}, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
+
+  async applyAllAdminSettings() {
+    const response = await axios.post(`${browserApiUrl}/api/admin-settings/apply-all`, {}, {
+      headers: this.getAuthHeader()
+    });
+    return response;
+  },
 }
 
 // Export services
@@ -1118,4 +1196,52 @@ export const scheduledJobsService = {
   deleteScheduledJob: apiClient.deleteScheduledJob.bind(apiClient),
   runScheduledJob: apiClient.runScheduledJob.bind(apiClient),
   toggleScheduledJob: apiClient.toggleScheduledJob.bind(apiClient)
+};
+
+// Admin Settings API
+export const adminSettingsApi = {
+  // Get all admin settings
+  getSettings: (params = {}) => {
+    return axios.get(`${browserApiUrl}/api/admin-settings/`, { params });
+  },
+  
+  // Get settings grouped by category
+  getSettingsByCategory: () => {
+    return axios.get(`${browserApiUrl}/api/admin-settings/by-category`);
+  },
+  
+  // Get a specific setting by ID
+  getSetting: (id) => {
+    return axios.get(`${browserApiUrl}/api/admin-settings/${id}`);
+  },
+  
+  // Get a specific setting by key
+  getSettingByKey: (key) => {
+    return axios.get(`${browserApiUrl}/api/admin-settings/key/${key}`);
+  },
+  
+  // Create a new setting
+  createSetting: (data) => {
+    return axios.post(`${browserApiUrl}/api/admin-settings/`, data);
+  },
+  
+  // Update a setting
+  updateSetting: (id, data) => {
+    return axios.put(`${browserApiUrl}/api/admin-settings/${id}`, data);
+  },
+  
+  // Update a setting value by key
+  updateSettingValue: (key, data) => {
+    return axios.patch(`${browserApiUrl}/api/admin-settings/key/${key}`, data);
+  },
+  
+  // Delete a setting
+  deleteSetting: (id) => {
+    return axios.delete(`${browserApiUrl}/api/admin-settings/${id}`);
+  },
+  
+  // Initialize default settings
+  initializeDefaultSettings: () => {
+    return axios.post(`${browserApiUrl}/api/admin-settings/initialize`);
+  }
 }; 

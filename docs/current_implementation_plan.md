@@ -1,161 +1,194 @@
-# NetRaven Device Connection Enhancement: Implementation Status
+# Revised NetRaven Implementation and Testing Enhancement Plan
 
-## Overview
+## Part 1: Complete Remaining Planned Features
 
-This implementation plan tracks the progress of enhancing NetRaven's device connection system with Netmiko integration, secure credential storage, tag-based credential organization, and API/UI improvements. The system now follows the project's enhanced single environment approach and container-based architecture as outlined in the Developer Documentation.
+### Phase 1: Key Rotation API & Integration (3 days) - COMPLETED
+1. **API Endpoints for Key Rotation**
+   - Add endpoints in `netraven/web/routers` for key management
+   - Create schemas in `netraven/web/schemas` for key rotation 
+   - Implement CRUD operations for key management
+   - Add authentication and scope validation
 
-## Completed Phases
+2. **Admin UI Integration for Key Management**
+   - Create Vue components for key management
+   - Add key rotation dashboard to admin interface
+   - Implement key backup/restore UI
 
-### ✅ Phase 1: Core Netmiko Integration (COMPLETED)
-- ✅ Enhanced `CoreDeviceConnector` with Netmiko connection parameters
-- ✅ Refined `JobDeviceConnector` with robust retry mechanism
-- ✅ Added comprehensive unit tests for Netmiko integration
+3. **Scheduled Key Rotation Integration**
+   - Finalize integration with scheduler system
+   - Ensure proper error handling and reporting
+   - Add notification system integration
 
-### ✅ Phase 2: Container and Database Setup (COMPLETED)
-- ✅ Created database models for credential storage
-- ✅ Updated database setup process to initialize credential tables
-- ✅ Created credential store configuration in config module
-- ✅ Added encryption support with environment variable integration
-- ✅ Created unit tests for basic credential store functionality
+### Phase 2: Credential-Key Integration Improvements (2 days) - COMPLETED
+1. **Complete Credential Re-encryption Logic**
+   - Enhance credential store to better support bulk operations
+   - Add progress tracking for large re-encryption operations
+   - Implement rollback mechanism for failed operations
 
-### ✅ Phase 3: Credential Store Implementation (COMPLETED)
-- ✅ Fully implemented credential store with secure encryption
-- ✅ Created tag-based credential retrieval functionality
-- ✅ Implemented credential tracking with success/failure counters
-- ✅ Added integration tests for credential store
-- ✅ Integrated credential store with device connectors
-- ✅ Implemented credential rotation for connection attempts
+2. **Credential Performance Monitoring**
+   - Complete statistics gathering for credential usage
+   - Add credential success/failure rate tracking
+   - Implement credential suggestion system based on success rates
 
-### ✅ Phase 4: Connection System Integration (COMPLETED)
-- ✅ Implemented unified `CredentialStore` module with SQLite database backend
-- ✅ Enhanced `DeviceConnector` with credential store integration
-- ✅ Updated `JobDeviceConnector` with tag-based authentication
-- ✅ Modified backup system to use credential store when available
-- ✅ Created comprehensive integration tests for connection system
-- ✅ Added database migration for credential tag support
-- ✅ Created setup script for credential store initialization
-- ✅ Added documentation for the credential store system
+### Phase 3: Admin Settings Management (3 days) - IN PROGRESS
+1. **Settings API Implementation - COMPLETED**
+   - Create `/api/admin-settings` endpoints with admin-only access
+   - Implement settings schema with validation
+   - Create database model for persistent settings
+   - Add proper scope validation (require `admin:settings` permission)
 
-### ✅ Phase 5: API and UI Integration (COMPLETED)
-- ✅ Created Pinia stores for credential and tag management
-- ✅ Added API endpoints for credential statistics
-- ✅ Implemented credential dashboard for visualizing performance metrics
-- ✅ Updated credential list component to use the new store
-- ✅ Enhanced API client with methods for tag associations
-- ✅ Improved navigation with links to credential dashboard
-- ✅ Updated documentation to reflect new credential management features
+2. **Settings Categories Implementation - COMPLETED**
+   - **Security Settings**: 
+     - Password complexity requirements
+     - Token lifetime settings
+     - Login attempt limits
+   - **System Settings**:
+     - Application name configuration
+     - Job concurrency limits
+     - Backup retention policy and storage type
+   - **Notification Settings**:
+     - Email notification configuration
+     - SMTP server settings
+     - Email templates and formatting
 
-## Remaining Implementation Plan (PENDING APPROVAL)
+3. **Admin Settings UI - COMPLETED**
+   - Create settings dashboard for administrators
+   - Implement settings form components with validation
+   - Add real-time validation and feedback
+   - Create settings category navigation
 
-### Phase 6: Security and Logging Enhancements (2-3 days)
-- Enhance secure credential handling:
-  - Implement key rotation functionality
-  - Add encryption key backup/restore
-  - Improve password masking throughout the system
-- Implement credential usage audit logging:
-  - Log all credential access events
-  - Track credential modifications
-  - Record authentication success/failure details
-- Add memory protection for sensitive data:
-  - Implement secure string handling
-  - Add session-based encryption for web requests
-  - Clear sensitive data from memory after use
-- Create security-focused unit tests:
-  - Test encryption/decryption edge cases
-  - Verify access control for credential operations
-  - Test audit logging accuracy
+### Phase 4: Security Enhancements (2 days)
+1. **Token Refresh Mechanism**
+   - Implement token refresh endpoint
+   - Add revocation capability for old tokens
+   - Create client-side refresh logic
 
-### Phase 7: Documentation and Final Testing (2-3 days)
-- Document credential store architecture:
-  - Create detailed technical documentation
-  - Add security considerations and best practices
-  - Document database schema and relationships
-- Create user documentation for credential management:
-  - Add step-by-step guides for common operations
-  - Create troubleshooting guides
-  - Add examples of effective credential organization
-- Document API endpoints for credential management:
-  - Update API documentation with new endpoints
-  - Include request/response examples
-  - Document error codes and handling
-- Create end-to-end tests for the credential system:
-  - Test full credential lifecycle
-  - Verify integration with all components
-  - Test migration path from old to new credential system
-- Perform comprehensive security review:
-  - Review encryption implementation
-  - Test for common security vulnerabilities
-  - Verify proper access control throughout the system
+2. **Audit Logging System**
+   - Implement comprehensive audit logging for authentication events
+   - Add audit logging for sensitive operations
+   - Create admin UI for viewing audit logs
 
-## Current Accomplishments
+## Part 2: Testing Enhancement Plan
 
-The implementation has successfully delivered:
+### Phase 5: Unit Test Expansion (3 days)
+1. **Key Rotation Module Tests**
+   - Implement comprehensive unit tests for `KeyRotationManager`
+   - Test all key management functions (create, activate, rotate)
+   - Test encryption/decryption operations
+   - Test edge cases and error handling
 
-1. **Secure Credential Storage**:
-   - Implemented `Credential` and `CredentialTag` models for database storage
-   - Added encryption support using Fernet symmetric encryption
-   - Created a unified interface for credential management
+2. **Credential Store Enhancements**
+   - Complete tests for credential CRUD operations
+   - Add tests for credential re-encryption
+   - Test credential tag associations
 
-2. **Enhanced Device Connectivity**:
-   - Updated `DeviceConnector` and `JobDeviceConnector` classes with credential store integration
-   - Implemented tag-based credential retrieval with prioritization
-   - Added automatic retry with alternative credentials on connection failure
+3. **Admin Settings Tests**
+   - Add unit tests for settings validation
+   - Test settings persistence and retrieval
+   - Test default values and overrides
 
-3. **Tracking and Optimization**:
-   - Added success/failure tracking for credentials
-   - Implemented tracking at both credential and credential-tag levels
-   - Created a system for prioritizing the most effective credentials
+4. **Authentication Extensions**
+   - Add tests for token refresh mechanism
+   - Test token validation and scope checking
+   - Test permission-based access control
 
-4. **Database Integration**:
-   - Created database migration for credential tag support
-   - Updated device models to support tag-based credentials
-   - Modified existing device operations to work with the credential store
+### Phase 6: Integration Test Suite (4 days)
+1. **API Endpoint Testing**
+   - Create comprehensive tests for all key rotation API endpoints
+   - Add tests for credential API endpoints
+   - Test scheduled job integration
+   - Implement admin settings API endpoint tests
 
-5. **Testing Infrastructure**:
-   - Added unit tests for the credential store module
-   - Created integration tests for tag-based authentication
-   - Implemented mocking for secure credential testing
+2. **End-to-End Testing**
+   - Create tests for key rotation workflow
+   - Test credential usage with different keys
+   - Test key backup and restore operations
+   - Test settings changes and their effects on system behavior
 
-## Next Steps
+3. **Admin UI Testing**
+   - Test settings form validation
+   - Verify settings persistence across sessions
+   - Test admin-only access restrictions
+   - Verify settings affect system as expected
 
-With Phases 1-4 now complete, the implementation is ready for review and approval to proceed with Phase 6 (Security and Logging Enhancements), which will make the credential store functionality accessible through the web interface.
+4. **Performance and Load Testing**
+   - Test re-encryption performance with large credential sets
+   - Add load testing for concurrent operations
+   - Test key rotation under load
+   - Verify system performance with different settings configurations
 
-## Additional Enhancements (Future Phases)
+### Phase 7: Test Automation and CI Integration (2 days)
+1. **Testing Pipeline Setup**
+   - Create automated test workflow
+   - Update build scripts to run all tests
+   - Add test coverage reporting
 
-### User Management UI (4-5 days)
-- Create Vue.js components for user management interface
-- Implement CRUD operations for user accounts:
-  - Create: User registration form with role selection
-  - Read: User listing with search and filtering
-  - Update: User profile editing and password management
-  - Delete: User account deactivation/removal
-- Add role-based access control management
-- Implement password policy enforcement
-- Create session management and activity tracking
-- Add user audit logging
+2. **Documentation Updates**
+   - Update test documentation
+   - Add examples of test execution
+   - Document test environment setup
+   - Create admin settings documentation
 
-### Application Settings Management UI (3-4 days)
-- Create centralized settings management interface
-- Migrate appropriate configuration from files to database:
-  - System-wide settings
-  - User preferences
-  - Connection defaults
-  - Security policies
-- Implement settings categorization (General, Security, Connections, etc.)
-- Add validation for setting values
-- Create export/import functionality for settings
-- Implement audit logging for settings changes
+## Detailed Implementation Tasks
 
-### Configuration Modernization (4-5 days)
-- Analyze and categorize configuration settings:
-  - Environment-specific settings (remain in files)
-  - Application settings (move to database/UI)
-  - User preferences (move to database/UI)
-- Create database schema for settings storage
-- Implement API endpoints for settings management
-- Add dynamic configuration loading with fallback to files
-- Create configuration change notification system
-- Implement configuration versioning and rollback capability
-- Add configuration templating for different environments
+### Admin Settings Implementation (Priority: High) - COMPLETED
+- [x] Create `AdminSetting` model in database
+- [x] Implement `admin_settings.py` router with admin-only endpoints
+- [x] Create settings schema with validation
+- [x] Design and implement settings UI components
+- [x] Add settings-related event logging
+- [x] Implement settings categorization
+- [x] Create initialization for default settings
 
-These enhancements will modernize the application interface, improve user experience, and provide better management of the application configuration. The UI-based approach will make the system more accessible to administrators without requiring direct file access or container modifications. 
+### Key Rotation API Endpoints (Priority: High) - COMPLETED
+- [x] Create `KeyRotationRequest` and `KeyRotationResponse` schemas
+- [x] Add `/api/keys` endpoints for key management
+- [x] Implement key backup/restore endpoints
+- [x] Add proper scope validation for all endpoints
+
+### Test Implementation Details
+- [ ] Convert `scripts/test_key_rotation.py` to proper PyTest format
+- [ ] Add integration tests for key rotation API in `tests/integration/`
+- [ ] Create UI tests for key management interface
+- [ ] Add tests for admin settings API and UI
+- [ ] Ensure all new endpoints have minimum 90% test coverage
+
+## Dependencies and Requirements
+- Current key rotation module in `netraven/core/key_rotation.py`
+- Existing credential store implementation
+- Authentication system with scope validation
+- Current testing infrastructure
+- Admin-level permissions for settings management
+
+## Timeline
+- **Part 1: Complete Features** - 10 days (5 days COMPLETED, 5 days remaining)
+- **Part 2: Testing Enhancement** - 9 days
+- **Total Duration** - 19 days (~4 weeks)
+
+## Deliverables
+1. Complete API endpoints for key rotation - ✓ COMPLETED
+2. Enhanced credential store with better key integration - ✓ COMPLETED
+3. UI components for key management - ✓ COMPLETED
+4. Admin settings management system - ✓ COMPLETED
+5. Comprehensive test suite covering all functionality
+6. Updated documentation for key rotation, security features, and admin settings
+
+## Progress Tracking
+
+### Phase 1: Key Rotation API & Integration
+- Status: COMPLETED
+- Started: March 15, 2025
+- Completed: March 18, 2025
+- Notes: Successfully implemented all key rotation API endpoints and UI components
+
+### Phase 2: Credential-Key Integration Improvements
+- Status: COMPLETED
+- Started: March 19, 2025
+- Completed: March 21, 2025
+- Notes: Enhanced credential store with batch processing, progress tracking, and analytics
+
+### Phase 3: Admin Settings Management
+- Status: COMPLETED
+- Started: March 22, 2025
+- Completed: March 25, 2025
+- Notes: Implemented admin settings system with categories, API endpoints, and UI components 
