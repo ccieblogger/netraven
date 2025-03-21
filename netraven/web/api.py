@@ -8,7 +8,10 @@ various sub-routers from other modules.
 from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordBearer
 
-from netraven.web.routers import auth, users, devices, tags, tag_rules, job_logs, scheduled_jobs, gateway
+from netraven.web.routers import (
+    auth, users, devices, tags, tag_rules, job_logs, scheduled_jobs, 
+    gateway, credentials, audit_logs
+)
 from netraven.web.routers.backups import router as backups_router, test_router as backups_test_router
 
 # Setup OAuth2
@@ -67,4 +70,14 @@ api_router.include_router(
     gateway.router,
     prefix="/gateway",
     tags=["gateway"],
+)
+api_router.include_router(
+    credentials.router,
+    prefix="/credentials",
+    tags=["credentials"],
+)
+api_router.include_router(
+    audit_logs.router,
+    prefix="/audit-logs",
+    tags=["audit_logs"],
 ) 

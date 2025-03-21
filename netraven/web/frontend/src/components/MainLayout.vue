@@ -37,6 +37,13 @@
             <router-link to="/tag-rules" class="hover:text-blue-200 transition">Tag Rules</router-link>
             <router-link to="/job-logs" class="hover:text-blue-200 transition">Job Logs</router-link>
             <router-link to="/scheduled-jobs" class="hover:text-blue-200 transition">Scheduled Jobs</router-link>
+            
+            <!-- Admin section -->
+            <template v-if="isAdmin">
+              <router-link to="/keys" class="hover:text-blue-200 transition">Key Management</router-link>
+              <router-link to="/admin-settings" class="hover:text-blue-200 transition">Admin Settings</router-link>
+              <router-link to="/audit-logs" class="hover:text-blue-200 transition">Audit Logs</router-link>
+            </template>
           </div>
           
           <div class="relative">
@@ -74,6 +81,13 @@
         <router-link to="/tag-rules" class="hover:text-blue-200 transition">Rules</router-link>
         <router-link to="/job-logs" class="hover:text-blue-200 transition">Logs</router-link>
         <router-link to="/scheduled-jobs" class="hover:text-blue-200 transition">Jobs</router-link>
+      </div>
+      
+      <!-- Admin Mobile links -->
+      <div v-if="isAdmin" class="container mx-auto px-4 py-2 flex justify-between bg-purple-700">
+        <router-link to="/keys" class="hover:text-purple-200 transition">Keys</router-link>
+        <router-link to="/admin-settings" class="hover:text-purple-200 transition">Settings</router-link>
+        <router-link to="/audit-logs" class="hover:text-purple-200 transition">Audit</router-link>
       </div>
     </div>
     
@@ -116,6 +130,7 @@ export default {
     const previousRoute = ref(null)
     
     const isAuthenticated = computed(() => authStore.isAuthenticated)
+    const isAdmin = computed(() => authStore.hasRole('admin'))
     
     const username = computed(() => {
       try {
@@ -268,6 +283,7 @@ export default {
     
     return {
       isAuthenticated,
+      isAdmin,
       username,
       showUserMenu,
       logout,

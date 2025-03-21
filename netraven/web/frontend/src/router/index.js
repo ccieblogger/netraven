@@ -19,6 +19,8 @@ import CredentialList from '../views/CredentialList.vue'
 import CredentialDashboard from '../views/CredentialDashboard.vue'
 import CredentialAnalytics from '../views/CredentialAnalytics.vue'
 import KeyManagement from '@/views/KeyManagement.vue'
+import AdminSettings from '@/views/AdminSettings.vue'
+import AuditLogs from '@/views/AuditLogs.vue'
 
 // Define routes
 const routes = [
@@ -125,6 +127,24 @@ const routes = [
     path: '/keys',
     name: 'KeyManagement',
     component: KeyManagement,
+    meta: {
+      requiresAuth: true,
+      adminOnly: true
+    }
+  },
+  {
+    path: '/admin-settings',
+    name: 'AdminSettings',
+    component: AdminSettings,
+    meta: {
+      requiresAuth: true,
+      adminOnly: true
+    }
+  },
+  {
+    path: '/audit-logs',
+    name: 'AuditLogs',
+    component: AuditLogs,
     meta: {
       requiresAuth: true,
       adminOnly: true
