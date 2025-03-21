@@ -25,9 +25,10 @@
 </template>
 
 <script>
-import { ref, onErrorCaptured, onMounted } from 'vue'
+import { ref, onErrorCaptured, onMounted, watch } from 'vue'
 import { useAuthStore } from './store/auth'
 import { useRouter } from 'vue-router'
+import { useToast } from 'vue-toastification'
 
 export default {
   name: 'App',
@@ -37,6 +38,7 @@ export default {
     const isInitializing = ref(true)
     const authStore = useAuthStore()
     const router = useRouter()
+    const toast = useToast()
     
     // Simple error handler
     onErrorCaptured((err, instance, info) => {
@@ -55,48 +57,50 @@ export default {
       return false; // Don't propagate app-level errors
     })
     
-    // Enhanced initialization with token validation
-    onMounted(async () => {
-      console.log('App: Component mounted, initializing...')
-      
-      // Check token validity on startup
-      try {
-        if (localStorage.getItem('access_token')) {
-          console.log('App: Found token in localStorage, validating...')
+    // Initialize auth state on app mount
+    onMounted(() => {
+      // If we have a token in localStorage, validate and setup refresh
+      if (localStorage.getItem('access_token')) {
+        // Set token in store
+        authStore.token = localStorage.getItem('access_token')
+        
+        // Validate token and setup refresh mechanism
+        const isValid = authStore.validateToken()
+        
+        if (isValid) {
+          console.log('Token validated, setting up refresh mechanism')
+          authStore.setupTokenRefresh()
           
-          // Validate token and handle invalid case
-          if (!authStore.validateToken()) {
-            console.log('App: Token validation failed on startup')
-            
-            // If not on login page, redirect to login
-            if (router.currentRoute.value.path !== '/login') {
-              console.log('App: Redirecting to login due to invalid token')
-              router.push('/login')
-            }
-          } else {
-            console.log('App: Token validation successful')
-            
-            // If token is valid, ensure we have user data
-            if (!authStore.hasUserData) {
-              try {
-                console.log('App: Fetching user data on startup')
-                await authStore.fetchCurrentUser()
-              } catch (err) {
-                console.error('App: Failed to fetch user data on startup:', err)
-                // Continue even if user fetch fails
-              }
-            }
-          }
+          // Try to fetch user data with the token
+          authStore.fetchCurrentUser().catch(error => {
+            console.error('Failed to fetch user data on app start:', error)
+          })
+        } else {
+          console.warn('Invalid token found in localStorage, clearing')
+          authStore.clearAuth()
+          toast.warning('Your session has expired. Please log in again.')
         }
-      } catch (e) {
-        console.error('App: Error during token validation:', e)
-        // Continue application initialization even if token validation fails
       }
-      
-      // Brief delay to ensure CSS and resources are loaded
-      setTimeout(() => {
-        isInitializing.value = false
-      }, 200)
+    })
+    
+    // Watch for token changes to save to localStorage
+    watch(() => authStore.token, (newToken) => {
+      if (newToken) {
+        localStorage.setItem('access_token', newToken)
+      } else {
+        localStorage.removeItem('access_token')
+      }
+    })
+    
+    // Watch for auth errors to display toast
+    watch(() => authStore.error, (newError) => {
+      if (newError) {
+        toast.error(newError)
+        // Clear error after showing toast
+        setTimeout(() => {
+          authStore.clearError()
+        }, 100)
+      }
     })
     
     // Reload the application

@@ -3,6 +3,10 @@ import axios from 'axios'
 // Configure axios defaults
 axios.defaults.withCredentials = false;
 
+// Add token refresh parameters
+const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes in milliseconds
+const REFRESH_IN_PROGRESS = { status: false, promise: null };
+
 // Safely access environment variables with fallbacks
 const getEnvVariable = (key, defaultValue) => {
   // Check if import.meta.env exists (in Vite) and contains the key
@@ -35,10 +39,53 @@ axios.interceptors.response.use(
     // Pass through successful responses
     return response;
   },
-  error => {
+  async error => {
     // Handle authentication errors
     if (error.response && error.response.status === 401) {
       console.warn('Authentication error intercepted:', error.response.data);
+      
+      const originalRequest = error.config;
+      
+      // Only try to refresh if it's an expired token and we're not already trying to refresh
+      const isTokenExpired = error.response.data.detail === 'Token expired' || 
+                             error.response.data.detail?.includes('Token has expired');
+      
+      // Don't retry if we've already tried to refresh for this request or if it's already the refresh endpoint
+      const isRefreshEndpoint = originalRequest.url.includes('/api/auth/refresh');
+      const hasBeenRetried = originalRequest._retry;
+
+      if (isTokenExpired && !isRefreshEndpoint && !hasBeenRetried) {
+        console.log('Token appears to be expired, attempting refresh');
+        
+        // Mark this request as retried to prevent infinite loops
+        originalRequest._retry = true;
+        
+        try {
+          // Try to refresh the token
+          const apiClient = axios.API_CLIENT_INSTANCE;
+          const newToken = await apiClient.refreshToken();
+          
+          if (newToken) {
+            console.log('Token refreshed successfully, retrying original request');
+            
+            // Update the request with the new token
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            
+            // Retry the original request with the new token
+            return axios(originalRequest);
+          }
+        } catch (refreshError) {
+          console.error('Failed to refresh token:', refreshError);
+          // Let the error pass through to be handled by the components
+        }
+      } else if (isTokenExpired) {
+        console.log('Token expired but cannot refresh: ' + 
+                   (isRefreshEndpoint ? 'is refresh endpoint' : '') + 
+                   (hasBeenRetried ? 'already retried' : ''));
+      }
+      
+      // If we're here, either it's not an expired token issue, or refresh failed,
+      // or it's the refresh endpoint itself that's failing
       
       // Only clear token if it's explicitly identified as invalid
       // We don't want to clear tokens for permission-based 401s
@@ -87,11 +134,21 @@ const apiClient = {
       
       if (payload.exp) {
         const now = Math.floor(Date.now() / 1000);
+        const expiresIn = payload.exp - now;
         
+        // If token is expired, clear it
         if (now >= payload.exp) {
           console.warn('Token has expired, clearing from localStorage');
           localStorage.removeItem('access_token');
           return {};
+        }
+        
+        // If token is close to expiration, trigger a refresh in the background
+        if (expiresIn < TOKEN_REFRESH_THRESHOLD / 1000 && !REFRESH_IN_PROGRESS.status) {
+          console.log(`Token expiring soon (${expiresIn}s), triggering background refresh`);
+          this.refreshToken().catch(err => {
+            console.error('Background token refresh failed:', err);
+          });
         }
         
         // Log token scopes for debugging
@@ -123,53 +180,163 @@ const apiClient = {
     return token ? { Authorization: `Bearer ${token}` } : {};
   },
 
+  // Token refresh method
+  async refreshToken() {
+    // If a refresh is already in progress, wait for it to complete rather than making a duplicate request
+    if (REFRESH_IN_PROGRESS.status && REFRESH_IN_PROGRESS.promise) {
+      console.log('Token refresh already in progress, waiting for it to complete');
+      try {
+        return await REFRESH_IN_PROGRESS.promise;
+      } catch (err) {
+        console.error('Waiting for in-progress token refresh failed:', err);
+        throw err;
+      }
+    }
+    
+    // Get current token
+    const currentToken = localStorage.getItem('access_token');
+    if (!currentToken) {
+      console.error('Cannot refresh token: No token available');
+      return null;
+    }
+    
+    // Set refresh in progress flag
+    REFRESH_IN_PROGRESS.status = true;
+    
+    // Create a promise for the refresh operation
+    REFRESH_IN_PROGRESS.promise = (async () => {
+      try {
+        console.log('Starting token refresh');
+        
+        // Call the token refresh API
+        const response = await axios.post(`${browserApiUrl}/api/auth/refresh`, {}, {
+          headers: {
+            'Authorization': `Bearer ${currentToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+        
+        // Store the new token
+        const newToken = response.data.access_token;
+        
+        if (newToken) {
+          // Store the new token
+          localStorage.setItem('access_token', newToken);
+          console.log('Token refreshed successfully');
+          
+          // Decode and log new expiration time
+          try {
+            const payload = JSON.parse(atob(newToken.split('.')[1]));
+            if (payload.exp) {
+              const expiresAt = new Date(payload.exp * 1000);
+              console.log(`New token expires at: ${expiresAt.toISOString()}`);
+            }
+          } catch (e) {
+            console.error('Error parsing new token payload:', e);
+          }
+          
+          return newToken;
+        } else {
+          console.error('Refresh token API returned success but no token');
+          return null;
+        }
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+        
+        // If the refresh endpoint itself returns 401, the refresh token is probably invalid
+        if (error.response && error.response.status === 401) {
+          console.warn('Refresh token is invalid, clearing token');
+          localStorage.removeItem('access_token');
+        } else if (error.response && error.response.status === 400 && 
+                  error.response.data.detail === 'Token is not near expiration yet') {
+          // This is a normal case - token not close enough to expiration to refresh
+          console.log('Token not near expiration yet, continuing with current token');
+          return currentToken;
+        }
+        
+        throw error;
+      } finally {
+        // Reset refresh in progress flag
+        REFRESH_IN_PROGRESS.status = false;
+        REFRESH_IN_PROGRESS.promise = null;
+      }
+    })();
+    
+    // Return the result of the refresh operation
+    return REFRESH_IN_PROGRESS.promise;
+  },
+
   // Authentication methods
   async login(username, password) {
     try {
-      // Send JSON data instead of form data for Pydantic 2.x compatibility
-      const response = await axios.post(`${browserApiUrl}/api/auth/token`, {
-        username: username,
-        password: password
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        withCredentials: false
-      });
+      const response = await axios.post(
+        `${browserApiUrl}/auth/token`, 
+        new URLSearchParams({
+          username,
+          password,
+          grant_type: 'password'
+        }), 
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }
+      );
       
-      // Store token in localStorage
-      localStorage.setItem('access_token', response.data.access_token);
-      
-      return {
-        success: true,
-        data: response.data
-      };
-    } catch (error) {
-      console.error('Login error:', error);
-      
-      // Handle different error scenarios
-      if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
+      if (response.data && response.data.access_token) {
+        // Store token in localStorage
+        localStorage.setItem('access_token', response.data.access_token);
+        
+        // Set authorization header for future requests
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
+        
+        // Parse token to get expiration time
+        try {
+          const tokenParts = response.data.access_token.split('.');
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(atob(tokenParts[1]));
+            if (payload.exp) {
+              console.log(`Token will expire at: ${new Date(payload.exp * 1000).toISOString()}`);
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing token payload:', e);
+        }
+        
         return {
-          success: false,
-          status: error.response.status,
-          message: error.response.data.detail || 'Authentication failed'
-        };
-      } else if (error.request) {
-        // The request was made but no response was received
-        return {
-          success: false,
-          message: 'No response from server. Please check your connection.'
+          success: true,
+          data: response.data,
+          message: 'Login successful'
         };
       } else {
-        // Something happened in setting up the request that triggered an Error
+        console.error('Login response missing access_token:', response.data);
         return {
           success: false,
-          message: 'Error setting up request: ' + error.message
+          message: 'Invalid response from server'
         };
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      let errorMessage = 'Login failed';
+      
+      if (error.response) {
+        // Server responded with error
+        if (error.response.status === 401) {
+          errorMessage = 'Invalid username or password';
+        } else if (error.response.data && error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (error.response.data && error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+      } else if (error.request) {
+        // Request made but no response
+        errorMessage = 'Server not responding. Please try again later.';
+      }
+      
+      return {
+        success: false,
+        message: errorMessage,
+        error: error
+      };
     }
   },
 
@@ -192,8 +359,25 @@ const apiClient = {
   },
 
   logout() {
+    // Remove token from localStorage
     localStorage.removeItem('access_token');
-    return true;
+    
+    // Remove authorization header
+    delete axios.defaults.headers.common['Authorization'];
+    
+    try {
+      // Attempt to revoke the token on the server (best effort)
+      axios.post(`${browserApiUrl}/auth/revoke`)
+        .catch(err => console.warn('Error revoking token during logout (continuing):', err));
+    } catch (e) {
+      console.warn('Error during token revocation (continuing):', e);
+    }
+    
+    // Redirect is handled by the caller
+    return {
+      success: true,
+      message: 'Logged out successfully'
+    };
   },
 
   // Device methods

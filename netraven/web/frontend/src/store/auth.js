@@ -1,19 +1,27 @@
 import { defineStore } from 'pinia'
 import apiClient from '../api/api'
 
+// Constants for token handling
+const TOKEN_REFRESH_BUFFER = 5 * 60; // 5 minutes in seconds before expiration to trigger refresh
+const TOKEN_CHECK_INTERVAL = 30 * 1000; // Check token validity every 30 seconds
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
     token: localStorage.getItem('access_token') || null,
     tokenScopes: [],
     loading: false,
-    error: null
+    error: null,
+    refreshInterval: null,
+    tokenExpiration: null
   }),
   
   getters: {
     isAuthenticated: (state) => !!state.token,
     hasUserData: (state) => !!state.user,
     username: (state) => state.user?.username || 'User',
+    
+    // Check if token is valid and not expired
     isTokenValid: (state) => {
       if (!state.token) return false
       
@@ -36,6 +44,28 @@ export const useAuthStore = defineStore('auth', {
         console.error('Error validating token:', e)
         return false
       }
+    },
+    
+    // Calculate seconds until token expiration
+    secondsUntilExpiration: (state) => {
+      if (!state.token) return 0
+      
+      try {
+        const payload = JSON.parse(atob(state.token.split('.')[1]))
+        
+        if (!payload.exp) return Infinity
+        
+        const now = Math.floor(Date.now() / 1000)
+        return Math.max(0, payload.exp - now)
+      } catch (e) {
+        console.error('Error calculating token expiration:', e)
+        return 0
+      }
+    },
+    
+    // Check if the token needs to be refreshed soon
+    shouldRefreshToken: (state) => {
+      return state.isTokenValid && state.secondsUntilExpiration < TOKEN_REFRESH_BUFFER
     },
     
     hasPermission: (state) => (permission) => {
@@ -102,6 +132,101 @@ export const useAuthStore = defineStore('auth', {
   },
   
   actions: {
+    // Setup token refresh mechanism
+    setupTokenRefresh() {
+      // Clear any existing interval
+      if (this.refreshInterval) {
+        clearInterval(this.refreshInterval)
+      }
+      
+      // Only setup refresh interval if we have a token
+      if (this.token) {
+        console.log('Setting up token refresh mechanism')
+        
+        // Check token validity and expiration immediately
+        this.checkTokenExpiration()
+        
+        // Set up interval to check token expiration
+        this.refreshInterval = setInterval(() => {
+          this.checkTokenExpiration()
+        }, TOKEN_CHECK_INTERVAL)
+      }
+    },
+    
+    // Check if token needs refreshing and refresh if needed
+    async checkTokenExpiration() {
+      // Skip if loading or no token
+      if (this.loading || !this.token) return
+      
+      if (this.isTokenValid) {
+        try {
+          const secondsLeft = this.secondsUntilExpiration
+          
+          // If token is close to expiration, refresh it
+          if (secondsLeft < TOKEN_REFRESH_BUFFER) {
+            console.log(`Token expiring soon (${secondsLeft}s left), refreshing...`)
+            await this.refreshToken()
+          } else {
+            // Log remaining time for debugging (only log occasionally to avoid spam)
+            if (secondsLeft % 300 < 30) { // Log roughly every 5 minutes
+              console.log(`Token still valid for ${Math.floor(secondsLeft / 60)} minutes ${secondsLeft % 60} seconds`)
+            }
+          }
+        } catch (e) {
+          console.error('Error checking token expiration:', e)
+        }
+      } else if (this.token) {
+        console.warn('Token is invalid or expired, clearing token')
+        this.clearAuth()
+      }
+    },
+    
+    // Refresh the current token
+    async refreshToken() {
+      this.loading = true
+      this.error = null
+      
+      try {
+        // Call API client refresh token method
+        const newToken = await apiClient.refreshToken()
+        
+        if (newToken) {
+          // Update store with new token
+          this.token = newToken
+          
+          // Extract token scopes and expiration
+          try {
+            const payload = JSON.parse(atob(newToken.split('.')[1]))
+            this.tokenScopes = payload.scope || []
+            
+            if (payload.exp) {
+              this.tokenExpiration = new Date(payload.exp * 1000)
+              console.log(`Token refreshed, new expiration: ${this.tokenExpiration.toISOString()}`)
+            }
+          } catch (e) {
+            console.error('Error extracting token data after refresh:', e)
+          }
+          
+          return true
+        } else {
+          console.warn('Token refresh returned no token')
+          return false
+        }
+      } catch (e) {
+        console.error('Token refresh failed:', e)
+        this.error = 'Failed to refresh authentication'
+        
+        // If the error is critical (invalid token), clear auth
+        if (e.isAuthError) {
+          this.clearAuth()
+        }
+        
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+    
     async login(username, password) {
       this.loading = true
       this.error = null
@@ -115,11 +240,20 @@ export const useAuthStore = defineStore('auth', {
           try {
             const payload = JSON.parse(atob(this.token.split('.')[1]))
             this.tokenScopes = payload.scope || []
+            
+            // Store token expiration
+            if (payload.exp) {
+              this.tokenExpiration = new Date(payload.exp * 1000)
+            }
+            
             console.log('Extracted token scopes:', this.tokenScopes)
           } catch (e) {
             console.error('Error extracting token scopes:', e)
             this.tokenScopes = []
           }
+          
+          // Setup token refresh mechanism
+          this.setupTokenRefresh()
           
           try {
             await this.fetchCurrentUser()
@@ -155,6 +289,11 @@ export const useAuthStore = defineStore('auth', {
       try {
         const payload = JSON.parse(atob(this.token.split('.')[1]))
         this.tokenScopes = payload.scope || []
+        
+        // Update token expiration
+        if (payload.exp) {
+          this.tokenExpiration = new Date(payload.exp * 1000)
+        }
       } catch (e) {
         console.error('Error extracting token scopes during validation:', e)
         this.tokenScopes = []
@@ -184,7 +323,14 @@ export const useAuthStore = defineStore('auth', {
       this.user = null
       this.token = null
       this.tokenScopes = []
+      this.tokenExpiration = null
       localStorage.removeItem('access_token')
+      
+      // Clear token refresh interval
+      if (this.refreshInterval) {
+        clearInterval(this.refreshInterval)
+        this.refreshInterval = null
+      }
     },
     
     async fetchCurrentUser() {
