@@ -39,7 +39,7 @@ logger = get_logger("netraven.web.routers.tags")
 # Create router
 router = APIRouter(prefix="", tags=["tags"])
 
-@router.get("", response_model=List[Tag])
+@router.get("/", response_model=List[Tag])
 async def list_tags(
     current_principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
@@ -76,7 +76,7 @@ async def list_tags(
             detail=f"Error listing tags: {str(e)}"
         )
 
-@router.post("", response_model=Tag, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=Tag, status_code=status.HTTP_201_CREATED)
 async def create_tag_endpoint(
     tag: TagCreate,
     current_principal: UserPrincipal = Depends(get_current_principal),

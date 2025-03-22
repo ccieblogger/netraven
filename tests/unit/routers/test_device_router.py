@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from netraven.web.routers.devices import router as device_router
 from netraven.web.models.device import Device, DeviceCreate, DeviceUpdate
 from netraven.core.models import UserPrincipal
-from netraven.web.db import get_db
+from netraven.web.database import get_db
 from netraven.web.auth import get_current_principal, get_optional_principal
 
 

@@ -10,7 +10,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from netraven.web.routers import (
     auth, users, devices, tags, tag_rules, job_logs, scheduled_jobs, 
-    gateway, credentials, audit_logs
+    gateway, credentials, audit_logs, keys
 )
 from netraven.web.routers.backups import router as backups_router, test_router as backups_test_router
 
@@ -80,4 +80,9 @@ api_router.include_router(
     audit_logs.router,
     prefix="/audit-logs",
     tags=["audit_logs"],
+)
+api_router.include_router(
+    keys.router,
+    prefix="/keys",
+    tags=["keys"],
 ) 

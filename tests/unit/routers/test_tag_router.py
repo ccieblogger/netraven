@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from netraven.web.routers.tags import router as tag_router
 from netraven.web.models.tag import Tag, TagCreate, TagUpdate
 from netraven.core.models import UserPrincipal
-from netraven.web.db import get_db
+from netraven.web.database import get_db
 from netraven.web.auth import get_current_principal, get_optional_principal
 
 

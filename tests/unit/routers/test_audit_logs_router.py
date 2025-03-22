@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from netraven.web.routers.audit_logs import router as audit_logs_router
 from netraven.web.models.audit_log import AuditLog, AuditLogCreate
 from netraven.core.models import UserPrincipal
-from netraven.web.db import get_db
+from netraven.web.database import get_db
 from netraven.web.auth import get_current_principal, get_optional_principal
 
 

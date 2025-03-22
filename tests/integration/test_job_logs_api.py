@@ -6,7 +6,7 @@ import datetime
 import uuid
 
 from netraven.web.app import app
-from netraven.web.db import get_db
+from netraven.web.database import get_db
 from netraven.web.models.user import User
 from netraven.web.models.job_log import JobLog
 from netraven.web.models.scheduled_job import ScheduledJob

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 import json
 
 from netraven.web.app import app
-from netraven.web.db import get_db
+from netraven.web.database import get_db
 from netraven.web.models.user import User
 from netraven.web.schemas.user import UserCreate, NotificationPreferences, UpdateNotificationPreferences
 from netraven.web.crud.user import create_user, get_user_by_username

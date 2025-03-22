@@ -4,13 +4,16 @@ Database initialization utilities for tests.
 This module provides functions to initialize and reset the database for testing.
 """
 import os
+import tempfile
 from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import NullPool
+from sqlalchemy_utils import database_exists, create_database
 
-from netraven.web.db import Base, get_db
-from netraven.web.models import user, device, job_log, scheduled_job, tag, tag_rule
+from netraven.web.database import Base, get_db
+from netraven.web.models import user, device, job_log, scheduled_job, tag
+from netraven.web.models.tag import TagRule
 
 # Set test database URL - use in-memory SQLite for tests
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite:///./test.db")
