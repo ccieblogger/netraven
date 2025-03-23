@@ -1,0 +1,35 @@
+# Key Rotation Configuration
+
+security:
+  key_rotation:
+    # Directory where keys are stored
+    key_path: "data/keys"
+    
+    # Interval in days between key rotations
+    rotation_interval_days: 90
+    
+    # Whether to automatically rotate keys
+    automatic_rotation: true
+    
+    # Backup settings
+    backup:
+      # Directory where backups are stored
+      backup_path: "data/key_backups"
+      
+      # Whether to automatically create backups when rotating keys
+      auto_backup: true
+      
+      # Number of backups to keep
+      max_backups: 5
+
+# Scheduled task configuration
+tasks:
+  key_rotation:
+    # Minimum age of keys in days before rotation
+    min_age_days: 85
+    
+    # Schedule settings
+    schedule:
+      type: "weekly"  # daily, weekly, monthly
+      day: "monday"   # Only for weekly and monthly schedules
+      time: "01:00"   # HH:MM format 

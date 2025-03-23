@@ -16,6 +16,8 @@ from netraven.core.credential_store import get_credential_store, CredentialTag, 
 from netraven.web.models.tag import Tag
 from netraven.web.schemas.credential import CredentialCreate, CredentialUpdate, CredentialTagAssociation
 from netraven.web.crud.device import get_device
+# Import models for credential_stats function
+from netraven.core import credential_store as models
 
 # Create logger
 from netraven.core.logging import get_logger
@@ -708,178 +710,95 @@ async def get_credential_stats(db: Session) -> Dict[str, Any]:
         Dictionary with various credential usage statistics
     """
     try:
-        # Get total counts
-        total_credentials = db.query(models.Credential).count()
+        credential_store = get_credential_store()
+        cs_db = credential_store.get_db()
         
-        # Query to get sum of success and failure counts
-        counts = db.query(
-            func.sum(models.Credential.success_count).label("total_success"),
-            func.sum(models.Credential.failure_count).label("total_failure")
-        ).first()
-        
-        total_success = counts.total_success or 0
-        total_failure = counts.total_failure or 0
-        total_attempts = total_success + total_failure
-        
-        # Calculate success rate
-        success_rate = 0.0
-        if total_attempts > 0:
-            success_rate = (total_success / total_attempts) * 100
+        try:
+            # Get total counts
+            total_credentials = cs_db.query(models.Credential).count()
             
-        # Get most successful credentials (at least 5 attempts and success rate > 0)
-        most_successful = []
-        most_successful_query = db.query(models.Credential).filter(
-            (models.Credential.success_count + models.Credential.failure_count) >= 5
-        ).order_by(
-            (models.Credential.success_count / (models.Credential.success_count + models.Credential.failure_count)).desc()
-        ).limit(5)
-        
-        for cred in most_successful_query:
-            total = cred.success_count + cred.failure_count
-            if total > 0:
-                success_rate = (cred.success_count / total) * 100
-                most_successful.append({
-                    "id": cred.id,
-                    "name": cred.name,
-                    "username": cred.username,
-                    "success_count": cred.success_count,
-                    "failure_count": cred.failure_count,
-                    "success_rate": success_rate
-                })
-        
-        # Get least successful credentials (at least 5 attempts and success rate < 100)
-        least_successful = []
-        least_successful_query = db.query(models.Credential).filter(
-            (models.Credential.success_count + models.Credential.failure_count) >= 5,
-            models.Credential.failure_count > 0
-        ).order_by(
-            (models.Credential.success_count / (models.Credential.success_count + models.Credential.failure_count)).asc()
-        ).limit(5)
-        
-        for cred in least_successful_query:
-            total = cred.success_count + cred.failure_count
-            if total > 0:
-                success_rate = (cred.success_count / total) * 100
-                least_successful.append({
-                    "id": cred.id,
-                    "name": cred.name,
-                    "username": cred.username,
-                    "success_count": cred.success_count,
-                    "failure_count": cred.failure_count,
-                    "success_rate": success_rate
-                })
-        
-        # Get device type breakdown from job logs
-        device_type_breakdown = []
-        # Use a raw SQL query to get this complex aggregation
-        device_query = db.execute("""
-            SELECT device_type, 
-                   COUNT(*) as total_attempts,
-                   SUM(CASE WHEN success = true THEN 1 ELSE 0 END) as successful,
-                   SUM(CASE WHEN success = false THEN 1 ELSE 0 END) as failed
-            FROM credential_usage_log
-            WHERE device_type IS NOT NULL
-            GROUP BY device_type
-            ORDER BY total_attempts DESC
-            LIMIT 10
-        """)
-        
-        for row in device_query:
-            success_rate = 0
-            if row.total_attempts > 0:
-                success_rate = (row.successful / row.total_attempts) * 100
+            # Query to get sum of success and failure counts
+            counts = cs_db.query(
+                func.sum(models.Credential.success_count).label("total_success"),
+                func.sum(models.Credential.failure_count).label("total_failure")
+            ).first()
+            
+            total_success = counts.total_success or 0
+            total_failure = counts.total_failure or 0
+            total_attempts = total_success + total_failure
+            
+            # Calculate success rate
+            success_rate = 0.0
+            if total_attempts > 0:
+                success_rate = (total_success / total_attempts) * 100
                 
-            device_type_breakdown.append({
-                "device_type": row.device_type,
-                "total_attempts": row.total_attempts,
-                "successful": row.successful,
-                "failed": row.failed,
-                "success_rate": success_rate
-            })
-        
-        # Get recent failures
-        recent_failures = []
-        failure_query = db.query(models.CredentialUsageLog).filter(
-            models.CredentialUsageLog.success == False
-        ).order_by(
-            models.CredentialUsageLog.timestamp.desc()
-        ).limit(5)
-        
-        for log in failure_query:
-            credential = db.query(models.Credential).filter(
-                models.Credential.id == log.credential_id
-            ).first()
+            # Get most successful credentials (at least 5 attempts and success rate > 0)
+            most_successful = []
+            most_successful_query = cs_db.query(models.Credential).filter(
+                (models.Credential.success_count + models.Credential.failure_count) >= 5
+            ).order_by(
+                (models.Credential.success_count / (models.Credential.success_count + models.Credential.failure_count)).desc()
+            ).limit(5)
             
-            if credential:
-                recent_failures.append({
-                    "id": log.id,
-                    "credential_id": log.credential_id,
-                    "credential_name": credential.name,
-                    "device_type": log.device_type,
-                    "hostname": log.hostname,
-                    "timestamp": log.timestamp,
-                    "error_message": log.error_message
-                })
-        
-        # Get recent successes
-        recent_successes = []
-        success_query = db.query(models.CredentialUsageLog).filter(
-            models.CredentialUsageLog.success == True
-        ).order_by(
-            models.CredentialUsageLog.timestamp.desc()
-        ).limit(5)
-        
-        for log in success_query:
-            credential = db.query(models.Credential).filter(
-                models.Credential.id == log.credential_id
-            ).first()
+            for cred in most_successful_query:
+                total = cred.success_count + cred.failure_count
+                if total > 0:
+                    success_rate = (cred.success_count / total) * 100
+                    most_successful.append({
+                        "id": cred.id,
+                        "name": cred.name,
+                        "username": cred.username,
+                        "success_count": cred.success_count,
+                        "failure_count": cred.failure_count,
+                        "success_rate": success_rate
+                    })
             
-            if credential:
-                recent_successes.append({
-                    "id": log.id,
-                    "credential_id": log.credential_id,
-                    "credential_name": credential.name,
-                    "device_type": log.device_type,
-                    "hostname": log.hostname,
-                    "timestamp": log.timestamp,
-                    "connection_time": log.connection_time
-                })
-        
-        # Get usage over time (last 30 days)
-        usage_over_time = {
-            "dates": [],
-            "success": [],
-            "failure": []
-        }
-        
-        # Use a raw SQL query to aggregate by day
-        usage_query = db.execute("""
-            SELECT DATE(timestamp) as date,
-                   SUM(CASE WHEN success = true THEN 1 ELSE 0 END) as successful,
-                   SUM(CASE WHEN success = false THEN 1 ELSE 0 END) as failed
-            FROM credential_usage_log
-            WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
-            GROUP BY DATE(timestamp)
-            ORDER BY date ASC
-        """)
-        
-        for row in usage_query:
-            usage_over_time["dates"].append(row.date.strftime("%Y-%m-%d"))
-            usage_over_time["success"].append(row.successful)
-            usage_over_time["failure"].append(row.failed)
-        
-        return {
-            "total_credentials": total_credentials,
-            "total_success_count": total_success,
-            "total_failure_count": total_failure,
-            "success_rate": success_rate,
-            "most_successful": most_successful,
-            "least_successful": least_successful,
-            "device_type_breakdown": device_type_breakdown,
-            "recent_failures": recent_failures,
-            "recent_successes": recent_successes,
-            "usage_over_time": usage_over_time
-        }
+            # Get least successful credentials (at least 5 attempts and success rate < 100)
+            least_successful = []
+            least_successful_query = cs_db.query(models.Credential).filter(
+                (models.Credential.success_count + models.Credential.failure_count) >= 5,
+                models.Credential.failure_count > 0
+            ).order_by(
+                (models.Credential.success_count / (models.Credential.success_count + models.Credential.failure_count)).asc()
+            ).limit(5)
+            
+            for cred in least_successful_query:
+                total = cred.success_count + cred.failure_count
+                if total > 0:
+                    success_rate = (cred.success_count / total) * 100
+                    least_successful.append({
+                        "id": cred.id,
+                        "name": cred.name,
+                        "username": cred.username,
+                        "success_count": cred.success_count,
+                        "failure_count": cred.failure_count,
+                        "success_rate": success_rate
+                    })
+            
+            # For now, we don't have credential_usage_log so we'll return empty data for those sections
+            device_type_breakdown = []
+            recent_failures = []
+            recent_successes = []
+            usage_over_time = {
+                "dates": [],
+                "success": [],
+                "failure": []
+            }
+            
+            return {
+                "total_credentials": total_credentials,
+                "total_success_count": total_success,
+                "total_failure_count": total_failure,
+                "success_rate": success_rate,
+                "most_successful": most_successful,
+                "least_successful": least_successful,
+                "device_type_breakdown": device_type_breakdown,
+                "recent_failures": recent_failures,
+                "recent_successes": recent_successes,
+                "usage_over_time": usage_over_time
+            }
+        finally:
+            cs_db.close()
     except Exception as e:
         logger.error(f"Error getting credential statistics: {str(e)}")
         raise 

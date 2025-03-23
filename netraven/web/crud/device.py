@@ -91,6 +91,9 @@ def create_device(db: Session, device: DeviceCreate, owner_id: str) -> Device:
     """
     logger.info(f"Creating new device with hostname: {device.hostname}")
     
+    # Convert Pydantic model to dict using model_dump() for Pydantic v2 compatibility
+    device_data = device.model_dump() if hasattr(device, 'model_dump') else device.dict()
+    
     # Create new device
     db_device = Device(
         id=str(uuid.uuid4()),
@@ -101,9 +104,8 @@ def create_device(db: Session, device: DeviceCreate, owner_id: str) -> Device:
         username=device.username,
         password=device.password,
         description=device.description,
-        enabled=device.enabled,
-        owner_id=owner_id,
-        credential_tag_ids=device.tag_ids
+        enabled=device_data.get('enabled', True),  # Get enabled from dict with default True
+        owner_id=owner_id
     )
     
     try:

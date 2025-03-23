@@ -59,8 +59,12 @@ export default {
     
     // Initialize auth state on app mount
     onMounted(() => {
+      console.log('App: Component mounted, initializing application');
+      
       // If we have a token in localStorage, validate and setup refresh
       if (localStorage.getItem('access_token')) {
+        console.log('App: Found token in localStorage, validating');
+        
         // Set token in store
         authStore.token = localStorage.getItem('access_token')
         
@@ -68,19 +72,36 @@ export default {
         const isValid = authStore.validateToken()
         
         if (isValid) {
-          console.log('Token validated, setting up refresh mechanism')
+          console.log('App: Token validated, setting up refresh mechanism')
           authStore.setupTokenRefresh()
           
           // Try to fetch user data with the token
-          authStore.fetchCurrentUser().catch(error => {
-            console.error('Failed to fetch user data on app start:', error)
-          })
+          authStore.fetchCurrentUser()
+            .catch(error => {
+              console.error('App: Failed to fetch user data on app start:', error)
+            })
+            .finally(() => {
+              console.log('App: Initialization complete, showing application UI');
+              isInitializing.value = false
+            })
         } else {
-          console.warn('Invalid token found in localStorage, clearing')
+          console.warn('App: Invalid token found in localStorage, clearing')
           authStore.clearAuth()
           toast.warning('Your session has expired. Please log in again.')
+          isInitializing.value = false
         }
+      } else {
+        console.log('App: No token found, proceeding to login');
+        isInitializing.value = false
       }
+      
+      // Safety timeout to ensure app loads even if other initialization fails
+      setTimeout(() => {
+        if (isInitializing.value) {
+          console.warn('App: Initialization timeout reached, forcing application to render');
+          isInitializing.value = false
+        }
+      }, 2000)
     })
     
     // Watch for token changes to save to localStorage

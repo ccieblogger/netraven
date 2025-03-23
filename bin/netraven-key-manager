@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""
+Command-line script for NetRaven encryption key management.
+"""
+
+import sys
+from netraven.cli.key_management import main
+
+if __name__ == "__main__":
+    sys.exit(main()) 

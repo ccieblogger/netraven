@@ -30,7 +30,6 @@ class Device(Base):
     username = Column(String(64), nullable=True)  # Optional if using tag-based credentials
     password = Column(String(128), nullable=True)  # Optional if using tag-based credentials
     description = Column(Text, nullable=True)
-    credential_tag_ids = Column(JSON, nullable=True)  # Store tag IDs for credential retrieval
     last_backup_at = Column(DateTime, nullable=True)
     last_backup_status = Column(String(20), nullable=True)  # success, failure, pending
     enabled = Column(Boolean, default=True)
@@ -38,7 +37,7 @@ class Device(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     serial_number = Column(String(100), nullable=True)  # Serial number of the device
     is_reachable = Column(Boolean, nullable=True)  # Whether the device is reachable
-    last_reachability_check = Column(DateTime, nullable=True)  # When the device was last checked for reachability
+    last_reachability_check = Column(DateTime, nullable=True)
     
     # Foreign keys
     owner_id = Column(String(36), ForeignKey("users.id"), nullable=False)

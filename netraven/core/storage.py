@@ -271,6 +271,15 @@ class S3StorageBackend(StorageBackend):
             return False
 
 
+# Wrapper classes for backward compatibility
+class LocalFileStorage(LocalStorageBackend):
+    """Wrapper class for LocalStorageBackend for backward compatibility."""
+    pass
+
+class S3Storage(S3StorageBackend):
+    """Wrapper class for S3StorageBackend for backward compatibility."""
+    pass
+
 def get_storage_backend(config: Dict[str, Any]) -> StorageBackend:
     """
     Factory function to create a storage backend based on configuration.

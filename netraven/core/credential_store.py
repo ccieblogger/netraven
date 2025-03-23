@@ -109,19 +109,16 @@ class CredentialStore:
         if db_url:
             self._db_url = db_url
         else:
-            db_config = config.get("database", {})
-            db_type = db_config.get("type", "postgresql")
+            # First try environment variables (for Docker)
+            pg_host = os.environ.get("POSTGRES_HOST", "postgres")
+            pg_port = os.environ.get("POSTGRES_PORT", "5432")
+            pg_db = os.environ.get("POSTGRES_DB", "netraven")
+            pg_user = os.environ.get("POSTGRES_USER", "netraven")
+            pg_password = os.environ.get("POSTGRES_PASSWORD", "netraven")
+            self._db_url = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_db}"
             
-            if db_type == "postgresql":
-                pg_config = db_config.get("postgresql", {})
-                host = pg_config.get("host", "localhost")
-                port = pg_config.get("port", 5432)
-                database = pg_config.get("database", "netraven")
-                user = pg_config.get("user", "netraven")
-                password = pg_config.get("password", "netraven")
-                self._db_url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
-            else:
-                raise ValueError(f"Unsupported database type: {db_type}")
+            # Log the connection details (without password)
+            logger.info(f"Connecting to database at {pg_host}:{pg_port}/{pg_db} as {pg_user}")
         
         # Setup encryption
         self._encryption_key = encryption_key or os.environ.get("NETRAVEN_ENCRYPTION_KEY")

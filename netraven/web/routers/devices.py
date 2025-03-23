@@ -223,7 +223,7 @@ async def create_device_endpoint(
                     )
         
         # Create device
-        db_device = create_device(db, device, current_principal.user_id)
+        db_device = create_device(db, device, current_principal.id)
         
         # If tag_ids are provided, associate them with the device
         if has_tag_ids and device.tag_ids:

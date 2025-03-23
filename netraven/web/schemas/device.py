@@ -38,6 +38,7 @@ class DeviceCreate(DeviceBase):
     username: Optional[str] = Field(None, min_length=1, max_length=64)
     password: Optional[str] = Field(None, min_length=1, max_length=128)
     tag_ids: Optional[List[str]] = Field(None, description="List of tag IDs to use for credential retrieval")
+    enabled: Optional[bool] = True
     
     @field_validator('tag_ids', 'username', 'password')
     def validate_authentication_method(cls, v, info):

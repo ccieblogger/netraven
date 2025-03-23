@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from netraven.web.models.user import User
-from netraven.web.crud import get_user_by_username, create_user
+from netraven.web.crud import get_user_by_username, create_user, initialize_default_settings
 from netraven.web.schemas.user import UserCreate
 from netraven.core.logging import get_logger
 
@@ -67,4 +67,28 @@ def ensure_default_admin(db: Session) -> None:
     except Exception as e:
         logger.error(f"Error creating default admin user: {e}")
         # Continue execution even if user creation fails
-        # This allows the application to start even if there's an issue with user creation 
+        # This allows the application to start even if there's an issue with user creation
+
+def initialize_admin_settings(db: Session) -> None:
+    """
+    Initialize admin settings if they don't exist.
+    
+    This function ensures that default admin settings are created in the database.
+    
+    Args:
+        db: Database session
+    """
+    logger.info("Initializing admin settings")
+    
+    try:
+        # Initialize default settings
+        settings = initialize_default_settings(db)
+        
+        if settings:
+            logger.info(f"Initialized {len(settings)} admin settings")
+        else:
+            logger.info("Admin settings were already initialized")
+            
+    except Exception as e:
+        logger.error(f"Error initializing admin settings: {e}")
+        # Continue execution even if settings initialization fails 

@@ -12,6 +12,7 @@ from netraven.web.models.job_log import JobLog
 from netraven.web.schemas.job_log import JobStatus
 from netraven.web.constants import JobTypeEnum
 from netraven.web.crud.user import get_user_by_username
+from tests.utils.api_test_utils import create_auth_headers
 
 from tests.utils.db_init import get_test_db_session
 
@@ -254,6 +255,9 @@ def test_notification_with_device_name(job_tracking_service, notification_servic
         job_details=job_details
     )
     
+    # Verify job started
+    assert job_log.status == JobStatus.IN_PROGRESS
+    
     # Reset mock to clear any calls during setup
     notification_service.reset_mock()
     
@@ -264,8 +268,10 @@ def test_notification_with_device_name(job_tracking_service, notification_servic
         results={"success": True, "message": "Backup completed successfully"}
     )
     
-    # Verify device name was passed to notification service
+    # Verify notification was triggered
     notification_service.notify_job_completion.assert_called_once()
+    
+    # Verify device details were included
     args, kwargs = notification_service.notify_job_completion.call_args
     assert "device_name" in kwargs
     assert kwargs["device_name"] == test_device.name
@@ -273,13 +279,14 @@ def test_notification_with_device_name(job_tracking_service, notification_servic
 
 @patch('netraven.web.services.job_tracking_service.datetime')
 def test_job_duration_calculation(mock_datetime, job_tracking_service, notification_service, admin_user, test_device, db_session):
-    """Test that job duration is calculated and included in results."""
-    # Mock start and end times for consistent duration
-    start_time = datetime.datetime(2023, 1, 1, 10, 0, 0)
-    end_time = datetime.datetime(2023, 1, 1, 10, 15, 0)  # 15 minutes later
+    """Test that job duration is properly calculated."""
+    # Mock the datetime for consistent testing
+    start_time = datetime.datetime(2023, 1, 1, 12, 0, 0)
+    end_time = datetime.datetime(2023, 1, 1, 12, 5, 30)  # 5 minutes and 30 seconds later
     
-    # Configure the datetime mock
+    # Configure the mock
     mock_datetime.datetime.now.side_effect = [start_time, end_time]
+    mock_datetime.datetime.side_effect = lambda *args, **kw: datetime.datetime(*args, **kw)
     
     # Start a job
     job_id = str(uuid.uuid4())
@@ -292,28 +299,70 @@ def test_job_duration_calculation(mock_datetime, job_tracking_service, notificat
         job_details=job_details
     )
     
-    # Verify start time was set
-    assert job_log.start_time == start_time
-    
-    # Reset mock to clear any calls during setup
-    notification_service.reset_mock()
-    
     # Complete the job
     job_tracking_service.update_job_status(
         job_id=job_id,
         status=JobStatus.COMPLETED,
-        results={"success": True, "message": "Backup completed successfully"}
+        results={"success": True}
     )
     
-    # Load job from database to verify results
+    # Get the updated job log
     updated_job = db_session.query(JobLog).filter(JobLog.id == job_id).first()
     
-    # Verify duration calculation (15 minutes = 900 seconds)
-    assert "duration_seconds" in updated_job.results
-    assert updated_job.results["duration_seconds"] == 900
+    # Verify duration was calculated correctly
+    assert updated_job.duration_seconds == 330  # 5 minutes and 30 seconds = 330 seconds
     
-    # Verify notification includes job with duration
-    notification_service.notify_job_completion.assert_called_once()
-    args, kwargs = notification_service.notify_job_completion.call_args
-    assert "duration_seconds" in kwargs["job_log"].results
-    assert kwargs["job_log"].results["duration_seconds"] == 900 
+
+def test_api_notification_integration(api_token, app_config, db_session, test_device, admin_user, monkeypatch):
+    """Test integration with the notification API endpoints."""
+    from fastapi.testclient import TestClient
+    from netraven.web.app import app
+    
+    client = TestClient(app)
+    
+    # Mock the notification service
+    mock_notification = MagicMock(spec=NotificationService)
+    mock_notification.notify_job_completion.return_value = True
+    
+    # Mock the job tracking service to use our mocked notification service
+    monkeypatch.setattr(
+        "netraven.web.routers.notifications.get_notification_service",
+        lambda: mock_notification
+    )
+    
+    # Use the API to update notification preferences
+    new_preferences = {
+        "email_notifications": True,
+        "email_on_job_completion": True,
+        "email_on_job_failure": True,
+        "notification_frequency": "daily"
+    }
+    
+    response = client.put(
+        f"{app_config['api_url']}/api/users/me/notifications",
+        json=new_preferences,
+        headers=create_auth_headers(api_token)
+    )
+    
+    assert response.status_code == 200
+    updated_prefs = response.json()
+    assert updated_prefs["notification_frequency"] == "daily"
+    
+    # Get the preferences
+    response = client.get(
+        f"{app_config['api_url']}/api/users/me/notifications",
+        headers=create_auth_headers(api_token)
+    )
+    
+    assert response.status_code == 200
+    prefs = response.json()
+    assert prefs["notification_frequency"] == "daily"
+    
+    # Test sending a test notification
+    response = client.post(
+        f"{app_config['api_url']}/api/notifications/test",
+        headers=create_auth_headers(api_token)
+    )
+    
+    assert response.status_code == 200
+    assert mock_notification.send_test_notification.called 

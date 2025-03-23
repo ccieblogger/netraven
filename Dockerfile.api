@@ -41,9 +41,11 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY netraven/ netraven/
 COPY docker/ docker/
 COPY tests/ tests/
+COPY scripts/ scripts/
 
 # Make entrypoint executable
 RUN chmod +x docker/entrypoint.sh
+RUN chmod +x scripts/*.py scripts/*.sh
 
 # Set environment variables
 ENV PYTHONPATH=/app

@@ -23,15 +23,21 @@ const getEnvVariable = (key, defaultValue) => {
 
 // Get browserApiUrl based on environment
 let browserApiUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000';
+console.log('INITIAL API URL:', browserApiUrl);
 
-// If VUE_APP_API_URL is not set, use hostname for dynamic resolution
-if (!process.env.VUE_APP_API_URL) {
+// In browser environments, use the browser's hostname to ensure connectivity
+if (typeof window !== 'undefined') {
   const hostname = window.location.hostname;
-  browserApiUrl = `http://${hostname}:8000`;
-  console.log('Using production API URL with hostname:', hostname);
+  // Replace api:8000 with the actual hostname if it's set that way in the environment
+  if (browserApiUrl.includes('api:8000')) {
+    const originalUrl = browserApiUrl;
+    browserApiUrl = `http://${hostname}:8000`;
+    console.log('TRANSFORMED API URL from', originalUrl, 'to', browserApiUrl);
+  }
+  console.log('USING API URL with browser hostname:', browserApiUrl);
 }
 
-console.log('Final API URL:', browserApiUrl);
+console.log('FINAL API URL:', browserApiUrl);
 
 // Setup Axios interceptors for authentication handling
 axios.interceptors.response.use(
@@ -107,6 +113,23 @@ axios.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Add this function before the API client definition
+const checkAuthHeader = () => {
+  const token = localStorage.getItem('access_token');
+  const hasAuthHeader = axios.defaults.headers.common['Authorization'] !== undefined;
+  console.log('Auth check:', 
+    token ? 'Token exists in localStorage' : 'No token in localStorage',
+    hasAuthHeader ? 'Auth header set in axios' : 'No auth header in axios'
+  );
+  
+  if (token && !hasAuthHeader) {
+    console.log('Setting missing auth header from localStorage token');
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    return true;
+  }
+  return hasAuthHeader;
+};
 
 // Create API client
 const apiClient = {
@@ -270,45 +293,36 @@ const apiClient = {
   // Authentication methods
   async login(username, password) {
     try {
+      console.log('API: Attempting login with URL:', `${browserApiUrl}/api/auth/token`);
       const response = await axios.post(
-        `${browserApiUrl}/auth/token`, 
-        new URLSearchParams({
+        `${browserApiUrl}/api/auth/token`, 
+        {
           username,
           password,
           grant_type: 'password'
-        }), 
+        }, 
         {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          headers: { 'Content-Type': 'application/json' }
         }
       );
       
       if (response.data && response.data.access_token) {
+        console.log('API: Login successful, received token');
         // Store token in localStorage
         localStorage.setItem('access_token', response.data.access_token);
         
         // Set authorization header for future requests
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
+        console.log('API: Set Authorization header for future requests');
         
-        // Parse token to get expiration time
-        try {
-          const tokenParts = response.data.access_token.split('.');
-          if (tokenParts.length === 3) {
-            const payload = JSON.parse(atob(tokenParts[1]));
-            if (payload.exp) {
-              console.log(`Token will expire at: ${new Date(payload.exp * 1000).toISOString()}`);
-            }
-          }
-        } catch (e) {
-          console.error('Error parsing token payload:', e);
-        }
-        
+        // Return success object for compatibility with auth store
         return {
           success: true,
           data: response.data,
           message: 'Login successful'
         };
       } else {
-        console.error('Login response missing access_token:', response.data);
+        console.error('API: Login response missing access_token:', response.data);
         return {
           success: false,
           message: 'Invalid response from server'
@@ -830,15 +844,23 @@ const apiClient = {
    */
   getCredentials: async (params = {}) => {
     try {
+      checkAuthHeader(); // Check auth header before request
+      
       const queryParams = new URLSearchParams();
       if (params.skip !== undefined) queryParams.append('skip', params.skip);
       if (params.limit !== undefined) queryParams.append('limit', params.limit);
       if (params.includeTags !== undefined) queryParams.append('include_tags', params.includeTags);
       
-      const response = await axios.get(`${browserApiUrl}/api/credentials/?${queryParams.toString()}`);
+      const url = `${browserApiUrl}/api/credentials/?${queryParams.toString()}`;
+      console.log('Fetching credentials with URL:', url);
+      console.log('Authorization header:', axios.defaults.headers.common['Authorization'] ? 'Present' : 'Missing');
+      
+      const response = await axios.get(url);
+      console.log('Credentials API response:', response.status);
       return response.data;
     } catch (error) {
       console.error('Error fetching credentials:', error);
+      console.error('Error details:', error.response ? error.response.data : 'No response data');
       throw error;
     }
   },

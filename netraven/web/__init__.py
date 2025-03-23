@@ -72,16 +72,20 @@ async def startup_event():
     # Create default admin user if it doesn't exist
     try:
         from netraven.web.database import SessionLocal
-        from netraven.web.startup import ensure_default_admin
+        from netraven.web.startup import ensure_default_admin, initialize_admin_settings
         
         db = SessionLocal()
         try:
             ensure_default_admin(db)
             logger.info("Default admin user initialization complete")
+            
+            # Initialize admin settings
+            initialize_admin_settings(db)
+            logger.info("Admin settings initialization complete")
         finally:
             db.close()
     except Exception as e:
-        logger.error(f"Error ensuring default admin user: {str(e)}")
+        logger.error(f"Error during startup initialization: {str(e)}")
     
     logger.info("Web service started")
 

@@ -2,6 +2,9 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import pinia from './store'
+import Toast from 'vue-toastification'
+import 'vue-toastification/dist/index.css'
+import axios from 'axios'
 
 // Import CSS
 import './assets/main.css'
@@ -71,10 +74,53 @@ router.isReady().then(() => {
   }
 });
 
-// Create and mount the Vue application
+// Initialize the app
 const app = createApp(App)
+
+// Add diagnostic API check
+const apiUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000'
+const browserApiUrl = typeof window !== 'undefined' && window.location ? 
+  `http://${window.location.hostname}:8000` : apiUrl
+
+// Configure axios default base URL
+axios.defaults.baseURL = browserApiUrl;
+console.log('Axios baseURL set to:', axios.defaults.baseURL);
+
+console.log('Testing API connectivity...')
+axios.get(`${browserApiUrl}/api/health`)
+  .then(response => {
+    console.log('API health check successful:', response.data)
+    // Also check auth endpoints
+    console.log('Checking auth endpoint URL:', `${browserApiUrl}/api/auth/token`)
+  })
+  .catch(error => {
+    console.error('API health check failed:', error.message)
+    if (error.response) {
+      console.error('Error response:', error.response.status, error.response.data)
+    } else if (error.request) {
+      console.error('No response received from API')
+    }
+  })
+
 app.use(pinia)
 app.use(router)
+app.use(Toast, {
+  transition: "Vue-Toastification__bounce",
+  maxToasts: 3,
+  newestOnTop: true,
+  position: "top-right",
+  timeout: 5000,
+  closeOnClick: true,
+  pauseOnFocusLoss: true,
+  pauseOnHover: true,
+  draggable: true,
+  draggablePercent: 0.6,
+  showCloseButtonOnHover: false,
+  hideProgressBar: false,
+  closeButton: "button",
+  icon: true,
+  rtl: false
+})
 
 // Add global error handler
 app.config.errorHandler = (err, vm, info) => {

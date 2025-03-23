@@ -39,7 +39,7 @@ class AuditService:
         target_type: Optional[str] = None,
         description: Optional[str] = None,
         status: str = "success",
-        metadata: Optional[Dict[str, Any]] = None,
+        event_metadata: Optional[Dict[str, Any]] = None,
         request: Optional[Request] = None
     ) -> AuditLog:
         """
@@ -49,17 +49,17 @@ class AuditService:
             db: Database session
             event_type: Type of event (auth, admin, key, data)
             event_name: Specific event name (login, logout, etc.)
-            actor_id: ID of the user or service that performed the action
-            actor_type: Type of actor (user, service, system)
+            actor_id: ID of the user or system component that initiated the action
+            actor_type: Type of actor (user, system, service)
             target_id: ID of the resource being acted upon
-            target_type: Type of target resource
-            description: Description of the event
-            status: Status of the event (success, failure, error)
-            metadata: Additional metadata about the event
-            request: Request object for extracting IP and user agent
+            target_type: Type of target resource (user, device, backup, etc.)
+            description: Human-readable description of the event
+            status: Outcome status (success, failure, error, warning)
+            event_metadata: Additional structured data about the event
+            request: FastAPI request object, used to extract client IP and user agent
             
         Returns:
-            The created audit log entry
+            The created AuditLog entry
         """
         # Extract request information if available
         ip_address = None
@@ -67,16 +67,23 @@ class AuditService:
         session_id = None
         
         if request:
-            ip_address = request.client.host if request.client else None
+            client = request.client
+            if client:
+                ip_address = client.host
+                
             user_agent = request.headers.get("User-Agent")
-            # Try to extract session ID from cookies or headers
-            session_id = (
-                request.cookies.get("session") or 
-                request.headers.get("X-Session-ID")
-            )
+            
+            # Extract session ID from cookies or headers if implemented
+            # session_id = request.cookies.get("session_id")
         
-        # Create audit log entry
-        audit_log_data = AuditLogCreate(
+        # Create a friendly default description if none provided
+        if not description:
+            actor_str = f"User {actor_id}" if actor_id else "System"
+            target_str = f" {target_type} {target_id}" if target_id else ""
+            description = f"{actor_str} performed {event_name} on{target_str}."
+        
+        # Create the audit log entry
+        audit_log = AuditLog(
             event_type=event_type,
             event_name=event_name,
             actor_id=actor_id,
@@ -88,23 +95,8 @@ class AuditService:
             session_id=session_id,
             description=description,
             status=status,
-            metadata=metadata
-        )
-        
-        # Create DB model instance
-        audit_log = AuditLog(
-            event_type=audit_log_data.event_type,
-            event_name=audit_log_data.event_name,
-            actor_id=audit_log_data.actor_id,
-            actor_type=audit_log_data.actor_type,
-            target_id=audit_log_data.target_id,
-            target_type=audit_log_data.target_type,
-            ip_address=audit_log_data.ip_address,
-            user_agent=audit_log_data.user_agent,
-            session_id=audit_log_data.session_id,
-            description=audit_log_data.description,
-            status=audit_log_data.status,
-            metadata=audit_log_data.metadata
+            event_metadata=event_metadata,
+            created_at=datetime.utcnow()
         )
         
         # Save to database
@@ -205,45 +197,75 @@ class AuditService:
     
     # Shortcut methods for common audit events
     
-    @classmethod
+    @staticmethod
     def log_auth_event(
-        cls,
         db: Session,
         event_name: str,
         actor_id: Optional[str] = None,
+        actor_type: str = "user",
         description: Optional[str] = None,
         status: str = "success",
-        metadata: Optional[Dict[str, Any]] = None,
+        event_metadata: Optional[Dict[str, Any]] = None,
         request: Optional[Request] = None
     ) -> AuditLog:
-        """Log an authentication event."""
-        return cls.log_event(
+        """
+        Log an authentication event.
+        
+        Args:
+            db: Database session
+            event_name: Authentication event (login, logout, password_change, etc.)
+            actor_id: User ID or service name
+            actor_type: Type of actor (user, service, system)
+            description: Description of the event
+            status: Outcome status (success, failure)
+            event_metadata: Additional data about the event
+            request: FastAPI request object
+            
+        Returns:
+            The created audit log entry
+        """
+        return AuditService.log_event(
             db=db,
             event_type="auth",
             event_name=event_name,
             actor_id=actor_id,
-            actor_type="user",
+            actor_type=actor_type,
             description=description,
             status=status,
-            metadata=metadata,
+            event_metadata=event_metadata,
             request=request
         )
     
-    @classmethod
+    @staticmethod
     def log_admin_event(
-        cls,
         db: Session,
         event_name: str,
-        actor_id: Optional[str] = None,
+        actor_id: str,
         target_id: Optional[str] = None,
         target_type: Optional[str] = None,
         description: Optional[str] = None,
         status: str = "success",
-        metadata: Optional[Dict[str, Any]] = None,
+        event_metadata: Optional[Dict[str, Any]] = None,
         request: Optional[Request] = None
     ) -> AuditLog:
-        """Log an admin action event."""
-        return cls.log_event(
+        """
+        Log an administrative action.
+        
+        Args:
+            db: Database session
+            event_name: Admin event (user_create, role_change, settings_update, etc.)
+            actor_id: ID of the admin user
+            target_id: ID of the affected resource
+            target_type: Type of affected resource
+            description: Description of the event
+            status: Outcome status
+            event_metadata: Additional data about the event
+            request: FastAPI request object
+            
+        Returns:
+            The created audit log entry
+        """
+        return AuditService.log_event(
             db=db,
             event_type="admin",
             event_name=event_name,
@@ -253,61 +275,94 @@ class AuditService:
             target_type=target_type,
             description=description,
             status=status,
-            metadata=metadata,
+            event_metadata=event_metadata,
             request=request
         )
     
-    @classmethod
+    @staticmethod
     def log_key_event(
-        cls,
         db: Session,
         event_name: str,
         actor_id: Optional[str] = None,
+        actor_type: str = "system",
         target_id: Optional[str] = None,
         description: Optional[str] = None,
         status: str = "success",
-        metadata: Optional[Dict[str, Any]] = None,
+        event_metadata: Optional[Dict[str, Any]] = None,
         request: Optional[Request] = None
     ) -> AuditLog:
-        """Log a key management event."""
-        return cls.log_event(
+        """
+        Log a key management event.
+        
+        Args:
+            db: Database session
+            event_name: Key event (key_rotation, key_generation, etc.)
+            actor_id: ID of the user or service
+            actor_type: Type of actor
+            target_id: ID of the affected key or service
+            description: Description of the event
+            status: Outcome status
+            event_metadata: Additional data about the event
+            request: FastAPI request object
+            
+        Returns:
+            The created audit log entry
+        """
+        return AuditService.log_event(
             db=db,
             event_type="key",
             event_name=event_name,
             actor_id=actor_id,
-            actor_type="user",
+            actor_type=actor_type,
             target_id=target_id,
             target_type="key",
             description=description,
             status=status,
-            metadata=metadata,
+            event_metadata=event_metadata,
             request=request
         )
     
-    @classmethod
+    @staticmethod
     def log_data_event(
-        cls,
         db: Session,
         event_name: str,
         actor_id: Optional[str] = None,
+        actor_type: str = "user",
         target_id: Optional[str] = None,
         target_type: Optional[str] = None,
         description: Optional[str] = None,
         status: str = "success",
-        metadata: Optional[Dict[str, Any]] = None,
+        event_metadata: Optional[Dict[str, Any]] = None,
         request: Optional[Request] = None
     ) -> AuditLog:
-        """Log a data access or modification event."""
-        return cls.log_event(
+        """
+        Log a data access or modification event.
+        
+        Args:
+            db: Database session
+            event_name: Data event (read, create, update, delete)
+            actor_id: ID of the user or service
+            actor_type: Type of actor
+            target_id: ID of the data resource
+            target_type: Type of data resource (backup, device, config)
+            description: Description of the event
+            status: Outcome status
+            event_metadata: Additional data about the event
+            request: FastAPI request object
+            
+        Returns:
+            The created audit log entry
+        """
+        return AuditService.log_event(
             db=db,
             event_type="data",
             event_name=event_name,
             actor_id=actor_id,
-            actor_type="user",
+            actor_type=actor_type,
             target_id=target_id,
             target_type=target_type,
             description=description,
             status=status,
-            metadata=metadata,
+            event_metadata=event_metadata,
             request=request
         ) 

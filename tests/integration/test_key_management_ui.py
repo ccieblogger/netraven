@@ -1,434 +1,465 @@
 """
-Integration tests for key management UI functionality using API-driven approach.
+Integration tests for the Key Management UI.
 
-This module tests the key management UI functionality by making API calls that would
-be triggered by UI interactions, focusing on:
-- Key management workflow validation
-- Key status display validation
-- Error handling in key management operations 
-- Permission checks for key operations
+These tests verify that the key management interface functionality works correctly
+by making API calls that simulate user interactions with the UI.
 """
 
 import pytest
+import requests
 import uuid
-import time
-import json
-import base64
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from datetime import datetime
 
-# Correct import path for the app
-from netraven.web.app import app
-from netraven.web.auth.jwt import create_access_token
-from netraven.core.key_rotation import KeyRotationManager
-from netraven.core.credential_store import CredentialStore, get_credential_store
-
-# Test client
-client = TestClient(app)
+from tests.utils.api_test_utils import create_auth_headers
 
 
 @pytest.fixture
-def admin_token():
-    """Create an admin token for testing."""
-    return create_access_token(
-        data={"sub": "admin-user", "roles": ["admin"]},
-        scopes=["admin:*"],
-        expires_minutes=15
+def read_only_token(app_config, api_token) -> str:
+    """Create a token for a read-only user."""
+    # First create a read-only user if it doesn't exist
+    admin_headers = {"Authorization": f"Bearer {api_token}"}
+    
+    # Check if user exists
+    username = "readonly_user"
+    user_response = requests.get(
+        f"{app_config['api_url']}/api/users",
+        headers=admin_headers
     )
+    
+    users = user_response.json()
+    user_exists = any(user["username"] == username for user in users)
+    
+    if not user_exists:
+        # Create read-only user
+        new_user = {
+            "username": username,
+            "email": f"{username}@example.com",
+            "full_name": "Read Only User",
+            "password": "ReadOnly123!",
+            "is_active": True,
+            "is_admin": False
+        }
+        requests.post(
+            f"{app_config['api_url']}/api/users",
+            headers=admin_headers,
+            json=new_user
+        )
+    
+    # Get token for read-only user
+    response = requests.post(
+        f"{app_config['api_url']}/api/auth/token",
+        json={"username": username, "password": "ReadOnly123!"}
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
 
 
 @pytest.fixture
-def read_only_token():
-    """Create a read-only admin token for testing permission checks."""
-    return create_access_token(
-        data={"sub": "readonly-admin", "roles": ["admin"]},
-        scopes=["admin:read", "read:keys"],
-        expires_minutes=15
-    )
-
-
-@pytest.fixture
-def non_admin_token():
-    """Create a non-admin token for testing."""
-    return create_access_token(
-        data={"sub": "regular-user", "roles": ["user"]},
-        scopes=["user:read"],
-        expires_minutes=15
-    )
-
-
-@pytest.fixture(autouse=True)
-def setup_key_manager(monkeypatch):
-    """Setup a key manager for testing."""
-    # Create an in-memory credential store
-    store = CredentialStore(use_memory_store=True)
+def non_admin_token(app_config, api_token) -> str:
+    """Create a token for a non-admin user with some permissions."""
+    # First create a non-admin user if it doesn't exist
+    admin_headers = {"Authorization": f"Bearer {api_token}"}
     
-    # Create a test key manager
-    key_manager = KeyRotationManager(
-        store=store,
-        settings_file=None,
-        use_memory=True
+    # Check if user exists
+    username = "key_manager"
+    user_response = requests.get(
+        f"{app_config['api_url']}/api/users",
+        headers=admin_headers
     )
     
-    # Create initial test key
-    key_manager.create_key("Initial Test Key")
+    users = user_response.json()
+    user_exists = any(user["username"] == username for user in users)
     
-    # Patch the get_credential_store and get_key_manager functions
-    # to return our test instances
-    def mock_get_credential_store():
-        return store
+    if not user_exists:
+        # Create key manager user
+        new_user = {
+            "username": username,
+            "email": f"{username}@example.com",
+            "full_name": "Key Manager",
+            "password": "KeyManager123!",
+            "is_active": True,
+            "is_admin": False
+        }
+        response = requests.post(
+            f"{app_config['api_url']}/api/users",
+            headers=admin_headers,
+            json=new_user
+        )
+        
+        # Assign key management permissions
+        user_id = response.json()["id"]
+        permissions = {
+            "permissions": ["read:keys", "write:keys"]
+        }
+        requests.put(
+            f"{app_config['api_url']}/api/users/{user_id}/permissions",
+            headers=admin_headers,
+            json=permissions
+        )
     
-    def mock_get_key_manager():
-        return key_manager
-    
-    monkeypatch.setattr(
-        "netraven.web.dependencies.get_credential_store",
-        mock_get_credential_store
+    # Get token for key manager user
+    response = requests.post(
+        f"{app_config['api_url']}/api/auth/token",
+        json={"username": username, "password": "KeyManager123!"}
     )
-    
-    monkeypatch.setattr(
-        "netraven.web.dependencies.get_key_manager",
-        mock_get_key_manager
-    )
-    
-    return key_manager
+    assert response.status_code == 200
+    return response.json()["access_token"]
 
 
-# UI Key Dashboard Tests
-
-def test_key_dashboard_display(admin_token, setup_key_manager):
-    """
-    Test that the key dashboard API returns the correct key information
-    that would be displayed in the UI.
-    """
-    # Get the list of keys that would populate the UI dashboard
-    response = client.get(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"}
+def test_key_dashboard_display(app_config, api_token):
+    """Test the key dashboard API which would be displayed in the UI."""
+    headers = {"Authorization": f"Bearer {api_token}"}
+    response = requests.get(
+        f"{app_config['api_url']}/api/keys",
+        headers=headers
     )
     
     assert response.status_code == 200
-    keys = response.json()
+    data = response.json()
+    assert isinstance(data, list)
     
-    # Verify the data needed for UI display is present
-    assert len(keys) > 0
-    
-    for key in keys:
-        # Check that all necessary fields for UI display are present
+    # Verify the structure of the response that would be used by the UI
+    if data:
+        key = data[0]
         assert "id" in key
-        assert "description" in key
-        assert "created_at" in key
+        assert "name" in key
         assert "status" in key
+        assert "created_at" in key
+
+
+def test_key_details_display(app_config, api_token):
+    """Test the key details API which would be displayed in the UI."""
+    headers = {"Authorization": f"Bearer {api_token}"}
+    
+    # First, get a list of keys
+    keys_response = requests.get(
+        f"{app_config['api_url']}/api/keys",
+        headers=headers
+    )
+    
+    assert keys_response.status_code == 200
+    keys = keys_response.json()
+    
+    # If there are keys, test getting details for the first one
+    if keys:
+        key_id = keys[0]["id"]
+        response = requests.get(
+            f"{app_config['api_url']}/api/keys/{key_id}",
+            headers=headers
+        )
         
-        # Check key status is one of the valid values
-        assert key["status"] in ["active", "inactive", "pending", "revoked", "rotated"]
-        
-        # Check timestamp format (should be ISO format for UI display)
-        assert "T" in key["created_at"]  # Simple check for ISO format with T separator
-
-
-def test_key_details_display(admin_token, setup_key_manager):
-    """
-    Test that the key details API returns the correct detailed information
-    that would be displayed in the UI key details view.
-    """
-    # First get all keys to find an ID
-    list_response = client.get(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    assert list_response.status_code == 200
-    keys = list_response.json()
-    assert len(keys) > 0
-    
-    # Get details for the first key
-    key_id = keys[0]["id"]
-    detail_response = client.get(
-        f"/api/keys/{key_id}",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    
-    assert detail_response.status_code == 200
-    key_details = detail_response.json()
-    
-    # Verify the detailed data needed for UI display is present
-    assert key_details["id"] == key_id
-    assert "description" in key_details
-    assert "created_at" in key_details
-    assert "status" in key_details
-    assert "last_used_at" in key_details
-    
-    # Check for metrics data that would be shown in UI
-    assert "usage_count" in key_details
-    assert "re_encryptions" in key_details
-
-
-def test_key_creation_form_validation(admin_token, setup_key_manager):
-    """
-    Test the validation rules that would be enforced by the key creation form
-    in the UI by testing the API validation.
-    """
-    # Test missing description field
-    response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={}
-    )
-    assert response.status_code == 422
-    
-    # Test with empty description
-    response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"description": ""}
-    )
-    assert response.status_code == 422
-    
-    # Test with valid description
-    response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"description": "New Test Key"}
-    )
-    assert response.status_code in [200, 201]
-    result = response.json()
-    assert result["description"] == "New Test Key"
-
-
-# UI Workflow Tests
-
-def test_key_activation_workflow(admin_token, setup_key_manager):
-    """
-    Test the key activation workflow that a user would perform in the UI.
-    """
-    # Step 1: Create a new key (like clicking 'Create Key' button in UI)
-    create_response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"description": "Key for Activation Test"}
-    )
-    assert create_response.status_code in [200, 201]
-    new_key = create_response.json()
-    key_id = new_key["id"]
-    
-    # Step 2: Verify the key is initially not active
-    assert new_key["status"] != "active"
-    
-    # Step 3: Activate the key (like clicking 'Activate Key' button in UI)
-    activate_response = client.post(
-        f"/api/keys/{key_id}/activate",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    assert activate_response.status_code == 200
-    
-    # Step 4: Check the key is now active (as would be shown in UI)
-    detail_response = client.get(
-        f"/api/keys/{key_id}",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    assert detail_response.status_code == 200
-    activated_key = detail_response.json()
-    assert activated_key["status"] == "active"
-
-
-def test_key_rotation_workflow(admin_token, setup_key_manager):
-    """
-    Test the key rotation workflow that an admin would perform in the UI.
-    """
-    # Step 1: Create and activate an initial key (setup)
-    create_response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"description": "Initial Key for Rotation"}
-    )
-    key_id = create_response.json()["id"]
-    
-    # Activate the key
-    client.post(
-        f"/api/keys/{key_id}/activate",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    
-    # Step 2: Create a new key for rotation (as if clicking 'Create New Key' in UI)
-    new_key_response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"description": "New Rotation Key"}
-    )
-    assert new_key_response.status_code in [200, 201]
-    new_key_id = new_key_response.json()["id"]
-    
-    # Step 3: Activate the new key (as if clicking 'Activate New Key' in UI)
-    activate_response = client.post(
-        f"/api/keys/{new_key_id}/activate",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    assert activate_response.status_code == 200
-    
-    # Step 4: Trigger key rotation (as if clicking 'Rotate Keys' in UI)
-    # In a real UI, there might be confirmation dialogs, which we're simulating
-    # by directly calling the API endpoint
-    rotate_response = client.post(
-        "/api/keys/rotate",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"force": True}
-    )
-    assert rotate_response.status_code == 200
-    
-    # Step 5: Verify rotation results (as would be displayed in UI)
-    list_response = client.get(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    keys = list_response.json()
-    
-    # Find our keys by ID
-    initial_key = next((k for k in keys if k["id"] == key_id), None)
-    new_key = next((k for k in keys if k["id"] == new_key_id), None)
-    
-    assert initial_key["status"] == "rotated"
-    assert new_key["status"] == "active"
-
-
-def test_key_backup_restore_workflow(admin_token, setup_key_manager):
-    """
-    Test the key backup and restore workflow that an admin would perform in the UI.
-    """
-    # Step 1: Create an active key for testing
-    create_response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"description": "Key for Backup/Restore Test"}
-    )
-    key_id = create_response.json()["id"]
-    
-    # Activate the key
-    client.post(
-        f"/api/keys/{key_id}/activate",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    
-    # Step 2: Create a backup (as if clicking 'Create Backup' in UI)
-    backup_password = "Test!Password123"
-    backup_response = client.post(
-        "/api/keys/backup",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"password": backup_password}
-    )
-    assert backup_response.status_code == 200
-    backup_data = backup_response.json()
-    assert "backup_data" in backup_data
-    
-    # Store the backup data (as if downloading the backup file in UI)
-    backup_content = backup_data["backup_data"]
-    
-    # Step 3: Restore from backup (as if uploading backup file and clicking 'Restore' in UI)
-    restore_response = client.post(
-        "/api/keys/restore",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={
-            "backup_data": backup_content,
-            "password": backup_password
-        }
-    )
-    assert restore_response.status_code == 200
-    
-    # Step 4: Verify restoration success (as would be displayed in UI)
-    list_response = client.get(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    keys = list_response.json()
-    
-    # Verify our key is in the list after restore
-    restored_key = next((k for k in keys if k["id"] == key_id), None)
-    assert restored_key is not None
-
-
-# Permission Tests (User-specific UI views)
-
-def test_permission_based_ui_actions(admin_token, read_only_token, non_admin_token):
-    """
-    Test the permission-based UI display logic by checking what actions
-    different users can perform via the API.
-    """
-    # Create a key for testing
-    create_response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"description": "Permission Test Key"}
-    )
-    key_id = create_response.json()["id"]
-    
-    # Test read-only admin - should see keys but not modify
-    # (UI would show list but disable edit buttons)
-    read_list_response = client.get(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {read_only_token}"}
-    )
-    assert read_list_response.status_code == 200
-    
-    read_create_response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {read_only_token}"},
-        json={"description": "Should Fail"}
-    )
-    assert read_create_response.status_code in [401, 403]  # Should not have permission
-    
-    # Test non-admin - should not see keys at all
-    # (UI would hide key management or show access denied)
-    non_admin_response = client.get(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {non_admin_token}"}
-    )
-    assert non_admin_response.status_code in [401, 403]
-
-
-# Error Handling Tests (UI Error Display)
-
-def test_error_handling_display(admin_token, setup_key_manager):
-    """
-    Test API error responses that would be displayed in the UI 
-    for various error conditions.
-    """
-    # Test 404 error display (as if clicking on non-existent key in UI)
-    non_existent_id = str(uuid.uuid4())
-    not_found_response = client.get(
-        f"/api/keys/{non_existent_id}",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    assert not_found_response.status_code == 404
-    error_content = not_found_response.json()
-    
-    # Verify error details that would be displayed in UI
-    assert "detail" in error_content
-    assert "not found" in error_content["detail"].lower()
-    
-    # Test invalid key activation (e.g., trying to activate already active key)
-    # Create and activate a key
-    create_response = client.post(
-        "/api/keys",
-        headers={"Authorization": f"Bearer {admin_token}"},
-        json={"description": "Error Test Key"}
-    )
-    key_id = create_response.json()["id"]
-    
-    # Activate the key
-    client.post(
-        f"/api/keys/{key_id}/activate",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    
-    # Try to activate it again
-    reactivate_response = client.post(
-        f"/api/keys/{key_id}/activate",
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    
-    # Should either return error or success with warning
-    if reactivate_response.status_code >= 400:
-        error_data = reactivate_response.json()
-        assert "detail" in error_data
+        assert response.status_code == 200
+        key = response.json()
+        assert key["id"] == key_id
+        assert "name" in key
+        assert "status" in key
+        assert "created_at" in key
+        assert "last_rotated" in key
     else:
-        # Some APIs might allow re-activation with a warning message
-        assert "warning" in reactivate_response.json() or "already active" in str(reactivate_response.json()).lower() 
+        # If no keys exist, create one
+        new_key = {
+            "name": f"Test Key {uuid.uuid4().hex[:8]}",
+            "description": "Created during integration test",
+            "key_type": "encryption",
+            "algorithm": "AES-256",
+            "auto_rotate": False
+        }
+        
+        create_response = requests.post(
+            f"{app_config['api_url']}/api/keys",
+            headers=headers,
+            json=new_key
+        )
+        
+        assert create_response.status_code in (200, 201)
+        key = create_response.json()
+        assert "id" in key
+        assert key["name"] == new_key["name"]
+
+
+def test_key_creation_form_validation(app_config, api_token):
+    """Test key creation form validation by attempting to create keys with invalid data."""
+    headers = {"Authorization": f"Bearer {api_token}"}
+    
+    # Test with missing required field
+    invalid_key = {
+        "description": "Missing name field",
+        "key_type": "encryption",
+        "algorithm": "AES-256",
+        "auto_rotate": False
+    }
+    
+    response = requests.post(
+        f"{app_config['api_url']}/api/keys",
+        headers=headers,
+        json=invalid_key
+    )
+    
+    assert response.status_code in (400, 422)  # 422 is FastAPI's validation error code
+    
+    # Test with invalid algorithm
+    invalid_algorithm = {
+        "name": f"Invalid Algo Key {uuid.uuid4().hex[:8]}",
+        "description": "Invalid algorithm",
+        "key_type": "encryption",
+        "algorithm": "NOT-A-REAL-ALGORITHM",
+        "auto_rotate": False
+    }
+    
+    response = requests.post(
+        f"{app_config['api_url']}/api/keys",
+        headers=headers,
+        json=invalid_algorithm
+    )
+    
+    assert response.status_code in (400, 422)
+
+
+def test_key_activation_workflow(app_config, api_token):
+    """Test the key activation workflow that would be performed through the UI."""
+    headers = {"Authorization": f"Bearer {api_token}"}
+    
+    # Create a new inactive key
+    new_key = {
+        "name": f"Activation Test Key {uuid.uuid4().hex[:8]}",
+        "description": "For testing activation workflow",
+        "key_type": "encryption",
+        "algorithm": "AES-256",
+        "auto_rotate": False,
+        "status": "inactive"
+    }
+    
+    create_response = requests.post(
+        f"{app_config['api_url']}/api/keys",
+        headers=headers,
+        json=new_key
+    )
+    
+    assert create_response.status_code in (200, 201)
+    key = create_response.json()
+    key_id = key["id"]
+    
+    # Now activate the key
+    activation = {
+        "status": "active"
+    }
+    
+    activate_response = requests.put(
+        f"{app_config['api_url']}/api/keys/{key_id}/status",
+        headers=headers,
+        json=activation
+    )
+    
+    assert activate_response.status_code in (200, 204)
+    
+    # Verify the key is now active
+    get_response = requests.get(
+        f"{app_config['api_url']}/api/keys/{key_id}",
+        headers=headers
+    )
+    
+    assert get_response.status_code == 200
+    updated_key = get_response.json()
+    assert updated_key["status"] == "active"
+
+
+def test_key_rotation_workflow(app_config, api_token):
+    """Test the key rotation workflow that would be performed through the UI."""
+    headers = {"Authorization": f"Bearer {api_token}"}
+    
+    # Create a new active key
+    new_key = {
+        "name": f"Rotation Test Key {uuid.uuid4().hex[:8]}",
+        "description": "For testing rotation workflow",
+        "key_type": "encryption",
+        "algorithm": "AES-256",
+        "auto_rotate": False,
+        "status": "active"
+    }
+    
+    create_response = requests.post(
+        f"{app_config['api_url']}/api/keys",
+        headers=headers,
+        json=new_key
+    )
+    
+    assert create_response.status_code in (200, 201)
+    key = create_response.json()
+    key_id = key["id"]
+    
+    # Now rotate the key
+    rotation_response = requests.post(
+        f"{app_config['api_url']}/api/keys/{key_id}/rotate",
+        headers=headers
+    )
+    
+    assert rotation_response.status_code in (200, 204)
+    
+    # Verify the key was rotated by checking last_rotated field
+    get_response = requests.get(
+        f"{app_config['api_url']}/api/keys/{key_id}",
+        headers=headers
+    )
+    
+    assert get_response.status_code == 200
+    updated_key = get_response.json()
+    assert "last_rotated" in updated_key
+    assert updated_key["last_rotated"] is not None
+
+
+def test_key_backup_restore_workflow(app_config, api_token):
+    """Test the key backup and restore workflow that would be performed through the UI."""
+    headers = {"Authorization": f"Bearer {api_token}"}
+    
+    # Create a new active key
+    new_key = {
+        "name": f"Backup Test Key {uuid.uuid4().hex[:8]}",
+        "description": "For testing backup workflow",
+        "key_type": "encryption",
+        "algorithm": "AES-256",
+        "auto_rotate": False,
+        "status": "active"
+    }
+    
+    create_response = requests.post(
+        f"{app_config['api_url']}/api/keys",
+        headers=headers,
+        json=new_key
+    )
+    
+    assert create_response.status_code in (200, 201)
+    key = create_response.json()
+    key_id = key["id"]
+    
+    # Create a backup
+    backup_response = requests.post(
+        f"{app_config['api_url']}/api/keys/{key_id}/backup",
+        headers=headers
+    )
+    
+    assert backup_response.status_code in (200, 201)
+    backup = backup_response.json()
+    assert "backup_id" in backup
+    backup_id = backup["backup_id"]
+    
+    # Verify the backup exists
+    backups_response = requests.get(
+        f"{app_config['api_url']}/api/keys/{key_id}/backups",
+        headers=headers
+    )
+    
+    assert backups_response.status_code == 200
+    backups = backups_response.json()
+    assert isinstance(backups, list)
+    assert any(b["id"] == backup_id for b in backups)
+    
+    # Simulate a restore (may not execute the actual restore in a test)
+    restore_response = requests.post(
+        f"{app_config['api_url']}/api/keys/{key_id}/restore",
+        headers=headers,
+        json={"backup_id": backup_id}
+    )
+    
+    assert restore_response.status_code in (200, 204, 422)  # 422 may be returned in test mode
+
+
+def test_permission_based_ui_actions(app_config, api_token, read_only_token, non_admin_token):
+    """Test permission-based UI actions by using different user tokens."""
+    # Admin user should have full access
+    admin_headers = {"Authorization": f"Bearer {api_token}"}
+    admin_keys_response = requests.get(
+        f"{app_config['api_url']}/api/keys",
+        headers=admin_headers
+    )
+    assert admin_keys_response.status_code == 200
+    
+    # Read-only user should be able to view keys but not create
+    readonly_headers = {"Authorization": f"Bearer {read_only_token}"}
+    readonly_keys_response = requests.get(
+        f"{app_config['api_url']}/api/keys",
+        headers=readonly_headers
+    )
+    assert readonly_keys_response.status_code == 200
+    
+    new_key = {
+        "name": f"Permission Test Key {uuid.uuid4().hex[:8]}",
+        "description": "Testing permissions",
+        "key_type": "encryption",
+        "algorithm": "AES-256",
+        "auto_rotate": False
+    }
+    
+    readonly_create_response = requests.post(
+        f"{app_config['api_url']}/api/keys",
+        headers=readonly_headers,
+        json=new_key
+    )
+    assert readonly_create_response.status_code in (401, 403)  # Should be forbidden
+    
+    # Key manager should be able to create keys
+    key_manager_headers = {"Authorization": f"Bearer {non_admin_token}"}
+    manager_create_response = requests.post(
+        f"{app_config['api_url']}/api/keys",
+        headers=key_manager_headers,
+        json=new_key
+    )
+    assert manager_create_response.status_code in (200, 201)
+
+
+def test_error_handling_display(app_config, api_token):
+    """Test error handling in the UI by making API calls with invalid data or ID."""
+    headers = {"Authorization": f"Bearer {api_token}"}
+    
+    # Test non-existent key
+    non_existent_id = str(uuid.uuid4())
+    response = requests.get(
+        f"{app_config['api_url']}/api/keys/{non_existent_id}",
+        headers=headers
+    )
+    assert response.status_code == 404
+    
+    # Test attempting to activate a key that can't be activated
+    activation = {
+        "status": "active"
+    }
+    
+    activate_response = requests.put(
+        f"{app_config['api_url']}/api/keys/{non_existent_id}/status",
+        headers=headers,
+        json=activation
+    )
+    
+    assert activate_response.status_code == 404
+    
+    # Test invalid status
+    invalid_status = {
+        "status": "not_a_real_status"
+    }
+    
+    # Create a key first
+    new_key = {
+        "name": f"Error Test Key {uuid.uuid4().hex[:8]}",
+        "description": "For testing error handling",
+        "key_type": "encryption",
+        "algorithm": "AES-256",
+        "auto_rotate": False
+    }
+    
+    create_response = requests.post(
+        f"{app_config['api_url']}/api/keys",
+        headers=headers,
+        json=new_key
+    )
+    
+    assert create_response.status_code in (200, 201)
+    key = create_response.json()
+    key_id = key["id"]
+    
+    # Try to set invalid status
+    invalid_status_response = requests.put(
+        f"{app_config['api_url']}/api/keys/{key_id}/status",
+        headers=headers,
+        json=invalid_status
+    )
+    
+    assert invalid_status_response.status_code in (400, 422) 

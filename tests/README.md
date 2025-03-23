@@ -1,111 +1,172 @@
-# NetRaven Tests
+# NetRaven Testing Framework
 
-This directory contains tests for the NetRaven application.
+This directory contains the test suite for the NetRaven network device management system. The tests ensure proper functionality, security, and performance of the application.
 
-## Getting Started
+## Test Structure
 
-To run the tests, you'll need to install the test dependencies:
+The test directory is organized into the following components:
 
-```bash
-pip install -r test-requirements.txt
-playwright install  # Install browsers for UI testing
 ```
+tests/
+  ├── unit/              # Unit tests for individual components
+  │   ├── routers/       # Tests for API routers
+  │   └── ...
+  ├── integration/       # Integration tests for system functionality
+  ├── utils/             # Utility functions for testing
+  ├── mock/              # Mock data and services
+  └── conftest.py        # Shared fixtures
+```
+
+## Test Categories
+
+The NetRaven test suite includes:
+
+### Unit Tests
+- Test individual components in isolation
+- Fast execution with minimal dependencies
+- Located in the `unit/` directory
+
+### Integration Tests
+- Test the interaction between components
+- Verify API endpoints and workflows
+- Located in the `integration/` directory
+
+### Security Tests
+- Test authentication and authorization mechanisms
+- Verify protection against common threats
+- Located in `integration/test_security_features.py`
+
+### Performance Tests
+- Test system behavior under load
+- Measure response times for critical operations
+- Located in `integration/test_performance.py`
+
+## Test Phases
+
+The test suite has been implemented in phases:
+
+### Phase 1 (Completed)
+- Basic test directory structure
+- Unit tests for router endpoints
+- Common test fixtures and utilities
+- Authentication and token testing
+
+### Phase 2 (Current)
+- Integration tests for key system flows
+- Security feature testing
+- Performance and reliability tests
+- System functionality tests (monitoring, scheduled operations)
 
 ## Running Tests
 
-You can run the tests using pytest:
+### Running All Tests
 
 ```bash
-# Start the application in test mode
-NETRAVEN_ENV=test docker-compose up -d
-
-# Run all tests
-pytest
-
-# Run specific test categories
-pytest tests/unit
-pytest tests/integration
-pytest tests/ui
+pytest tests/
 ```
 
-## Test Organization
+### Running Specific Test Categories
 
-Tests are organized into the following categories:
+```bash
+# Run all unit tests
+pytest tests/unit/
 
-- **Unit Tests** (`tests/unit/`): Tests for individual components in isolation
-- **Integration Tests** (`tests/integration/`): Tests for component interactions
-- **UI Tests** (`tests/ui/`): End-to-end tests using Playwright
+# Run all integration tests
+pytest tests/integration/
 
-## Writing Tests
+# Run security tests
+pytest tests/integration/test_security_features.py
 
-### Unit Tests
+# Run performance tests
+pytest tests/integration/test_performance.py
 
-Unit tests should focus on testing a single function or method in isolation.
-
-```python
-# tests/unit/web/test_auth.py
-def test_token_validation():
-    token = create_token({"sub": "testuser"})
-    result = validate_token(token)
-    assert result["sub"] == "testuser"
+# Run system functionality tests
+pytest tests/integration/test_system_functionality.py
 ```
 
-### Integration Tests
+### Running Tests with Coverage
 
-Integration tests verify that different components work together correctly.
-
-```python
-# tests/integration/test_api_devices.py
-def test_create_device(app_config, api_token):
-    response = requests.post(
-        f"{app_config['api_url']}/api/devices",
-        headers={"Authorization": f"Bearer {api_token}"},
-        json={"hostname": "test-router", "device_type": "cisco_ios", "ip_address": "192.168.1.200"}
-    )
-    assert response.status_code == 200
+```bash
+pytest --cov=netraven tests/
 ```
 
-### UI Tests
+## Performance Testing
 
-UI tests verify the application from a user's perspective.
+The performance tests (`test_performance.py`) may take longer to run as they test system behavior under load. You can isolate slow tests with:
 
-```python
-# tests/ui/test_flows/test_login.py
-def test_valid_login(page, app_config):
-    login_page = LoginPage(page)
-    login_page.navigate().login(app_config["admin_user"], app_config["admin_password"])
-    expect(page).to_have_url(f"{app_config['ui_url']}/dashboard")
+```bash
+# Skip slow tests
+pytest -k "not slow" tests/
+
+# Run only performance tests
+pytest tests/integration/test_performance.py
 ```
 
 ## Test Fixtures
 
-Common test fixtures are defined in `conftest.py` files:
+Common test fixtures are defined in `conftest.py`. These include:
 
-- `tests/conftest.py`: Top-level fixtures shared by all tests
-- `tests/ui/conftest.py`: UI-specific fixtures
+- Database session fixtures
+- Authentication token fixtures
+- Mock data fixtures
 
-## Debugging Tests
+## Adding New Tests
 
-To debug failing tests:
+When adding new tests, follow these guidelines:
 
-```bash
-# Run with verbose output
-pytest -v
+1. Place tests in the appropriate directory (unit or integration)
+2. Use descriptive test names prefixed with `test_`
+3. Use fixtures from `conftest.py` when possible
+4. Keep unit tests focused on a single component
+5. For integration tests, clearly document the flow being tested
 
-# Show local variables in traceback
-pytest --showlocals
+## Test Utilities
 
-# Run a specific test
-pytest tests/unit/web/test_auth.py::test_token_validation
-```
+The `utils/` directory contains helper functions for testing:
 
-## Test Environment
+- `mock_data.py`: Functions to generate test data
+- `api_test_utils.py`: Utilities for API testing
 
-Tests run in a "test" environment, enabled by setting the `NETRAVEN_ENV=test` environment variable. When running in test mode:
+## Security Testing Notes
 
-- An in-memory SQLite database is used
-- Token expiration is shortened
-- Debug mode is enabled
-- File logging is disabled
+Security tests verify:
 
-This ensures tests run quickly and don't interfere with the production configuration. 
+- Authentication edge cases
+- Permission boundaries
+- Input validation and sanitization
+- API rate limiting
+- Cross-origin requests
+- Session management
+
+## Performance Testing Notes
+
+Performance tests verify:
+
+- Large configuration file handling 
+- Concurrent API request handling
+- Database query performance
+- Resource usage (memory, CPU)
+- System degradation under load
+- Error handling and recovery
+
+## System Functionality Tests
+
+The system functionality tests verify:
+
+- Scheduled operations (backups, key rotation)
+- Device connectivity testing
+- Monitoring and health checks
+- Configuration comparison
+- Metrics collection
+
+## Mocking External Services
+
+For tests that require external services (e.g., network devices), mock implementations are provided in the `mock/` directory.
+
+## Continuous Integration
+
+These tests are automatically run in the CI pipeline on each pull request. Tests must pass before code can be merged.
+
+## Test Data
+
+Test data is generated dynamically using utilities in `utils/mock_data.py`. This ensures tests can run without external dependencies while remaining representative of real-world scenarios. 

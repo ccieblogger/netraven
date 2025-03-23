@@ -91,27 +91,39 @@ class BackupScheduler:
         recurrence_time: Optional[str] = None,
         recurrence_day: Optional[int] = None,
         recurrence_month: Optional[int] = None,
-        job_data: Optional[Dict[str, Any]] = None
+        job_data: Optional[Dict[str, Any]] = None,
+        schedule_time: Optional[str] = None,
+        schedule_day: Optional[str] = None,
+        schedule_interval: Optional[int] = None
     ) -> str:
         """
-        Schedule a job using the new architecture.
+        Schedule a job with the scheduler.
         
         Args:
-            job_id: ID of the job in the database
-            device_id: ID of the device
-            job_type: Type of job (backup, command)
-            schedule_type: Type of schedule (immediate, one_time, daily, weekly, monthly, yearly)
-            start_datetime: Start datetime for one_time jobs
-            recurrence_time: Time of day for recurring jobs (HH:MM)
-            recurrence_day: Day of month/week for recurring jobs
+            job_id: ID for the job
+            device_id: Device ID for the job
+            job_type: Type of job
+            schedule_type: Type of schedule
+            start_datetime: Start datetime for one-time jobs
+            recurrence_time: Time for recurring jobs (HH:MM)
+            recurrence_day: Day for weekly/monthly jobs
             recurrence_month: Month for yearly jobs
             job_data: Additional job data
+            schedule_time: New field for recurrence_time
+            schedule_day: New field for recurrence_day
+            schedule_interval: Interval in minutes
             
         Returns:
-            str: Scheduler job ID
+            ID for the scheduled job
         """
-        # Generate scheduler job ID (different from database job ID)
         scheduler_job_id = str(uuid.uuid4())
+        
+        # Use new field names if provided, otherwise fall back to old names
+        recurrence_time = schedule_time or recurrence_time
+        recurrence_day = schedule_day or recurrence_day
+        
+        logger.info(f"Scheduling job {job_id} with type={job_type}, " 
+                  f"schedule_type={schedule_type}, device_id={device_id}")
         
         # Default job data if not provided
         if job_data is None:

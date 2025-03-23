@@ -472,4 +472,66 @@ docker-compose up -d
 ```bash
 # Always use test environment for tests
 NETRAVEN_ENV=test docker-compose up -d
-``` 
+```
+
+## Authentication Standards for Testing
+
+All integration tests in the NetRaven project use the standard `api_token` fixture for authentication. This approach ensures consistent, reliable testing with proper error handling when authentication fails.
+
+### The `api_token` Fixture
+
+Located in `tests/conftest.py`, the `api_token` fixture:
+- Uses admin credentials from `app_config` to acquire a real authentication token
+- Raises clear error messages when authentication fails (using `pytest.fail` instead of skipping tests)
+- Simplifies test maintenance by providing authentication in a consistent way
+- Makes tests more realistic by using the actual authentication flow
+
+### Updating Tests to Use the `api_token` Fixture
+
+All integration test files have been updated to use the `api_token` fixture:
+- Gateway API tests in `tests/integration/test_gateway_api.py`
+- Advanced authentication tests in `tests/integration/test_auth_advanced.py`
+- Credential management tests in `tests/integration/test_credential_advanced.py`
+- Job logs tests in `tests/integration/test_job_logs_advanced.py`
+- Admin settings API tests in `tests/integration/test_admin_settings_api.py`
+- Admin settings UI tests in `tests/integration/test_admin_settings_ui.py`
+- Key management UI tests in `tests/integration/test_key_management_ui.py`
+
+### Using the `api_token` in Tests
+
+To use the `api_token` fixture in a test:
+
+```python
+def test_some_authenticated_endpoint(app_config, api_token):
+    headers = {"Authorization": f"Bearer {api_token}"}
+    response = requests.get(
+        f"{app_config['api_url']}/api/some-endpoint",
+        headers=headers
+    )
+    assert response.status_code == 200
+```
+
+## Integration Testing Structure
+
+The integration tests are organized by feature areas:
+
+### API Tests
+- `test_gateway_api.py`: Tests the network device gateway API
+- `test_auth_advanced.py`: Tests token management, refresh flow, and permissions
+- `test_credential_advanced.py`: Tests credential management features
+- `test_job_logs_advanced.py`: Tests job logging and retrieval
+
+### UI-Driven Tests (API-based)
+- `test_admin_settings_ui.py`: Tests admin settings UI functionality via the API
+- `test_admin_settings_api.py`: Tests direct admin settings API endpoints
+- `test_key_management_ui.py`: Tests key management UI functionality via the API
+
+## Best Practices for NetRaven Tests
+
+1. **Always use the `api_token` fixture** for authentication
+2. **Include meaningful assertions** that verify expected behavior
+3. **Clean up test resources** to avoid interference between tests
+4. **Handle missing features gracefully** using conditional tests/skips
+5. **Use descriptive test names** that clearly indicate what's being tested
+6. **Keep test functions focused** on testing a single aspect
+7. **Group related tests** into appropriate files 

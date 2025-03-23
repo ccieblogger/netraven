@@ -25,17 +25,11 @@ class ScheduledJob(Base):
     name = Column(String(255), nullable=False)
     device_id = Column(String(36), ForeignKey("devices.id"), nullable=False)
     
-    # Job type field
-    job_type = Column(String(50), nullable=False, default="backup")  # "backup" or future types
-    
-    # Enhanced schedule fields
+    # Schedule fields
     schedule_type = Column(String(50), nullable=False)  # "immediate", "one_time", "daily", "weekly", "monthly", "yearly"
-    start_datetime = Column(DateTime, nullable=True)  # When the schedule should start
-    
-    # Recurrence fields
-    recurrence_day = Column(String(50), nullable=True)  # Day of week/month for recurrence
-    recurrence_month = Column(String(50), nullable=True)  # Month for yearly recurrence
-    recurrence_time = Column(String(5), nullable=True)  # HH:MM format
+    schedule_time = Column(String(5), nullable=True)  # HH:MM format
+    schedule_interval = Column(Integer, nullable=True)  # Interval for recurring schedules
+    schedule_day = Column(String(10), nullable=True)  # Day of week/month for recurrence
     
     # Standard fields
     enabled = Column(Boolean, default=True)

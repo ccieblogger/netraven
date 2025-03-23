@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { apiClient } from '../api/api'
+import apiClient from '../api/api'
 
 export const useCredentialStore = defineStore('credential', {
   state: () => ({
@@ -52,18 +52,23 @@ export const useCredentialStore = defineStore('credential', {
   
   actions: {
     async fetchCredentials(params = {}) {
+      console.log('Store: Starting fetchCredentials');
       this.loading = true
       this.error = null
       
       try {
+        console.log('Store: Calling apiClient.getCredentials');
         const data = await apiClient.getCredentials(params)
+        console.log('Store: Received credential data:', data.length, 'items');
         this.credentials = data
         return data
       } catch (error) {
-        console.error('Error fetching credentials:', error)
+        console.error('Store: Error fetching credentials:', error)
+        console.error('Store: Error details:', error.response ? error.response.data : 'No response data');
         this.error = error.message || 'Failed to fetch credentials'
         return []
       } finally {
+        console.log('Store: Completed fetchCredentials');
         this.loading = false
       }
     },

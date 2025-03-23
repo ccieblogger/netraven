@@ -33,7 +33,7 @@ class AuditLogBase(BaseModel):
     session_id: Optional[str] = Field(None, description="Session ID for the request")
     
     # Additional data
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional structured data about the event")
+    event_metadata: Optional[Dict[str, Any]] = Field(None, description="Additional structured data about the event")
 
 
 class AuditLogCreate(AuditLogBase):

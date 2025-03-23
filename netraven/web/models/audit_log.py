@@ -43,7 +43,7 @@ class AuditLog(Base):
                           comment="Human-readable description of the event")
     status = Column(String(16), nullable=False, 
                      comment="Outcome status (success, failure, error, warning)")
-    metadata = Column(JSON, nullable=True, 
+    event_metadata = Column(JSON, nullable=True, 
                        comment="Additional structured data about the event")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, 
                          comment="Timestamp when the event was logged")
@@ -84,6 +84,6 @@ class AuditLog(Base):
             "session_id": self.session_id,
             "description": self.description,
             "status": self.status,
-            "metadata": self.metadata,
+            "metadata": self.event_metadata,
             "created_at": self.created_at.isoformat() if self.created_at else None
         } 

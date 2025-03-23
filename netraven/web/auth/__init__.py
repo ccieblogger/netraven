@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt
+from jose import jwt as jose_jwt  # Renamed to avoid conflicts with local module
+import jwt as pyjwt  # Import the PyJWT library explicitly
 
 from netraven.core.auth import (
     validate_token,
@@ -215,7 +216,7 @@ async def get_current_principal(
         # For debugging purposes, decode the token without validation first
         try:
             logger.info(f"Raw token: {token[:20]}...")
-            payload = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
+            payload = jose_jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
             logger.info(f"Token payload: {payload}")
         except Exception as e:
             logger.warning(f"Error decoding token: {str(e)}")
@@ -235,7 +236,7 @@ async def get_current_principal(
             logger.info("Using development mode token validation")
             try:
                 # Skip token store validation in dev mode
-                payload = jwt.decode(token, TOKEN_SECRET_KEY, algorithms=[TOKEN_ALGORITHM])
+                payload = pyjwt.decode(token, TOKEN_SECRET_KEY, algorithms=[TOKEN_ALGORITHM])
                 logger.info(f"Dev mode token validation succeeded for {payload.get('sub', 'unknown')}")
             except Exception as e:
                 logger.error(f"Dev mode token validation failed: {str(e)}")
@@ -454,7 +455,7 @@ def create_user_token(user: User) -> str:
     )
     
     # Store token metadata
-    token_data = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
+    token_data = pyjwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
     token_store.add_token(token_data["jti"], {
         "sub": user.username,
         "type": "user",
@@ -490,7 +491,7 @@ def create_service_token(
     )
     
     # Store token metadata
-    token_data = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
+    token_data = pyjwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
     token_store.add_token(token_data["jti"], {
         "sub": service_name,
         "type": "service",

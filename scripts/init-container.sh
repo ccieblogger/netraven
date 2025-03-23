@@ -49,6 +49,10 @@ while retries > 0:
 echo "Running database migrations..."
 ./scripts/run-migrations.sh
 
+# Ensure schema has all required columns
+echo "Ensuring database schema is complete..."
+python scripts/ensure_schema.py
+
 # Create default admin user if not exists
 echo "Setting up default admin user..."
 python scripts/create_default_admin.py

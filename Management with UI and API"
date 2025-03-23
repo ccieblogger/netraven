@@ -1,0 +1,15 @@
+[33mcommit 6de116f0ed89ab8bd287ad39b041fb03d937f8c6[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m)[m
+Author: ccieblogger <ccieblogger@gmail.com>
+Date:   Fri Mar 21 12:31:20 2025 -0700
+
+    Implement Credential-Key Integration Improvements with enhanced credential store and analytics
+
+ netraven/core/credential_store.py                           | 720 [32m+++++++++++++++++++++++++++++++++++++++++++++++++++++[m[31m----[m
+ netraven/web/frontend/src/api/api.js                        | 134 [32m+++++++++++[m
+ netraven/web/frontend/src/components/layouts/MainLayout.vue |  41 [32m++++[m
+ netraven/web/frontend/src/router/index.js                   |   7 [32m+[m
+ netraven/web/frontend/src/store/credential.js               | 140 [32m++++++++[m[31m---[m
+ netraven/web/frontend/src/views/CredentialAnalytics.vue     | 703 [32m+++++++++++++++++++++++++++++++++++++++++++++++++++++++[m
+ netraven/web/routers/credentials.py                         | 319 [32m++++++++++++++++++++[m[31m-----[m
+ netraven/web/schemas/credential.py                          |  42 [32m++[m[31m--[m
+ 8 files changed, 1961 insertions(+), 145 deletions(-)

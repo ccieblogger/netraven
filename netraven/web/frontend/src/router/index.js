@@ -160,8 +160,9 @@ const router = createRouter({
 
 // Robust navigation guard for authentication
 router.beforeEach((to, from, next) => {
-  console.log(`Router: Navigating from ${from.path || '/'} to ${to.path}`);
-
+  console.log('Router navigation: from', from.path, 'to', to.path);
+  console.log('Router matched route:', to.matched);
+  
   // Check if the route requires authentication
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth !== false);
   

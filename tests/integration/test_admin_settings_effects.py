@@ -9,6 +9,14 @@ import pytest
 import uuid
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
+import time
+import requests
+from tests.utils.api_test_utils import (
+    create_test_user,
+    get_api_token,
+    update_admin_setting,
+    ensure_user_exists_with_role,
+)
 
 from netraven.web.app import app
 from netraven.web.auth.jwt import create_access_token
@@ -317,66 +325,62 @@ def test_email_notification_setting(admin_token, setup_default_settings):
 
 
 def test_backup_failure_notification_setting(admin_token, setup_default_settings):
-    """Test that backup failure notification setting affects notification behavior."""
-    # First enable email notifications
+    """Test that changing backup failure notification setting affects notifications."""
+    # Update backup failure notification setting
+    new_value = True
     response = client.put(
         "/api/admin/settings/notification",
-        json={
-            "email_notifications": True,
-            "admin_email": "admin@example.com"
-        },
+        json={"backup_failure_notification": new_value},
         headers={"Authorization": f"Bearer {admin_token}"}
     )
     assert response.status_code == 200
     
-    # Then update backup failure notification setting
-    response = client.put(
-        "/api/admin/settings/notification",
-        json={"backup_failure_notification": False},
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    assert response.status_code == 200
-    
-    # Mock the backup failure handler
-    with patch("netraven.jobs.backup_manager.handle_backup_failure") as mock_handler:
-        # Simulate a backup failure
+    # Mock the notification system
+    with patch("netraven.web.services.notification_service.send_notification") as mock_notify:
+        # Set up the mock
+        mock_notify.return_value = True
         
-        # Verify the mock was called
-        # In an actual test, you would verify that no notification is sent when the setting is disabled
-        # This is a simplification for demonstration
+        # Simulate a backup failure that would trigger the notification
+        # In a real app, this would be handled by the job system
+        from netraven.web.services.notification_service import send_backup_failure_notification
+        device_id = str(uuid.uuid4())  # Mock device ID
+        error_message = "Backup failed due to connection timeout"
+        send_backup_failure_notification(device_id, error_message)
+        
+        # Verify the notification was sent (or not sent) based on the setting
+        if new_value:
+            mock_notify.assert_called_once()
+        else:
+            mock_notify.assert_not_called()
 
 
 def test_key_rotation_notification_setting(admin_token, setup_default_settings):
-    """Test that key rotation notification setting affects notification behavior."""
-    # First enable email notifications
+    """Test that changing key rotation notification setting affects notifications."""
+    # Update key rotation notification setting
+    new_value = True
     response = client.put(
         "/api/admin/settings/notification",
-        json={
-            "email_notifications": True,
-            "admin_email": "admin@example.com"
-        },
+        json={"key_rotation_notification": new_value},
         headers={"Authorization": f"Bearer {admin_token}"}
     )
     assert response.status_code == 200
     
-    # Then update key rotation notification setting
-    response = client.put(
-        "/api/admin/settings/notification",
-        json={"key_rotation_notification": True},
-        headers={"Authorization": f"Bearer {admin_token}"}
-    )
-    assert response.status_code == 200
-    
-    # Mock the key rotation handler
-    with patch("netraven.jobs.key_rotation.handle_key_rotation") as mock_handler:
-        # Simulate a key rotation event
-        from netraven.jobs.key_rotation import handle_key_rotation
-        handle_key_rotation(key_id=str(uuid.uuid4()))
+    # Mock the notification system
+    with patch("netraven.web.services.notification_service.send_notification") as mock_notify:
+        # Set up the mock
+        mock_notify.return_value = True
         
-        # Verify the mock was called
-        mock_handler.assert_called_once()
-        # In an actual test, you would verify that a notification is sent when the setting is enabled
-        # This is a simplification for demonstration
+        # Simulate a key rotation event that would trigger the notification
+        from netraven.web.services.notification_service import send_key_rotation_notification
+        key_id = str(uuid.uuid4())  # Mock key ID
+        days_until_expiry = 30
+        send_key_rotation_notification(key_id, days_until_expiry)
+        
+        # Verify the notification was sent (or not sent) based on the setting
+        if new_value:
+            mock_notify.assert_called_once()
+        else:
+            mock_notify.assert_not_called()
 
 
 # Settings Change Validation Tests
@@ -420,4 +424,68 @@ def test_non_admin_cannot_change_settings(user_token, setup_default_settings):
         json=update_data,
         headers={"Authorization": f"Bearer {user_token}"}
     )
-    assert response.status_code == 403  # Forbidden 
+    assert response.status_code == 403  # Forbidden
+
+
+def test_admin_settings_idle_timeout_effects(clear_db, api_url, api_port):
+    # Setup admin user
+    admin_username = "admin_timeout_test"
+    admin_password = "Admin123!"
+    ensure_user_exists_with_role(api_url, admin_username, admin_password, "admin")
+    
+    # Get admin token
+    admin_token = get_api_token(api_url, admin_username, admin_password)
+    
+    # Update idle timeout setting to 5 seconds for testing
+    update_admin_setting(api_url, admin_token, "session_idle_timeout", "5")
+    
+    # Setup regular user
+    test_username = "timeout_test_user"
+    test_password = "Test123!"
+    create_test_user(api_url, admin_token, test_username, test_password, ["user"])
+    
+    # Get user token
+    user_token = get_api_token(api_url, test_username, test_password)
+    
+    # Make a request with the user token
+    with requests.Session() as session:
+        session.headers.update({"Authorization": f"Bearer {user_token}"})
+        response = session.get(f"{api_url}/users/me")
+        assert response.status_code == 200
+        
+        # Wait for longer than the idle timeout
+        time.sleep(7)
+        
+        # Try to make another request with the same token
+        response = session.get(f"{api_url}/users/me")
+        # Should be unauthorized due to idle timeout
+        assert response.status_code == 401
+
+
+def test_admin_settings_password_policy_effects(clear_db, api_url, api_port):
+    # Setup admin user
+    admin_username = "admin_password_policy_test"
+    admin_password = "Admin123!"
+    ensure_user_exists_with_role(api_url, admin_username, admin_password, "admin")
+    
+    # Get admin token
+    admin_token = get_api_token(api_url, admin_username, admin_password)
+    
+    # Update password policy to require minimum 10 characters
+    update_admin_setting(api_url, admin_token, "password_min_length", "10")
+    
+    # Try to create a user with a short password (should fail)
+    short_password = "Short123"  # 8 characters
+    response = requests.post(
+        f"{api_url}/users",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "username": "short_password_user",
+            "password": short_password,
+            "roles": ["user"]
+        }
+    )
+    
+    # Should be rejected due to password policy
+    assert response.status_code == 400
+    assert "password" in response.json().get("detail", "").lower() 

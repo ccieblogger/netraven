@@ -49,6 +49,7 @@ setup(
     entry_points={
         "console_scripts": [
             "netraven=netraven.cli:main",
+            "netraven-key-manager=netraven.cli.key_management:main",
         ],
     },
     package_data={

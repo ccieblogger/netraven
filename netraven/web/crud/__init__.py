@@ -41,5 +41,13 @@ from netraven.web.crud.scheduled_job import (
 from netraven.web.crud.credential import (
     get_credentials, get_credential, create_credential, update_credential, delete_credential,
     get_credentials_by_tag, associate_credential_with_tag, remove_credential_from_tag,
-    test_credential, bulk_associate_credentials_with_tags, bulk_remove_credentials_from_tags
+    test_credential, bulk_associate_credentials_with_tags, bulk_remove_credentials_from_tags,
+    get_credential_stats
+)
+
+# Import admin settings CRUD operations
+from netraven.web.crud.admin_settings import (
+    get_admin_setting, get_admin_setting_by_key, get_admin_settings,
+    get_admin_settings_by_category, create_admin_setting, update_admin_setting,
+    update_admin_setting_value, delete_admin_setting, initialize_default_settings
 ) 

@@ -322,7 +322,7 @@
 </template>
 
 <script>
-import { api } from '@/api/api';
+import { default as apiClient } from '@/api/api';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 
 export default {
@@ -436,7 +436,7 @@ export default {
         if (this.filters.endDate) params.end_date = this.filters.endDate;
         
         // Make API request
-        const response = await api.get('/api/audit-logs', { params });
+        const response = await apiClient.get('/api/audit-logs', { params });
         
         this.auditLogs = response.data.items;
         this.totalItems = response.data.total;

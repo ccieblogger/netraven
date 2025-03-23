@@ -9,8 +9,9 @@ RUN addgroup -S netraven -g 1001 && \
 # Copy package.json and package-lock.json first for better layer caching
 COPY package*.json ./
 
-# Install dependencies and make sure Babel packages are installed
+# Install dependencies and make sure all required packages are installed
 RUN npm install && \
+    npm install --save date-fns vue-toastification@2.0.0-rc.5 && \
     npm install --save-dev @babel/core @babel/eslint-parser @babel/preset-env && \
     chown -R netraven:netraven /app
 

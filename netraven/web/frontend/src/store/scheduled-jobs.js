@@ -81,12 +81,46 @@ export const useScheduledJobStore = defineStore('scheduledJobs', {
       this.error = null
       
       try {
+        console.log("Creating scheduled job with data:", jobData);
         const newJob = await scheduledJobsService.createScheduledJob(jobData)
         this.scheduledJobs.push(newJob)
         return newJob
       } catch (error) {
         console.error('Scheduled Job Store: Error creating scheduled job:', error)
-        this.error = error.response?.data?.detail || 'Failed to create scheduled job'
+        
+        // Get detailed validation error info
+        if (error.response && error.response.status === 422) {
+          const details = error.response.data.detail || [];
+          
+          // Special handling for common errors
+          if (Array.isArray(details)) {
+            // Look for specific device-related errors
+            const deviceErrors = details.filter(err => 
+              err.loc.includes('device_id') || 
+              (typeof err.msg === 'string' && err.msg.toLowerCase().includes('device'))
+            );
+            
+            if (deviceErrors.length > 0) {
+              // Provide a more user-friendly message for device errors
+              this.error = 'Device error: Please make sure you have selected a valid device for this job.';
+            } else {
+              // Format other validation errors
+              const errorMessages = details.map(err => 
+                `Field '${err.loc.join('.')}': ${err.msg}`
+              ).join(', ');
+              this.error = `Validation error: ${errorMessages}`;
+            }
+          } else if (typeof error.response.data.detail === 'string' && 
+                     error.response.data.detail.toLowerCase().includes('device')) {
+            this.error = 'Device error: Please make sure you have selected a valid device for this job.';
+          } else {
+            this.error = `Validation error: ${error.response.data.detail}`;
+          }
+        } else {
+          this.error = error.response?.data?.detail || 'Failed to create scheduled job';
+        }
+        
+        alert(this.error);
         return null
       } finally {
         this.loading = false

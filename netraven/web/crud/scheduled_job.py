@@ -128,6 +128,131 @@ def get_scheduled_job_with_details(db: Session, job_id: str) -> Optional[Dict[st
         # Re-raise to let the router handle it
         raise
 
+def calculate_next_run(
+    schedule_type: str,
+    schedule_time: Optional[str] = None,
+    schedule_day: Optional[str] = None,
+    schedule_interval: Optional[int] = None,
+) -> Optional[datetime]:
+    """
+    Calculate the next run time based on schedule parameters.
+    
+    Args:
+        schedule_type: Type of schedule (one_time, daily, weekly, monthly, yearly)
+        schedule_time: Time in HH:MM format
+        schedule_day: Day of week/month
+        schedule_interval: Interval for recurring schedules
+        
+    Returns:
+        Next run time as datetime
+    """
+    now = datetime.utcnow()
+    
+    if schedule_type == "immediate":
+        return now
+    
+    if schedule_type == "one_time":
+        if not schedule_time:
+            return None
+        
+        # Parse time (HH:MM)
+        hour, minute = map(int, schedule_time.split(':'))
+        dt = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        
+        # If time is in the past, set for tomorrow
+        if dt < now:
+            dt = dt + timedelta(days=1)
+        
+        return dt
+    
+    if schedule_type == "daily":
+        if not schedule_time:
+            return None
+        
+        # Parse time (HH:MM)
+        hour, minute = map(int, schedule_time.split(':'))
+        dt = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        
+        # If time is in the past, set for tomorrow
+        if dt < now:
+            dt = dt + timedelta(days=1)
+        
+        return dt
+    
+    if schedule_type == "weekly":
+        if not schedule_time or not schedule_day:
+            return None
+        
+        # Parse day of week (0-6, where 0 is Monday)
+        day_of_week = int(schedule_day)
+        
+        # Calculate days until target day of week
+        days_ahead = day_of_week - now.weekday()
+        if days_ahead <= 0:  # Target day already passed this week
+            days_ahead += 7
+        
+        # Calculate target date
+        target_date = now.date() + timedelta(days=days_ahead)
+        
+        # Parse time (HH:MM)
+        hour, minute = map(int, schedule_time.split(':'))
+        
+        # Combine date and time
+        dt = datetime.combine(target_date, datetime.min.time().replace(hour=hour, minute=minute))
+        
+        return dt
+    
+    if schedule_type == "monthly":
+        if not schedule_time or not schedule_day:
+            return None
+        
+        # Parse day of month (1-31)
+        day_of_month = int(schedule_day)
+        
+        # Check if current month still has the target day
+        target_month = now.month
+        target_year = now.year
+        
+        # Get last day of current month
+        last_day = calendar.monthrange(target_year, target_month)[1]
+        
+        # If target day is beyond end of month, adjust to last day
+        if day_of_month > last_day:
+            day_of_month = last_day
+        
+        # Create target date for current month
+        target_date = now.replace(day=day_of_month, hour=0, minute=0, second=0, microsecond=0)
+        
+        # If target date is in the past, move to next month
+        if target_date < now:
+            # Move to next month
+            if target_month == 12:
+                target_month = 1
+                target_year += 1
+            else:
+                target_month += 1
+            
+            # Calculate last day of next month
+            last_day = calendar.monthrange(target_year, target_month)[1]
+            
+            # If target day is beyond end of month, adjust to last day
+            if day_of_month > last_day:
+                day_of_month = last_day
+            
+            # Create target date for next month
+            target_date = now.replace(year=target_year, month=target_month, day=day_of_month)
+        
+        # Parse time (HH:MM)
+        hour, minute = map(int, schedule_time.split(':'))
+        
+        # Set time component
+        target_date = target_date.replace(hour=hour, minute=minute)
+        
+        return target_date
+        
+    # Default case
+    return None
+
 def create_scheduled_job(
     db: Session,
     job_data: ScheduledJobCreate,
@@ -147,10 +272,9 @@ def create_scheduled_job(
     # Calculate next run time based on schedule
     next_run = calculate_next_run(
         schedule_type=job_data.schedule_type,
-        start_datetime=job_data.start_datetime,
-        recurrence_time=job_data.recurrence_time,
-        recurrence_day=job_data.recurrence_day,
-        recurrence_month=job_data.recurrence_month
+        schedule_time=job_data.schedule_time,
+        schedule_day=job_data.schedule_day,
+        schedule_interval=job_data.schedule_interval
     )
     
     # Using model_dump for Pydantic v2 compatibility
@@ -201,7 +325,7 @@ def update_scheduled_job(
     
     # If schedule parameters changed, recalculate next run
     schedule_changed = False
-    schedule_params = ["schedule_type", "start_datetime", "recurrence_time", "recurrence_day", "recurrence_month"]
+    schedule_params = ["schedule_type", "schedule_time", "schedule_day", "schedule_interval"]
     
     for field in schedule_params:
         if field in update_data:
@@ -215,10 +339,9 @@ def update_scheduled_job(
     if schedule_changed:
         db_job.next_run = calculate_next_run(
             schedule_type=db_job.schedule_type,
-            start_datetime=db_job.start_datetime,
-            recurrence_time=db_job.recurrence_time,
-            recurrence_day=db_job.recurrence_day,
-            recurrence_month=db_job.recurrence_month
+            schedule_time=db_job.schedule_time,
+            schedule_day=db_job.schedule_day,
+            schedule_interval=db_job.schedule_interval
         )
     
     db.commit()
@@ -274,10 +397,9 @@ def toggle_scheduled_job(
     if enabled:
         db_job.next_run = calculate_next_run(
             schedule_type=db_job.schedule_type,
-            start_datetime=db_job.start_datetime,
-            recurrence_time=db_job.recurrence_time,
-            recurrence_day=db_job.recurrence_day,
-            recurrence_month=db_job.recurrence_month
+            schedule_time=db_job.schedule_time,
+            schedule_day=db_job.schedule_day,
+            schedule_interval=db_job.schedule_interval
         )
     
     db.commit()
@@ -312,10 +434,9 @@ def update_job_last_run(
     # Calculate next run time
     db_job.next_run = calculate_next_run(
         schedule_type=db_job.schedule_type,
-        start_datetime=db_job.start_datetime,
-        recurrence_time=db_job.recurrence_time,
-        recurrence_day=db_job.recurrence_day,
-        recurrence_month=db_job.recurrence_month
+        schedule_time=db_job.schedule_time,
+        schedule_day=db_job.schedule_day,
+        schedule_interval=db_job.schedule_interval
     )
     
     db.commit()
@@ -343,139 +464,4 @@ def get_due_jobs(db: Session) -> List[ScheduledJob]:
                 ScheduledJob.next_run == None
             )
         )
-    ).all()
-
-def calculate_next_run(
-    schedule_type: ScheduleTypeEnum,
-    start_datetime: Optional[datetime] = None,
-    recurrence_time: Optional[str] = None,
-    recurrence_day: Optional[str] = None,
-    recurrence_month: Optional[str] = None
-) -> Optional[datetime]:
-    """
-    Calculate the next run time for a scheduled job.
-    
-    Args:
-        schedule_type: Type of schedule (immediate, one_time, daily, weekly, monthly, yearly)
-        start_datetime: Start datetime for scheduled jobs
-        recurrence_time: Time of day for recurring jobs (HH:MM format)
-        recurrence_day: Day of month/week for monthly/weekly jobs
-        recurrence_month: Month for yearly jobs
-        
-    Returns:
-        Next run time as a datetime object, or None if no schedule
-    """
-    now = datetime.utcnow()
-    
-    # For immediate schedules, use now
-    if schedule_type == ScheduleTypeEnum.IMMEDIATE:
-        return now
-    
-    # For one-time schedules, use start_datetime
-    if schedule_type == ScheduleTypeEnum.ONE_TIME:
-        if start_datetime:
-            # If start_datetime is in the past, return None (job won't run)
-            return start_datetime if start_datetime > now else None
-        return None
-    
-    # Calculate next run time based on recurrence pattern
-    if schedule_type == ScheduleTypeEnum.DAILY and recurrence_time:
-        # For daily schedules, next run is today at recurrence_time or tomorrow if that's in the past
-        hour, minute = map(int, recurrence_time.split(":"))
-        next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if next_run <= now:
-            next_run += timedelta(days=1)
-        return next_run
-    
-    if schedule_type == ScheduleTypeEnum.WEEKLY and recurrence_time and recurrence_day:
-        # For weekly schedules, next run is the next occurrence of recurrence_day at recurrence_time
-        hour, minute = map(int, recurrence_time.split(":"))
-        day_map = {
-            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
-            "friday": 4, "saturday": 5, "sunday": 6
-        }
-        target_weekday = day_map.get(recurrence_day.lower())
-        if target_weekday is None:
-            return None
-        
-        next_run = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        days_ahead = target_weekday - now.weekday()
-        if days_ahead < 0:  # Target day already happened this week
-            days_ahead += 7
-        elif days_ahead == 0 and next_run <= now:  # Target day is today but time has passed
-            days_ahead = 7
-        
-        next_run += timedelta(days=days_ahead)
-        return next_run
-    
-    if schedule_type == ScheduleTypeEnum.MONTHLY and recurrence_time and recurrence_day:
-        # For monthly schedules, next run is the specified day of the current month
-        # or next month if that day has passed this month
-        hour, minute = map(int, recurrence_time.split(":"))
-        
-        try:
-            # Try to parse the recurrence_day as an integer (day of month)
-            day = int(recurrence_day)
-            
-            # Calculate next run date
-            if day < 1 or day > 31:
-                return None
-            
-            # Start with a day candidate for this month
-            next_run = now.replace(day=min(day, calendar.monthrange(now.year, now.month)[1]),
-                                 hour=hour, minute=minute, second=0, microsecond=0)
-            
-            # If the day has passed this month, move to next month
-            if next_run <= now:
-                # Move to first day of next month
-                if now.month == 12:
-                    next_run = next_run.replace(year=now.year + 1, month=1)
-                else:
-                    next_run = next_run.replace(month=now.month + 1)
-                
-                # Adjust day based on days in month
-                max_day = calendar.monthrange(next_run.year, next_run.month)[1]
-                next_run = next_run.replace(day=min(day, max_day))
-            
-            return next_run
-        except ValueError:
-            # If recurrence_day isn't an integer, it might be a string like "last"
-            # This would be an advanced feature to implement
-            return None
-    
-    if schedule_type == ScheduleTypeEnum.YEARLY and recurrence_time and recurrence_day and recurrence_month:
-        # For yearly schedules, next run is the specified day of the specified month
-        hour, minute = map(int, recurrence_time.split(":"))
-        
-        try:
-            # Try to parse inputs
-            day = int(recurrence_day)
-            month_map = {
-                "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
-                "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12
-            }
-            month = month_map.get(recurrence_month.lower())
-            
-            if month is None or day < 1 or day > 31:
-                return None
-            
-            # Calculate next run date
-            year = now.year
-            max_day = calendar.monthrange(year, month)[1]
-            next_run = now.replace(year=year, month=month, 
-                                day=min(day, max_day),
-                                hour=hour, minute=minute, second=0, microsecond=0)
-            
-            # If the date has passed this year, move to next year
-            if next_run <= now:
-                next_run = next_run.replace(year=year + 1)
-                # Recalculate max days for the new year (leap year consideration)
-                max_day = calendar.monthrange(next_run.year, month)[1]
-                next_run = next_run.replace(day=min(day, max_day))
-            
-            return next_run
-        except ValueError:
-            return None
-    
-    # Return None if schedule type is not recognized or missing required parameters
-    return None 
+    ).all() 

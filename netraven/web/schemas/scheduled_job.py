@@ -19,11 +19,10 @@ class ScheduledJobBase(BaseModel):
     schedule_type: ScheduleTypeEnum
     enabled: bool = True
     
-    # New scheduling fields
-    start_datetime: Optional[datetime] = None
-    recurrence_day: Optional[str] = None  # Day of week/month for recurrence
-    recurrence_month: Optional[str] = None  # Month for yearly recurrence
-    recurrence_time: Optional[str] = None  # HH:MM format
+    # Schedule fields
+    schedule_time: Optional[str] = Field(None, pattern=r"^([01]\d|2[0-3]):([0-5]\d)$")  # HH:MM format
+    schedule_day: Optional[str] = None  # Day of week/month for recurrence
+    schedule_interval: Optional[int] = None  # Interval for recurring schedules
     
     job_data: Optional[Dict[str, Any]] = None
 
@@ -39,11 +38,10 @@ class ScheduledJobUpdate(BaseModel):
     schedule_type: Optional[ScheduleTypeEnum] = None
     enabled: Optional[bool] = None
     
-    # New scheduling fields
-    start_datetime: Optional[datetime] = None
-    recurrence_day: Optional[str] = None
-    recurrence_month: Optional[str] = None
-    recurrence_time: Optional[str] = None
+    # Schedule fields
+    schedule_time: Optional[str] = Field(None, pattern=r"^([01]\d|2[0-3]):([0-5]\d)$")  # HH:MM format
+    schedule_day: Optional[str] = None  # Day of week/month for recurrence
+    schedule_interval: Optional[int] = None  # Interval for recurring schedules
     
     job_data: Optional[Dict[str, Any]] = None
 

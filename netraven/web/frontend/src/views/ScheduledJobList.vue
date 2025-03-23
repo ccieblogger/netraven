@@ -2,9 +2,32 @@
   <MainLayout>
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold">Scheduled Jobs</h1>
-      <button @click="showAddJobModal = true" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-        Add Scheduled Job
-      </button>
+      <div>
+        <button 
+          v-if="devices.length > 0"
+          @click="showAddJobModal = true" 
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Add Scheduled Job
+        </button>
+        <router-link 
+          v-else
+          to="/devices" 
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center"
+        >
+          <span class="mr-2">Add Devices</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </router-link>
+      </div>
+    </div>
+    
+    <!-- Warning when no devices exist -->
+    <div v-if="devices.length === 0" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6">
+      <p class="font-bold">No Devices Available</p>
+      <p>You need to add at least one device before you can create scheduled jobs. Please go to the Devices section to add a device first.</p>
+      <router-link to="/devices" class="underline mt-2 inline-block">Go to Devices</router-link>
     </div>
     
     <!-- Filters -->
@@ -83,14 +106,24 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <h3 class="mt-2 text-lg font-medium text-gray-900">No scheduled jobs found</h3>
-      <p class="mt-1 text-gray-500">No scheduled jobs match your current filters.</p>
+      <p class="mt-1 text-gray-500">
+        {{ devices.length === 0 ? 'You need to add devices before creating scheduled jobs.' : 'No scheduled jobs match your current filters.' }}
+      </p>
       <div class="mt-6">
         <button 
+          v-if="devices.length > 0"
           @click="showAddJobModal = true" 
           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
         >
           Add Your First Scheduled Job
         </button>
+        <router-link 
+          v-else
+          to="/devices" 
+          class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+        >
+          Add Devices First
+        </router-link>
       </div>
     </div>
     
@@ -208,35 +241,88 @@
               v-model="jobForm.job_type" 
               class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
             >
-              <option value="device_backup">Device Backup</option>
-              <option value="config_compliance">Config Compliance</option>
-              <option value="device_discovery">Device Discovery</option>
-              <option value="system_maintenance">System Maintenance</option>
+              <option value="backup">Device Backup</option>
             </select>
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Schedule Interval (minutes)</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Schedule Type</label>
+            <select 
+              v-model="jobForm.schedule_type" 
+              class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
+            >
+              <option value="immediate">Immediate (Run once now)</option>
+              <option value="one_time">One Time</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          
+          <div v-if="jobForm.schedule_type === 'daily' || jobForm.schedule_type === 'weekly' || jobForm.schedule_type === 'monthly'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Schedule Time (HH:MM)</label>
+            <input 
+              type="text" 
+              v-model="jobForm.schedule_time" 
+              class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
+              placeholder="00:00"
+              pattern="^([01]\d|2[0-3]):([0-5]\d)$"
+            />
+          </div>
+          
+          <div v-if="jobForm.schedule_type === 'weekly'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Day of Week</label>
+            <select 
+              v-model="jobForm.schedule_day" 
+              class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
+            >
+              <option value="monday">Monday</option>
+              <option value="tuesday">Tuesday</option>
+              <option value="wednesday">Wednesday</option>
+              <option value="thursday">Thursday</option>
+              <option value="friday">Friday</option>
+              <option value="saturday">Saturday</option>
+              <option value="sunday">Sunday</option>
+            </select>
+          </div>
+          
+          <div v-if="jobForm.schedule_type === 'monthly'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Day of Month (1-31)</label>
             <input 
               type="number" 
-              v-model="jobForm.schedule_interval" 
+              v-model="jobForm.schedule_day" 
               min="1"
+              max="31"
               class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
-              placeholder="Enter interval in minutes"
+              placeholder="1"
+            />
+          </div>
+          
+          <div v-if="jobForm.schedule_type === 'one_time'">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Start Date and Time</label>
+            <input 
+              type="datetime-local" 
+              v-model="jobForm.start_datetime" 
+              class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
             />
           </div>
           
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Device</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Device <span class="text-red-500" v-if="jobForm.job_type === 'backup'">*</span></label>
             <select 
               v-model="jobForm.device_id" 
               class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
+              :class="{ 'border-red-500': jobForm.job_type === 'backup' && !jobForm.device_id }"
+              required
             >
               <option value="">None (System-wide job)</option>
               <option v-for="device in devices" :key="device.id" :value="device.id">
                 {{ device.hostname }}
               </option>
             </select>
+            <p v-if="jobForm.job_type === 'backup' && !jobForm.device_id" class="mt-1 text-sm text-red-600">
+              A device is required for backup jobs
+            </p>
           </div>
           
           <div>
@@ -343,8 +429,12 @@ export default {
     const jobForm = ref({
       id: null,
       name: '',
-      job_type: 'device_backup',
+      job_type: 'backup',
+      schedule_type: 'daily',
       schedule_interval: 60,
+      schedule_time: '00:00',
+      schedule_day: null,
+      start_datetime: null,
       device_id: '',
       job_params_json: '{}',
       enabled: true
@@ -401,7 +491,11 @@ export default {
         id: job.id,
         name: job.name,
         job_type: job.job_type,
+        schedule_type: job.schedule_type,
         schedule_interval: job.schedule_interval,
+        schedule_time: job.schedule_time,
+        schedule_day: job.schedule_day,
+        start_datetime: job.start_datetime ? job.start_datetime.toISOString().split('T')[0] + 'T' + job.start_datetime.toISOString().split('T')[1] : null,
         device_id: job.device_id || '',
         job_params_json: job.job_params ? JSON.stringify(job.job_params, null, 2) : '{}',
         enabled: job.enabled
@@ -435,12 +529,19 @@ export default {
     }
     
     const resetJobForm = () => {
+      // Set default device if available
+      const defaultDevice = devices.value.length > 0 ? devices.value[0].id : '';
+      
       jobForm.value = {
         id: null,
         name: '',
-        job_type: 'device_backup',
+        job_type: 'backup',
+        schedule_type: 'daily',
         schedule_interval: 60,
-        device_id: '',
+        schedule_time: '00:00',
+        schedule_day: null,
+        start_datetime: null,
+        device_id: defaultDevice,
         job_params_json: '{}',
         enabled: true
       }
@@ -450,6 +551,22 @@ export default {
       isSavingJob.value = true
       
       try {
+        // Check if devices exist in the system
+        if (devices.value.length === 0) {
+          alert('You need to add at least one device before creating a scheduled job. Please go to the Devices section first.');
+          closeJobModal();
+          router.push('/devices');
+          return;
+        }
+        
+        // Validate the form
+        const validationError = validateForm();
+        if (validationError) {
+          alert(validationError);
+          isSavingJob.value = false;
+          return;
+        }
+        
         // Parse job parameters from JSON string
         let jobParams = {}
         try {
@@ -459,14 +576,34 @@ export default {
           return
         }
         
+        // Basic job data
         const jobData = {
           name: jobForm.value.name,
           job_type: jobForm.value.job_type,
-          schedule_interval: parseInt(jobForm.value.schedule_interval),
+          schedule_type: jobForm.value.schedule_type,
           device_id: jobForm.value.device_id || null,
-          job_params: jobParams,
+          job_data: jobParams,
           enabled: jobForm.value.enabled
         }
+        
+        // Add schedule parameters based on schedule type
+        if (jobForm.value.schedule_type === 'daily' || 
+            jobForm.value.schedule_type === 'weekly' || 
+            jobForm.value.schedule_type === 'monthly') {
+          jobData.schedule_time = jobForm.value.schedule_time || '00:00'
+        }
+        
+        if (jobForm.value.schedule_type === 'weekly' || 
+            jobForm.value.schedule_type === 'monthly') {
+          jobData.schedule_day = jobForm.value.schedule_day
+        }
+        
+        if (jobForm.value.schedule_type === 'one_time') {
+          jobData.start_datetime = jobForm.value.start_datetime ? 
+            new Date(jobForm.value.start_datetime).toISOString() : null
+        }
+        
+        console.log('Sending job data:', jobData)
         
         if (showEditJobModal.value) {
           // Update existing job
@@ -549,6 +686,43 @@ export default {
     const getDeviceName = (deviceId) => {
       const device = deviceStore.getDeviceById(deviceId)
       return device ? device.hostname : deviceId
+    }
+    
+    // Add a new function to validate the form
+    const validateForm = () => {
+      // Check for required fields
+      if (!jobForm.value.name || jobForm.value.name.trim() === '') {
+        return 'Job name is required';
+      }
+      
+      if (jobForm.value.job_type === 'backup' && !jobForm.value.device_id) {
+        return 'A device is required for backup jobs';
+      }
+      
+      // Validate schedule based on type
+      if (jobForm.value.schedule_type === 'daily' || 
+          jobForm.value.schedule_type === 'weekly' || 
+          jobForm.value.schedule_type === 'monthly') {
+        
+        if (!jobForm.value.schedule_time || !/^([01]\d|2[0-3]):([0-5]\d)$/.test(jobForm.value.schedule_time)) {
+          return 'Valid schedule time (HH:MM) is required';
+        }
+      }
+      
+      if (jobForm.value.schedule_type === 'weekly' && !jobForm.value.schedule_day) {
+        return 'Day of week is required for weekly schedules';
+      }
+      
+      if (jobForm.value.schedule_type === 'monthly' && !jobForm.value.schedule_day) {
+        return 'Day of month is required for monthly schedules';
+      }
+      
+      if (jobForm.value.schedule_type === 'one_time' && !jobForm.value.start_datetime) {
+        return 'Start date and time is required for one-time schedules';
+      }
+      
+      // Validation passed
+      return null;
     }
     
     return {

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import uuid
 import os
 import calendar
+from sqlalchemy import func
 
 # Import authentication dependencies
 from netraven.web.auth import (
@@ -41,6 +42,7 @@ from netraven.core.logging import get_logger
 from netraven.jobs.scheduler import get_scheduler
 from netraven.web.models.job_log import JobLog as JobLogModel
 from netraven.web.services.scheduler_service import get_scheduler_service
+from netraven.web.models.device import Device
 
 # Create router
 router = APIRouter(prefix="", tags=["scheduled-jobs"])
@@ -218,6 +220,9 @@ async def create_scheduled_job_endpoint(
     Returns:
         Created scheduled job
     """
+    # Log received data for debugging
+    logger.info(f"Received scheduled job create request: {job_data.model_dump()}")
+    
     # Check permission
     if not current_user.has_scope("write:schedules") and not current_user.is_admin:
         logger.warning(f"Access denied: user={current_user.username}, " 
@@ -228,16 +233,50 @@ async def create_scheduled_job_endpoint(
         )
     
     try:
-        # Check if user has access to the device
-        device = check_device_access(
-            principal=current_user,
-            device_id_or_obj=job_data.device_id,
-            required_scope="read:devices",
-            db=db
-        )
+        # Special handling for backup jobs - require device_id
+        if job_data.job_type == "backup" and not job_data.device_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="A device is required for backup jobs. Please select a valid device."
+            )
+        
+        # Check if device exists when device_id is provided
+        if job_data.device_id:
+            # First check if any devices exist in the system
+            device_count = db.query(func.count()).select_from(Device).scalar()
+            if device_count == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="No devices found in the system. Please add at least one device before creating a scheduled job."
+                )
+            
+            # Check if user has access to the device
+            try:
+                device = check_device_access(
+                    principal=current_user,
+                    device_id_or_obj=job_data.device_id,
+                    required_scope="read:devices",
+                    db=db
+                )
+                
+                if not device:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"Device with ID {job_data.device_id} not found or you don't have access to it."
+                    )
+            except Exception as e:
+                logger.error(f"Error checking device access: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Error validating device: {str(e)}"
+                )
         
         # Validate schedule parameters based on schedule type
-        validate_schedule_parameters(job_data.schedule_type, job_data)
+        try:
+            validate_schedule_parameters(job_data.schedule_type, job_data)
+        except HTTPException as e:
+            logger.error(f"Schedule parameter validation failed: {e.detail}")
+            raise
         
         # Create the scheduled job
         job = create_scheduled_job(db, job_data, current_user.id)
@@ -252,9 +291,12 @@ async def create_scheduled_job_endpoint(
                 device_id=device.id,
                 job_type=job_data.job_type,
                 schedule_type=job_data.schedule_type,
+                schedule_time=job_data.schedule_time,
+                schedule_day=job_data.schedule_day,
+                schedule_interval=job_data.schedule_interval,
                 start_datetime=job_data.start_datetime,
-                recurrence_time=job_data.recurrence_time,
-                recurrence_day=job_data.recurrence_day,
+                recurrence_time=None,
+                recurrence_day=None,
                 recurrence_month=job_data.recurrence_month,
                 job_data=job_data.job_data
             )
@@ -342,6 +384,9 @@ async def update_scheduled_job_endpoint(
                     device_id=device.id if device else updated_job.device_id,
                     job_type=updated_job.job_type,
                     schedule_type=updated_job.schedule_type,
+                    schedule_time=updated_job.schedule_time,
+                    schedule_day=updated_job.schedule_day,
+                    schedule_interval=updated_job.schedule_interval,
                     start_datetime=updated_job.start_datetime,
                     recurrence_time=updated_job.recurrence_time,
                     recurrence_day=updated_job.recurrence_day,
@@ -576,6 +621,9 @@ async def toggle_scheduled_job_endpoint(
                     device_id=device.id if device else updated_job.device_id,
                     job_type=updated_job.job_type,
                     schedule_type=updated_job.schedule_type,
+                    schedule_time=updated_job.schedule_time,
+                    schedule_day=updated_job.schedule_day,
+                    schedule_interval=updated_job.schedule_interval,
                     start_datetime=updated_job.start_datetime,
                     recurrence_time=updated_job.recurrence_time,
                     recurrence_day=updated_job.recurrence_day,

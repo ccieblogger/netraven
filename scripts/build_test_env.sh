@@ -91,15 +91,47 @@ if [[ "$CONTAINER_ENV" != *"test"* ]]; then
 fi
 echo -e "${GREEN}Container environment is correctly set to test mode.${NC}"
 
+# Ensure PyJWT library is properly installed
+echo -e "${YELLOW}Ensuring PyJWT library is installed...${NC}"
+docker exec netraven-api-1 pip install PyJWT
+
+# Ensure database schema is complete
+echo -e "${YELLOW}Ensuring database schema is properly initialized...${NC}"
+docker exec netraven-api-1 python scripts/ensure_schema.py
+
+# Create default admin user
+echo -e "${YELLOW}Creating default admin user...${NC}"
+docker exec netraven-api-1 python scripts/create_default_admin.py
+
+# Verify database setup
+echo -e "${YELLOW}Verifying database setup...${NC}"
+docker exec netraven-api-1 python -c "
+from netraven.web.database import SessionLocal
+from netraven.web.models.user import User
+from netraven.web.models.audit_log import AuditLog
+
+db = SessionLocal()
+try:
+    user_count = db.query(User).count()
+    audit_count = db.query(AuditLog).count()
+    print(f'Database has {user_count} users and {audit_count} audit log entries')
+    if user_count > 0:
+        print('Database initialization verified successfully!')
+    else:
+        print('Warning: No users found in database')
+finally:
+    db.close()
+"
+
 # Provide helpful command examples
 echo -e "\n${GREEN}NetRaven test environment is running!${NC}"
 echo -e "\n${GREEN}Example commands to run tests:${NC}"
 echo -e "${YELLOW}Run all tests:${NC}"
 echo "docker exec netraven-api-1 python -m pytest"
-echo -e "${YELLOW}Run UI tests:${NC}"
-echo "docker exec netraven-api-1 python -m pytest tests/ui -v"
+echo -e "${YELLOW}Run integration tests:${NC}"
+echo "docker exec netraven-api-1 python -m pytest tests/integration -v"
 echo -e "${YELLOW}Run specific test:${NC}"
-echo "docker exec netraven-api-1 python -m pytest tests/ui/test_flows/test_login.py -v"
+echo "docker exec netraven-api-1 python -m pytest tests/integration/test_key_management_ui.py -v"
 echo -e "${YELLOW}View test artifacts:${NC}"
 echo "ls -la test-artifacts/"
 echo -e "${YELLOW}To view logs: docker-compose logs -f api${NC}"

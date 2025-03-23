@@ -228,50 +228,55 @@ export const useAuthStore = defineStore('auth', {
     },
     
     async login(username, password) {
-      this.loading = true
-      this.error = null
+      this.loading = true;
+      this.error = null;
+      
+      console.log('Auth Store: Starting login process');
+      console.log('Auth Store: Using API URL from apiClient');
       
       try {
-        const result = await apiClient.login(username, password)
+        console.log('Auth Store: Calling apiClient.login');
+        const result = await apiClient.login(username, password);
+        console.log('Auth Store: Login API response received:', result.success ? 'Success' : 'Failed');
         
         if (result.success) {
-          this.token = result.data.access_token
+          console.log('Auth Store: Login successful, storing token');
+          this.token = result.data.access_token;
           
           try {
-            const payload = JSON.parse(atob(this.token.split('.')[1]))
-            this.tokenScopes = payload.scope || []
+            const payload = JSON.parse(atob(this.token.split('.')[1]));
+            this.tokenScopes = payload.scope || [];
             
             // Store token expiration
             if (payload.exp) {
-              this.tokenExpiration = new Date(payload.exp * 1000)
+              this.tokenExpiration = new Date(payload.exp * 1000);
+              console.log('Auth Store: Token expiration set:', this.tokenExpiration.toISOString());
             }
             
-            console.log('Extracted token scopes:', this.tokenScopes)
+            console.log('Auth Store: Extracted token scopes:', this.tokenScopes);
           } catch (e) {
-            console.error('Error extracting token scopes:', e)
-            this.tokenScopes = []
+            console.error('Auth Store: Error parsing token payload:', e);
           }
+          
+          // Fetch user data immediately after login
+          console.log('Auth Store: Fetching user data after login');
+          await this.fetchCurrentUser();
           
           // Setup token refresh mechanism
-          this.setupTokenRefresh()
+          this.setupTokenRefresh();
           
-          try {
-            await this.fetchCurrentUser()
-          } catch (userError) {
-            console.error('Failed to fetch user after login:', userError)
-          }
-          
-          return true
+          return true;
         } else {
-          this.error = result.message || 'Login failed'
-          return false
+          console.error('Auth Store: Login failed:', result.message);
+          this.error = result.message || 'Login failed';
+          return false;
         }
       } catch (error) {
-        console.error('Login failed:', error)
-        this.error = error.message || 'Login failed'
-        return false
+        console.error('Auth Store: Login error:', error);
+        this.error = error.message || 'An error occurred during login';
+        return false;
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
     
