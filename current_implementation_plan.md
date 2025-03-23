@@ -220,6 +220,10 @@ docker exec netraven-api-1 python -m pytest -v tests/integration/test_key_manage
     - Incorrect import paths in various test files
     - FastAPI router configuration errors with empty prefixes and paths
     - Missing dependencies like sqlalchemy-utils in test environment
+    - Frontend login functionality issues due to wrong API endpoints in auth store
+    - Auth.py errors when accessing missing attributes on Pydantic User model
+    - Missing MainLayout component in CredentialList.vue causing UI rendering issues
+    - API credentials endpoint returning 500 errors due to improper database connection
 - ✅ Fix issues in test files or application code
   - Created proper FastAPI app definition in app.py
   - Added backward compatibility wrappers for storage classes (LocalFileStorage, S3Storage)
@@ -231,6 +235,16 @@ docker exec netraven-api-1 python -m pytest -v tests/integration/test_key_manage
   - Fixed API configuration in `netraven.web.api.py` by adding missing closing brackets and ensuring all routers are properly included
   - Added `sqlalchemy-utils` to the test requirements
   - Fixed the `tag_rule` import in `tests/utils/db_init.py` to use the correct import path
+  - Fixed frontend authentication by correcting API endpoint paths in api.js (using /token and /refresh instead of /api/token and /api/refresh)
+  - Fixed login functionality in auth.py by updating the event_metadata to use existing User model attributes (username and email) instead of missing attributes (id and role)
+  - Fixed CredentialList.vue by wrapping its content in the MainLayout component for consistent UI
+  - Updated credential_store.py to properly connect to PostgreSQL using environment variables from Docker configuration
+  - Added additional debugging in the frontend to help diagnose authentication and API request issues
+  - Fixed login API response formatting in API client to maintain compatibility with auth store expectations
+  - Fixed scheduled jobs and devices models to match actual database schema:
+    - Updated ScheduledJob model to use schedule_time, schedule_day, and schedule_interval columns instead of non-existent job_type and recurrence fields
+    - Updated Device model to remove non-existent credential_tag_ids column
+    - Updated scheduled job CRUD operations and Pydantic schemas to use the correct field names
 - [ ] Resolve remaining test failures:
   - Fix TestClient compatibility issue - tests failing with error: "TypeError: Client.__init__() got an unexpected keyword argument 'app'"
   - Add version constraints in test-requirements.txt to ensure compatible versions of httpx, starlette and fastapi
@@ -252,7 +266,7 @@ docker exec netraven-api-1 python -m pytest -v tests/integration/test_key_manage
 | API Authentication Standard    | ✅ Complete | March 22, 2025 |
 | Core Functionality Tests       | ✅ Complete | March 22, 2025 |
 | Advanced Tests                 | ✅ Complete | March 23, 2025 |
-| Test Verification & Troubleshooting | 📅 Scheduled | March 24, 2025 |
+| Test Verification & Troubleshooting | 🔄 In Progress | March 24, 2025 |
 | End-to-End Test Implementation | 📅 Scheduled | March 25, 2025 |
 | Final Test Run & Verification  | 📅 Scheduled | March 26, 2025 |
 
@@ -264,25 +278,46 @@ docker exec netraven-api-1 python -m pytest -v tests/integration/test_key_manage
   - Missing utility functions in api_test_utils.py
   - Storage class compatibility wrappers added
   - Import path corrections
+  - Fixed frontend authentication functionality:
+    - Corrected API endpoint paths in api.js (from /api/token to /token and from /api/refresh to /refresh)
+    - Fixed event_metadata in auth.py to use existing User model attributes
+  - Successfully resolved login functionality in the UI
 - Ready to continue troubleshooting remaining test failures
 
-## Next Steps
+## Today's Accomplishments (March 22, 2025)
 
-1. Continue Phase 4: Test Verification and Troubleshooting
-   - Fix remaining import and module errors
-   - Resolve any other test failures
-   - Verify tests run correctly after all fixes
+1. **Fixed API Authentication URL Routing Issue**
+   - Identified and resolved a critical API routing issue: the frontend was expecting authentication endpoints at `/api/auth/token` while the backend had them at `/token`
+   - Fixed by properly configuring the auth router in `app.py` to use the prefix `/api/auth`
+   - Successfully tested the token endpoint with proper JSON payload
+   - Confirmed that authorization is now working correctly for authenticated API requests
 
-2. After establishing a stable test baseline, proceed to Phase 5 for end-to-end tests
-   - Start with authentication flow end-to-end tests
-   - Develop device management workflow tests
-   - Implement backup and configuration comparison tests
+2. **API Route Configuration Audit**
+   - Verified all router configurations match the expected frontend endpoints
+   - Ensured consistency across the API interface by checking router mounting points
+   - Fixed inconsistencies between documentation and actual API implementation
 
-3. Create comprehensive test plan documentation to guide future testing efforts
+## Next Steps for Completion
 
-4. Verify test coverage across all key product features
+1. **Frontend Testing with Corrected API Routes**
+   - Test the complete login flow in the frontend with the corrected authentication endpoints
+   - Verify token refresh functionality works properly
+   - Ensure all authenticated API calls use the correct prefixes
 
-5. Conduct final test run and validation before releasing to production
+2. **Device Management Testing**
+   - Complete testing of device creation, editing, and deletion through the API
+   - Verify device listing functionality works properly
+   - Test scheduled job management related to devices
+
+3. **Test Remaining API Endpoints**
+   - Methodically test each API endpoint to ensure they're accessible at the correct paths
+   - Document any remaining issues with API endpoint configurations
+   - Ensure all CRUD operations function as expected
+
+4. **TestClient Compatibility Fixes**
+   - Address the TestClient compatibility issue in the test suite
+   - Add appropriate version constraints in test-requirements.txt
+   - Run the full test suite after resolving compatibility issues
 
 ## Key Improvements
 
@@ -291,6 +326,8 @@ docker exec netraven-api-1 python -m pytest -v tests/integration/test_key_manage
 3. Clear error messages when authentication fails
 4. Tests are more realistic by using the actual authentication flow
 5. Maintenance is simplified with a standardized approach
+6. Frontend authentication properly connected to backend with correct API endpoints
+7. Login functionality fully operational with proper error handling
 
 ## Completion Criteria
 
@@ -299,3 +336,63 @@ Testing implementation will be considered complete when:
 2. All tests are passing
 3. Any required fixes have been properly documented
 4. The application demonstrates consistent behavior across all test cases 
+
+## Updates to the Scheduled Jobs module
+
+1. **Fixed ScheduledJob model field names**: Updated field names to match the database schema (`schedule_time`, `schedule_day`, `schedule_interval` instead of the old names `recurrence_time`, `recurrence_day`, etc.)
+
+2. **Updated frontend form**: Modified the scheduled job form in `ScheduledJobList.vue` to:
+   - Include a proper `schedule_type` field with options
+   - Display dynamic fields based on the selected schedule type
+   - Format the data properly before sending to the API
+
+3. **Enhanced error handling**: Added better error handling for validation errors in the frontend, displaying meaningful messages to the user.
+
+4. **Updated scheduler adapters**: Modified the backend scheduler to accept both old and new field names for backward compatibility.
+
+5. **Added debugging**: Included additional logging to help diagnose API validation issues.
+
+6. **Improved device validation**: 
+   - Added warning message when no devices exist in the system
+   - Disabled "Add Scheduled Job" button when no devices are available
+   - Added detailed form validation to prevent submissions with missing required fields
+   - Improved error messages for device-related validation errors
+   - Added a "Go to Devices" link when no devices exist to guide users 
+   - Pre-select the first device in the dropdown when available
+
+7. **Better API validation**: Enhanced the API endpoint with improved validation for device requirements, providing more meaningful error messages when:
+   - No devices exist in the system
+   - A backup job is attempted without specifying a device
+   - The specified device doesn't exist or user doesn't have access 
+
+## Fixed Device Creation Issue
+
+1. The `create_device_endpoint` in `devices.py` was updated to use `current_principal.id` instead of `current_principal.user_id`, which was causing a 500 error when adding new devices.
+2. Root cause: The `UserPrincipal` class has an `id` attribute but not a `user_id` attribute, leading to the error during device creation.
+3. Impact: Users can now successfully create new devices through the UI without encountering internal server errors.
+
+## Fixed DeviceCreate Schema Issue
+
+1. The `DeviceCreate` schema in `schemas/device.py` was updated to explicitly include the `enabled` field, despite already inheriting it from the base class.
+2. Root cause: An `AttributeError` occurred when the CRUD function tried to access the `enabled` attribute, which suggests an issue with inheritance in the Pydantic models.
+3. Impact: Device creation now works correctly without attribute errors.
+
+## Fixed Pydantic v2 Compatibility Issues
+
+1. Updated the `create_device` function in `netraven/web/crud/device.py` to use Pydantic v2 compatible attribute access:
+   - Added support for using `model_dump()` for Pydantic v2 or falling back to `dict()` for older versions
+   - Modified how field values are accessed, using dictionary access with defaults instead of direct attribute access
+   - Removed the non-existent `credential_tag_ids` parameter from the Device constructor
+2. Root cause: The codebase was written for an older version of Pydantic, but the current environment uses Pydantic v2, which has different attribute access patterns.
+3. Impact: Device creation is now compatible with Pydantic v2 and works correctly in the current environment.
+
+## Fixed API Authentication URL Mismatch
+
+1. **Problem**: The frontend was looking for the authentication endpoint at `/api/auth/token`, but the backend had it mounted directly at `/token` without the `/api/auth` prefix.
+
+2. **Solution**: Updated the app configuration in `netraven/web/app.py` to mount the auth router with the correct prefix:
+   ```python
+   app.include_router(auth.router, prefix="/api/auth")
+   ```
+
+3. **Impact**: Authentication from the frontend now works correctly as the API endpoint aligns with the frontend's expectations.
