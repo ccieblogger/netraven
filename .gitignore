@@ -155,4 +155,5 @@ yarn-error.log*
 network_backups/
 
 # Trash can
+_archive/
 _archive/token.json
