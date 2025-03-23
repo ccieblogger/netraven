@@ -1,91 +1,80 @@
 # NetRaven Documentation
 
-## Introduction
-
-Welcome to the NetRaven documentation. This documentation provides comprehensive information about installing, configuring, using, and extending the NetRaven network management platform. NetRaven helps network administrators automate the backup, restoration, and comparison of network device configurations.
+Welcome to the NetRaven documentation. This documentation provides comprehensive information about installing, configuring, using, and maintaining the NetRaven network management platform.
 
 ## Documentation Structure
 
-The documentation is organized into the following main sections:
+Our documentation is organized into the following sections:
 
 ### [Getting Started](./getting-started/README.md)
-
-Information to help you get up and running with NetRaven:
-
-- [Quick Start Guide](./getting-started/quick-start.md)
 - [Installation Guide](./getting-started/installation.md)
+- [Quick Start Guide](./getting-started/quick-start.md)
 - [Initial Setup](./getting-started/initial-setup.md)
 
 ### [User Guide](./user-guide/README.md)
-
-Comprehensive documentation for end users:
-
-- [Managing Devices](./user-guide/managing-devices.md)
-- [Configuration Backups](./user-guide/backups.md)
-- [Scheduled Tasks](./user-guide/scheduled-tasks.md)
-- [Device Groups and Tags](./user-guide/device-groups.md)
+- [Device Management](./user-guide/device-management.md)
+- [Configuration Management](./user-guide/configuration-management.md)
+- [Dashboard and Reporting](./user-guide/dashboard-reporting.md)
+- [User Troubleshooting Guide](./user-guide/troubleshooting-guide.md)
 
 ### [Administrator Guide](./admin-guide/README.md)
-
-Information for system administrators:
-
+- [Monitoring and Alerting](./admin-guide/monitoring.md)
 - [User Management](./admin-guide/user-management.md)
-- [Security Configuration](./admin-guide/security.md)
-- [Backup Storage](./admin-guide/storage-configuration.md)
-- [System Monitoring](./admin-guide/monitoring.md)
+- [Backup and Recovery](./admin-guide/backup-recovery.md)
+- [Troubleshooting](./admin-guide/troubleshooting.md)
 
 ### [Developer Guide](./developer-guide/README.md)
-
-Information for developers and integrators:
-
+- [Architecture Overview](./developer-guide/architecture.md)
 - [API Reference](./developer-guide/api-reference.md)
-- [Architecture Overview](./developer-guide/architecture-overview.md)
-- [Development Environment Setup](./developer-guide/development-setup.md)
-- [Extension Points](./developer-guide/extension-points.md)
+- [Custom Integrations](./developer-guide/integrations.md)
+- [Contributing to NetRaven](./developer-guide/contributing.md)
 
 ### [Deployment](./deployment/README.md)
-
-Information about deploying NetRaven:
-
 - [Deployment Options](./deployment/deployment-options.md)
-- [Docker Deployment](./deployment/docker-deployment.md)
 - [High Availability Setup](./deployment/high-availability.md)
-- [Performance Tuning](./deployment/performance-tuning.md)
+- [Scalability Guidelines](./deployment/scalability.md)
 
 ### [Reference](./reference/README.md)
-
-Detailed reference information:
-
 - [Configuration Options](./reference/configuration-options.md)
 - [Command Line Interface](./reference/cli-reference.md)
-- [Error Messages](./reference/error-messages.md)
-- [Glossary](./reference/glossary.md)
-
-## Documentation Standards
-
-Documentation in this repository follows our [Documentation Standards](./DOCUMENTATION_STANDARDS.md). These standards ensure consistency, completeness, and clarity across all documentation.
-
-## Contributing to Documentation
-
-We welcome contributions to the NetRaven documentation. If you find issues or have suggestions for improvements, please see our [Contributing Guide](./developer-guide/contributing.md).
+- [Environment Variables](./reference/environment-variables.md)
+- [Database Schema](./reference/database-schema.md)
 
 ## Finding Information
 
-To find specific information in the documentation:
+### For New Users
+If you're new to NetRaven, we recommend starting with the [Quick Start Guide](./getting-started/quick-start.md) to get familiar with the basic concepts and features. Then, follow the [Installation Guide](./getting-started/installation.md) to set up your environment.
 
-1. Use the **README.md** files in each section as starting points
-2. Browse the directory structure to find specific topics
-3. Use GitHub's search functionality to find specific terms
-4. Check the [Glossary](./reference/glossary.md) for definitions of terms
+### For Network Operators
+If you're responsible for managing network devices using NetRaven, focus on the [User Guide](./user-guide/README.md) section. The [Device Management](./user-guide/device-management.md) and [Configuration Management](./user-guide/configuration-management.md) guides will be particularly helpful.
 
-## Documentation Updates
+### For System Administrators
+If you're tasked with deploying and maintaining NetRaven, the [Administrator Guide](./admin-guide/README.md) and [Deployment](./deployment/README.md) sections contain the information you need for successful implementation and operation.
 
-The documentation is regularly updated to reflect new features and improvements in NetRaven. Check the [Changelog](./reference/changelog.md) for information about recent updates.
+### For Developers
+If you're extending or integrating with NetRaven, refer to the [Developer Guide](./developer-guide/README.md) section, particularly the [API Reference](./developer-guide/api-reference.md) and [Custom Integrations](./developer-guide/integrations.md) guides.
 
-## Getting Help
+## About NetRaven
 
-If you can't find the information you need in the documentation:
+NetRaven is a comprehensive network management platform designed to simplify the management, monitoring, and configuration of network devices. Key features include:
 
-- Visit our [Community Forum](https://community.netraven.io)
-- Submit an issue on [GitHub](https://github.com/your-org/netraven/issues)
-- Contact [support@netraven.io](mailto:support@netraven.io) for enterprise support 
+- **Device Management**: Discover, categorize, and manage network devices across multiple vendors
+- **Configuration Management**: Back up, compare, and deploy network device configurations
+- **Compliance Monitoring**: Ensure network configurations adhere to organization policies
+- **Automated Backups**: Schedule regular configuration backups with flexible storage options
+- **Reporting and Analytics**: Generate insights about your network infrastructure
+- **API-First Design**: Integrate with existing tools and systems through a comprehensive API
+
+## Documentation Standards
+
+This documentation follows the standards outlined in our [Documentation Standards](./DOCUMENTATION_STANDARDS.md) guide. If you're contributing to the documentation, please review these standards first.
+
+## Feedback and Contributions
+
+We welcome feedback and contributions to improve our documentation. Please report any issues or submit enhancement requests through our issue tracking system.
+
+For information on contributing to the NetRaven project, including documentation, please see the [Contributing Guide](./developer-guide/contributing.md).
+
+## License
+
+NetRaven and its documentation are licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). 
