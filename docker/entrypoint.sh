@@ -3,6 +3,15 @@ set -e
 
 echo "Starting NetRaven initialization..."
 
+# Setup NetMiko logs directory without trying to change permissions
+NETMIKO_LOG_DIR=${NETMIKO_LOG_DIR:-/app/data/netmiko_logs}
+if [ ! -d "$NETMIKO_LOG_DIR" ]; then
+    echo "Creating NetMiko logs directory: $NETMIKO_LOG_DIR"
+    mkdir -p "$NETMIKO_LOG_DIR"
+else
+    echo "NetMiko logs directory already exists: $NETMIKO_LOG_DIR"
+fi
+
 # Initialize database
 python -m netraven.scripts.init_container
 

@@ -39,7 +39,7 @@ services:
       - GATEWAY_URL=http://device_gateway:8001
       - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
       - ALLOW_CREDENTIALS=true
-      - NETMIKO_LOG_DIR=/tmp/netmiko_logs
+      - NETMIKO_LOG_DIR=/app/data/netmiko_logs
       - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
     volumes:
       - api-data:/app/data
@@ -61,8 +61,8 @@ services:
       retries: 3
     networks:
       - netraven-network
-    # Run database initialization on container startup
-    entrypoint: ["/bin/bash", "-c", "mkdir -p /tmp/netmiko_logs && chmod 777 /tmp/netmiko_logs && python /app/scripts/ensure_schema.py && /app/docker/entrypoint.sh"]
+    # Use entrypoint.sh directly without trying to modify /tmp/netmiko_logs
+    entrypoint: ["/bin/bash", "-c", "python /app/scripts/ensure_schema.py && /app/docker/entrypoint.sh"]
 
   # Scheduler service
   scheduler:
@@ -111,7 +111,7 @@ services:
     environment:
       - API_URL=http://api:8000
       - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
-      - NETMIKO_LOG_DIR=/tmp/netmiko_logs
+      - NETMIKO_LOG_DIR=/app/data/netmiko_logs
       - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
     restart: unless-stopped
     depends_on:

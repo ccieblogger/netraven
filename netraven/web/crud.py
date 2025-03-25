@@ -689,7 +689,10 @@ def create_job_log_entry(db: Session, entry: job_log_schemas.JobLogEntryCreate) 
         level=entry.level,
         category=entry.category,
         message=entry.message,
-        details=entry.details
+        details=entry.details,
+        session_log_path=entry.session_log_path,
+        session_log_content=entry.session_log_content,
+        credential_username=entry.credential_username
     )
     db.add(db_entry)
     db.commit()

@@ -76,7 +76,7 @@ def check_device_connectivity_via_gateway(
         
         # Register device
         if device_id:
-            register_device(session_id, device_id, host)
+            register_device(device_id=device_id, hostname=host, device_type="autodetect", session_id=session_id)
     
     try:
         # Check gateway health
@@ -88,7 +88,7 @@ def check_device_connectivity_via_gateway(
         
         # Log connectivity check
         if session_id and device_id:
-            log_device_connect(session_id, device_id, host, "Checking device connectivity via gateway")
+            log_device_connect(device_id=device_id, session_id=session_id, message=f"Checking device connectivity via gateway")
         
         return True, None
     except Exception as e:
@@ -97,7 +97,7 @@ def check_device_connectivity_via_gateway(
         
         # Log failure
         if session_id and device_id:
-            log_device_connect_failure(session_id, device_id, error_msg)
+            log_device_connect_failure(device_id=device_id, error=error_msg, session_id=session_id)
             
         return False, error_msg
     finally:
@@ -146,7 +146,7 @@ def connect_device_via_gateway(
         local_session = True
         
     # Register device
-    register_device(session_id, device_id, host)
+    register_device(device_id=device_id, hostname=host, device_type=device_type or "autodetect", session_id=session_id)
     
     # Create gateway client
     client = GatewayClient(
@@ -157,7 +157,7 @@ def connect_device_via_gateway(
     
     try:
         # Log connection attempt
-        log_device_connect(session_id, device_id, host, f"Connecting to device via gateway")
+        log_device_connect(device_id=device_id, session_id=session_id, message=f"Connecting to device via gateway")
         
         # Connect to device
         result = client.connect_device(
@@ -173,7 +173,7 @@ def connect_device_via_gateway(
         # Check result
         if result.get("status") == "success":
             # Log success
-            log_device_connect_success(session_id, device_id)
+            log_device_connect_success(device_id=device_id, session_id=session_id)
             
             # Extract device info
             device_info = result.get("data", {})
@@ -192,13 +192,13 @@ def connect_device_via_gateway(
         else:
             # Log failure
             error_msg = result.get("message", "Unknown error")
-            log_device_connect_failure(session_id, device_id, error_msg)
+            log_device_connect_failure(device_id=device_id, error=error_msg, session_id=session_id)
             return False, None
     except Exception as e:
         # Log failure
         error_msg = f"Error connecting to device via gateway: {str(e)}"
         logger.error(error_msg)
-        log_device_connect_failure(session_id, device_id, error_msg)
+        log_device_connect_failure(device_id=device_id, error=error_msg, session_id=session_id)
         return False, None
     finally:
         # End session if we started it
@@ -248,7 +248,7 @@ def execute_command_via_gateway(
         local_session = True
         
     # Register device
-    register_device(session_id, device_id, host)
+    register_device(device_id=device_id, hostname=host, device_type=device_type or "autodetect", session_id=session_id)
     
     # Create gateway client
     client = GatewayClient(
@@ -259,7 +259,7 @@ def execute_command_via_gateway(
     
     try:
         # Log command execution
-        log_device_command(session_id, device_id, command, f"Executing command via gateway")
+        log_device_command(device_id=device_id, command=command, session_id=session_id)
         
         # Execute command
         result = client.execute_command(
@@ -277,18 +277,18 @@ def execute_command_via_gateway(
         if result.get("status") == "success":
             # Log success
             command_result = result.get("data")
-            log_device_response(session_id, device_id, command, str(command_result)[:1000])
+            log_device_response(device_id=device_id, command=command, success=True, response_size=len(str(command_result)[:1000]) if command_result else 0, session_id=session_id)
             return True, command_result
         else:
             # Log failure
             error_msg = result.get("message", "Unknown error")
-            log_device_response(session_id, device_id, command, f"Error: {error_msg}")
+            log_device_response(device_id=device_id, command=command, success=False, response_size=0, session_id=session_id)
             return False, None
     except Exception as e:
         # Log failure
         error_msg = f"Error executing command via gateway: {str(e)}"
         logger.error(error_msg)
-        log_device_response(session_id, device_id, command, f"Exception: {error_msg}")
+        log_device_response(device_id=device_id, command=command, success=False, response_size=0, session_id=session_id)
         return False, None
     finally:
         # End session if we started it
@@ -329,17 +329,16 @@ def backup_device_config_via_gateway(
     local_session = False
     if not session_id:
         session_id = start_job_session(
-            job_type="gateway_device_backup",
-            device_id=device_id,
+            description="gateway_device_backup",
             user_id=user_id
         )
         local_session = True
         
     # Register device
-    register_device(session_id, device_id, host)
+    register_device(device_id=device_id, hostname=host, device_type=device_type or "autodetect", session_id=session_id)
     
     # Log backup start
-    log_backup_start(session_id, device_id, host)
+    log_backup_start(device_id=device_id, session_id=session_id)
     
     try:
         # Connect to device
@@ -357,7 +356,7 @@ def backup_device_config_via_gateway(
         
         if not connected:
             error_msg = "Failed to connect to device"
-            log_backup_failure(session_id, device_id, error_msg)
+            log_backup_failure(device_id=device_id, error=error_msg, session_id=session_id)
             return False
         
         # Execute get_running_config command
@@ -376,7 +375,7 @@ def backup_device_config_via_gateway(
         
         if not success or not config:
             error_msg = "Failed to get running configuration"
-            log_backup_failure(session_id, device_id, error_msg)
+            log_backup_failure(device_id=device_id, error=error_msg, session_id=session_id)
             return False
         
         # Save configuration to file
@@ -393,11 +392,10 @@ def backup_device_config_via_gateway(
         # Log backup success
         serial_number = device_info.get("serial_number") if device_info else None
         log_backup_success(
-            session_id=session_id,
             device_id=device_id,
             file_path=filepath,
-            file_size=len(config),
-            serial_number=serial_number
+            size=len(config),
+            session_id=session_id
         )
         
         logger.info(f"Successfully backed up configuration for {host} to {filepath}")
@@ -405,7 +403,7 @@ def backup_device_config_via_gateway(
     except Exception as e:
         error_msg = f"Error backing up {host}: {str(e)}"
         logger.exception(error_msg)
-        log_backup_failure(session_id, device_id, error_msg)
+        log_backup_failure(device_id=device_id, error=error_msg, session_id=session_id)
         return False
     finally:
         # End session if we started it

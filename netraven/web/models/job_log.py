@@ -60,5 +60,10 @@ class JobLogEntry(Base):
     message = Column(Text, nullable=False)
     details = Column(JSON, nullable=True)
     
+    # New fields for enhanced session logging
+    session_log_path = Column(String(255), nullable=True)
+    session_log_content = Column(Text, nullable=True)
+    credential_username = Column(String(255), nullable=True, index=True)
+    
     # Relationship
     job_log = relationship("JobLog", back_populates="log_entries") 

@@ -2,7 +2,36 @@
   <MainLayout>
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold">Job Logs</h1>
+      <div v-if="deviceId" class="flex items-center">
+        <router-link :to="`/devices/${deviceId}`" class="text-blue-600 hover:text-blue-800 flex items-center mr-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+          </svg>
+          Back to Device
+        </router-link>
+      </div>
     </div>
+    
+    <!-- Breadcrumb Navigation -->
+    <nav class="text-sm text-gray-500 mb-4">
+      <ol class="list-none p-0 inline-flex">
+        <li class="flex items-center">
+          <router-link to="/" class="hover:text-blue-600">Dashboard</router-link>
+          <svg class="fill-current w-3 h-3 mx-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"/></svg>
+        </li>
+        <li v-if="deviceId" class="flex items-center">
+          <router-link to="/devices" class="hover:text-blue-600">Devices</router-link>
+          <svg class="fill-current w-3 h-3 mx-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"/></svg>
+        </li>
+        <li v-if="deviceId" class="flex items-center">
+          <router-link :to="`/devices/${deviceId}`" class="hover:text-blue-600">{{ deviceName || 'Device' }}</router-link>
+          <svg class="fill-current w-3 h-3 mx-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path d="M285.476 272.971L91.132 467.314c-9.373 9.373-24.569 9.373-33.941 0l-22.667-22.667c-9.357-9.357-9.375-24.522-.04-33.901L188.505 256 34.484 101.255c-9.335-9.379-9.317-24.544.04-33.901l22.667-22.667c9.373-9.373 24.569-9.373 33.941 0L285.475 239.03c9.373 9.372 9.373 24.568.001 33.941z"/></svg>
+        </li>
+        <li>
+          <span class="text-gray-700">{{ deviceId ? 'Job History' : 'Job Logs' }}</span>
+        </li>
+      </ol>
+    </nav>
     
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow p-4 mb-6">
@@ -155,7 +184,10 @@
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <router-link :to="`/job-logs/${jobLog.id}`" class="text-blue-600 hover:text-blue-900 mr-3">
+              <router-link :to="{
+                path: `/job-logs/${jobLog.id}`,
+                query: deviceId ? { from_device: deviceId, device_name: deviceName } : {}
+              }" class="text-blue-600 hover:text-blue-900 mr-3">
                 View
               </router-link>
               <button @click="confirmDeleteJobLog(jobLog)" class="text-red-600 hover:text-red-900">
@@ -195,7 +227,7 @@
 
 <script>
 import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import MainLayout from '../components/MainLayout.vue'
 import { useJobLogStore } from '../store/job-logs'
 
@@ -205,9 +237,21 @@ export default {
     MainLayout
   },
   
-  setup() {
+  props: {
+    id: {
+      type: String,
+      required: false
+    },
+    deviceId: {
+      type: String,
+      required: false
+    }
+  },
+  
+  setup(props) {
     const jobLogStore = useJobLogStore()
     const router = useRouter()
+    const route = useRoute()
     
     const filters = ref({
       job_type: '',
@@ -218,9 +262,20 @@ export default {
     
     const showDeleteModal = ref(false)
     const jobLogToDelete = ref(null)
+    const deviceName = ref('')
     
     // Fetch job logs on component mount
     onMounted(async () => {
+      // If device ID is provided in props or route, set it in filters
+      if (props.deviceId || route.params.deviceId) {
+        const deviceId = props.deviceId || route.params.deviceId
+        filters.value.device_id = deviceId
+        
+        // Try to get device name (this would require a device store or API call)
+        // For simplicity, just create a generic name based on ID for now
+        deviceName.value = 'Device ' + deviceId.substring(0, 8)
+      }
+      
       await fetchJobLogs()
     })
     
@@ -305,6 +360,7 @@ export default {
       jobLogStore,
       filters,
       showDeleteModal,
+      jobLogToDelete,
       fetchJobLogs,
       applyFilters,
       clearFilters,
@@ -312,7 +368,9 @@ export default {
       deleteJobLog,
       formatJobType,
       formatDateTime,
-      truncateText
+      truncateText,
+      deviceId: computed(() => props.deviceId || route.params.deviceId),
+      deviceName
     }
   }
 }

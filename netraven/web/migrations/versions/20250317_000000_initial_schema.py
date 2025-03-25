@@ -142,6 +142,9 @@ def upgrade() -> None:
         sa.Column('category', sa.String(length=50), nullable=True),
         sa.Column('message', sa.Text(), nullable=False),
         sa.Column('details', sa.JSON(), nullable=True),
+        sa.Column('session_log_path', sa.String(length=255), nullable=True),
+        sa.Column('session_log_content', sa.Text(), nullable=True),
+        sa.Column('credential_username', sa.String(length=255), nullable=True),
         sa.ForeignKeyConstraint(['job_log_id'], ['job_logs.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
@@ -205,6 +208,7 @@ def upgrade() -> None:
     op.create_index('ix_job_log_entries_timestamp', 'job_log_entries', ['timestamp'])
     op.create_index('ix_job_log_entries_level', 'job_log_entries', ['level'])
     op.create_index('ix_job_log_entries_category', 'job_log_entries', ['category'])
+    op.create_index('ix_job_log_entries_credential_username', 'job_log_entries', ['credential_username'])
     
     op.create_index('ix_scheduled_jobs_schedule_type', 'scheduled_jobs', ['schedule_type'])
     op.create_index('ix_scheduled_jobs_job_type', 'scheduled_jobs', ['job_type'])

@@ -17,6 +17,7 @@ logging:
   filename: netraven.log
   # Retention policy settings
   retention_days: 30
+  session_log_retention_days: 14  # Specific retention for Netmiko session logs
   use_database_logging: true
   log_to_file: false
   console:

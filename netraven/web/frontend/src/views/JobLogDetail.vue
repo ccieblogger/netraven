@@ -45,12 +45,7 @@
                 <span class="text-gray-600">Status:</span>
                 <span 
                   class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                  :class="{
-                    'bg-yellow-100 text-yellow-800': jobLogStore.currentJobLog.status === 'running',
-                    'bg-green-100 text-green-800': jobLogStore.currentJobLog.status === 'completed',
-                    'bg-red-100 text-red-800': jobLogStore.currentJobLog.status === 'failed',
-                    'bg-gray-100 text-gray-800': !['running', 'completed', 'failed'].includes(jobLogStore.currentJobLog.status)
-                  }"
+                  :class="statusClass"
                 >
                   {{ jobLogStore.currentJobLog.status }}
                 </span>
@@ -60,12 +55,16 @@
                 <span class="font-mono text-sm">{{ jobLogStore.currentJobLog.session_id }}</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-gray-600">Device ID:</span>
-                <span>{{ jobLogStore.currentJobLog.device_id || 'N/A' }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Created By:</span>
-                <span>{{ jobLogStore.currentJobLog.created_by || 'System' }}</span>
+                <span class="text-gray-600">Device:</span>
+                <span v-if="jobLogStore.currentJobLog.device_id">
+                  <router-link 
+                    :to="`/devices/${jobLogStore.currentJobLog.device_id}`" 
+                    class="text-blue-600 hover:underline"
+                  >
+                    {{ jobLogStore.currentJobLog.device_id }}
+                  </router-link>
+                </span>
+                <span v-else>N/A</span>
               </div>
             </div>
           </div>
@@ -83,24 +82,21 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-600">Duration:</span>
-                <span>{{ calculateDuration(jobLogStore.currentJobLog.start_time, jobLogStore.currentJobLog.end_time) }}</span>
+                <span>{{ formattedDuration }}</span>
               </div>
-              <div class="flex justify-between">
+                <div class="flex justify-between">
                 <span class="text-gray-600">Result:</span>
-                <span>{{ jobLogStore.currentJobLog.result_message || 'N/A' }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Retention Days:</span>
-                <span>{{ jobLogStore.currentJobLog.retention_days }}</span>
+                  <span 
+                    :class="{
+                      'text-red-600 font-semibold': jobLogStore.currentJobLog.status === 'failed',
+                      'text-green-600 font-semibold': jobLogStore.currentJobLog.status === 'completed'
+                    }"
+                  >
+                  {{ jobLogStore.currentJobLog.result_message || jobLogStore.currentJobLog.status }}
+                      </span>
               </div>
             </div>
           </div>
-        </div>
-        
-        <!-- Job Data (if available) -->
-        <div v-if="jobLogStore.currentJobLog.job_data" class="mt-6 pt-6 border-t border-gray-200">
-          <h2 class="text-lg font-semibold mb-4">Job Data</h2>
-          <pre class="bg-gray-100 p-4 rounded overflow-auto text-sm">{{ JSON.stringify(jobLogStore.currentJobLog.job_data, null, 2) }}</pre>
         </div>
       </div>
       
@@ -134,22 +130,25 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Timestamp
                 </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Level
                 </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Category
                 </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Message
+                </th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
                 </th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="entry in jobLogStore.currentJobLogEntries" :key="entry.id" class="hover:bg-gray-50">
+              <tr v-for="(entry, index) in jobLogStore.currentJobLogEntries" :key="entry.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {{ formatDateTime(entry.timestamp) }}
                 </td>
@@ -170,6 +169,31 @@
                 <td class="px-6 py-4 text-sm text-gray-500">
                   <div class="max-w-lg break-words">{{ entry.message }}</div>
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <button 
+                    v-if="hasSessionLog(entry)"
+                    @click="toggleDetails(index)" 
+                    class="text-blue-600 hover:text-blue-800"
+                  >
+                    {{ expandedEntries[index] ? 'Hide' : 'View' }} Details
+                  </button>
+                </td>
+              </tr>
+              <!-- Details row that appears when expanded -->
+              <tr v-for="(entry, index) in jobLogStore.currentJobLogEntries" :key="`${entry.id}-details`" v-show="expandedEntries[index]">
+                <td colspan="5" class="px-6 py-4 bg-gray-50">
+                  <!-- Session Log Content -->
+                  <div v-if="entry.session_log_content">
+                    <h3 class="font-semibold text-gray-700 mb-2">Session Log</h3>
+                    <pre class="bg-black text-green-400 p-4 rounded text-sm overflow-x-auto whitespace-pre-wrap">{{ entry.session_log_content }}</pre>
+                  </div>
+                  
+                  <!-- Fallback Session Log from Details -->
+                  <div v-else-if="entry.details && entry.details.fallback_log">
+                    <h3 class="font-semibold text-gray-700 mb-2">Session Log</h3>
+                    <pre class="bg-black text-green-400 p-4 rounded text-sm overflow-x-auto whitespace-pre-wrap">{{ entry.details.fallback_log }}</pre>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -178,36 +202,32 @@
     </div>
     
     <!-- Not Found State -->
-    <div v-else class="bg-white rounded-lg shadow p-8 text-center">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-      <h3 class="mt-2 text-lg font-medium text-gray-900">Job Log Not Found</h3>
-      <p class="mt-1 text-gray-500">The job log you're looking for doesn't exist or has been deleted.</p>
-      <div class="mt-6">
-        <router-link to="/job-logs" class="text-blue-600 hover:text-blue-800">
+    <div v-else class="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow">
+      <div class="text-center py-8">
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">Job Log Not Found</h2>
+        <p class="text-gray-500">The requested job log could not be found or you don't have permission to access it.</p>
+        <button @click="router.push('/job-logs')" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
           Back to Job Logs
-        </router-link>
+        </button>
       </div>
     </div>
     
     <!-- Delete Confirmation Modal -->
-    <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg p-6 max-w-md w-full">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Confirm Delete</h3>
-        <p class="text-gray-500 mb-6">
-          Are you sure you want to delete this job log? This action cannot be undone.
-        </p>
+    <div v-if="showDeleteModal" class="fixed inset-0 flex items-center justify-center z-50">
+      <div class="absolute inset-0 bg-black opacity-50"></div>
+      <div class="relative z-10 bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+        <p class="text-gray-600 mb-6">Are you sure you want to delete this job log? This action cannot be undone.</p>
         <div class="flex justify-end space-x-3">
           <button 
             @click="showDeleteModal = false" 
-            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
+            class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
           >
             Cancel
           </button>
           <button 
             @click="deleteJobLog" 
-            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+            class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
           >
             Delete
           </button>
@@ -218,10 +238,10 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import MainLayout from '../components/MainLayout.vue'
 import { useJobLogStore } from '../store/job-logs'
+import MainLayout from '../components/MainLayout.vue'
 
 export default {
   name: 'JobLogDetail',
@@ -234,16 +254,68 @@ export default {
     const route = useRoute()
     const router = useRouter()
     
-    const jobLogId = computed(() => route.params.id)
+    // Basic state
+    const jobLogId = computed(() => route.params.id?.toString())
     const showDeleteModal = ref(false)
     const loadingEntries = ref(false)
+    const expandedEntries = ref({})
     
-    // Fetch job log and entries on component mount
-    onMounted(async () => {
-      await fetchJobLog()
-      await fetchJobLogEntries()
+    // Computed values
+    const statusClass = computed(() => {
+      if (!jobLogStore.currentJobLog) return ''
+      
+      switch (jobLogStore.currentJobLog.status) {
+        case 'completed': return 'bg-green-100 text-green-800'
+        case 'failed': return 'bg-red-100 text-red-800'
+        case 'running': return 'bg-blue-100 text-blue-800'
+        default: return 'bg-gray-100 text-gray-800'
+      }
     })
     
+    const formattedDuration = computed(() => {
+      if (!jobLogStore.currentJobLog || !jobLogStore.currentJobLog.start_time) return '0s'
+      
+      const start = new Date(jobLogStore.currentJobLog.start_time).getTime()
+      const end = jobLogStore.currentJobLog.end_time 
+        ? new Date(jobLogStore.currentJobLog.end_time).getTime()
+        : Date.now()
+      
+      const ms = end - start
+      
+      if (ms < 1000) return `${ms}ms`
+      const sec = Math.floor(ms / 1000)
+      if (sec < 60) return `${sec}s`
+      
+      const min = Math.floor(sec / 60)
+      const secRem = sec % 60
+      return `${min}m ${secRem}s`
+    })
+    
+    // Helper methods
+    const hasSessionLog = (entry) => {
+      return Boolean(entry.session_log_content) || 
+        (entry.details && entry.details.fallback_log)
+    }
+    
+    const toggleDetails = (index) => {
+      expandedEntries.value[index] = !expandedEntries.value[index]
+    }
+    
+    const formatJobType = (jobType) => {
+      if (!jobType) return 'Unknown'
+      return jobType
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+    }
+    
+    const formatDateTime = (dateTimeStr) => {
+      if (!dateTimeStr) return '-'
+      const date = new Date(dateTimeStr)
+      return date.toLocaleString()
+    }
+    
+    // Data fetching
     const fetchJobLog = async () => {
       if (jobLogId.value) {
         await jobLogStore.fetchJobLog(jobLogId.value)
@@ -261,6 +333,7 @@ export default {
       }
     }
     
+    // Delete operation
     const confirmDeleteJobLog = () => {
       showDeleteModal.value = true
     }
@@ -275,59 +348,29 @@ export default {
       }
     }
     
-    const formatJobType = (jobType) => {
-      if (!jobType) return 'Unknown'
-      
-      // Convert snake_case to Title Case
-      return jobType
-        .split('_')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ')
-    }
-    
-    const formatDateTime = (dateTimeStr) => {
-      if (!dateTimeStr) return '-'
-      
-      const date = new Date(dateTimeStr)
-      return date.toLocaleString()
-    }
-    
-    const calculateDuration = (startTime, endTime) => {
-      if (!startTime) return 'Unknown'
-      if (!endTime) return 'In Progress'
-      
-      const start = new Date(startTime)
-      const end = new Date(endTime)
-      const durationMs = end - start
-      
-      // Format duration
-      if (durationMs < 1000) {
-        return `${durationMs}ms`
-      } else if (durationMs < 60000) {
-        return `${Math.floor(durationMs / 1000)}s`
-      } else if (durationMs < 3600000) {
-        const minutes = Math.floor(durationMs / 60000)
-        const seconds = Math.floor((durationMs % 60000) / 1000)
-        return `${minutes}m ${seconds}s`
-      } else {
-        const hours = Math.floor(durationMs / 3600000)
-        const minutes = Math.floor((durationMs % 3600000) / 60000)
-        return `${hours}h ${minutes}m`
-      }
-    }
+    // Initialize component
+    onMounted(() => {
+      fetchJobLog()
+      fetchJobLogEntries()
+    })
     
     return {
       jobLogStore,
       jobLogId,
+      statusClass,
+      formattedDuration,
       showDeleteModal,
       loadingEntries,
+      expandedEntries,
+      hasSessionLog,
+      toggleDetails,
       fetchJobLog,
       fetchJobLogEntries,
       confirmDeleteJobLog,
       deleteJobLog,
       formatJobType,
       formatDateTime,
-      calculateDuration
+      router
     }
   }
 }

@@ -93,6 +93,13 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/job-logs/device/:deviceId',
+    name: 'DeviceJobLogs',
+    component: JobLogList,
+    props: true,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/job-logs/:id',
     name: 'JobLogDetail',
     component: JobLogDetail,

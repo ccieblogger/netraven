@@ -90,7 +90,7 @@ class JobTrackingService:
             job_data={
                 **(job_data or {}),
                 "scheduled_job_id": scheduled_job_id,
-                "device_name": device.name if device else None,
+                "device_name": device.hostname if device else None,
                 "start_timestamp": time.time()
             }
         )
@@ -128,7 +128,8 @@ class JobTrackingService:
         job_id: str, 
         status: str, 
         result_message: Optional[str] = None,
-        send_notification: bool = True
+        send_notification: bool = True,
+        job_data: Optional[Dict[str, Any]] = None
     ) -> bool:
         """
         Update the status of a tracked job.
@@ -138,6 +139,7 @@ class JobTrackingService:
             status: New status
             result_message: Result message to add to the job log
             send_notification: Whether to send a notification
+            job_data: Additional job data to update or merge with existing data
             
         Returns:
             bool: True if the update was successful, False otherwise
@@ -160,16 +162,31 @@ class JobTrackingService:
                 if job_log.job_data and "start_timestamp" in job_log.job_data:
                     start_timestamp = job_log.job_data.get("start_timestamp")
                     if start_timestamp:
+                        if not job_log.job_data:
+                            job_log.job_data = {}
                         job_log.job_data["duration_seconds"] = time.time() - start_timestamp
             
             # Add result message if provided
             if result_message:
                 job_log.result_message = result_message
+                
+            # Update job_data if provided
+            if job_data:
+                if not job_log.job_data:
+                    job_log.job_data = {}
+                # Merge the new job_data with existing data
+                job_log.job_data.update(job_data)
             
             # Add log entry
+            log_level = "INFO"
+            if status == JOB_STATUS_FAILED:
+                log_level = "ERROR"
+            elif status == JOB_STATUS_CANCELED:
+                log_level = "WARNING"
+                
             self.add_job_log_entry(
                 job_log_id=job_id,
-                level="INFO" if status == JOB_STATUS_COMPLETED else "ERROR" if status == JOB_STATUS_FAILED else "WARNING",
+                level=log_level,
                 category="status_update",
                 message=f"Job status updated to {status}" + (f": {result_message}" if result_message else "")
             )

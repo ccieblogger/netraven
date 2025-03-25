@@ -25,3 +25,7 @@ requests==2.28.2
 prometheus-client==0.16.0
 schedule==1.1.0
 PyYAML==6.0
+
+# Network automation
+netmiko==4.3.0
+paramiko==3.2.0

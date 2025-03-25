@@ -24,6 +24,11 @@ class JobLogEntryBase(BaseModel):
     category: Optional[str] = None
     message: str = Field(..., min_length=1)
     details: Optional[Dict[str, Any]] = None
+    
+    # New fields for enhanced session logging
+    session_log_path: Optional[str] = None
+    session_log_content: Optional[str] = None
+    credential_username: Optional[str] = None
 
 class JobLogEntryCreate(JobLogEntryBase):
     """Schema for creating a new job log entry."""

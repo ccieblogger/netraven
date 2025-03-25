@@ -13,6 +13,7 @@ from datetime import datetime
 import uuid
 import os
 from fastapi.responses import JSONResponse
+from http import HTTPStatus  # Add fallback status codes
 
 # Import authentication dependencies
 from netraven.web.auth import (
@@ -71,7 +72,7 @@ class BackupContent(BaseModel):
 @router.get("", response_model=List[dict])
 async def list_backups(
     device_id: Optional[str] = None,
-    status: Optional[str] = None,
+    status_filter: Optional[str] = None,  # Renamed parameter to avoid conflict
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     is_automatic: Optional[bool] = None,
@@ -85,7 +86,7 @@ async def list_backups(
     
     Args:
         device_id: Optional device ID to filter by
-        status: Optional status to filter by
+        status_filter: Optional status to filter by
         start_date: Optional start date for filtering
         end_date: Optional end date for filtering
         is_automatic: Optional flag to filter by automatic backups
@@ -98,8 +99,8 @@ async def list_backups(
         JSONResponse: List of backup objects
     """
     try:
-        # Check if user has the required permission
-        if not has_permission(current_principal, "read:backups"):
+        # Check if user has the required permission using direct check
+        if not current_principal.is_admin and "read:backups" not in current_principal.scopes:
             logger.warning(f"Permission denied: user={current_principal.username}, "
                          f"scope=read:backups, action=list_backups")
             raise HTTPException(
@@ -130,7 +131,7 @@ async def list_backups(
             skip=offset,
             limit=limit,
             device_id=device_id,
-            status=status,
+            status=status_filter,  # Use renamed parameter
             start_date=start_date,
             end_date=end_date,
             is_automatic=is_automatic
@@ -144,7 +145,7 @@ async def list_backups(
             if backup.device:
                 device_hostname = backup.device.hostname
                 
-            # Add backup to result
+            # Add backup to result - convert datetime to ISO string format
             result.append({
                 "id": backup.id,
                 "device_id": backup.device_id,
@@ -156,7 +157,7 @@ async def list_backups(
                 "comment": backup.comment,
                 "content_hash": backup.content_hash,
                 "is_automatic": backup.is_automatic,
-                "created_at": backup.created_at,
+                "created_at": backup.created_at.isoformat() if backup.created_at else None,  # Convert to ISO format string
                 "serial_number": backup.serial_number
             })
             
@@ -217,7 +218,7 @@ async def get_backup_details(
         if backup.device:
             device_hostname = backup.device.hostname
         
-        # Format backup for response
+        # Format backup for response - convert datetime to ISO string format
         backup_response = {
             "id": backup.id,
             "device_id": backup.device_id,
@@ -229,7 +230,7 @@ async def get_backup_details(
             "comment": backup.comment,
             "content_hash": backup.content_hash,
             "is_automatic": backup.is_automatic,
-            "created_at": backup.created_at,
+            "created_at": backup.created_at.isoformat() if backup.created_at else None,  # Convert to ISO format string
             "serial_number": backup.serial_number
         }
         return backup_response
@@ -293,7 +294,7 @@ async def get_backup_content_endpoint(
             "device_id": backup.device_id,
             "device_hostname": device_hostname or "Unknown Device",
             "content": content,
-            "created_at": backup.created_at
+            "created_at": backup.created_at.isoformat() if backup.created_at else None  # Convert to ISO format string
         }
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -375,8 +376,8 @@ async def compare_backups(
         response = {
             "backup1_id": backup1.id,
             "backup2_id": backup2.id,
-            "backup1_created_at": backup1.created_at,
-            "backup2_created_at": backup2.created_at,
+            "backup1_created_at": backup1.created_at.isoformat() if backup1.created_at else None,  # Convert to ISO format string
+            "backup2_created_at": backup2.created_at.isoformat() if backup2.created_at else None,  # Convert to ISO format string
             "backup1_device": device1_hostname or "Unknown Device",
             "backup2_device": device2_hostname or "Unknown Device",
             "differences": comparison_result["summary"],

@@ -93,6 +93,26 @@
     
     <!-- Main Content -->
     <div class="flex-grow container mx-auto px-4 py-6">
+      <header class="bg-white shadow">
+        <div class="flex items-center justify-between max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <div class="flex items-center">
+            <button 
+              v-if="canGoBack"
+              @click="goBack" 
+              class="mr-3 text-gray-600 hover:text-gray-900 focus:outline-none"
+              title="Go back"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+            <slot name="header"></slot>
+          </div>
+          <div class="flex items-center">
+            <!-- User dropdown -->
+          </div>
+        </div>
+      </header>
       <slot></slot>
     </div>
     
@@ -119,8 +139,13 @@ import { useAuthStore } from '../store/auth'
 
 export default {
   name: 'MainLayout',
-  
-  setup() {
+  props: {
+    title: {
+      type: String,
+      default: ''
+    }
+  },
+  setup(props) {
     const authStore = useAuthStore()
     const router = useRouter()
     const route = useRoute()
@@ -281,6 +306,18 @@ export default {
       }
     }
     
+    // Back navigation support
+    const canGoBack = computed(() => {
+      // Always show back button on detail pages
+      return route.path.includes('/devices/') || 
+             route.path.includes('/job-logs/') ||
+             route.path.includes('/backups/');
+    })
+    
+    const goBack = () => {
+      router.back()
+    }
+    
     return {
       isAuthenticated,
       isAdmin,
@@ -291,7 +328,9 @@ export default {
       retryLayout,
       hasToken,
       currentRoute,
-      previousRoute
+      previousRoute,
+      canGoBack,
+      goBack
     }
   }
 }

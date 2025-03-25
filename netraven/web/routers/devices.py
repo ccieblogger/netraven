@@ -427,6 +427,25 @@ async def create_device_backup(
         # Create a UUID for the backup job
         backup_job_id = str(uuid.uuid4())
         
+        # Initialize job tracking service for proper logging
+        from netraven.web.services.job_tracking_service import get_job_tracking_service
+        job_tracking = get_job_tracking_service()
+        
+        # Start job tracking session
+        job_log, session_id = job_tracking.start_job_tracking(
+            job_id=backup_job_id,
+            job_type="device_backup",
+            device_id=device_id,
+            user_id=current_principal.id,
+            job_data={
+                "device_hostname": device.hostname,
+                "device_ip": device.ip_address,
+                "device_type": device.device_type,
+                "use_tag_credentials": use_tags,
+                "tag_id": tag_id if use_tags else None
+            }
+        )
+        
         # Create initial backup entry with pending status
         backup_data = BackupCreate(
             device_id=device_id,
@@ -441,42 +460,86 @@ async def create_device_backup(
         # Create backup record in database (without content yet)
         backup = create_backup(db, backup_data, device.serial_number)
         
-        # Start background task for backup job
-        # This will be run in a background worker
-        from netraven.jobs.device_connector import backup_device_config
-        
-        # Determine authentication method based on available tags
-        if use_tags:
-            logger.info(f"Using tag-based credentials for device {device.hostname} (tag: {tag_id})")
-            # Use tag-based authentication
-            result = backup_device_config(
-                device_id=device_id,
-                host=device.ip_address,
-                device_type=device.device_type,
-                port=device.port,
-                session_id=backup_job_id,
-                tag_id=tag_id
+        try:
+            # Start background task for backup job
+            # This will be run in a background worker
+            from netraven.jobs.device_connector import backup_device_config
+            
+            # Determine authentication method based on available tags
+            if use_tags:
+                logger.info(f"Using tag-based credentials for device {device.hostname} (tag: {tag_id})")
+                # Use tag-based authentication
+                result = backup_device_config(
+                    device_id=device_id,
+                    host=device.ip_address,
+                    device_type=device.device_type,
+                    port=device.port,
+                    session_id=session_id,
+                    tag_id=tag_id
+                )
+            else:
+                # Fall back to device's stored credentials
+                logger.info(f"Using stored credentials for device {device.hostname} (no tags found)")
+                result = backup_device_config(
+                    device_id=device_id,
+                    host=device.ip_address,
+                    username=device.username,
+                    password=device.password,
+                    device_type=device.device_type,
+                    port=device.port,
+                    session_id=session_id
+                )
+            
+            # Update backup record status based on result
+            if result:
+                backup.status = "completed"
+                job_tracking.update_job_status(
+                    job_id=backup_job_id,
+                    status="completed",
+                    result_message="Backup completed successfully"
+                )
+            else:
+                backup.status = "failed"
+                job_tracking.update_job_status(
+                    job_id=backup_job_id,
+                    status="failed",
+                    result_message="Backup failed"
+                )
+            
+            db.commit()
+        except Exception as backup_error:
+            # Get more detailed error information
+            error_message = str(backup_error)
+            error_type = type(backup_error).__name__
+            
+            # Check for common error patterns to provide better context
+            if "authentication" in error_message.lower():
+                context_message = "Authentication failure: Check device credentials"
+            elif "timeout" in error_message.lower():
+                context_message = "Connection timeout: Device is taking too long to respond"
+            elif "connection" in error_message.lower() or "unreachable" in error_message.lower():
+                context_message = "Connection error: Device might be unreachable"
+            elif "permission" in error_message.lower():
+                context_message = "Permission error: Check privilege level on device"
+            elif "command" in error_message.lower():
+                context_message = "Command error: Device might not support the commands used"
+            else:
+                context_message = f"Backup error: {error_type}"
+            
+            # Update job status with detailed error information
+            job_tracking.update_job_status(
+                job_id=backup_job_id,
+                status="failed",
+                result_message=context_message,
+                job_data={
+                    "error_type": error_type,
+                    "error_message": error_message,
+                    "error_context": context_message
+                }
             )
-        else:
-            # Fall back to device's stored credentials
-            logger.info(f"Using stored credentials for device {device.hostname} (no tags found)")
-            result = backup_device_config(
-                device_id=device_id,
-                host=device.ip_address,
-                username=device.username,
-                password=device.password,
-                device_type=device.device_type,
-                port=device.port,
-                session_id=backup_job_id
-            )
-        
-        # Update backup record status based on result
-        if result:
-            backup.status = "completed"
-        else:
-            backup.status = "failed"
-        
-        db.commit()
+            
+            # Re-raise for handling
+            raise
         
         # Standardized access granted log
         logger.info(f"Access granted: user={current_principal.username}, " 

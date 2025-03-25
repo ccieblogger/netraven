@@ -138,19 +138,20 @@
       </div>
       
       <!-- Recent Backups -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold mb-4">Recent Backups</h2>
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-4">Device Jobs</h2>
         <div v-if="loadingBackups" class="text-center py-4">
-          <p>Loading backups...</p>
+          <p>Loading jobs...</p>
         </div>
         <div v-else-if="deviceBackups.length === 0" class="text-center py-4 text-gray-500">
-          <p>No backups found for this device.</p>
+          <p>No jobs found for this device.</p>
         </div>
         <div v-else class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead>
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -158,6 +159,9 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <tr v-for="backup in deviceBackups" :key="backup.id">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  {{ backup.job_name || 'Device Backup' }}
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   {{ formatDate(backup.created_at) }}
                 </td>
@@ -183,6 +187,210 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+      
+      <!-- Job Logs -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">Job Run History</h2>
+          
+          <!-- Job Metrics Summary -->
+          <div class="flex space-x-3">
+            <div class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+              </svg>
+              <span>Success: {{ jobSuccessCount }}</span>
+            </div>
+            <div class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+              </svg>
+              <span>Failed: {{ jobFailureCount }}</span>
+            </div>
+            <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+              </svg>
+              <span>Total: {{ deviceJobLogs.length }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Job Log Filters -->
+        <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+          <div class="flex flex-wrap items-center gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Job Type</label>
+              <select 
+                v-model="jobFilters.job_type" 
+                class="border border-gray-300 rounded-md px-2 py-1 text-sm"
+              >
+                <option value="">All Types</option>
+                <option value="device_backup">Device Backup</option>
+                <option value="config_compliance">Config Compliance</option>
+                <option value="device_discovery">Device Discovery</option>
+              </select>
+            </div>
+            
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Status</label>
+              <select 
+                v-model="jobFilters.status" 
+                class="border border-gray-300 rounded-md px-2 py-1 text-sm"
+              >
+                <option value="">All Statuses</option>
+                <option value="running">Running</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Date Range</label>
+              <div class="flex space-x-1">
+                <input 
+                  type="date" 
+                  v-model="jobFilters.start_date" 
+                  class="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                />
+                <input 
+                  type="date" 
+                  v-model="jobFilters.end_date" 
+                  class="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                />
+              </div>
+            </div>
+            
+            <div class="flex items-end ml-auto">
+              <button 
+                @click="applyJobFilters" 
+                class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded"
+              >
+                Apply Filters
+              </button>
+              <button 
+                @click="clearJobFilters" 
+                class="bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm px-3 py-1 rounded ml-2"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Job Logs Table -->
+        <div v-if="loadingJobLogs" class="text-center py-4">
+          <p>Loading job logs...</p>
+        </div>
+        
+        <div v-else-if="deviceJobLogs.length === 0" class="text-center py-8 text-gray-500">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p class="mt-2">No job logs found for this device.</p>
+        </div>
+        
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Job Name
+                </th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Job Type
+                </th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Start Time
+                </th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Duration
+                </th>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Result
+                </th>
+                <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr v-for="jobLog in deviceJobLogs" :key="jobLog.id" class="hover:bg-gray-50">
+                <td class="px-3 py-3 whitespace-nowrap">
+                  {{ jobLog.job_name || getJobName(jobLog.job_type) }}
+                </td>
+                <td class="px-3 py-3 whitespace-nowrap">
+                  <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                    :class="{
+                      'bg-blue-100 text-blue-800': jobLog.job_type === 'device_backup',
+                      'bg-green-100 text-green-800': jobLog.job_type === 'config_compliance',
+                      'bg-purple-100 text-purple-800': jobLog.job_type === 'device_discovery',
+                      'bg-gray-100 text-gray-800': !['device_backup', 'config_compliance', 'device_discovery'].includes(jobLog.job_type)
+                    }">
+                    {{ formatJobType(jobLog.job_type) }}
+                  </span>
+                </td>
+                <td class="px-3 py-3 whitespace-nowrap">
+                  <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                    :class="{
+                      'bg-yellow-100 text-yellow-800': jobLog.status === 'running',
+                      'bg-green-100 text-green-800': jobLog.status === 'completed',
+                      'bg-red-100 text-red-800': jobLog.status === 'failed',
+                      'bg-gray-100 text-gray-800': !['running', 'completed', 'failed'].includes(jobLog.status)
+                    }">
+                    {{ jobLog.status }}
+                  </span>
+                </td>
+                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                  {{ formatDateTime(jobLog.start_time) }}
+                </td>
+                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                  {{ calculateDuration(jobLog.start_time, jobLog.end_time) }}
+                </td>
+                <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <span :title="jobLog.result_message">
+                    {{ truncateText(jobLog.result_message, 30) || '-' }}
+                  </span>
+                </td>
+                <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
+                  <router-link :to="{
+                    path: `/job-logs/${jobLog.id}`,
+                    query: { from_device: deviceId, device_name: device.hostname }
+                  }" class="text-blue-600 hover:text-blue-900">
+                    View Details
+                  </router-link>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <!-- Pagination Controls -->
+          <div class="flex justify-between items-center mt-4">
+            <p class="text-sm text-gray-700">
+              Showing <span class="font-medium">{{ deviceJobLogs.length }}</span> results
+            </p>
+            <div class="flex space-x-2">
+              <button 
+                @click="loadMoreJobLogs" 
+                class="bg-white border border-gray-300 text-gray-700 px-3 py-1 rounded text-sm"
+                :disabled="!hasMoreJobLogs"
+                :class="{'opacity-50 cursor-not-allowed': !hasMoreJobLogs}"
+              >
+                Load More
+              </button>
+              <router-link 
+                :to="`/job-logs/device/${deviceId}`" 
+                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+              >
+                View All Logs
+              </router-link>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -420,6 +628,7 @@ import TagBadge from '@/components/TagBadge.vue'
 import { useDeviceStore } from '@/store/devices'
 import { useBackupStore } from '@/store/backups'
 import { useTagStore } from '@/store/tags'
+import { useJobLogStore } from '@/store/job-logs'
 import TagModal from '@/components/TagModal.vue'
 
 export default {
@@ -440,6 +649,7 @@ export default {
     const deviceStore = useDeviceStore()
     const backupStore = useBackupStore()
     const tagStore = useTagStore()
+    const jobLogStore = useJobLogStore()
     
     const loading = ref(true)
     const loadingBackups = ref(true)
@@ -483,6 +693,30 @@ export default {
       description: ''
     })
     
+    // Job logs state
+    const loadingJobLogs = ref(false)
+    const currentPage = ref(1)
+    const pageSize = ref(10)
+    const hasMoreJobLogs = ref(false)
+    
+    const jobFilters = ref({
+      job_type: '',
+      status: '',
+      start_date: '',
+      end_date: ''
+    })
+    
+    const deviceJobLogs = ref([])
+    
+    // Job metrics computed properties
+    const jobSuccessCount = computed(() => {
+      return deviceJobLogs.value.filter(log => log.status === 'completed').length
+    })
+    
+    const jobFailureCount = computed(() => {
+      return deviceJobLogs.value.filter(log => log.status === 'failed').length
+    })
+    
     onMounted(async () => {
       loading.value = true
       try {
@@ -519,6 +753,9 @@ export default {
       await fetchDeviceTags()
       // Fetch all tags
       await tagStore.fetchTags()
+      
+      // Fetch job logs for the device
+      await fetchDeviceJobLogs()
     })
     
     const saveDevice = async () => {
@@ -745,6 +982,147 @@ export default {
       }, 50)
     }
     
+    const fetchDeviceJobLogs = async () => {
+      if (!deviceId.value) return
+      
+      loadingJobLogs.value = true
+      try {
+        // Reset pagination when fetching new logs
+        currentPage.value = 1
+        
+        // Set device_id filter
+        const params = {
+          device_id: deviceId.value,
+          ...jobFilters.value,
+          page: currentPage.value,
+          page_size: pageSize.value
+        }
+        
+        // Remove empty filters
+        Object.keys(params).forEach(key => {
+          if (!params[key]) delete params[key]
+        })
+        
+        const jobLogs = await jobLogStore.fetchJobLogs(params)
+        deviceJobLogs.value = jobLogs
+        
+        // Check if there are more logs to load
+        hasMoreJobLogs.value = jobLogs.length === pageSize.value
+      } catch (error) {
+        console.error('Failed to fetch device job logs:', error)
+      } finally {
+        loadingJobLogs.value = false
+      }
+    }
+    
+    const loadMoreJobLogs = async () => {
+      if (!deviceId.value || !hasMoreJobLogs.value) return
+      
+      loadingJobLogs.value = true
+      try {
+        // Increment page number
+        currentPage.value++
+        
+        // Set device_id filter
+        const params = {
+          device_id: deviceId.value,
+          ...jobFilters.value,
+          page: currentPage.value,
+          page_size: pageSize.value
+        }
+        
+        // Remove empty filters
+        Object.keys(params).forEach(key => {
+          if (!params[key]) delete params[key]
+        })
+        
+        const jobLogs = await jobLogStore.fetchJobLogs(params)
+        
+        // Append new logs to existing ones
+        deviceJobLogs.value = [...deviceJobLogs.value, ...jobLogs]
+        
+        // Check if there are more logs to load
+        hasMoreJobLogs.value = jobLogs.length === pageSize.value
+      } catch (error) {
+        console.error('Failed to load more device job logs:', error)
+      } finally {
+        loadingJobLogs.value = false
+      }
+    }
+    
+    const applyJobFilters = () => {
+      fetchDeviceJobLogs()
+    }
+    
+    const clearJobFilters = () => {
+      jobFilters.value = {
+        job_type: '',
+        status: '',
+        start_date: '',
+        end_date: ''
+      }
+      fetchDeviceJobLogs()
+    }
+    
+    const formatJobType = (type) => {
+      const typeMap = {
+        'device_backup': 'Backup',
+        'config_compliance': 'Compliance',
+        'device_discovery': 'Discovery',
+        'system_maintenance': 'Maintenance'
+      }
+      return typeMap[type] || type
+    }
+    
+    const formatDateTime = (dateString) => {
+      if (!dateString) return 'N/A'
+      const date = new Date(dateString)
+      return date.toLocaleString()
+    }
+    
+    const calculateDuration = (startTime, endTime) => {
+      if (!startTime) return 'N/A'
+      
+      const start = new Date(startTime)
+      const end = endTime ? new Date(endTime) : new Date()
+      
+      const durationMs = end - start
+      const seconds = Math.floor(durationMs / 1000)
+      
+      if (seconds < 60) {
+        return `${seconds} sec${seconds !== 1 ? 's' : ''}`
+      }
+      
+      const minutes = Math.floor(seconds / 60)
+      if (minutes < 60) {
+        return `${minutes} min${minutes !== 1 ? 's' : ''}`
+      }
+      
+      const hours = Math.floor(minutes / 60)
+      const remainingMinutes = minutes % 60
+      return `${hours} hr${hours !== 1 ? 's' : ''} ${remainingMinutes} min${remainingMinutes !== 1 ? 's' : ''}`
+    }
+    
+    const truncateText = (text, maxLength) => {
+      if (!text) return ''
+      if (text.length <= maxLength) return text
+      return `${text.substring(0, maxLength)}...`
+    }
+    
+    const getJobName = (jobType) => {
+      // Generate a job name based on the job type
+      switch(jobType) {
+        case 'device_backup':
+          return 'Device Backup Job';
+        case 'config_compliance':
+          return 'Configuration Compliance Job';
+        case 'device_discovery':
+          return 'Device Discovery Job';
+        default:
+          return 'Maintenance Job';
+      }
+    }
+    
     return {
       device,
       loading,
@@ -778,7 +1156,22 @@ export default {
       deviceId,
       handleOpenCreateTag,
       checkingReachability,
-      checkReachability
+      checkReachability,
+      loadingJobLogs,
+      deviceJobLogs,
+      jobFilters,
+      jobSuccessCount,
+      jobFailureCount,
+      hasMoreJobLogs,
+      fetchDeviceJobLogs,
+      loadMoreJobLogs,
+      applyJobFilters,
+      clearJobFilters,
+      formatJobType,
+      formatDateTime,
+      calculateDuration,
+      truncateText,
+      getJobName
     }
   }
 }

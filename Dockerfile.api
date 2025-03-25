@@ -14,8 +14,9 @@ RUN groupadd -g 1001 netraven && \
     useradd -u 1001 -g netraven -m -s /bin/bash netraven
 
 # Create directories for non-root operations
-RUN mkdir -p /app /app/logs /app/data /app/test-artifacts && \
-    chown -R netraven:netraven /app
+RUN mkdir -p /app /app/logs /app/data /app/test-artifacts /tmp/netmiko_logs && \
+    chown -R netraven:netraven /app && \
+    chmod 777 /tmp/netmiko_logs
 
 # Create Python cache directories with appropriate permissions
 RUN mkdir -p /.local /.cache && \
@@ -43,7 +44,7 @@ COPY docker/ docker/
 COPY tests/ tests/
 COPY scripts/ scripts/
 
-# Make entrypoint executable
+# Make entrypoint and scripts executable
 RUN chmod +x docker/entrypoint.sh
 RUN chmod +x scripts/*.py scripts/*.sh
 
@@ -51,6 +52,7 @@ RUN chmod +x scripts/*.py scripts/*.sh
 ENV PYTHONPATH=/app
 ENV SERVICE_TYPE=api
 ENV BUILD_ENVIRONMENT=${NETRAVEN_ENV}
+ENV NETMIKO_LOG_DIR=/tmp/netmiko_logs
 
 # Set permissions for test artifacts directory
 RUN chmod 777 /app/test-artifacts

@@ -1,0 +1,15 @@
+## Coding principles
+- Always prefer simple solutions
+- Avoid duplication of code whenever possible, which means checking for other areas of the codebase that might already have similar code or functionality and leverage that before introducing something new. 
+- only make changes that are requested or related to the change being requested.
+- when fixing a bug or issue do not introduce a new pattern or technology without exhausting all options with the existing implementation. If you do need to introduce a new pattern or technology make sure to remove the old implemenation to prevent duplicate logic and legacy code.
+- always consider the project deployment model when introducing changes to make sure that those changes are incorporated into the deployment model.
+- Always clean up after yourself. If you introduce temporary files or code make sure to remove it when its no longer needed.
+- avoid writing scripts in files if possible, especially if its only going to be used once or temporarily.
+- avoid having files over 200-300 lines of code. Refactor at that point.
+- Mocking data should only be used for tests, never use it for dev or prod.
+- Never add stubbing or fake data patterns to code the affects dev or prod.
+- Always present a plan that outlines your proposed changes when intially asked to update, enhance, create, or fix an issue and then wait for approval of the plan before proceeding. The plan should be broken into phases so as not to make to many changes all at once.
+- Always ask if you can proced before moving on the the next phase of your plan.
+- Always git state, commit, and push after every successfull completion of a phase.
+- Without being to verbose and inefficient explain what you are doing as you code, test, or make changes so that I can understand what you are doing while you are doing it. 
