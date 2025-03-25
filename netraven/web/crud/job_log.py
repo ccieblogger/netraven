@@ -67,7 +67,7 @@ def get_job_log(db: Session, log_id: str) -> Optional[JobLog]:
 
 def get_job_log_entries(
     db: Session,
-    log_id: str,
+    job_log_id: str,
     skip: int = 0,
     limit: int = 100,
     level: Optional[str] = None
@@ -77,7 +77,7 @@ def get_job_log_entries(
     
     Args:
         db: Database session
-        log_id: Job log ID
+        job_log_id: Job log ID
         skip: Number of records to skip
         limit: Maximum number of records to return
         level: Filter by log level
@@ -85,7 +85,7 @@ def get_job_log_entries(
     Returns:
         List of job log entry records
     """
-    query = db.query(JobLogEntry).filter(JobLogEntry.job_log_id == log_id)
+    query = db.query(JobLogEntry).filter(JobLogEntry.job_log_id == job_log_id)
     
     if level:
         query = query.filter(JobLogEntry.level == level)
@@ -113,7 +113,7 @@ def get_job_log_with_entries(
     if not job_log:
         return None
     
-    entries = get_job_log_entries(db, log_id, limit=entries_limit)
+    entries = get_job_log_entries(db, job_log_id=log_id, limit=entries_limit)
     
     return {
         "job_log": job_log,

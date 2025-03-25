@@ -184,7 +184,7 @@ async def get_job_log(
         # Get entries if requested
         entries = []
         if include_entries:
-            entries = get_job_log_entries(db, job_log_id, limit=entry_limit)
+            entries = get_job_log_entries(db, job_log_id=job_log_id, limit=entry_limit)
             # Convert entries to list of dictionaries
             entries_list = []
             for entry in entries:
@@ -215,55 +215,67 @@ async def get_job_log(
             detail=f"Error retrieving job log: {str(e)}"
         )
 
-@router.get("/{job_log_id}/entries", response_model=List[job_log_schemas.JobLogEntry])
-async def get_job_log_entries_endpoint(
-    job_log_id: str,
-    limit: int = Query(100, gt=0, le=1000),
-    offset: int = Query(0, ge=0),
-    current_principal: UserPrincipal = Depends(get_current_principal),
+@router.get("/{id}/entries")
+def fetch_job_log_entries(
+    id: str,
+    principal: UserPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db)
-) -> List[job_log_schemas.JobLogEntry]:
+) -> List[Dict[str, Any]]:
     """
-    Get entries for a specific job log.
+    Get job log entries for a job log.
     
     Args:
-        job_log_id: The job log ID
-        limit: Maximum number of entries to return
-        offset: Number of entries to skip
-        current_principal: The authenticated user
+        id: Job log ID
+        principal: User principal
         db: Database session
         
     Returns:
-        List[job_log_schemas.JobLogEntry]: List of job log entries
+        List of job log entries
         
     Raises:
-        HTTPException: If the job log is not found or user is not authorized
+        HTTPException: If job log not found or user doesn't have permission
     """
     # Use standardized resource access check
     job_log = check_job_log_access(
-        principal=current_principal,
-        log_id_or_obj=job_log_id,
+        principal=principal,
+        log_id_or_obj=id,
         required_scope="read:job_logs",
         db=db
     )
     
     try:
-        # Get entries
-        entries = get_job_log_entries(db, job_log_id, limit=limit, offset=offset)
+        # Get job log entries
+        entries = get_job_log_entries(db, job_log_id=id)
         
-        # Standardized access granted log
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=job_log:{job_log_id}, scope=read:job_logs, action=get_entries, count={len(entries)}")
-        return entries
+        # Convert entries to list of dictionaries
+        entries_list = []
+        for entry in entries:
+            entries_list.append({
+                "id": entry.id,
+                "job_log_id": entry.job_log_id,
+                "timestamp": entry.timestamp,
+                "level": entry.level,
+                "category": entry.category,
+                "message": entry.message,
+                "details": entry.details,
+                "session_log_content": entry.session_log_content,
+                "session_log_path": entry.session_log_path,
+                "credential_username": entry.credential_username
+            })
+        
+        # Log access granted
+        logger.info(f"Access granted: user={principal.username}, " 
+                   f"resource=job_log_entries:{id}, scope=read:job_logs, count={len(entries_list)}")
+        
+        return entries_list
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        # Standardized error handling
-        logger.exception(f"Error retrieving job log entries: {str(e)}")
+        logger.exception(f"Error getting job log entries: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving job log entries: {str(e)}"
+            detail=f"Error getting job log entries: {str(e)}"
         )
 
 @router.delete("/{job_log_id}", status_code=status.HTTP_204_NO_CONTENT)
