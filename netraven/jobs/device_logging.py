@@ -8,17 +8,23 @@ detailed device communication logs during job execution.
 import logging
 import uuid
 import os
+import re
 from typing import Optional, Dict, Any
-from netraven.core.logging import get_logger
-from netraven.core.config import load_config, get_default_config_path
+from datetime import datetime
 
-# Load configuration
-config_path = os.environ.get("NETRAVEN_CONFIG", get_default_config_path())
+# Load configuration without circular imports
+config_path = os.environ.get("NETRAVEN_CONFIG", None)
+if config_path is None:
+    from netraven.core.config import get_default_config_path
+    config_path = get_default_config_path()
+
+from netraven.core.config import load_config
 config, _ = load_config(config_path)
 
 # Get logging configuration
 _use_database_logging = config["logging"].get("use_database_logging", False)
 _log_to_file = config["logging"].get("log_to_file", False)
+_default_retention_days = config["logging"].get("retention_days", 30)
 
 # Job session ID for associating log messages with specific job runs
 _current_job_session: Optional[str] = None
@@ -27,11 +33,11 @@ _current_device_id: Optional[str] = None
 _current_user_id: Optional[str] = None
 
 # Create a logger with the jobs prefix to ensure logs are routed to jobs.log
-if _use_database_logging:
-    # Import here to avoid circular imports
-    from netraven.core.db_logging import get_db_logger
-    logger = get_db_logger("netraven.jobs.device_comm")
-else:
+logger = logging.getLogger("netraven.jobs.device_comm")
+
+# Initialize the logger based on configuration
+if _log_to_file:
+    from netraven.core.logging import get_logger
     logger = get_logger("netraven.jobs.device_comm")
 
 def start_job_session(description: str = "Backup job", user_id: Optional[str] = None) -> str:
@@ -53,8 +59,9 @@ def start_job_session(description: str = "Backup job", user_id: Optional[str] = 
     
     # Start a database job session if database logging is enabled
     if _use_database_logging:
-        from netraven.core.db_logging import start_db_job_session
-        start_db_job_session(
+        # Import here to avoid circular imports
+        import netraven.core.db_logging as db_logging
+        db_logging.start_db_job_session(
             job_type=description,
             user_id=user_id
         )
@@ -80,8 +87,9 @@ def end_job_session(session_id: Optional[str] = None, success: bool = True) -> N
     
     # End the database job session if database logging is enabled
     if _use_database_logging:
-        from netraven.core.db_logging import end_db_job_session
-        end_db_job_session(
+        # Import here to avoid circular imports
+        import netraven.core.db_logging as db_logging
+        db_logging.end_db_job_session(
             success=success,
             result_message="Job completed successfully" if success else "Job failed"
         )
@@ -332,15 +340,14 @@ def log_backup_success(device_id: str, file_path: str, size: int,
     logger.info(f"[Session: {session_id}] Backup successful for device: {device_info.get('hostname', device_id)}, "
                 f"file: {file_path}, size: {size_str}")
 
-def log_backup_failure(device_id: str, error: str, 
-                      session_id: Optional[str] = None) -> None:
+def log_backup_failure(device_id: str, error: str, session_id: Optional[str] = None) -> None:
     """
-    Log a failed backup operation.
+    Log a backup failure.
     
     Args:
-        device_id: Device ID
+        device_id: The device ID that failed
         error: Error message
-        session_id: Optional session ID
+        session_id: Session ID (if None, uses current session)
     """
     session_id = session_id or _current_job_session
     
@@ -353,8 +360,46 @@ def log_backup_failure(device_id: str, error: str,
         logger.warning(f"No device info for backup failure: {device_id}")
         return
     
-    logger.error(f"[Session: {session_id}] Backup failed for device: {device_info.get('hostname', device_id)}, "
-                f"error: {error}")
+    hostname = device_info.get('hostname', device_id)
+    
+    # Enhanced error detail message
+    enhanced_error = f"Backup failed for device {hostname}: {error}"
+    
+    # Format error for better readability
+    if "[NetMiko:" in error:
+        # Make NetMiko error more prominent
+        parts = error.split("[NetMiko:")
+        error_type = parts[1].split("]")[0].strip()
+        enhanced_error = f"NetMiko Error ({error_type}): {parts[0].strip()}"
+        
+        # Add detailed suggestion based on error type
+        if "Authentication" in error_type:
+            enhanced_error += "\n\nSuggestion: Verify credentials are correct for this device."
+        elif "Timeout" in error_type:
+            enhanced_error += "\n\nSuggestion: Device connection timed out. Check network connectivity and increase timeout settings."
+        elif "SSH" in error_type:
+            enhanced_error += "\n\nSuggestion: SSH connection issue. Verify SSH is enabled on the device and accessible."
+    elif "unreachable" in error.lower() or "Connection to" in error:
+        enhanced_error = f"Device Unreachable: {error}\n\nSuggestion: Verify the device is powered on and the IP/hostname is correct."
+    elif "authentication" in error.lower():
+        enhanced_error = f"Authentication Failed: {error}\n\nSuggestion: Check username/password or try different credentials."
+    elif "validation" in error.lower():
+        enhanced_error = f"Validation Error: {error}\n\nSuggestion: Verify required authentication parameters are provided."
+    
+    logger.error(f"[Session: {session_id}] Backup failed for device: {hostname}, error: {error}")
+    
+    # Add the enhanced error message to the job log entry using both methods
+    if _use_database_logging:
+        # Use the standard method 
+        import netraven.core.db_logging as db_logging
+        db_logging.end_db_job_session(
+            success=False,
+            result_message=enhanced_error
+        )
+        
+        # Also use the direct method to ensure the error is set properly
+        import netraven.core.db_logging as db_logging
+        db_logging.set_error_message(enhanced_error)
 
 def log_device_info(session_id: str, device_id: str, serial_number: Optional[str] = None, 
                   os_version: Optional[str] = None, os_model: Optional[str] = None) -> None:
@@ -444,6 +489,40 @@ def log_credential_usage(device_id: str, session_id: str, credential_id: Optiona
     else:
         logger.info(f"[Session: {session_id}] Credential usage for device: {hostname}, type: {attempt_type}")
 
+def log_job_data(session_id: str, data: Dict[str, Any]) -> None:
+    """
+    Store additional job data in the database for UI display.
+    
+    This function is used to add structured data to a job record that can
+    be accessed by the UI for enhanced error reporting and status information.
+    
+    Args:
+        session_id: Session ID to associate the data with
+        data: Dictionary of data to store with the job
+    """
+    if not session_id:
+        logger.warning("No active job session to store data for")
+        return
+    
+    logger.debug(f"[Session: {session_id}] Logging job data: {data}")
+    
+    if _use_database_logging:
+        try:
+            import netraven.core.db_logging as db_logging
+            db_logging.update_job_data(data)
+            logger.debug(f"[Session: {session_id}] Updated job data: {list(data.keys())}")
+        except Exception as e:
+            logger.error(f"[Session: {session_id}] Failed to update job data: {str(e)}", exc_info=True)
+    else:
+        # Just log the data when database logging is disabled
+        logger.info(f"[Session: {session_id}] Job data: {data}")
+        
+    # Also log backup failure details for better debugging
+    if data.get('error_details'):
+        error_type = data['error_details'].get('class', 'Unknown')
+        error_msg = data['error_details'].get('message', 'Unknown error')
+        logger.error(f"[Session: {session_id}] Detailed error - Type: {error_type}, Message: {error_msg}")
+
 def _get_device_info(device_id: str, session_id: str) -> Optional[Dict[str, Any]]:
     """
     Get device info for a session.
@@ -458,4 +537,151 @@ def _get_device_info(device_id: str, session_id: str) -> Optional[Dict[str, Any]
     if session_id not in _job_device_info:
         return None
     
-    return _job_device_info[session_id].get(device_id) 
+    return _job_device_info[session_id].get(device_id)
+
+def log_netmiko_session(device_id: str, session_log_path: str, username: str, 
+                        session_id: Optional[str] = None, mask_passwords: bool = True) -> bool:
+    """
+    Capture and log Netmiko session content with enhanced details.
+    
+    Args:
+        device_id: Device ID
+        session_log_path: Path to the Netmiko session log file
+        username: Username used for the connection
+        session_id: Optional session ID (uses current if None)
+        mask_passwords: Whether to mask passwords in the logs (default: True)
+        
+    Returns:
+        bool: True if log was successfully captured, False otherwise
+    """
+    logger.info(f"Processing NetMiko session log: {session_log_path} for device {device_id}")
+    
+    session_id = session_id or _current_job_session
+    
+    if not session_id:
+        logger.warning(f"No active job session for Netmiko log: {device_id}")
+        return False
+    
+    device_info = _get_device_info(device_id, session_id)
+    if not device_info:
+        logger.warning(f"No device info for Netmiko log: {device_id}")
+        return False
+    
+    hostname = device_info.get('hostname', device_id)
+    
+    # Check if session log file exists
+    if not os.path.exists(session_log_path):
+        logger.warning(f"Session log file does not exist: {session_log_path}")
+        # Try alternate locations
+        filename = os.path.basename(session_log_path)
+        alt_paths = [
+            os.path.join("/app/data/netmiko_logs", filename),
+            os.path.join("/tmp/netmiko_logs", filename),
+            os.path.join("/tmp", filename)
+        ]
+        
+        # Log the search paths for debugging
+        logger.info(f"Searching for log file {filename} in alternate locations")
+        for alt_path in alt_paths:
+            logger.info(f"Checking alternate path: {alt_path}")
+            if os.path.exists(alt_path):
+                logger.info(f"Found session log at alternate location: {alt_path}")
+                session_log_path = alt_path
+                break
+        else:
+            # One more attempt - try looking for any files with similar name pattern
+            for log_dir in ["/app/data/netmiko_logs", "/tmp/netmiko_logs", "/tmp"]:
+                if os.path.exists(log_dir):
+                    logger.info(f"Searching in directory: {log_dir}")
+                    try:
+                        # Look for files with host in the name (part of the original filename)
+                        host_part = filename.split('_')[2] if len(filename.split('_')) > 2 else ""
+                        if host_part:
+                            for file in os.listdir(log_dir):
+                                if host_part in file and file.startswith("netmiko_session_"):
+                                    logger.info(f"Found potential session log match: {os.path.join(log_dir, file)}")
+                                    session_log_path = os.path.join(log_dir, file)
+                                    break
+                    except Exception as e:
+                        logger.warning(f"Error searching for log files: {str(e)}")
+            
+            if not os.path.exists(session_log_path):
+                logger.error(f"Session log file not found at any location: {session_log_path}")
+                return False
+    
+    try:
+        # Read the session log content
+        with open(session_log_path, 'r') as f:
+            log_content = f.read()
+        
+        logger.info(f"Successfully read session log content: {len(log_content)} bytes")
+        
+        # Process log content - mask passwords if enabled
+        if mask_passwords:
+            # Mask common password patterns
+            patterns = [
+                # Common format like "password: mypassword"
+                r'password\s*:\s*(.+?)[\r\n]',  
+                r'secret\s*:\s*(.+?)[\r\n]',
+                
+                # Single quoted values like password='mypassword'
+                r'pass\s*=\s*\'(.+?)\'',
+                r'password\s*=\s*\'(.+?)\'',
+                r'secret\s*=\s*\'(.+?)\'',
+                
+                # Double quoted values like password="mypassword"
+                r'pass\s*=\s*\"(.+?)\"',
+                r'password\s*=\s*\"(.+?)\"',
+                r'secret\s*=\s*\"(.+?)\"',
+                
+                # Unquoted values like password=mypassword
+                r'pass\s*=\s*([^\s;,]+)',
+                r'password\s*=\s*([^\s;,]+)',
+                r'secret\s*=\s*([^\s;,]+)'
+            ]
+            
+            masked_count = 0
+            for pattern in patterns:
+                # Count the number of matches before masking
+                matches_before = len(re.findall(pattern, log_content))
+                log_content = re.sub(pattern, lambda m: m.group(0).replace(m.group(1), '*' * len(m.group(1))), log_content)
+                # Count the number of matches after masking
+                matches_after = len(re.findall(pattern, log_content.replace('*', 'X')))  # Replace asterisks to compare
+                masked_count += matches_before - matches_after
+            
+            logger.info(f"Masked {masked_count} password occurrences in log content")
+        
+        # Format timestamp for the log
+        timestamp = datetime.utcnow()
+        
+        # Log the captured content
+        logger.info(f"[Session: {session_id}] Captured Netmiko session log for device: {hostname}, log size: {len(log_content)} bytes")
+        
+        # Store in database if database logging is enabled
+        if _use_database_logging:
+            # Import here to avoid circular imports
+            import netraven.core.db_logging as db_logging
+            
+            # Create a standard format for device communication logs
+            logger.info(f"Storing session log in database for job {session_id}")
+            db_logging.log_db_entry(
+                level="INFO",
+                category="device communication",
+                message=f"Netmiko session log for device: {hostname}",
+                details={
+                    "session_log_path": session_log_path,
+                    "device_id": device_id,
+                    "device_hostname": hostname,
+                    "device_type": device_info.get('device_type', 'unknown')
+                },
+                session_log_path=session_log_path,
+                session_log_content=log_content,
+                credential_username=username
+            )
+            logger.info(f"Successfully stored session log in database for job {session_id}")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error processing Netmiko session log: {str(e)}")
+        logger.exception("Session log processing exception details:")
+        return False 

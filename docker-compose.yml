@@ -39,10 +39,15 @@ services:
       - GATEWAY_URL=http://device_gateway:8001
       - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
       - ALLOW_CREDENTIALS=true
+      - NETMIKO_LOG_DIR=/tmp/netmiko_logs
+      - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
     volumes:
       - api-data:/app/data
       - ./test-artifacts:/app/test-artifacts
       - ./config.yml:/app/config.yml
+      - netraven_netmiko_logs:/app/data/netmiko_logs
+      - ./netraven:/app/netraven
+      - ./scripts:/app/scripts
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -57,7 +62,7 @@ services:
     networks:
       - netraven-network
     # Run database initialization on container startup
-    entrypoint: ["/bin/bash", "-c", "python /app/scripts/ensure_schema.py && /app/docker/entrypoint.sh"]
+    entrypoint: ["/bin/bash", "-c", "mkdir -p /tmp/netmiko_logs && chmod 777 /tmp/netmiko_logs && python /app/scripts/ensure_schema.py && /app/docker/entrypoint.sh"]
 
   # Scheduler service
   scheduler:
@@ -69,11 +74,14 @@ services:
     volumes:
       - ./:/app
       - logs_data:/app/logs
+      - netraven_netmiko_logs:/app/data/netmiko_logs
     working_dir: /app
-    command: bash -c "python -m netraven.jobs.scheduler"
+    command: bash -c "mkdir -p /app/data/netmiko_logs && python -m netraven.jobs.scheduler"
     environment:
       - API_URL=http://api:8000
       - NETRAVEN_ENV=${NETRAVEN_ENV:-test}
+      - NETMIKO_LOG_DIR=/app/data/netmiko_logs
+      - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,9 +106,13 @@ services:
       - ./netraven:/app/netraven
       - token_data:/app/tokens
       - ./config.yml:/app/config.yml
+      - netraven_netmiko_logs:/app/data/netmiko_logs
+      - ./scripts:/app/scripts
     environment:
       - API_URL=http://api:8000
       - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
+      - NETMIKO_LOG_DIR=/tmp/netmiko_logs
+      - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -170,6 +182,7 @@ volumes:
   token_data:
   api-data:
   key_data:
+  netraven_netmiko_logs:
 
 networks:
   netraven-network:
