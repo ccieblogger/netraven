@@ -248,6 +248,40 @@ The web interface provides:
 - **Tag-based Organization**: Organize devices with tags and tag rules
 - **Device Gateway**: Secure gateway for device communication with metrics collection
 
+### Scheduler Service
+
+The Scheduler Service provides a centralized system for scheduling and executing jobs on network devices. It supports:
+
+- One-time and recurring job scheduling using cron expressions
+- Priority-based job queuing
+- Backup and command execution job types
+- Comprehensive job logging and status tracking
+- Command-line interface for job management
+
+To use the Scheduler CLI:
+
+```bash
+# Show service status
+./netraven/cli/scheduler_cli.py status
+
+# Schedule a backup job
+./netraven/cli/scheduler_cli.py backup --device-id device1 --host 192.168.1.1 --username admin --password secret --now
+
+# Schedule a command execution job
+./netraven/cli/scheduler_cli.py command --device-id device1 --host 192.168.1.1 --username admin --password secret --command "show version" --now
+
+# List all jobs
+./netraven/cli/scheduler_cli.py list
+
+# Show job details
+./netraven/cli/scheduler_cli.py show <job_id>
+
+# Cancel a job
+./netraven/cli/scheduler_cli.py cancel <job_id>
+```
+
+For more information about the Scheduler Service, see the [development documentation](docs/aidocs/development/phase2_scheduler_service.md).
+
 ## Architecture
 
 NetRaven consists of several components:
