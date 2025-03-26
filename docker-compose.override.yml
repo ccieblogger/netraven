@@ -1,5 +1,5 @@
-# This file contains overrides for test environment
-# It is automatically loaded by docker-compose when present
+# This file contains overrides for the test environment configuration.
+# It is automatically loaded by docker-compose when present.
 
 services:
   api:
@@ -44,4 +44,4 @@ services:
   scheduler:
     command: bash -c "cd /app && python -m netraven.jobs.scheduler"
     environment:
-      - NETRAVEN_ENV=test 
+      - NETRAVEN_ENV=test

@@ -25,16 +25,15 @@ const getEnvVariable = (key, defaultValue) => {
 let browserApiUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000';
 console.log('INITIAL API URL:', browserApiUrl);
 
-// In browser environments, use the browser's hostname to ensure connectivity
+// In browser environments, use the browser's origin to ensure connectivity
 if (typeof window !== 'undefined') {
-  const hostname = window.location.hostname;
-  // Replace api:8000 with the actual hostname if it's set that way in the environment
-  if (browserApiUrl.includes('api:8000')) {
+  // If we're in the browser and the API URL has container references, use the browser's origin
+  if (browserApiUrl.includes('api:8000') || browserApiUrl.includes('localhost:8000')) {
     const originalUrl = browserApiUrl;
-    browserApiUrl = `http://${hostname}:8000`;
+    browserApiUrl = window.location.origin;
     console.log('TRANSFORMED API URL from', originalUrl, 'to', browserApiUrl);
   }
-  console.log('USING API URL with browser hostname:', browserApiUrl);
+  console.log('USING API URL with browser origin:', browserApiUrl);
 }
 
 console.log('FINAL API URL:', browserApiUrl);

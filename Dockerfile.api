@@ -1,3 +1,6 @@
+# This Dockerfile is used to build the Backend API container for NetRaven.
+# The API serves as the central communication layer for the application.
+
 FROM python:3.10-slim
 
 # Add build argument for environment
@@ -63,4 +66,4 @@ EXPOSE 8000
 USER netraven
 
 # Run entrypoint
-ENTRYPOINT ["/app/docker/entrypoint.sh"] 
+ENTRYPOINT ["/app/docker/entrypoint.sh"]

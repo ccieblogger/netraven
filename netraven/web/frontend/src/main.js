@@ -80,7 +80,7 @@ const app = createApp(App)
 // Add diagnostic API check
 const apiUrl = process.env.VUE_APP_API_URL || 'http://localhost:8000'
 const browserApiUrl = typeof window !== 'undefined' && window.location ? 
-  `http://${window.location.hostname}:8000` : apiUrl
+  `${window.location.protocol}//${window.location.host}` : apiUrl
 
 // Configure axios default base URL
 axios.defaults.baseURL = browserApiUrl;

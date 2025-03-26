@@ -1,3 +1,6 @@
+# This Dockerfile is used to build the Frontend container for NetRaven.
+# The Frontend provides a Vue.js-based user interface for the application.
+
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -30,4 +33,4 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
 # Run the application
-CMD ["python", "-m", "netraven.cli", "web", "--host", "0.0.0.0", "--port", "8080"] 
+CMD ["python", "-m", "netraven.cli", "web", "--host", "0.0.0.0", "--port", "8080"]
