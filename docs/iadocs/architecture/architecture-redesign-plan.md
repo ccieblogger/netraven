@@ -221,6 +221,184 @@ The Device Communication Service will integrate tightly with the existing creden
    - Add automatic retry strategies
    - Implement circuit breaker patterns
 
+## Technical Implementation Details
+
+### API & Interface Specifications
+
+#### REST API Contracts
+All service APIs will follow REST principles and be documented using OpenAPI 3.0:
+- **Scheduler Service API**: `/api/v1/jobs/` for job management operations
+- **Job Logging Service API**: `/api/v1/logs/` for log retrieval and management
+- **Device Communication Service API**: `/api/v1/devices/communication/` for device operations
+
+An example OpenAPI specification excerpt for the Scheduler Service:
+```yaml
+paths:
+  /api/v1/jobs:
+    post:
+      summary: Create a new job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCreate'
+      responses:
+        '201':
+          description: Job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+```
+
+#### Inter-Service Communication
+- **Primary Pattern**: REST over HTTP for synchronous operations
+- **Event Communication**: For asynchronous workflows, we'll use RabbitMQ message queues
+- **Message Formats**: All messages will use JSON with standardized envelope format:
+  ```json
+  {
+    "metadata": {
+      "correlation_id": "uuid-string",
+      "timestamp": "ISO-datetime",
+      "source": "service-name"
+    },
+    "payload": { /* operation-specific data */ }
+  }
+  ```
+
+### Asynchronous & Concurrency Considerations
+
+#### Async Implementation Strategy
+- **Framework**: FastAPI for async HTTP endpoints
+- **Worker Framework**: Celery for background task processing
+- **Libraries**: Python's asyncio for core async operations
+- **Transition Approach**: 
+  1. Initial implementation with synchronous methods
+  2. Add async equivalents with `_async` suffix
+  3. Default to async implementation when mature
+
+#### Connection Pool Configuration
+```python
+# Connection Pool Configuration
+CONNECTION_POOL_CONFIG = {
+    "max_pool_size": 50,
+    "min_idle": 5,
+    "max_idle_time_sec": 300,
+    "connection_timeout_sec": 30,
+    "keep_alive_interval_sec": 60,
+    "per_host_limit": 5
+}
+```
+
+### Error Handling & Resilience
+
+#### Error Propagation Standards
+- **HTTP Error Codes**: Follow standard REST error codes (400-599)
+- **Error Response Format**:
+  ```json
+  {
+    "error": {
+      "code": "ERROR_CODE",
+      "message": "Human-readable message",
+      "details": { /* additional context */ },
+      "correlation_id": "uuid-for-tracing"
+    }
+  }
+  ```
+- **Logging**: All errors must be logged with correlation ID and stacktrace
+
+#### Retry Policies
+Standard retry configuration applied consistently across services:
+```python
+# Standard Retry Configuration
+RETRY_CONFIG = {
+    "max_attempts": 3,
+    "initial_backoff_ms": 500,
+    "max_backoff_ms": 10000,
+    "backoff_multiplier": 2.0,
+    "retry_codes": [
+        "UNAVAILABLE", "ABORTED", "DEADLINE_EXCEEDED"
+    ]
+}
+```
+
+### Testing Strategy
+
+#### Test Levels
+1. **Unit Tests**: Minimum 80% code coverage for all components
+2. **Integration Tests**: Service to service, focusing on API contracts
+3. **System Tests**: End-to-end operational flows
+4. **Performance Tests**: Connection pooling, concurrency, and throughput
+
+#### Mocking Strategy
+- Use pytest-mock for unit test mocking
+- Dedicated mock servers for device simulation
+- Sample test structure:
+  ```python
+  def test_device_connection_retry(mock_device_server):
+      # Given a device that will fail authentication once then succeed
+      mock_device_server.configure(auth_failures=1, then_succeed=True)
+      
+      # When connecting to the device
+      result = device_comm_service.connect_to_device("device-001")
+      
+      # Then connection succeeds after retry
+      assert result.success is True
+      assert result.attempts == 2
+  ```
+
+### Containerization & Deployment
+
+#### Container Guidelines
+Each service will have a standardized Dockerfile structure:
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "service.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+#### Configuration Management
+- Environment-specific configs in `.env` files (not committed to source control)
+- Kubernetes ConfigMaps for non-sensitive configuration
+- Kubernetes Secrets for sensitive data
+- Centralized configuration validation at startup
+
+### Security Implementation
+
+#### Authentication Flow
+1. API Gateway validates JWT tokens from auth service
+2. Internal service communication uses service account tokens
+3. Token format: JWTs with role-based access claims
+4. Token validation at service boundaries using shared library
+
+#### Credential Storage
+- Credentials encrypted at rest using AES-256
+- Key rotation support with versioned keys
+- Credentials never logged, even in debug mode
+- In-memory cache with short TTL for performance
+
+### Documentation Requirements
+
+#### Code Documentation Standards
+- Docstrings for all public methods (Google style)
+- Architecture decision records (ADRs) for significant choices
+- README in each component directory
+- Interface definitions in separate files with full documentation
+
+#### Living Documentation
+- OpenAPI specs auto-generated from code
+- Sequence diagrams for key workflows
+- Component dependency graphs maintained with code
+
 ## Source Control and Release Strategy
 
 ### Branching Strategy
@@ -358,7 +536,7 @@ The following principles **must** be adhered to when implementing this architect
 - **Module Size Limits**: Keep files under 200-300 lines of code. When a file exceeds this limit, refactor it into multiple focused modules.
 - **Scope Discipline**: Only make changes that are directly requested or related to the task at hand. Avoid "scope creep" during implementation.
 
-### Technology Choices
+### Technology ChoicesBria
 
 - **Conservative Enhancement**: When fixing bugs or issues, exhaust all options with existing patterns and technologies before introducing new ones.
 - **Legacy Code Replacement**: If introducing a new pattern or technology is necessary, completely remove the old implementation to prevent duplicate logic and legacy code fragments.
