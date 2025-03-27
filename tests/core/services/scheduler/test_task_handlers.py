@@ -5,7 +5,7 @@ Integration tests for task handlers.
 import pytest
 from unittest.mock import patch, MagicMock
 
-from netraven.core.services.scheduler.models import Job, JobStatus, JobPriority
+from netraven.core.services.scheduler.models import Job, JobStatus, JobPriority, JobDefinition
 from netraven.core.services.scheduler.task_handlers import BackupTaskHandler, CommandTaskHandler
 from netraven.core.services.scheduler.handlers import get_registry
 from netraven.core.services.scheduler.logging import JobLoggingService
@@ -16,20 +16,25 @@ class TestTaskHandlers:
     
     def test_backup_task_handler(self):
         """Test backup task handler execution."""
-        # Create a job
-        job = Job(
-            id="test_backup_job",
-            name="Test Backup Job",
+        # Create job definition
+        job_def = JobDefinition(
             job_type="backup",
-            priority=JobPriority.NORMAL,
-            status=JobStatus.PENDING,
             parameters={
                 "device_id": "test_device",
                 "host": "192.168.1.1",
                 "username": "admin",
                 "password": "password",
                 "save_config": True
-            }
+            },
+            priority=JobPriority.NORMAL,
+            job_id="test_backup_job",
+            name="Test Backup Job"
+        )
+        
+        # Create a job
+        job = Job(
+            definition=job_def,
+            status=JobStatus.PENDING
         )
         
         # Execute job using handler
@@ -57,20 +62,25 @@ class TestTaskHandlers:
     
     def test_command_task_handler(self):
         """Test command execution task handler."""
-        # Create a job
-        job = Job(
-            id="test_command_job",
-            name="Test Command Job",
+        # Create job definition
+        job_def = JobDefinition(
             job_type="command_execution",
-            priority=JobPriority.NORMAL,
-            status=JobStatus.PENDING,
             parameters={
                 "device_id": "test_device",
                 "host": "192.168.1.1",
                 "username": "admin",
                 "password": "password",
                 "command": "show version"
-            }
+            },
+            priority=JobPriority.NORMAL,
+            job_id="test_command_job",
+            name="Test Command Job"
+        )
+        
+        # Create a job
+        job = Job(
+            definition=job_def,
+            status=JobStatus.PENDING
         )
         
         # Execute job using handler
@@ -117,29 +127,37 @@ class TestTaskHandlers:
     def test_missing_parameters(self):
         """Test handlers with missing parameters."""
         # Create jobs with missing parameters
-        backup_job = Job(
-            id="test_backup_job_missing_params",
-            name="Test Backup Job Missing Params",
+        backup_job_def = JobDefinition(
             job_type="backup",
-            priority=JobPriority.NORMAL,
-            status=JobStatus.PENDING,
             parameters={
                 "device_id": "test_device",
                 # Missing host, username, password
-            }
+            },
+            priority=JobPriority.NORMAL,
+            job_id="test_backup_job_missing_params",
+            name="Test Backup Job Missing Params"
         )
         
-        command_job = Job(
-            id="test_command_job_missing_params",
-            name="Test Command Job Missing Params",
+        backup_job = Job(
+            definition=backup_job_def,
+            status=JobStatus.PENDING
+        )
+        
+        command_job_def = JobDefinition(
             job_type="command_execution",
-            priority=JobPriority.NORMAL,
-            status=JobStatus.PENDING,
             parameters={
                 "device_id": "test_device",
                 "host": "192.168.1.1",
                 # Missing username, password, command
-            }
+            },
+            priority=JobPriority.NORMAL,
+            job_id="test_command_job_missing_params",
+            name="Test Command Job Missing Params"
+        )
+        
+        command_job = Job(
+            definition=command_job_def,
+            status=JobStatus.PENDING
         )
         
         # Execute jobs and expect ValueError
@@ -171,19 +189,24 @@ class TestTaskHandlers:
     
     def test_handler_exception_handling(self):
         """Test exception handling in task handlers."""
-        # Create a job
-        job = Job(
-            id="test_exception_job",
-            name="Test Exception Job",
+        # Create job definition
+        job_def = JobDefinition(
             job_type="backup",
-            priority=JobPriority.NORMAL,
-            status=JobStatus.PENDING,
             parameters={
                 "device_id": "test_device",
                 "host": "192.168.1.1",
                 "username": "admin",
                 "password": "password"
-            }
+            },
+            priority=JobPriority.NORMAL,
+            job_id="test_exception_job",
+            name="Test Exception Job"
+        )
+        
+        # Create a job
+        job = Job(
+            definition=job_def,
+            status=JobStatus.PENDING
         )
         
         # Create handler with mocked execute method that raises an exception

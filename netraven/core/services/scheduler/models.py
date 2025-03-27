@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, List, Union
 from enum import Enum, auto
 
 
-class JobStatus(enum.Enum):
+class JobStatus(Enum):
     """Enumeration of possible job statuses."""
     QUEUED = 1      # Job is created but not yet in the queue
     PENDING = 2     # Job is in the queue waiting to be executed
@@ -22,7 +22,7 @@ class JobStatus(enum.Enum):
     PAUSED = 7      # Job is paused
 
 
-class JobPriority(enum.Enum):
+class JobPriority(Enum):
     """Enumeration of job priority levels, with higher values indicating higher priority."""
     CRITICAL = 100  # Critical priority - execute immediately
     HIGH = 80       # High priority
@@ -31,7 +31,7 @@ class JobPriority(enum.Enum):
     LOWEST = 10     # Lowest priority - execute when nothing else is pending
 
 
-class ScheduleType(enum.Enum):
+class ScheduleType(Enum):
     """Enumeration of job scheduling types."""
     IMMEDIATE = 1   # Run immediately
     ONE_TIME = 2    # Run once at a specific time
