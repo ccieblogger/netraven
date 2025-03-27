@@ -5,11 +5,11 @@ This module provides SQLAlchemy database connection and session management
 for the NetRaven web interface.
 """
 
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 import os
 from pathlib import Path
-from typing import Dict, Any, Generator
+from typing import Dict, Any, AsyncGenerator
 from datetime import datetime
 
 # Import internal modules
@@ -36,30 +36,35 @@ if db_type == "sqlite":
         db_path = os.path.abspath(db_path)
         # Ensure the directory exists
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    DATABASE_URL = f"sqlite:///{db_path}"
+    DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
 elif db_type == "postgres":
     pg_config = db_config["postgres"]
-    DATABASE_URL = f"postgresql://{pg_config['user']}:{pg_config['password']}@{pg_config['host']}:{pg_config['port']}/{pg_config['database']}"
+    DATABASE_URL = f"postgresql+asyncpg://{pg_config['user']}:{pg_config['password']}@{pg_config['host']}:{pg_config['port']}/{pg_config['database']}"
 elif db_type == "mysql":
     mysql_config = db_config["mysql"]
-    DATABASE_URL = f"mysql+pymysql://{mysql_config['user']}:{mysql_config['password']}@{mysql_config['host']}:{mysql_config['port']}/{mysql_config['database']}"
+    DATABASE_URL = f"mysql+aiomysql://{mysql_config['user']}:{mysql_config['password']}@{mysql_config['host']}:{mysql_config['port']}/{mysql_config['database']}"
 else:
     raise ValueError(f"Unsupported database type: {db_type}")
 
-# Create SQLAlchemy engine
-# For SQLite, connect_args={"check_same_thread": False} allows using the connection in multiple threads
-connect_args = {}
-if db_type == "sqlite":
-    connect_args["check_same_thread"] = False
-
-engine = create_engine(
+# Create SQLAlchemy async engine
+engine = create_async_engine(
     DATABASE_URL,
-    connect_args=connect_args,
-    echo=config["web"].get("debug", False)  # Echo SQL to stdout in debug mode
+    echo=config["web"].get("debug", False),  # Echo SQL to stdout in debug mode
+    pool_size=5,  # Number of connections to keep open
+    max_overflow=10,  # Number of connections to allow beyond pool_size
+    pool_timeout=30,  # Seconds to wait before giving up on getting a connection
+    pool_recycle=1800,  # Recycle connections after 30 minutes
+    pool_pre_ping=True  # Enable connection health checks
 )
 
-# Create sessionmaker
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Create async sessionmaker
+AsyncSessionLocal = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
+)
 
 # Create base class for declarative models
 Base = declarative_base()
@@ -70,7 +75,7 @@ DEFAULT_TAG_NAME = "Default"
 DEFAULT_TAG_COLOR = "#6366F1"  # Indigo color
 DEFAULT_TAG_DESCRIPTION = "Default tag for all devices"
 
-def create_default_tag_if_not_exists():
+async def create_default_tag_if_not_exists():
     """
     Ensures the default tag exists in the database.
     This function creates the default tag if it doesn't already exist.
@@ -78,69 +83,52 @@ def create_default_tag_if_not_exists():
     from netraven.web.models.tag import Tag
     from netraven.web.crud.tag import get_tag_by_name
     
-    db = SessionLocal()
-    try:
+    async with AsyncSessionLocal() as session:
         # Check if default tag exists
-        default_tag = get_tag_by_name(db, DEFAULT_TAG_NAME)
+        default_tag = await get_tag_by_name(session, DEFAULT_TAG_NAME)
         
         if not default_tag:
-            logger.info("Creating default tag in database")
             # Create default tag
             default_tag = Tag(
                 id=DEFAULT_TAG_ID,
                 name=DEFAULT_TAG_NAME,
-                description=DEFAULT_TAG_DESCRIPTION,
                 color=DEFAULT_TAG_COLOR,
+                description=DEFAULT_TAG_DESCRIPTION,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )
-            db.add(default_tag)
-            db.commit()
-            logger.info(f"Default tag created with ID: {DEFAULT_TAG_ID}")
-        else:
-            logger.info(f"Default tag already exists with ID: {default_tag.id}")
-            
-            # If the default tag exists but has a different ID, update it
-            if default_tag.id != DEFAULT_TAG_ID:
-                logger.info(f"Updating default tag ID from {default_tag.id} to {DEFAULT_TAG_ID}")
-                # This is risky as it might break existing relationships
-                # Only do this if absolutely necessary
-                # default_tag.id = DEFAULT_TAG_ID
-                # db.commit()
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error creating default tag: {e}")
-    finally:
-        db.close()
+            session.add(default_tag)
+            await session.commit()
 
-def get_db() -> Generator:
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """
-    Get database session.
+    Get async database session.
     
     This is a dependency for FastAPI endpoints that need database access.
     
     Yields:
-        SQLAlchemy session
+        AsyncSession: SQLAlchemy async session
     """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
-def init_db() -> None:
+async def init_db():
     """
-    Initialize database.
+    Initialize the database.
     
-    This creates all tables if they don't exist.
+    This function creates all tables and ensures the default tag exists.
     """
-    from netraven.web.models import user, device, backup, tag  # Import models to register them with Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    await create_default_tag_if_not_exists()
+
+async def close_db():
+    """
+    Close database connections.
     
-    logger.info(f"Initializing database at {DATABASE_URL}")
-    try:
-        Base.metadata.create_all(bind=engine)
-        create_default_tag_if_not_exists()
-        logger.info("Database initialization complete")
-    except Exception as e:
-        logger.error(f"Error initializing database: {e}")
-        raise 
+    This function should be called when shutting down the application.
+    """
+    await engine.dispose() 

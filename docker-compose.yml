@@ -1,6 +1,8 @@
 # This file defines the production deployment configuration for NetRaven.
 # It includes services for the database, API, scheduler, gateway, and frontend.
 
+version: '3.8'
+
 services:
   # PostgreSQL database service
   postgres:
@@ -17,7 +19,7 @@ services:
       - POSTGRES_DB=netraven
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U netraven"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
     networks:

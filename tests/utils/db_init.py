@@ -5,31 +5,35 @@ This module provides functions to initialize and reset the database for testing.
 """
 import os
 import tempfile
-from typing import Generator
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
-from sqlalchemy_utils import database_exists, create_database
 
-from netraven.web.database import Base, get_db
+from netraven.web.database import Base
 from netraven.web.models import user, device, job_log, scheduled_job, tag
 from netraven.web.models.tag import TagRule
 
 # Set test database URL - use in-memory SQLite for tests
-TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite:///./test.db")
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test.db")
 
 # Create test engine with appropriate parameters
-engine = create_engine(
-    TEST_DATABASE_URL, 
-    connect_args={"check_same_thread": False} if TEST_DATABASE_URL.startswith("sqlite") else {},
-    poolclass=NullPool  # Don't pool connections for tests
+engine = create_async_engine(
+    TEST_DATABASE_URL,
+    poolclass=NullPool,  # Don't pool connections for tests
+    echo=False  # Don't echo SQL in tests
 )
 
 # Create test session factory
-TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+TestAsyncSessionLocal = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
+)
 
-
-def get_test_db_session() -> Generator[Session, None, None]:
+async def get_test_db_session() -> AsyncGenerator[AsyncSession, None]:
     """
     Get a test database session.
     
@@ -37,34 +41,29 @@ def get_test_db_session() -> Generator[Session, None, None]:
     session which is automatically closed after use.
     """
     # Create tables if they don't exist
-    Base.metadata.create_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     
     # Create a fresh session
-    db = TestSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    async with TestAsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
-
-def reset_test_database() -> None:
+async def init_test_db():
     """
-    Reset the test database by dropping and recreating all tables.
+    Initialize the test database.
     
-    This is useful for ensuring tests start with a clean database.
+    This function creates all tables and ensures the default tag exists.
     """
-    # Drop all tables
-    Base.metadata.drop_all(bind=engine)
-    
-    # Create tables again
-    Base.metadata.create_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-
-def override_get_db() -> Generator[Session, None, None]:
+async def close_test_db():
     """
-    Override the get_db dependency for FastAPI tests.
+    Close test database connections.
     
-    This is used to replace the normal database dependency with the test database
-    in FastAPI TestClient tests.
+    This function should be called when shutting down the test environment.
     """
-    return get_test_db_session() 
+    await engine.dispose() 

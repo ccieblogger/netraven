@@ -1,0 +1,28 @@
+web:
+  host: 0.0.0.0
+  port: 8000
+  debug: false
+  log_level: INFO
+  database:
+    type: postgres
+    postgres:
+      host: postgres
+      port: 5432
+      database: netraven
+      user: netraven
+      password: netraven
+  cors:
+    allow_origins: ["*"]
+    allow_credentials: true
+    allow_methods: ["*"]
+    allow_headers: ["*"]
+
+core:
+  log_level: INFO
+  encryption_key: ${NETRAVEN_ENCRYPTION_KEY}
+  backup_dir: /app/backups
+  temp_dir: /app/temp
+  max_workers: 4
+  job_timeout: 3600
+  retry_attempts: 3
+  retry_delay: 5 

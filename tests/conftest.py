@@ -17,6 +17,11 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy.orm import Session
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import NullPool
+from sqlalchemy import delete
 
 # Add the parent directory to the path so we can import the application
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -39,30 +44,267 @@ try:
     from netraven.web.models.user import User
     from netraven.web.models.device import Device
     from netraven.web.models.backup import Backup
+    from netraven.web.models.job_log import JobLog
+    from netraven.web.models.scheduled_job import ScheduledJob
     from netraven.core.config import get_env, is_test_env, load_config
     from netraven.web.database import get_db
+    from netraven.core.services.async_job_logging_service import AsyncJobLoggingService
+    from netraven.core.services.async_scheduler_service import AsyncSchedulerService
+    from netraven.core.services.async_device_comm_service import AsyncDeviceCommunicationService
     DATABASE_IMPORTS_AVAILABLE = True
 except ImportError as e:
     DATABASE_IMPORTS_AVAILABLE = False
     print(f"WARNING: Database imports failed - some tests may be skipped: {str(e)}")
 
-try:
-    from passlib.context import CryptContext
-    # Password context for hashing test passwords
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    PASSWORD_CONTEXT_AVAILABLE = True
-except ImportError:
-    PASSWORD_CONTEXT_AVAILABLE = False
-    print("WARNING: passlib not available - some tests may be skipped")
+# Load environment variables
+load_dotenv()
 
-from tests.utils.api_test_utils import create_auth_headers, create_test_api_token
+# Test configuration
+TEST_CONFIG = {
+    "api_url": "http://localhost:8000",
+    "test_user": {
+        "username": "testuser",
+        "password": "testpass",
+        "email": "test@example.com",
+        "full_name": "Test User"
+    },
+    "test_admin": {
+        "username": "admin",
+        "password": "adminpass",
+        "email": "admin@example.com",
+        "full_name": "Admin User"
+    }
+}
 
-# Import the core dependencies
-# Note: Update these imports based on your actual module structure
-from netraven.web.auth import UserPrincipal
-from netraven.web.database import get_db
-from netraven.web.auth import get_current_principal
+# Conditionally define database fixtures only if imports are available
+if DATABASE_IMPORTS_AVAILABLE:
+    @pytest.fixture(scope="session")
+    async def test_db():
+        """Create a test database."""
+        # Create a temporary file for the SQLite database
+        db_file = tempfile.NamedTemporaryFile(suffix=".db")
+        
+        # Create the SQLite URL
+        SQLALCHEMY_DATABASE_URL = f"sqlite+aiosqlite:///{db_file.name}"
+        
+        # Create the engine
+        engine = create_async_engine(
+            SQLALCHEMY_DATABASE_URL,
+            poolclass=NullPool  # Don't pool connections for tests
+        )
+        
+        # Create the tables
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        
+        # Create a session
+        TestingAsyncSessionLocal = sessionmaker(
+            engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            autocommit=False,
+            autoflush=False
+        )
+        
+        # Yield the session and engine
+        yield TestingAsyncSessionLocal, engine
+        
+        # Clean up
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await engine.dispose()
+        db_file.close()
 
+    @pytest.fixture
+    async def db_session(test_db):
+        """Create a database session for testing."""
+        TestingAsyncSessionLocal, _ = test_db
+        
+        # Create a session
+        async with TestingAsyncSessionLocal() as session:
+            try:
+                yield session
+            finally:
+                await session.close()
+
+    @pytest.fixture(autouse=True)
+    async def cleanup_test_data(db_session):
+        """Clean up test data after each test."""
+        yield
+        # Clean up all test data
+        for model in [User, Device, Backup, JobLog, ScheduledJob]:
+            await db_session.execute(delete(model))
+        await db_session.commit()
+
+    @pytest.fixture
+    async def job_logging_service(db_session):
+        """Create a job logging service instance."""
+        service = AsyncJobLoggingService(db_session=db_session)
+        yield service
+        await service.close()
+
+    @pytest.fixture
+    async def scheduler_service(job_logging_service, db_session):
+        """Create a scheduler service instance."""
+        service = AsyncSchedulerService(
+            job_logging_service=job_logging_service,
+            db_session=db_session
+        )
+        yield service
+        await service.stop()
+
+    @pytest.fixture
+    async def device_comm_service(job_logging_service, db_session):
+        """Create a device communication service instance."""
+        service = AsyncDeviceCommunicationService(
+            job_logging_service=job_logging_service,
+            db_session=db_session
+        )
+        yield service
+        await service.close()
+
+    @pytest.fixture
+    async def test_device_data():
+        """Create test device data."""
+        return {
+            "name": "Test Device",
+            "hostname": "test.example.com",
+            "ip_address": "192.168.1.1",
+            "device_type": "cisco_ios",
+            "protocol": "ssh",
+            "port": 22,
+            "username": "admin",
+            "password": "password",
+            "enable_password": "enable",
+            "tags": ["test", "cisco"]
+        }
+
+    @pytest.fixture
+    async def test_job_data():
+        """Create test job data."""
+        return {
+            "name": "Test Job",
+            "description": "Test job description",
+            "job_type": "backup",
+            "schedule": "0 0 * * *",
+            "device_ids": ["device-1", "device-2"]
+        }
+
+    @pytest.fixture
+    async def test_user_data():
+        """Create test user data."""
+        return {
+            "username": "testuser",
+            "email": "test@example.com",
+            "full_name": "Test User",
+            "password": "testpass",
+            "is_active": True,
+            "is_admin": False
+        }
+
+    @pytest.fixture
+    async def test_admin_data():
+        """Create test admin data."""
+        return {
+            "username": "admin",
+            "email": "admin@example.com",
+            "full_name": "Admin User",
+            "password": "adminpass",
+            "is_active": True,
+            "is_admin": True
+        }
+
+    @pytest.fixture
+    async def test_user(db_session, test_user_data):
+        """Create a test user."""
+        user = User(**test_user_data)
+        db_session.add(user)
+        await db_session.commit()
+        await db_session.refresh(user)
+        return user
+
+    @pytest.fixture
+    async def test_admin(db_session, test_admin_data):
+        """Create a test admin user."""
+        admin = User(**test_admin_data)
+        db_session.add(admin)
+        await db_session.commit()
+        await db_session.refresh(admin)
+        return admin
+
+    @pytest.fixture
+    async def test_device(db_session, test_device_data):
+        """Create a test device."""
+        device = Device(**test_device_data)
+        db_session.add(device)
+        await db_session.commit()
+        await db_session.refresh(device)
+        return device
+
+    @pytest.fixture
+    async def test_job(db_session, test_job_data):
+        """Create a test job."""
+        job = ScheduledJob(**test_job_data)
+        db_session.add(job)
+        await db_session.commit()
+        await db_session.refresh(job)
+        return job
+
+    @pytest.fixture
+    def client(db_session):
+        """Create a test client for the FastAPI application."""
+        if not FASTAPI_TEST_CLIENT_AVAILABLE:
+            pytest.skip("FastAPI TestClient not available")
+            
+        # Override the get_db dependency to use our test database
+        async def override_get_db():
+            try:
+                yield db_session
+            finally:
+                pass
+                
+        app.dependency_overrides[get_db] = override_get_db
+        
+        # Create a test client
+        with TestClient(app) as client:
+            yield client
+            
+        # Clear the dependency override
+        app.dependency_overrides = {}
+
+# Test client factories
+@pytest.fixture
+def create_test_client():
+    """
+    Factory function to create a test client with custom router and principal.
+    
+    Example usage:
+        client = create_test_client(router=my_router, 
+                                    principal=mock_admin_principal,
+                                    service_path="module.path.get_service",
+                                    service_mock=mock_service)
+    """
+    def _create_client(router, principal=None, service_path=None, service_mock=None, db=None):
+        app = FastAPI()
+        app.include_router(router)
+        
+        # Override dependencies
+        if db is None:
+            db = MagicMock(spec=AsyncSession)
+        app.dependency_overrides[get_db] = lambda: db
+        
+        # Override dependencies if principal is provided
+        if principal is not None:
+            app.dependency_overrides[get_current_principal] = lambda: principal
+        
+        # Mock service if provided
+        if service_path and service_mock:
+            with patch(service_path, return_value=service_mock):
+                yield TestClient(app)
+        else:
+            yield TestClient(app)
+    
+    return _create_client
 
 def pytest_addoption(parser):
     """Add custom command-line options for pytest."""
@@ -288,178 +530,6 @@ def regular_user_token(app_config, api_token):
         pytest.skip(f"Could not create regular user token: {str(e)}")
 
 
-# Conditionally define database fixtures only if imports are available
-if DATABASE_IMPORTS_AVAILABLE:
-    @pytest.fixture
-    def test_db():
-        """Create a test database."""
-        # Create a temporary file for the SQLite database
-        db_file = tempfile.NamedTemporaryFile(suffix=".db")
-        
-        # Create the SQLite URL
-        SQLALCHEMY_DATABASE_URL = f"sqlite:///{db_file.name}"
-        
-        # Create the engine
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-        
-        engine = create_engine(
-            SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-        )
-        
-        # Create the tables
-        Base.metadata.create_all(bind=engine)
-        
-        # Create a session
-        TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        
-        # Yield the session and engine
-        yield TestingSessionLocal, engine
-        
-        # Clean up
-        Base.metadata.drop_all(bind=engine)
-        db_file.close()
-
-    @pytest.fixture
-    def db_session(test_db):
-        """Create a database session for testing."""
-        TestingSessionLocal, _ = test_db
-        
-        # Create a session
-        db = TestingSessionLocal()
-        
-        try:
-            yield db
-        finally:
-            db.close()
-
-    @pytest.fixture
-    def client(db_session):
-        """Create a test client for the FastAPI application."""
-        if not FASTAPI_TEST_CLIENT_AVAILABLE:
-            pytest.skip("FastAPI TestClient not available")
-            
-        # Override the get_db dependency to use our test database
-        def override_get_db():
-            try:
-                yield db_session
-            finally:
-                pass
-                
-        app.dependency_overrides[get_db] = override_get_db
-        
-        # Create a test client
-        with TestClient(app) as client:
-            yield client
-            
-        # Clear the dependency override
-        app.dependency_overrides = {}
-
-@pytest.fixture
-def test_user(db_session):
-    """Create a test user."""
-    # Create a user
-    user = User(
-        id="00000000-0000-0000-0000-000000000001",
-        username="testuser",
-        email="test@example.com",
-        hashed_password=pwd_context.hash("password"),
-        full_name="Test User",
-        is_active=True,
-        is_admin=False
-    )
-    
-    # Add the user to the database
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    
-    return user
-
-@pytest.fixture
-def test_admin(db_session):
-    """Create a test admin user."""
-    # Create an admin user
-    admin = User(
-        id="00000000-0000-0000-0000-000000000002",
-        username="admin",
-        email="admin@example.com",
-        hashed_password=pwd_context.hash("adminpassword"),
-        full_name="Admin User",
-        is_active=True,
-        is_admin=True
-    )
-    
-    # Add the admin to the database
-    db_session.add(admin)
-    db_session.commit()
-    db_session.refresh(admin)
-    
-    return admin
-
-@pytest.fixture
-def test_device(db_session, test_user):
-    """Create a test device."""
-    # Create a device
-    device = Device(
-        id="00000000-0000-0000-0000-000000000003",
-        hostname="testrouter",
-        ip_address="192.168.1.1",
-        device_type="cisco_ios",
-        port=22,
-        username="cisco",
-        password="cisco",
-        description="Test Router",
-        enabled=True,
-        owner_id=test_user.id
-    )
-    
-    # Add the device to the database
-    db_session.add(device)
-    db_session.commit()
-    db_session.refresh(device)
-    
-    return device
-
-@pytest.fixture
-def test_backup(db_session, test_device):
-    """Create a test backup."""
-    # Create a backup
-    backup = Backup(
-        id="00000000-0000-0000-0000-000000000004",
-        device_id=test_device.id,
-        version="1.0",
-        file_path="/backups/testrouter_config.txt",
-        file_size=1024,
-        status="complete",
-        comment="Test backup",
-        content_hash="abcdef1234567890",
-        is_automatic=True
-    )
-    
-    # Add the backup to the database
-    db_session.add(backup)
-    db_session.commit()
-    db_session.refresh(backup)
-    
-    return backup
-
-@pytest.fixture
-def token_headers(client, test_user):
-    """Get authentication headers with a valid token."""
-    # Log in to get a token
-    response = client.post(
-        "/api/auth/token",
-        data={"username": test_user.username, "password": "password"}
-    )
-    
-    # Get the token from the response
-    token = response.json()["access_token"]
-    
-    # Return the headers
-    return {"Authorization": f"Bearer {token}"}
-
-
 # Core test fixtures
 @pytest.fixture
 def app_config():
@@ -498,7 +568,7 @@ def api_token(app_config):
 @pytest.fixture
 def mock_db():
     """Create a mock database session."""
-    return MagicMock(spec=Session)
+    return MagicMock(spec=AsyncSession)
 
 
 # Principal fixtures
@@ -538,40 +608,6 @@ def mock_user_principal():
 
 
 # Test client factories
-@pytest.fixture
-def create_test_client():
-    """
-    Factory function to create a test client with custom router and principal.
-    
-    Example usage:
-        client = create_test_client(router=my_router, 
-                                    principal=mock_admin_principal,
-                                    service_path="module.path.get_service",
-                                    service_mock=mock_service)
-    """
-    def _create_client(router, principal=None, service_path=None, service_mock=None, db=None):
-        app = FastAPI()
-        app.include_router(router)
-        
-        # Override dependencies
-        if db is None:
-            db = MagicMock(spec=Session)
-        app.dependency_overrides[get_db] = lambda: db
-        
-        # Override dependencies if principal is provided
-        if principal is not None:
-            app.dependency_overrides[get_current_principal] = lambda: principal
-        
-        # Mock service if provided
-        if service_path and service_mock:
-            with patch(service_path, return_value=service_mock):
-                yield TestClient(app)
-        else:
-            yield TestClient(app)
-    
-    return _create_client
-
-
 @pytest.fixture
 def admin_client_factory(mock_admin_principal, mock_db, create_test_client):
     """Factory for creating admin test clients for different routers."""
@@ -762,4 +798,68 @@ def create_mock_audit_logs_service():
         
         return service
     
-    return _create_service 
+    return _create_service
+
+@pytest.fixture
+def mock_service_factory():
+    """Create a mock service factory."""
+    return MagicMock()
+
+@pytest.fixture
+def mock_job_logging_service():
+    """Create a mock job logging service."""
+    return MagicMock()
+
+@pytest.fixture
+def mock_scheduler_service():
+    """Create a mock scheduler service."""
+    return MagicMock()
+
+@pytest.fixture
+def mock_device_comm_service():
+    """Create a mock device communication service."""
+    return MagicMock()
+
+@pytest.fixture
+def test_user_data():
+    """Create test user data."""
+    return {
+        "username": "testuser",
+        "email": "test@example.com",
+        "password": "testpassword",
+        "full_name": "Test User",
+        "is_active": True,
+        "is_superuser": False
+    }
+
+@pytest.fixture
+def test_device_data():
+    """Create test device data."""
+    return {
+        "name": "Test Device",
+        "hostname": "test.example.com",
+        "ip_address": "192.168.1.1",
+        "device_type": "cisco_ios",
+        "protocol": "ssh",
+        "port": 22,
+        "username": "admin",
+        "password": "password",
+        "enable_password": "enable",
+        "tags": ["test", "cisco"]
+    }
+
+@pytest.fixture
+def test_job_data():
+    """Create test job data."""
+    return {
+        "job_type": "backup",
+        "device_id": "test-device-id",
+        "parameters": {
+            "backup_type": "config",
+            "destination": "local"
+        },
+        "schedule": {
+            "type": "once",
+            "start_time": "2024-01-01T00:00:00Z"
+        }
+    } 
