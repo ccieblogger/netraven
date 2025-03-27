@@ -47,6 +47,5 @@ jobs:
       - name: Install requirements
         run: pip install -r requirements.txt -v
 
-      - name: Run tests
-        run: |
-          echo 'Testing complete'
+      - name: Run flake8 linting
+        run: flake8 .
