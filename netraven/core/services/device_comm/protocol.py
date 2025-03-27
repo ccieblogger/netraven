@@ -182,34 +182,40 @@ class ProtocolAdapterFactory:
                 **kwargs
             )
         elif protocol == "telnet":
-            from netraven.core.services.device_comm.adapters.telnet import TelnetProtocolAdapter
-            
-            # Use default Telnet port if not specified
-            if port is None:
-                port = 23
+            try:
+                from netraven.core.services.device_comm.adapters.telnet import TelnetProtocolAdapter
                 
-            return TelnetProtocolAdapter(
-                host=host,
-                username=username,
-                password=password,
-                device_type=device_type,
-                port=port,
-                **kwargs
-            )
+                # Use default Telnet port if not specified
+                if port is None:
+                    port = 23
+                    
+                return TelnetProtocolAdapter(
+                    host=host,
+                    username=username,
+                    password=password,
+                    device_type=device_type,
+                    port=port,
+                    **kwargs
+                )
+            except ImportError:
+                raise NotImplementedError(f"Telnet protocol adapter is not yet implemented")
         elif protocol == "rest":
-            from netraven.core.services.device_comm.adapters.rest import RESTProtocolAdapter
-            
-            # Use default HTTPS port if not specified
-            if port is None:
-                port = 443
+            try:
+                from netraven.core.services.device_comm.adapters.rest import RESTProtocolAdapter
                 
-            return RESTProtocolAdapter(
-                host=host,
-                username=username,
-                password=password,
-                device_type=device_type,
-                port=port,
-                **kwargs
-            )
+                # Use default HTTPS port if not specified
+                if port is None:
+                    port = 443
+                    
+                return RESTProtocolAdapter(
+                    host=host,
+                    username=username,
+                    password=password,
+                    device_type=device_type,
+                    port=port,
+                    **kwargs
+                )
+            except ImportError:
+                raise NotImplementedError(f"REST protocol adapter is not yet implemented")
         else:
             raise ValueError(f"Unsupported protocol: {protocol}") 
