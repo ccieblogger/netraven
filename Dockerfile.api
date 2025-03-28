@@ -6,10 +6,15 @@ FROM python:3.10-slim
 # Add build argument for environment
 ARG NETRAVEN_ENV=prod
 
-# Install curl for health check and other utilities
+# Install system dependencies including those needed for PyYAML and other libraries
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
-    apt-get clean && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    gcc \
+    libyaml-dev \
+    python3-dev \
+    libpq-dev \
+    && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user and group
@@ -35,11 +40,11 @@ COPY test-requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     if [ "$NETRAVEN_ENV" = "test" ]; then \
         echo "Installing test dependencies..." && \
-        pip install --no-cache-dir -r test-requirements.txt && \
-        # Clean up
-        apt-get clean && \
-        rm -rf /var/lib/apt/lists/*; \
+        pip install --no-cache-dir -r test-requirements.txt; \
     fi
+
+# Copy application configuration
+COPY config/ config/
 
 # Copy only the needed files
 COPY netraven/ netraven/
@@ -56,6 +61,7 @@ ENV PYTHONPATH=/app
 ENV SERVICE_TYPE=api
 ENV BUILD_ENVIRONMENT=${NETRAVEN_ENV}
 ENV NETMIKO_LOG_DIR=/tmp/netmiko_logs
+ENV NETRAVEN_CONFIG=/app/config/netraven.yaml
 
 # Set permissions for test artifacts directory
 RUN chmod 777 /app/test-artifacts
