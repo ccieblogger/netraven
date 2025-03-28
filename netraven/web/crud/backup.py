@@ -2,19 +2,21 @@
 Backup CRUD operations for the NetRaven web interface.
 
 This module provides database operations for creating, reading, updating, and
-deleting backup records.
+deleting backup records. Includes both synchronous and asynchronous implementations.
 """
 
 import uuid
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, desc
 
 from netraven.web.models.backup import Backup
 from netraven.web.models.device import Device as DeviceModel
-from netraven.web.schemas.backup import BackupCreate
+from netraven.web.schemas.backup import BackupCreate, BackupUpdate
 from netraven.core.backup import (
     store_backup_content, 
     retrieve_backup_content, 
@@ -25,221 +27,353 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_backup(db: Session, backup_id: str) -> Optional[Backup]:
+async def get_backup_async(db: AsyncSession, backup_id: str) -> Optional[Backup]:
+    """
+    Get a backup by ID (async version).
+    
+    Args:
+        db: Async database session
+        backup_id: ID of the backup to retrieve
+        
+    Returns:
+        Backup object if found, None otherwise
+    """
+    logger.debug(f"Getting backup with id: {backup_id} (async)")
+    result = await db.execute(
+        select(Backup).filter(Backup.id == backup_id)
+    )
+    return result.scalars().first()
+
+def get_backup(db: Union[Session, AsyncSession], backup_id: str) -> Optional[Backup]:
     """
     Get a backup by ID.
     
+    This function supports both sync and async database sessions.
+    
     Args:
-        db: Database session
+        db: Database session (sync or async)
         backup_id: ID of the backup to retrieve
         
     Returns:
         Backup object if found, None otherwise
     """
     logger.debug(f"Getting backup with id: {backup_id}")
-    return db.query(Backup).filter(Backup.id == backup_id).first()
+    
+    if isinstance(db, AsyncSession):
+        # Return awaitable coroutine for async usage
+        return get_backup_async(db, backup_id)
+    else:
+        # Synchronous implementation
+        return db.query(Backup).filter(Backup.id == backup_id).first()
 
-def get_backups(
-    db: Session, 
+async def get_backups_async(
+    db: AsyncSession, 
     skip: int = 0, 
     limit: int = 100,
     device_id: Optional[str] = None,
-    status: Optional[str] = None,
+    config_type: Optional[str] = None,
     start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    is_automatic: Optional[bool] = None
+    end_date: Optional[datetime] = None
 ) -> List[Backup]:
     """
-    Get a list of backups with optional filtering and pagination.
+    Get a list of backups with optional filtering and pagination (async version).
     
     Args:
-        db: Database session
+        db: Async database session
         skip: Number of records to skip
         limit: Maximum number of records to return
         device_id: Optional device ID to filter by
-        status: Optional status to filter by
-        start_date: Optional start date to filter by (inclusive)
-        end_date: Optional end date to filter by (inclusive)
-        is_automatic: Optional is_automatic flag to filter by
+        config_type: Optional configuration type to filter by (running, startup)
+        start_date: Optional start date for filtering
+        end_date: Optional end date for filtering
         
     Returns:
         List of Backup objects
     """
-    logger.debug(f"Getting backups with skip={skip}, limit={limit}, device_id={device_id}, "
-                f"status={status}, start_date={start_date}, end_date={end_date}, "
-                f"is_automatic={is_automatic}")
+    logger.debug(f"Getting backups with skip={skip}, limit={limit}, device_id={device_id}, config_type={config_type} (async)")
     
-    try:
-        query = db.query(Backup)
+    query = select(Backup).order_by(desc(Backup.created_at))
+    
+    # Apply filters if provided
+    if device_id:
+        query = query.filter(Backup.device_id == device_id)
+    
+    if config_type:
+        query = query.filter(Backup.config_type == config_type)
+    
+    if start_date:
+        query = query.filter(Backup.created_at >= start_date)
+    
+    if end_date:
+        query = query.filter(Backup.created_at <= end_date)
+    
+    # Apply pagination
+    query = query.offset(skip).limit(limit)
+    
+    result = await db.execute(query)
+    return result.scalars().all()
+
+def get_backups(
+    db: Union[Session, AsyncSession], 
+    skip: int = 0, 
+    limit: int = 100,
+    device_id: Optional[str] = None,
+    config_type: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> List[Backup]:
+    """
+    Get a list of backups with optional filtering and pagination.
+    
+    This function supports both sync and async database sessions.
+    
+    Args:
+        db: Database session (sync or async)
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        device_id: Optional device ID to filter by
+        config_type: Optional configuration type to filter by (running, startup)
+        start_date: Optional start date for filtering
+        end_date: Optional end date for filtering
+        
+    Returns:
+        List of Backup objects
+    """
+    logger.debug(f"Getting backups with skip={skip}, limit={limit}, device_id={device_id}, config_type={config_type}")
+    
+    if isinstance(db, AsyncSession):
+        # Return awaitable coroutine for async usage
+        return get_backups_async(db, skip, limit, device_id, config_type, start_date, end_date)
+    else:
+        # Synchronous implementation
+        query = db.query(Backup).order_by(desc(Backup.created_at))
         
         # Apply filters if provided
         if device_id:
             query = query.filter(Backup.device_id == device_id)
         
-        if status:
-            query = query.filter(Backup.status == status)
+        if config_type:
+            query = query.filter(Backup.config_type == config_type)
         
-        if is_automatic is not None:
-            query = query.filter(Backup.is_automatic == is_automatic)
-        
-        # Apply date filters if provided
         if start_date:
             query = query.filter(Backup.created_at >= start_date)
         
         if end_date:
             query = query.filter(Backup.created_at <= end_date)
         
-        # Order by created_at descending (newest first)
-        query = query.order_by(desc(Backup.created_at))
-        
         # Apply pagination
-        result = query.offset(skip).limit(limit).all()
-        logger.debug(f"Successfully retrieved {len(result)} backups")
-        return result
-    except Exception as e:
-        logger.exception(f"Error in get_backups: {str(e)}")
-        raise
+        return query.offset(skip).limit(limit).all()
 
-def create_backup(db: Session, backup: BackupCreate, serial_number: Optional[str] = None, content: Optional[str] = None) -> Backup:
+async def create_backup_async(
+    db: AsyncSession, 
+    backup: BackupCreate, 
+    serial_number: Optional[str] = None,
+    content: Optional[str] = None
+) -> Backup:
     """
-    Create a new backup.
+    Create a new backup (async version).
     
     Args:
-        db: Database session
-        backup: Backup creation data
-        serial_number: Optional serial number of the device
-        content: Optional backup content to store (if provided, will be written to storage)
+        db: Async database session
+        backup: Backup creation data (Pydantic model)
+        serial_number: Optional serial number for the device
+        content: Optional backup content
         
     Returns:
         Created Backup object
     """
-    logger.info(f"Creating new backup for device: {backup.device_id}")
+    logger.info(f"Creating new backup for device: {backup.device_id}, config type: {backup.config_type} (async)")
     
     # Create new backup
     db_backup = Backup(
         id=str(uuid.uuid4()),
-        version=backup.version,
-        file_path=backup.file_path,
-        file_size=backup.file_size,
-        status=backup.status,
-        comment=backup.comment,
-        is_automatic=backup.is_automatic,
         device_id=backup.device_id,
+        config_type=backup.config_type,
         serial_number=serial_number,
+        content=content,
         created_at=datetime.utcnow()
     )
     
-    # If content is provided, store it and update the backup record
-    if content is not None:
-        try:
-            # Get device hostname (will be used for constructing file path)
-            device_hostname = None
-            device = db.query(DeviceModel).filter(DeviceModel.id == backup.device_id).first()
-            if device:
-                device_hostname = device.hostname
-            else:
-                device_hostname = f"device-{backup.device_id[:8]}"
-            
-            # Store the content and get metadata
-            storage_result = store_backup_content(
-                device_hostname=device_hostname,
-                device_id=backup.device_id,
-                content=content,
-                timestamp=db_backup.created_at
-            )
-            
-            # Update backup with storage metadata
-            db_backup.file_path = storage_result["file_path"]
-            db_backup.file_size = storage_result["file_size"]
-            db_backup.content_hash = storage_result["content_hash"]
-            db_backup.status = "completed"
-            
-            logger.info(f"Stored backup content for device {device_hostname} with hash {db_backup.content_hash}")
-        except Exception as e:
-            logger.error(f"Error storing backup content: {str(e)}")
-            db_backup.status = "failed"
-    
     try:
         db.add(db_backup)
-        db.commit()
-        db.refresh(db_backup)
-        logger.info(f"Backup created successfully: {db_backup.id}")
+        await db.commit()
+        await db.refresh(db_backup)
+        logger.info(f"Backup created successfully: {db_backup.id} (async)")
         return db_backup
+    except IntegrityError as e:
+        await db.rollback()
+        logger.error(f"IntegrityError creating backup: {str(e)} (async)")
+        raise
     except Exception as e:
-        db.rollback()
-        logger.error(f"Error creating backup: {e}")
+        await db.rollback()
+        logger.exception(f"Error creating backup: {str(e)} (async)")
         raise
 
-def delete_backup(db: Session, backup_id: str) -> bool:
+def create_backup(
+    db: Union[Session, AsyncSession], 
+    backup: BackupCreate, 
+    serial_number: Optional[str] = None,
+    content: Optional[str] = None
+) -> Backup:
     """
-    Delete a backup.
+    Create a new backup.
+    
+    This function supports both sync and async database sessions.
     
     Args:
-        db: Database session
+        db: Database session (sync or async)
+        backup: Backup creation data (Pydantic model)
+        serial_number: Optional serial number for the device
+        content: Optional backup content
+        
+    Returns:
+        Created Backup object
+    """
+    logger.info(f"Creating new backup for device: {backup.device_id}, config type: {backup.config_type}")
+    
+    if isinstance(db, AsyncSession):
+        # Return awaitable coroutine for async usage
+        return create_backup_async(db, backup, serial_number, content)
+    else:
+        # Synchronous implementation
+        # Create new backup
+        db_backup = Backup(
+            id=str(uuid.uuid4()),
+            device_id=backup.device_id,
+            config_type=backup.config_type,
+            serial_number=serial_number,
+            content=content,
+            created_at=datetime.utcnow()
+        )
+        
+        try:
+            db.add(db_backup)
+            db.commit()
+            db.refresh(db_backup)
+            logger.info(f"Backup created successfully: {db_backup.id}")
+            return db_backup
+        except IntegrityError as e:
+            db.rollback()
+            logger.error(f"IntegrityError creating backup: {str(e)}")
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.exception(f"Error creating backup: {str(e)}")
+            raise
+
+async def delete_backup_async(db: AsyncSession, backup_id: str) -> bool:
+    """
+    Delete a backup (async version).
+    
+    Args:
+        db: Async database session
         backup_id: ID of the backup to delete
         
     Returns:
-        True if deletion was successful, False if backup not found
+        True if backup was deleted, False if backup not found
     """
-    logger.info(f"Deleting backup with id: {backup_id}")
+    logger.info(f"Deleting backup: {backup_id} (async)")
     
-    db_backup = get_backup(db, backup_id)
+    # Get existing backup
+    result = await db.execute(select(Backup).filter(Backup.id == backup_id))
+    db_backup = result.scalars().first()
+    
     if not db_backup:
-        logger.warning(f"Backup with id {backup_id} not found")
+        logger.warning(f"Backup not found: {backup_id} (async)")
         return False
     
     try:
-        # First, delete the backup file if it exists
-        if db_backup.file_path:
-            logger.info(f"Deleting backup file: {db_backup.file_path}")
-            file_deleted = delete_backup_file(db_backup.file_path)
-            if not file_deleted:
-                logger.warning(f"Failed to delete backup file: {db_backup.file_path}")
-                # Continue with database deletion even if file deletion fails
-        
-        # Then delete the database record
-        db.delete(db_backup)
-        db.commit()
-        logger.info(f"Backup deleted successfully: {backup_id}")
+        await db.delete(db_backup)
+        await db.commit()
+        logger.info(f"Backup deleted: {backup_id} (async)")
         return True
     except Exception as e:
-        db.rollback()
-        logger.error(f"Error deleting backup: {e}")
+        await db.rollback()
+        logger.exception(f"Error deleting backup: {str(e)} (async)")
         raise
 
-def get_backup_content(db: Session, backup_id: str) -> Optional[str]:
+def delete_backup(db: Union[Session, AsyncSession], backup_id: str) -> bool:
+    """
+    Delete a backup.
+    
+    This function supports both sync and async database sessions.
+    
+    Args:
+        db: Database session (sync or async)
+        backup_id: ID of the backup to delete
+        
+    Returns:
+        True if backup was deleted, False if backup not found
+    """
+    logger.info(f"Deleting backup: {backup_id}")
+    
+    if isinstance(db, AsyncSession):
+        # Return awaitable coroutine for async usage
+        return delete_backup_async(db, backup_id)
+    else:
+        # Synchronous implementation
+        db_backup = db.query(Backup).filter(Backup.id == backup_id).first()
+        if not db_backup:
+            logger.warning(f"Backup not found: {backup_id}")
+            return False
+        
+        try:
+            db.delete(db_backup)
+            db.commit()
+            logger.info(f"Backup deleted: {backup_id}")
+            return True
+        except Exception as e:
+            db.rollback()
+            logger.exception(f"Error deleting backup: {str(e)}")
+            raise
+
+async def get_backup_content_async(db: AsyncSession, backup_id: str) -> Optional[str]:
+    """
+    Get the content of a backup (async version).
+    
+    Args:
+        db: Async database session
+        backup_id: ID of the backup to retrieve
+        
+    Returns:
+        Backup content if found, None otherwise
+    """
+    logger.debug(f"Getting backup content with id: {backup_id} (async)")
+    result = await db.execute(
+        select(Backup).filter(Backup.id == backup_id)
+    )
+    backup = result.scalars().first()
+    
+    if not backup:
+        logger.warning(f"Backup not found: {backup_id} (async)")
+        return None
+    
+    return backup.content
+
+def get_backup_content(db: Union[Session, AsyncSession], backup_id: str) -> Optional[str]:
     """
     Get the content of a backup.
     
+    This function supports both sync and async database sessions.
+    
     Args:
-        db: Database session
-        backup_id: ID of the backup
+        db: Database session (sync or async)
+        backup_id: ID of the backup to retrieve
         
     Returns:
-        Optional[str]: The backup content, or None if not found
+        Backup content if found, None otherwise
     """
-    logger.debug(f"Getting backup content for id: {backup_id}")
+    logger.debug(f"Getting backup content with id: {backup_id}")
     
-    # Get the backup record
-    db_backup = get_backup(db, backup_id)
-    if not db_backup:
-        logger.warning(f"Backup with id {backup_id} not found")
-        return None
-    
-    # Get the content from storage
-    content = retrieve_backup_content(db_backup.file_path)
-    
-    if content is None:
-        logger.error(f"Failed to retrieve content for backup {backup_id}")
-        return None
-    
-    # Verify content hash if available
-    if db_backup.content_hash:
-        calculated_hash = hash_content(content)
-        if calculated_hash != db_backup.content_hash:
-            logger.warning(
-                f"Content hash mismatch for backup {backup_id}. "
-                f"Expected: {db_backup.content_hash}, Got: {calculated_hash}"
-            )
-    
-    return content 
+    if isinstance(db, AsyncSession):
+        # Return awaitable coroutine for async usage
+        return get_backup_content_async(db, backup_id)
+    else:
+        # Synchronous implementation
+        backup = db.query(Backup).filter(Backup.id == backup_id).first()
+        
+        if not backup:
+            logger.warning(f"Backup not found: {backup_id}")
+            return None
+        
+        return backup.content 
