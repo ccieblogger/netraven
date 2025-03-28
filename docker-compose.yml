@@ -1,29 +1,39 @@
 # This file defines the production deployment configuration for NetRaven.
 # It includes services for the database, API, scheduler, gateway, and frontend.
 
-version: '3.8'
-
 services:
   # PostgreSQL database service
   postgres:
     image: postgres:14-alpine
     volumes:
-      - postgres-data:/var/lib/postgresql/data/
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - type: volume
+        source: postgres-data
+        target: /var/lib/postgresql/data
+      - type: bind
+        source: ./scripts/init-db.sql
+        target: /docker-entrypoint-initdb.d/init-db.sql
+        read_only: true
     ports:
       - "5432:5432"
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=netraven
-      - POSTGRES_PASSWORD=netraven
-      - POSTGRES_DB=netraven
+      POSTGRES_USER: netraven
+      POSTGRES_PASSWORD: netraven
+      POSTGRES_DB: netraven
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U netraven"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - netraven-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
 
   # Backend API service
   api:
@@ -31,28 +41,43 @@ services:
       context: .
       dockerfile: Dockerfile.api
       args:
-        - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
+        NETRAVEN_ENV: ${NETRAVEN_ENV:-prod}
     environment:
-      - DATABASE_URL=postgresql://netraven:netraven@postgres:5432/netraven
-      - POSTGRES_HOST=postgres
-      - POSTGRES_USER=netraven
-      - POSTGRES_PASSWORD=netraven
-      - POSTGRES_DB=netraven
-      - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
-      - TOKEN_EXPIRY_HOURS=${TOKEN_EXPIRY_HOURS:-24}
-      - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
-      - GATEWAY_URL=http://device_gateway:8001
-      - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost,http://127.0.0.1,http://nginx,http://netraven.local,*
-      - ALLOW_CREDENTIALS=true
-      - NETMIKO_LOG_DIR=/app/data/netmiko_logs
-      - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
+      DATABASE_URL: postgresql://netraven:netraven@postgres:5432/netraven
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: netraven
+      POSTGRES_PASSWORD: netraven
+      POSTGRES_DB: netraven
+      TOKEN_SECRET_KEY: ${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
+      TOKEN_EXPIRY_HOURS: ${TOKEN_EXPIRY_HOURS:-24}
+      NETRAVEN_ENV: ${NETRAVEN_ENV:-prod}
+      GATEWAY_URL: http://device_gateway:8001
+      CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://localhost,http://127.0.0.1,http://nginx,http://netraven.local,*
+      ALLOW_CREDENTIALS: "true"
+      NETMIKO_LOG_DIR: /app/data/netmiko_logs
+      NETMIKO_PRESERVE_LOGS: ${NETMIKO_PRESERVE_LOGS:-false}
     volumes:
-      - api-data:/app/data
-      - ./test-artifacts:/app/test-artifacts
-      - ./config.yml:/app/config.yml
-      - netraven_netmiko_logs:/app/data/netmiko_logs
-      - ./netraven:/app/netraven
-      - ./scripts:/app/scripts
+      - type: volume
+        source: api-data
+        target: /app/data
+      - type: bind
+        source: ./test-artifacts
+        target: /app/test-artifacts
+      - type: bind
+        source: ./config.yml
+        target: /app/config.yml
+        read_only: true
+      - type: volume
+        source: netraven_netmiko_logs
+        target: /app/data/netmiko_logs
+      - type: bind
+        source: ./netraven
+        target: /app/netraven
+        read_only: true
+      - type: bind
+        source: ./scripts
+        target: /app/scripts
+        read_only: true
     ports:
       - "0.0.0.0:8000:8000"
     restart: unless-stopped
@@ -60,13 +85,19 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
       retries: 3
+      start_period: 40s
     networks:
       - netraven-network
-    # Use entrypoint.sh directly without trying to modify /tmp/netmiko_logs
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
     entrypoint: ["/bin/bash", "-c", "python /app/scripts/ensure_schema.py && /app/docker/entrypoint.sh"]
 
   # Scheduler service
@@ -75,18 +106,25 @@ services:
       context: .
       dockerfile: Dockerfile.api
       args:
-        - NETRAVEN_ENV=${NETRAVEN_ENV:-test}
+        NETRAVEN_ENV: ${NETRAVEN_ENV:-test}
     volumes:
-      - ./:/app
-      - logs_data:/app/logs
-      - netraven_netmiko_logs:/app/data/netmiko_logs
+      - type: bind
+        source: .
+        target: /app
+        read_only: true
+      - type: volume
+        source: logs_data
+        target: /app/logs
+      - type: volume
+        source: netraven_netmiko_logs
+        target: /app/data/netmiko_logs
     working_dir: /app
     command: bash -c "mkdir -p /app/data/netmiko_logs && python -m netraven.jobs.scheduler"
     environment:
-      - API_URL=http://api:8000
-      - NETRAVEN_ENV=${NETRAVEN_ENV:-test}
-      - NETMIKO_LOG_DIR=/app/data/netmiko_logs
-      - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
+      API_URL: http://api:8000
+      NETRAVEN_ENV: ${NETRAVEN_ENV:-test}
+      NETMIKO_LOG_DIR: /app/data/netmiko_logs
+      NETMIKO_PRESERVE_LOGS: ${NETMIKO_PRESERVE_LOGS:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,6 +135,12 @@ services:
     restart: unless-stopped
     networks:
       - netraven-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
 
   # Device Gateway service
   device_gateway:
@@ -104,35 +148,53 @@ services:
       context: .
       dockerfile: Dockerfile.gateway
       args:
-        - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
+        NETRAVEN_ENV: ${NETRAVEN_ENV:-prod}
     ports:
       - "8001:8001"
     volumes:
-      - ./netraven:/app/netraven
-      - token_data:/app/tokens
-      - ./config.yml:/app/config.yml
-      - netraven_netmiko_logs:/app/data/netmiko_logs
-      - ./scripts:/app/scripts
+      - type: bind
+        source: ./netraven
+        target: /app/netraven
+        read_only: true
+      - type: volume
+        source: token_data
+        target: /app/tokens
+      - type: bind
+        source: ./config.yml
+        target: /app/config.yml
+        read_only: true
+      - type: volume
+        source: netraven_netmiko_logs
+        target: /app/data/netmiko_logs
+      - type: bind
+        source: ./scripts
+        target: /app/scripts
+        read_only: true
     environment:
-      - API_URL=http://api:8000
-      - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
-      - NETMIKO_LOG_DIR=/app/data/netmiko_logs
-      - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
+      API_URL: http://api:8000
+      NETRAVEN_ENV: ${NETRAVEN_ENV:-prod}
+      NETMIKO_LOG_DIR: /app/data/netmiko_logs
+      NETMIKO_PRESERVE_LOGS: ${NETMIKO_PRESERVE_LOGS:-false}
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
       retries: 3
+      start_period: 20s
     cap_drop:
       - ALL
     cap_add:
       - NET_BIND_SERVICE
     security_opt:
       - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
     networks:
       - netraven-network
 
@@ -142,8 +204,13 @@ services:
       context: ./netraven/web/frontend
       dockerfile: Dockerfile
     volumes:
-      - ./netraven/web/frontend:/app
-      - frontend_node_modules:/app/node_modules
+      - type: bind
+        source: ./netraven/web/frontend
+        target: /app
+        read_only: true
+      - type: volume
+        source: frontend_node_modules
+        target: /app/node_modules
     ports:
       - "8080:8080"
     depends_on:
@@ -151,17 +218,21 @@ services:
       - device_gateway
     user: netraven
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider --quiet --tries=1 http://0.0.0.0:8080 || exit 1"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "wget", "--spider", "--quiet", "--tries=1", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 40s
     environment:
-      - NODE_ENV=development
-      # Internal name for container-to-container access, will be transformed for browser access
-      - VUE_APP_API_URL=http://api:8000
+      NODE_ENV: development
+      VUE_APP_API_URL: http://api:8000
     networks:
       - netraven-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
 
   nginx:
     build:
@@ -174,32 +245,56 @@ services:
       - frontend
     networks:
       - netraven-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
 
   key-rotation:
     build:
       context: .
       dockerfile: docker/key-rotation.Dockerfile
       args:
-        - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
+        NETRAVEN_ENV: ${NETRAVEN_ENV:-prod}
     volumes:
-      - key_data:/app/data/keys
-      - ./config:/app/config
+      - type: volume
+        source: key_data
+        target: /app/data/keys
+      - type: bind
+        source: ./config
+        target: /app/config
+        read_only: true
     restart: on-failure:5
     environment:
-      - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
-      - NETRAVEN_ENCRYPTION_KEY=${NETRAVEN_ENCRYPTION_KEY:-netraven-dev-key}
-      - CONFIG_FILE=config/key_rotation.yaml
+      NETRAVEN_ENV: ${NETRAVEN_ENV:-prod}
+      NETRAVEN_ENCRYPTION_KEY: ${NETRAVEN_ENCRYPTION_KEY:-netraven-dev-key}
+      CONFIG_FILE: config/key_rotation.yaml
     networks:
       - netraven-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
 
 volumes:
   frontend_node_modules:
+    driver: local
   postgres-data:
+    driver: local
   logs_data:
+    driver: local
   token_data:
+    driver: local
   api-data:
+    driver: local
   key_data:
+    driver: local
   netraven_netmiko_logs:
+    driver: local
 
 networks:
   netraven-network:
