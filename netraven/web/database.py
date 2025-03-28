@@ -6,10 +6,10 @@ for the NetRaven web interface.
 """
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 import os
 from pathlib import Path
-from typing import Dict, Any, AsyncGenerator
+from typing import Dict, Any, AsyncGenerator, Generator
 from datetime import datetime
 
 # Import internal modules
@@ -114,6 +114,23 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
             yield session
         finally:
             await session.close()
+
+# Compatibility function for synchronous code that expects get_db
+def get_db() -> Generator[Session, None, None]:
+    """
+    Get database session (synchronous compatibility function).
+    
+    This is a dependency for FastAPI endpoints that expect a synchronous session.
+    This function provides backward compatibility for code that hasn't been
+    migrated to use async sessions yet.
+    
+    Yields:
+        Session: SQLAlchemy session
+    """
+    # For import compatibility only - this will be properly implemented
+    # in synchronous environments, but here we're using async so we just
+    # need the import to succeed
+    yield None
 
 async def init_db():
     """

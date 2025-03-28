@@ -6,8 +6,9 @@ as well as managing device-tag associations.
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from typing import List, Optional, Dict, Any
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional, Dict, Any, Union
 import uuid
 import logging
 
@@ -70,21 +71,28 @@ def get_tag(
     
     return tag
 
-def get_tag_by_name(
-    db: Session, 
+async def get_tag_by_name(
+    db: Union[Session, AsyncSession], 
     name: str
 ) -> Optional[Tag]:
     """
     Get a tag by name.
     
     Args:
-        db: Database session
+        db: Database session (sync or async)
         name: Tag name
         
     Returns:
         Tag if found, None otherwise
     """
-    return db.query(Tag).filter(Tag.name == name).first()
+    # Handle both sync and async sessions
+    if isinstance(db, AsyncSession):
+        # Async query
+        result = await db.execute(select(Tag).filter(Tag.name == name))
+        return result.scalars().first()
+    else:
+        # Sync query (legacy support)
+        return db.query(Tag).filter(Tag.name == name).first()
 
 def create_tag(
     db: Session, 
