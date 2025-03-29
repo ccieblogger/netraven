@@ -1,9 +1,6 @@
 #!/bin/bash
 # Script to run async tests
 
-# Create output directory for reports
-mkdir -p ./test-reports
-
 # Set environment variables for testing
 export TESTING=1
 export ASYNC_TEST_MODE=1
@@ -19,10 +16,5 @@ PYTHONPATH=. pytest -v ./tests/test_async_*.py
 EXIT_CODE=$?
 
 echo "Tests completed with exit code $EXIT_CODE"
-
-# Display report location
-echo "Test reports available at:"
-echo "  - HTML Report: ./test-reports/report-async.html"
-echo "  - JUnit XML: ./test-reports/junit-async.xml"
 
 exit $EXIT_CODE 
