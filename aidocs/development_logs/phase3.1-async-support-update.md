@@ -20,7 +20,6 @@ This phase focuses on implementing async support across the application, particu
 4. Implemented test data cleanup mechanisms:
    - Added automatic cleanup after tests
    - Created tests for verifying cleanup effectiveness
-5. Added helper script to run async tests
 
 ## Implementation Phases Completed
 1. **Phase 1: Test Infrastructure Analysis** ✓
@@ -47,22 +46,18 @@ This phase focuses on implementing async support across the application, particu
 4. **Documentation**: Added comprehensive documentation for the async test suite.
 
 ## Running the Tests
-The async tests can now be run using the included shell script:
+The async tests should be run within the application containers to ensure proper environment configuration and dependency availability:
+
 ```bash
-./run_async_tests.sh
+docker-compose exec api pytest -v tests/test_async_*.py
 ```
 
-This script sets up the proper environment variables, runs the tests, and generates test reports.
-
 ## Dependencies
-To run the async tests, the following dependencies must be installed:
+The async tests require the following dependencies:
 - asyncpg: Required for PostgreSQL async database operations (already in requirements.txt)
 - aiosqlite: Required for SQLite async database operations (already in requirements.txt)
 
-Make sure all requirements are installed with:
-```bash
-pip install -r requirements.txt
-```
+These dependencies are already included in the project's requirements.txt file and are installed automatically in the Docker containers.
 
 ## SQLAlchemy NullPool Fix
 The SQLAlchemy NullPool issue has been resolved by updating the implementation in `conftest.py`. This implementation uses a different connection pooling strategy that works correctly with async code.
@@ -72,4 +67,4 @@ The SQLAlchemy NullPool issue has been resolved by updating the implementation i
 2. Addition of performance tests for async features if required
 
 ## Conclusion
-All the tasks outlined in the initial development log have been completed. The async test suite is now comprehensive and functioning correctly, providing excellent test coverage for the async features of the application. 
+All the tasks outlined in the initial development log have been completed. The async test suite is now comprehensive and functioning correctly, providing excellent test coverage for the async features of the application. All tests should be run within the container environment to ensure proper dependency resolution and environmental consistency. 

@@ -20,28 +20,24 @@ The async test suite tests the asynchronous components of the application, parti
 
 ## Running Tests
 
-### Running All Tests
+All tests should be run within the application containers to ensure proper environment configuration and dependency availability.
+
+### Running All Tests in Container
 
 ```bash
-pytest -v
+docker-compose exec api pytest -v
 ```
 
-### Running Only Async Tests
+### Running Only Async Tests in Container
 
 ```bash
-pytest -v tests/test_async_*.py
+docker-compose exec api pytest -v tests/test_async_*.py
 ```
 
-### Running Tests With Coverage
+### Running Tests With Coverage in Container
 
 ```bash
-pytest --cov=netraven -v
-```
-
-### Running Async Tests With Fixes
-
-```bash
-./run_async_tests.sh
+docker-compose exec api pytest --cov=netraven -v
 ```
 
 ## Test Database Configuration
@@ -51,6 +47,14 @@ The test suite uses an in-memory SQLite database for testing. This is configured
 ## Test Data Cleanup
 
 Test data is automatically cleaned up after each test by the `cleanup_test_data` fixture in `conftest.py`. This ensures that tests do not interfere with each other.
+
+## Dependencies
+
+The async tests require:
+- asyncpg: For PostgreSQL async database operations
+- aiosqlite: For SQLite async database operations
+
+These dependencies are already included in the requirements.txt file and are installed in the Docker containers.
 
 ## Known Issues
 
