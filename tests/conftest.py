@@ -51,6 +51,8 @@ try:
     from netraven.core.services.async_job_logging_service import AsyncJobLoggingService
     from netraven.core.services.async_scheduler_service import AsyncSchedulerService
     from netraven.core.services.async_device_comm_service import AsyncDeviceCommunicationService
+    # Ensure asyncpg is imported for PostgreSQL async support
+    import asyncpg
     DATABASE_IMPORTS_AVAILABLE = True
 except ImportError as e:
     DATABASE_IMPORTS_AVAILABLE = False
@@ -94,22 +96,22 @@ if DATABASE_IMPORTS_AVAILABLE:
         Create a test database with proper async support.
         
         This implementation addresses the SQLAlchemy NullPool issue by using
-        a different connection pooling strategy.
+        a proper connection pooling strategy for PostgreSQL.
         """
-        # Create a temporary file for the SQLite database
-        db_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-        db_file_path = db_file.name
-        db_file.close()
+        # Get PostgreSQL connection details from environment or use defaults for testing
+        DB_USER = os.getenv("TEST_DB_USER", "postgres")
+        DB_PASS = os.getenv("TEST_DB_PASS", "postgres")
+        DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+        DB_PORT = os.getenv("TEST_DB_PORT", "5432")
+        DB_NAME = os.getenv("TEST_DB_NAME", "netraven_test")
         
-        # Create the SQLite URL with explicitly enabling WAL mode
-        # which helps with concurrent access
-        SQLALCHEMY_DATABASE_URL = f"sqlite+aiosqlite:///{db_file_path}?mode=rwc"
+        # Create the PostgreSQL URL
+        SQLALCHEMY_DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
         
         # Create the engine with proper pooling setup
         # Using default pool instead of NullPool which causes issues with async code
         engine = create_async_engine(
             SQLALCHEMY_DATABASE_URL,
-            connect_args={"check_same_thread": False},
             poolclass=None,  # Default pool
             echo=False,
             future=True
@@ -135,12 +137,6 @@ if DATABASE_IMPORTS_AVAILABLE:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
         await engine.dispose()
-        
-        # Remove temp file
-        try:
-            os.unlink(db_file_path)
-        except:
-            pass
 
     @pytest.fixture
     async def db_session(test_db):
