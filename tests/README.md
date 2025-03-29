@@ -42,7 +42,9 @@ docker-compose exec api pytest --cov=netraven -v
 
 ## Test Database Configuration
 
-The application uses PostgreSQL for both production and testing environments. Tests should be configured to use a dedicated PostgreSQL instance or schema. This is configured in `conftest.py` using a proper connection pooling strategy to support async database operations. Using PostgreSQL for tests ensures compatibility with all database features and provides a testing environment that closely matches production.
+The application uses PostgreSQL for both production and testing environments. When running tests in a Docker environment, they connect to the main PostgreSQL database using the container network hostname (`postgres`). When running tests locally, they connect to localhost. This configuration is handled automatically by the test fixtures.
+
+The database connection is configured in `conftest.py` using a proper connection pooling strategy to support async database operations.
 
 ## Test Data Cleanup
 
@@ -61,10 +63,7 @@ This dependency is already included in the requirements.txt file and is installe
 
 2. **Event Loop Scoping**: A session-scoped event_loop fixture has been added to conftest.py to fix scope mismatch issues with pytest-asyncio when using session-scoped fixtures.
 
-3. **Database Configuration**: Tests must use PostgreSQL to properly support all data types used in the application models (including JSONB). Ensure that:
-   - The test environment has access to a properly configured PostgreSQL instance
-   - The test database connection string points to PostgreSQL
-   - Test fixtures properly initialize and clean up PostgreSQL test data
+3. **Docker Network Hostname**: When running tests in Docker, the tests need to connect to PostgreSQL using the service name (`postgres`) rather than localhost. This is now handled automatically by the test fixtures.
 
 ## Adding New Tests
 
