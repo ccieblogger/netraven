@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.asyncio import NullPool
+from sqlalchemy.pool import NullPool
 from sqlalchemy import delete
 
 # Add the parent directory to the path so we can import the application
