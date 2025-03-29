@@ -14,13 +14,21 @@ from netraven.web.database import Base
 from netraven.web.models import user, device, job_log, scheduled_job, tag
 from netraven.web.models.tag import TagRule
 
-# Set test database URL - use in-memory SQLite for tests
-TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test.db")
+# Get PostgreSQL connection details from environment or use defaults for testing
+DB_USER = os.getenv("TEST_DB_USER", "postgres")
+DB_PASS = os.getenv("TEST_DB_PASS", "postgres") 
+DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+DB_PORT = os.getenv("TEST_DB_PORT", "5432")
+DB_NAME = os.getenv("TEST_DB_NAME", "netraven_test")
+
+# Set test database URL to use PostgreSQL
+DEFAULT_DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", DEFAULT_DATABASE_URL)
 
 # Create test engine with appropriate parameters
 engine = create_async_engine(
     TEST_DATABASE_URL,
-    poolclass=NullPool,  # Don't pool connections for tests
+    poolclass=None,  # Use default pooling for better async support
     echo=False  # Don't echo SQL in tests
 )
 

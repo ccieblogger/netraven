@@ -11,6 +11,7 @@ import pytest
 import uuid
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
+import os
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -28,8 +29,18 @@ from netraven.web.models.device import Device
 @pytest.fixture
 async def async_db_session():
     """Create an async database session for testing."""
-    # Create in-memory SQLite database for testing
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    # Get PostgreSQL connection details from environment or use defaults for testing
+    DB_USER = os.getenv("TEST_DB_USER", "postgres")
+    DB_PASS = os.getenv("TEST_DB_PASS", "postgres") 
+    DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+    DB_PORT = os.getenv("TEST_DB_PORT", "5432")
+    DB_NAME = os.getenv("TEST_DB_NAME", "netraven_test_scheduler")
+    
+    # Create PostgreSQL database URL
+    DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    
+    # Create PostgreSQL engine
+    engine = create_async_engine(DATABASE_URL)
     
     # Create tables
     async with engine.begin() as conn:
