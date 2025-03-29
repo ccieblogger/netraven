@@ -100,7 +100,7 @@ class TestAsyncBackupManagement:
         # Verify job is in the scheduler's active jobs
         status = await scheduler_service.get_job_status(job.job_id)
         assert status is not None
-        assert status["job_type"] == "backup"
+        assert status["type"] == "backup"
 
     @pytest.mark.asyncio
     @patch('netraven.core.services.async_device_comm_service.AsyncDeviceCommunicationService.get_device_config')

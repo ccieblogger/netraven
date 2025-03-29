@@ -100,8 +100,9 @@ if DATABASE_IMPORTS_AVAILABLE:
         a proper connection pooling strategy for PostgreSQL.
         """
         # Get PostgreSQL connection details from environment
-        # In Docker, we need to use the service name instead of localhost
-        if os.getenv("SERVICE_TYPE") == "api" or os.getenv("POSTGRES_HOST"):
+        # In Docker, we always use the postgres service name in a container
+        in_container = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
+        if in_container or os.getenv("SERVICE_TYPE") == "api" or os.getenv("POSTGRES_HOST"):
             print("Detected Docker environment, using 'postgres' as database host")
             DB_HOST = "postgres"
         else:
@@ -119,7 +120,7 @@ if DATABASE_IMPORTS_AVAILABLE:
         # Log the database connection string (without credentials)
         print(f"Test database: Connecting to PostgreSQL at {DB_HOST}:{DB_PORT}/{DB_NAME}")
         
-        # Create the engine with proper pooling setup
+        # Create the engine with proper pooling setup - no connect_timeout for asyncpg
         engine = create_async_engine(
             SQLALCHEMY_DATABASE_URL,
             poolclass=None,  # Default pool
@@ -184,7 +185,7 @@ if DATABASE_IMPORTS_AVAILABLE:
         """Create a job logging service instance."""
         service = AsyncJobLoggingService(db_session=db_session)
         yield service
-        await service.close()
+        # No close() method needed - the service doesn't manage resources directly
 
     @pytest.fixture
     async def scheduler_service(job_logging_service, db_session):
@@ -204,14 +205,13 @@ if DATABASE_IMPORTS_AVAILABLE:
             db_session=db_session
         )
         yield service
-        await service.close()
+        # Service might not have a close method - only call if it exists
+        if hasattr(service, 'close') and callable(service.close):
+            await service.close()
 
     @pytest.fixture
     async def test_device_data():
         """Create test device data."""
-        # Create admin user ID for owner_id
-        owner_id = str(uuid.uuid4())
-        
         return {
             "hostname": "test.example.com",
             "ip_address": "192.168.1.1",
@@ -219,9 +219,8 @@ if DATABASE_IMPORTS_AVAILABLE:
             "port": 22,
             "username": "admin",
             "password": "password",
-            "description": "Test device",
-            "enabled": True,
-            "owner_id": owner_id  # Required foreign key
+            "description": "Test Device",
+            "enabled": True
         }
 
     @pytest.fixture
@@ -241,8 +240,8 @@ if DATABASE_IMPORTS_AVAILABLE:
         return {
             "username": "testuser",
             "email": "test@example.com",
+            "password_hash": "hashed_password",
             "full_name": "Test User",
-            "password_hash": "hashed_password",  # Changed from password to password_hash
             "is_active": True,
             "is_admin": False
         }
@@ -254,7 +253,7 @@ if DATABASE_IMPORTS_AVAILABLE:
             "username": "admin",
             "email": "admin@example.com",
             "full_name": "Admin User",
-            "password_hash": "hashed_admin_password",  # Changed from password to password_hash
+            "password_hash": "hashed_admin_password",
             "is_active": True,
             "is_admin": True
         }
@@ -911,26 +910,10 @@ def test_user_data():
     return {
         "username": "testuser",
         "email": "test@example.com",
-        "password": "testpassword",
+        "password_hash": "hashed_password",
         "full_name": "Test User",
         "is_active": True,
-        "is_superuser": False
-    }
-
-@pytest.fixture
-def test_device_data():
-    """Create test device data."""
-    return {
-        "name": "Test Device",
-        "hostname": "test.example.com",
-        "ip_address": "192.168.1.1",
-        "device_type": "cisco_ios",
-        "protocol": "ssh",
-        "port": 22,
-        "username": "admin",
-        "password": "password",
-        "enable_password": "enable",
-        "tags": ["test", "cisco"]
+        "is_admin": False
     }
 
 @pytest.fixture
