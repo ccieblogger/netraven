@@ -54,6 +54,16 @@ The async tests can now be run using the included shell script:
 
 This script sets up the proper environment variables, runs the tests, and generates test reports.
 
+## Dependencies
+To run the async tests, the following dependencies must be installed:
+- asyncpg: Required for PostgreSQL async database operations (already in requirements.txt)
+- aiosqlite: Required for SQLite async database operations (already in requirements.txt)
+
+Make sure all requirements are installed with:
+```bash
+pip install -r requirements.txt
+```
+
 ## SQLAlchemy NullPool Fix
 The SQLAlchemy NullPool issue has been resolved by updating the implementation in `conftest.py`. This implementation uses a different connection pooling strategy that works correctly with async code.
 
