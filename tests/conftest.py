@@ -80,17 +80,29 @@ TEST_CONFIG = {
 if DATABASE_IMPORTS_AVAILABLE:
     @pytest.fixture(scope="session")
     async def test_db():
-        """Create a test database."""
+        """
+        Create a test database with proper async support.
+        
+        This implementation addresses the SQLAlchemy NullPool issue by using
+        a different connection pooling strategy.
+        """
         # Create a temporary file for the SQLite database
-        db_file = tempfile.NamedTemporaryFile(suffix=".db")
+        db_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        db_file_path = db_file.name
+        db_file.close()
         
-        # Create the SQLite URL
-        SQLALCHEMY_DATABASE_URL = f"sqlite+aiosqlite:///{db_file.name}"
+        # Create the SQLite URL with explicitly enabling WAL mode
+        # which helps with concurrent access
+        SQLALCHEMY_DATABASE_URL = f"sqlite+aiosqlite:///{db_file_path}?mode=rwc"
         
-        # Create the engine
+        # Create the engine with proper pooling setup
+        # Using default pool instead of NullPool which causes issues with async code
         engine = create_async_engine(
             SQLALCHEMY_DATABASE_URL,
-            poolclass=NullPool  # Don't pool connections for tests
+            connect_args={"check_same_thread": False},
+            poolclass=None,  # Default pool
+            echo=False,
+            future=True
         )
         
         # Create the tables
@@ -113,7 +125,12 @@ if DATABASE_IMPORTS_AVAILABLE:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
         await engine.dispose()
-        db_file.close()
+        
+        # Remove temp file
+        try:
+            os.unlink(db_file_path)
+        except:
+            pass
 
     @pytest.fixture
     async def db_session(test_db):

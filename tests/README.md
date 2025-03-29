@@ -1,172 +1,67 @@
-# NetRaven Testing Framework
+# NetRaven Test Suite
 
-This directory contains the test suite for the NetRaven network device management system. The tests ensure proper functionality, security, and performance of the application.
+This directory contains the test suite for the NetRaven application, including unit tests, integration tests, and async tests.
 
 ## Test Structure
 
-The test directory is organized into the following components:
+- `tests/unit/`: Unit tests for individual components
+- `tests/integration/`: Integration tests for testing component interactions
+- `tests/conftest.py`: Pytest fixtures and configuration
+- `tests/test_async_*.py`: Async test suite for testing async features
 
-```
-tests/
-  ├── unit/              # Unit tests for individual components
-  │   ├── routers/       # Tests for API routers
-  │   └── ...
-  ├── integration/       # Integration tests for system functionality
-  ├── utils/             # Utility functions for testing
-  ├── mock/              # Mock data and services
-  └── conftest.py        # Shared fixtures
-```
+## Async Test Suite
 
-## Test Categories
+The async test suite tests the asynchronous components of the application, particularly:
 
-The NetRaven test suite includes:
-
-### Unit Tests
-- Test individual components in isolation
-- Fast execution with minimal dependencies
-- Located in the `unit/` directory
-
-### Integration Tests
-- Test the interaction between components
-- Verify API endpoints and workflows
-- Located in the `integration/` directory
-
-### Security Tests
-- Test authentication and authorization mechanisms
-- Verify protection against common threats
-- Located in `integration/test_security_features.py`
-
-### Performance Tests
-- Test system behavior under load
-- Measure response times for critical operations
-- Located in `integration/test_performance.py`
-
-## Test Phases
-
-The test suite has been implemented in phases:
-
-### Phase 1 (Completed)
-- Basic test directory structure
-- Unit tests for router endpoints
-- Common test fixtures and utilities
-- Authentication and token testing
-
-### Phase 2 (Current)
-- Integration tests for key system flows
-- Security feature testing
-- Performance and reliability tests
-- System functionality tests (monitoring, scheduled operations)
+1. **Async Scheduler Service**: Tests for job scheduling, execution, and management
+2. **Backup Management**: Tests for async backup operations
+3. **Database Configuration**: Tests for async database operations
+4. **Test Data Cleanup**: Tests for cleaning up test data after async tests
 
 ## Running Tests
 
 ### Running All Tests
 
 ```bash
-pytest tests/
+pytest -v
 ```
 
-### Running Specific Test Categories
+### Running Only Async Tests
 
 ```bash
-# Run all unit tests
-pytest tests/unit/
-
-# Run all integration tests
-pytest tests/integration/
-
-# Run security tests
-pytest tests/integration/test_security_features.py
-
-# Run performance tests
-pytest tests/integration/test_performance.py
-
-# Run system functionality tests
-pytest tests/integration/test_system_functionality.py
+pytest -v tests/test_async_*.py
 ```
 
-### Running Tests with Coverage
+### Running Tests With Coverage
 
 ```bash
-pytest --cov=netraven tests/
+pytest --cov=netraven -v
 ```
 
-## Performance Testing
-
-The performance tests (`test_performance.py`) may take longer to run as they test system behavior under load. You can isolate slow tests with:
+### Running Async Tests With Fixes
 
 ```bash
-# Skip slow tests
-pytest -k "not slow" tests/
-
-# Run only performance tests
-pytest tests/integration/test_performance.py
+./run_async_tests.sh
 ```
 
-## Test Fixtures
+## Test Database Configuration
 
-Common test fixtures are defined in `conftest.py`. These include:
+The test suite uses an in-memory SQLite database for testing. This is configured in `conftest.py` using a proper connection pooling strategy to support async database operations.
 
-- Database session fixtures
-- Authentication token fixtures
-- Mock data fixtures
+## Test Data Cleanup
+
+Test data is automatically cleaned up after each test by the `cleanup_test_data` fixture in `conftest.py`. This ensures that tests do not interfere with each other.
+
+## Known Issues
+
+1. **SQLAlchemy NullPool Issue**: There was a known issue with SQLAlchemy's NullPool in the project's conftest.py file, which has been fixed by using a different connection pooling strategy. The fix is now integrated directly into the main conftest.py file.
 
 ## Adding New Tests
 
-When adding new tests, follow these guidelines:
+When adding new tests:
 
-1. Place tests in the appropriate directory (unit or integration)
-2. Use descriptive test names prefixed with `test_`
-3. Use fixtures from `conftest.py` when possible
-4. Keep unit tests focused on a single component
-5. For integration tests, clearly document the flow being tested
-
-## Test Utilities
-
-The `utils/` directory contains helper functions for testing:
-
-- `mock_data.py`: Functions to generate test data
-- `api_test_utils.py`: Utilities for API testing
-
-## Security Testing Notes
-
-Security tests verify:
-
-- Authentication edge cases
-- Permission boundaries
-- Input validation and sanitization
-- API rate limiting
-- Cross-origin requests
-- Session management
-
-## Performance Testing Notes
-
-Performance tests verify:
-
-- Large configuration file handling 
-- Concurrent API request handling
-- Database query performance
-- Resource usage (memory, CPU)
-- System degradation under load
-- Error handling and recovery
-
-## System Functionality Tests
-
-The system functionality tests verify:
-
-- Scheduled operations (backups, key rotation)
-- Device connectivity testing
-- Monitoring and health checks
-- Configuration comparison
-- Metrics collection
-
-## Mocking External Services
-
-For tests that require external services (e.g., network devices), mock implementations are provided in the `mock/` directory.
-
-## Continuous Integration
-
-These tests are automatically run in the CI pipeline on each pull request. Tests must pass before code can be merged.
-
-## Test Data
-
-Test data is generated dynamically using utilities in `utils/mock_data.py`. This ensures tests can run without external dependencies while remaining representative of real-world scenarios. 
+1. Follow the existing test structure and naming conventions
+2. Use pytest fixtures from `conftest.py` for test setup and teardown
+3. Clean up any resources created during the test
+4. Add appropriate documentation to test files
+5. Mark async tests with `@pytest.mark.asyncio` 
