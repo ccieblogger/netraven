@@ -42,7 +42,7 @@ docker-compose exec api pytest --cov=netraven -v
 
 ## Test Database Configuration
 
-The test suite uses an in-memory SQLite database for testing. This is configured in `conftest.py` using a proper connection pooling strategy to support async database operations.
+The application uses PostgreSQL for both production and testing environments. Tests should be configured to use a dedicated PostgreSQL instance or schema. This is configured in `conftest.py` using a proper connection pooling strategy to support async database operations. Using PostgreSQL for tests ensures compatibility with all database features and provides a testing environment that closely matches production.
 
 ## Test Data Cleanup
 
@@ -52,13 +52,19 @@ Test data is automatically cleaned up after each test by the `cleanup_test_data`
 
 The async tests require:
 - asyncpg: For PostgreSQL async database operations
-- aiosqlite: For SQLite async database operations
 
-These dependencies are already included in the requirements.txt file and are installed in the Docker containers.
+This dependency is already included in the requirements.txt file and is installed in the Docker containers.
 
 ## Known Issues
 
 1. **SQLAlchemy NullPool Issue**: There was a known issue with SQLAlchemy's NullPool in the project's conftest.py file, which has been fixed by using a different connection pooling strategy. The fix is now integrated directly into the main conftest.py file.
+
+2. **Event Loop Scoping**: A session-scoped event_loop fixture has been added to conftest.py to fix scope mismatch issues with pytest-asyncio when using session-scoped fixtures.
+
+3. **Database Configuration**: Tests must use PostgreSQL to properly support all data types used in the application models (including JSONB). Ensure that:
+   - The test environment has access to a properly configured PostgreSQL instance
+   - The test database connection string points to PostgreSQL
+   - Test fixtures properly initialize and clean up PostgreSQL test data
 
 ## Adding New Tests
 
