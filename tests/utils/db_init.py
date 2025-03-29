@@ -17,13 +17,24 @@ from netraven.web.models.tag import TagRule
 # Get PostgreSQL connection details from environment or use defaults for testing
 DB_USER = os.getenv("TEST_DB_USER", "postgres")
 DB_PASS = os.getenv("TEST_DB_PASS", "postgres") 
-DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+
+# Check if we're running in Docker by looking for container-specific environment variables
+# In Docker, we should connect to the postgres service by its service name
+if os.getenv("SERVICE_TYPE") == "api" or os.getenv("POSTGRES_HOST"):
+    print("Detected Docker environment, using 'postgres' as database host")
+    DB_HOST = os.getenv("TEST_DB_HOST", "postgres")
+else:
+    DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+    
 DB_PORT = os.getenv("TEST_DB_PORT", "5432")
 DB_NAME = os.getenv("TEST_DB_NAME", "netraven_test")
 
 # Set test database URL to use PostgreSQL
 DEFAULT_DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", DEFAULT_DATABASE_URL)
+
+# Log connection info
+print(f"DB_INIT: Connecting to PostgreSQL at {DB_HOST}:{DB_PORT}/{DB_NAME}")
 
 # Create test engine with appropriate parameters
 engine = create_async_engine(

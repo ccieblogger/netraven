@@ -32,12 +32,23 @@ async def async_db_session():
     # Get PostgreSQL connection details from environment or use defaults for testing
     DB_USER = os.getenv("TEST_DB_USER", "postgres")
     DB_PASS = os.getenv("TEST_DB_PASS", "postgres") 
-    DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+    
+    # Check if we're running in Docker by looking for container-specific environment variables
+    # In Docker, we should connect to the postgres service by its service name
+    if os.getenv("SERVICE_TYPE") == "api" or os.getenv("POSTGRES_HOST"):
+        print("Detected Docker environment, using 'postgres' as database host")
+        DB_HOST = os.getenv("TEST_DB_HOST", "postgres")
+    else:
+        DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+        
     DB_PORT = os.getenv("TEST_DB_PORT", "5432")
     DB_NAME = os.getenv("TEST_DB_NAME", "netraven_test_scheduler")
     
     # Create PostgreSQL database URL
     DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    
+    # Log connection info
+    print(f"Scheduler Test: Connecting to PostgreSQL at {DB_HOST}:{DB_PORT}/{DB_NAME}")
     
     # Create PostgreSQL engine
     engine = create_async_engine(DATABASE_URL)
