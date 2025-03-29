@@ -98,29 +98,27 @@ if DATABASE_IMPORTS_AVAILABLE:
         This implementation addresses the SQLAlchemy NullPool issue by using
         a proper connection pooling strategy for PostgreSQL.
         """
-        # Get PostgreSQL connection details from environment or use defaults for testing
-        DB_USER = os.getenv("TEST_DB_USER", "postgres")
-        DB_PASS = os.getenv("TEST_DB_PASS", "postgres")
-        
-        # Check if we're running in Docker by looking for container-specific environment variables
-        # In Docker, we should connect to the postgres service by its service name
+        # Get PostgreSQL connection details from environment
+        # In Docker, we need to use the service name instead of localhost
         if os.getenv("SERVICE_TYPE") == "api" or os.getenv("POSTGRES_HOST"):
             print("Detected Docker environment, using 'postgres' as database host")
-            DB_HOST = os.getenv("TEST_DB_HOST", "postgres")
+            DB_HOST = "postgres"
         else:
-            DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+            DB_HOST = "localhost"
             
-        DB_PORT = os.getenv("TEST_DB_PORT", "5432")
-        DB_NAME = os.getenv("TEST_DB_NAME", "netraven_test")
+        # Use the same database credentials as the main application
+        DB_USER = os.getenv("POSTGRES_USER", "netraven")
+        DB_PASS = os.getenv("POSTGRES_PASSWORD", "netraven")
+        DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+        DB_NAME = os.getenv("POSTGRES_DB", "netraven")
         
         # Create the PostgreSQL URL
         SQLALCHEMY_DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
         
         # Log the database connection string (without credentials)
-        print(f"Connecting to PostgreSQL at {DB_HOST}:{DB_PORT}/{DB_NAME}")
+        print(f"Test database: Connecting to PostgreSQL at {DB_HOST}:{DB_PORT}/{DB_NAME}")
         
         # Create the engine with proper pooling setup
-        # Using default pool instead of NullPool which causes issues with async code
         engine = create_async_engine(
             SQLALCHEMY_DATABASE_URL,
             poolclass=None,  # Default pool

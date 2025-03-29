@@ -29,20 +29,18 @@ from netraven.web.models.device import Device
 @pytest.fixture
 async def async_db_session():
     """Create an async database session for testing."""
-    # Get PostgreSQL connection details from environment or use defaults for testing
-    DB_USER = os.getenv("TEST_DB_USER", "postgres")
-    DB_PASS = os.getenv("TEST_DB_PASS", "postgres") 
-    
-    # Check if we're running in Docker by looking for container-specific environment variables
-    # In Docker, we should connect to the postgres service by its service name
+    # In Docker, we need to use the service name instead of localhost
     if os.getenv("SERVICE_TYPE") == "api" or os.getenv("POSTGRES_HOST"):
-        print("Detected Docker environment, using 'postgres' as database host")
-        DB_HOST = os.getenv("TEST_DB_HOST", "postgres")
+        print("Scheduler Test: Detected Docker environment, using 'postgres' as database host")
+        DB_HOST = "postgres"
     else:
-        DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+        DB_HOST = "localhost"
         
-    DB_PORT = os.getenv("TEST_DB_PORT", "5432")
-    DB_NAME = os.getenv("TEST_DB_NAME", "netraven_test_scheduler")
+    # Use the same database credentials as the main application
+    DB_USER = os.getenv("POSTGRES_USER", "netraven")
+    DB_PASS = os.getenv("POSTGRES_PASSWORD", "netraven")
+    DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+    DB_NAME = os.getenv("POSTGRES_DB", "netraven")
     
     # Create PostgreSQL database URL
     DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"

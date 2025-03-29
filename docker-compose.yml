@@ -48,12 +48,6 @@ services:
       POSTGRES_USER: netraven
       POSTGRES_PASSWORD: netraven
       POSTGRES_DB: netraven
-      # Test database configuration
-      TEST_DB_USER: netraven
-      TEST_DB_PASS: netraven
-      TEST_DB_HOST: postgres
-      TEST_DB_PORT: 5432
-      TEST_DB_NAME: netraven
       TOKEN_SECRET_KEY: ${TOKEN_SECRET_KEY:-netraven-dev-secret-key}
       TOKEN_EXPIRY_HOURS: ${TOKEN_EXPIRY_HOURS:-24}
       NETRAVEN_ENV: ${NETRAVEN_ENV:-prod}
