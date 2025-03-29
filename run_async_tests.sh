@@ -13,11 +13,7 @@ export DB_ASYNC=1
 echo "Running async tests..."
 
 # Run the tests
-PYTHONPATH=. pytest -v ./tests/test_async_*.py \
-  --asyncio-mode=auto \
-  --junitxml=./test-reports/junit-async.xml \
-  --html=./test-reports/report-async.html \
-  --self-contained-html
+PYTHONPATH=. pytest -v ./tests/test_async_*.py
 
 # Get the exit code
 EXIT_CODE=$?
