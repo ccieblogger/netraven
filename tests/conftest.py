@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy import delete
+import uuid
 
 # Add the parent directory to the path so we can import the application
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -164,8 +165,18 @@ if DATABASE_IMPORTS_AVAILABLE:
         """Clean up test data after each test."""
         yield
         # Clean up all test data
-        for model in [User, Device, Backup, JobLog, ScheduledJob]:
+        # Order is important to avoid foreign key constraint violations
+        # First clean up tables with foreign keys
+        for model in [ScheduledJob, JobLog, Backup]:
             await db_session.execute(delete(model))
+        await db_session.commit()
+        
+        # Then clean up Device which depends on User
+        await db_session.execute(delete(Device))
+        await db_session.commit()
+        
+        # Finally clean up User
+        await db_session.execute(delete(User))
         await db_session.commit()
 
     @pytest.fixture
@@ -198,17 +209,19 @@ if DATABASE_IMPORTS_AVAILABLE:
     @pytest.fixture
     async def test_device_data():
         """Create test device data."""
+        # Create admin user ID for owner_id
+        owner_id = str(uuid.uuid4())
+        
         return {
-            "name": "Test Device",
             "hostname": "test.example.com",
             "ip_address": "192.168.1.1",
             "device_type": "cisco_ios",
-            "protocol": "ssh",
             "port": 22,
             "username": "admin",
             "password": "password",
-            "enable_password": "enable",
-            "tags": ["test", "cisco"]
+            "description": "Test device",
+            "enabled": True,
+            "owner_id": owner_id  # Required foreign key
         }
 
     @pytest.fixture
@@ -229,7 +242,7 @@ if DATABASE_IMPORTS_AVAILABLE:
             "username": "testuser",
             "email": "test@example.com",
             "full_name": "Test User",
-            "password": "testpass",
+            "password_hash": "hashed_password",  # Changed from password to password_hash
             "is_active": True,
             "is_admin": False
         }
@@ -241,7 +254,7 @@ if DATABASE_IMPORTS_AVAILABLE:
             "username": "admin",
             "email": "admin@example.com",
             "full_name": "Admin User",
-            "password": "adminpass",
+            "password_hash": "hashed_admin_password",  # Changed from password to password_hash
             "is_active": True,
             "is_admin": True
         }
@@ -265,9 +278,13 @@ if DATABASE_IMPORTS_AVAILABLE:
         return admin
 
     @pytest.fixture
-    async def test_device(db_session, test_device_data):
-        """Create a test device."""
-        device = Device(**test_device_data)
+    async def test_device(db_session, test_device_data, test_user):
+        """Create a test device with a valid owner."""
+        # Use the test_user for the owner_id
+        device_data = test_device_data.copy()
+        device_data["owner_id"] = test_user.id
+        
+        device = Device(**device_data)
         db_session.add(device)
         await db_session.commit()
         await db_session.refresh(device)
@@ -303,6 +320,43 @@ if DATABASE_IMPORTS_AVAILABLE:
             
         # Clear the dependency override
         app.dependency_overrides = {}
+
+    @pytest.fixture
+    async def test_backup_device(db_session, test_user):
+        """Create a test device for backup tests."""
+        device = Device(
+            hostname="backup-test.example.com",
+            ip_address="192.168.1.10",
+            device_type="cisco_ios",
+            port=22,
+            username="admin",
+            password="password",
+            description="Test device for backups",
+            enabled=True,
+            owner_id=test_user.id
+        )
+        db_session.add(device)
+        await db_session.commit()
+        await db_session.refresh(device)
+        return device
+
+    @pytest.fixture
+    async def test_backup(db_session, test_backup_device):
+        """Create a test backup."""
+        backup = Backup(
+            version="1.0",
+            file_path="/backups/test.cfg",
+            file_size=1024,
+            status="complete",
+            comment="Test backup",
+            content_hash="abcdef1234567890",
+            is_automatic=True,
+            device_id=test_backup_device.id
+        )
+        db_session.add(backup)
+        await db_session.commit()
+        await db_session.refresh(backup)
+        return backup
 
 # Test client factories
 @pytest.fixture
@@ -524,7 +578,6 @@ def regular_user_token(app_config, api_token):
     headers = {"Authorization": f"Bearer {api_token}"}
     
     # Create a regular user
-    import uuid
     username = f"test-regular-{uuid.uuid4().hex[:8]}"
     
     user_data = {

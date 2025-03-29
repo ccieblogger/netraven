@@ -75,10 +75,18 @@ class TestAsyncDatabaseConfiguration:
         """Test that multiple async queries can be executed concurrently."""
         # Create test data
         user = User(**test_user_data)
-        device = Device(**test_device_data)
         
-        # Add test data
+        # Add user first and get ID for device owner_id
         db_session.add(user)
+        await db_session.commit()
+        await db_session.refresh(user)
+        
+        # Now create device with user's ID
+        device_data = test_device_data.copy()
+        device_data["owner_id"] = user.id
+        device = Device(**device_data)
+        
+        # Add device
         db_session.add(device)
         await db_session.commit()
         
@@ -91,7 +99,7 @@ class TestAsyncDatabaseConfiguration:
             
         async def get_device():
             result = await db_session.execute(
-                select(Device).where(Device.name == test_device_data["name"])
+                select(Device).where(Device.hostname == device_data["hostname"])
             )
             return result.scalars().first()
             
@@ -102,7 +110,7 @@ class TestAsyncDatabaseConfiguration:
         assert user_result is not None
         assert user_result.username == test_user_data["username"]
         assert device_result is not None
-        assert device_result.name == test_device_data["name"]
+        assert device_result.hostname == device_data["hostname"]
 
     @pytest.mark.asyncio
     async def test_connection_pool_behavior(self, test_db):

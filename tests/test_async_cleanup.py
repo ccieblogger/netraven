@@ -46,24 +46,27 @@ class TestAsyncCleanupMechanisms:
         assert count == 0, f"Expected user count to be 0, but got {count}"
 
     @pytest.mark.asyncio
-    async def test_explicit_cleanup(self, db_session, test_device_data):
+    async def test_explicit_cleanup(self, db_session, test_device_data, test_user):
         """Test explicit cleanup of test data."""
-        # Add a device
-        device = Device(**test_device_data)
+        # Add a device with a valid owner
+        device_data = test_device_data.copy()
+        device_data["owner_id"] = test_user.id
+        
+        device = Device(**device_data)
         db_session.add(device)
         await db_session.commit()
         
         # Verify the device was added
-        result = await db_session.execute(select(Device).where(Device.name == test_device_data["name"]))
+        result = await db_session.execute(select(Device).where(Device.hostname == device_data["hostname"]))
         device = result.scalars().first()
         assert device is not None
         
         # Explicitly clean up
-        await db_session.execute(delete(Device).where(Device.name == test_device_data["name"]))
+        await db_session.execute(delete(Device).where(Device.hostname == device_data["hostname"]))
         await db_session.commit()
         
         # Verify the device was deleted
-        result = await db_session.execute(select(Device).where(Device.name == test_device_data["name"]))
+        result = await db_session.execute(select(Device).where(Device.hostname == device_data["hostname"]))
         device = result.scalars().first()
         assert device is None
 
@@ -130,7 +133,7 @@ class TestAsyncCleanupMechanisms:
                 username=f"testuser{i}",
                 email=f"test{i}@example.com",
                 full_name=f"Test User {i}",
-                password="testpass",
+                password_hash="hashed_password",
                 is_active=True,
                 is_admin=False
             )
