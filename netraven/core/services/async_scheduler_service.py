@@ -13,6 +13,8 @@ from enum import Enum
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+import calendar
+import time
 
 from netraven.web.database import get_async_session
 from netraven.web.models.scheduled_job import ScheduledJob
@@ -24,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class JobStatus(Enum):
     """Enumeration of possible job states."""
+    CREATED = "created"
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -31,48 +34,55 @@ class JobStatus(Enum):
     CANCELED = "canceled"
 
 class Job:
-    """
-    Representation of a scheduled job.
-    
-    This class provides a standardized structure for jobs,
-    including metadata like type, parameters, and scheduling information.
-    """
+    """Job data class for the async scheduler."""
     
     def __init__(
         self,
         job_id: str,
         job_type: str,
-        parameters: Dict[str, Any],
+        parameters: Dict[str, Any] = None,
         device_id: Optional[str] = None,
-        status: JobStatus = JobStatus.QUEUED,
+        priority: int = 0,
+        status: JobStatus = JobStatus.CREATED,
         created_at: Optional[datetime] = None,
         scheduled_for: Optional[datetime] = None,
         started_at: Optional[datetime] = None,
-        completed_at: Optional[datetime] = None
+        completed_at: Optional[datetime] = None,
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+        recurrence: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize a job.
         
         Args:
             job_id: Unique ID for the job
-            job_type: Type of job (e.g., backup, command_execution)
-            parameters: Job parameters
-            device_id: ID of the device the job is running on
-            status: Current job status
+            job_type: Type of job (e.g., backup, command)
+            parameters: Job-specific parameters
+            device_id: ID of device job operates on
+            priority: Priority level (lower value = higher priority)
+            status: Current status of the job
             created_at: When the job was created
-            scheduled_for: When the job is scheduled to run
+            scheduled_for: When to execute the job
             started_at: When the job started running
             completed_at: When the job completed
+            result: Result of the job execution
+            error: Error message from the job execution
+            recurrence: Recurrence pattern for repeating jobs
         """
         self.job_id = job_id
         self.job_type = job_type
-        self.parameters = parameters
+        self.parameters = parameters or {}
         self.device_id = device_id
+        self.priority = priority
         self.status = status
         self.created_at = created_at or datetime.utcnow()
         self.scheduled_for = scheduled_for or self.created_at
         self.started_at = started_at
         self.completed_at = completed_at
+        self.recurrence = recurrence
+        self.result = result
+        self.error = error
     
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -143,43 +153,53 @@ class AsyncSchedulerService:
     
     def __init__(
         self,
-        job_logging_service: Optional[AsyncJobLoggingService] = None,
-        db_session: Optional[AsyncSession] = None
+        db_session: Optional[AsyncSession] = None,
+        job_queue_threshold: int = 100,
+        job_logging_service: Optional[Any] = None,
+        device_comm_service: Optional[Any] = None
     ):
         """
         Initialize the scheduler service.
         
         Args:
-            job_logging_service: Job logging service instance
-            db_session: Optional database session to use
+            db_session: Optional database session
+            job_queue_threshold: Maximum number of jobs to keep in memory
+            job_logging_service: Optional service for logging job events
+            device_comm_service: Optional service for device communication
         """
-        self.job_logging_service = job_logging_service
         self._db_session = db_session
-        self._active_jobs: Dict[str, Job] = {}
-        self._job_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+        self._job_queue_threshold = job_queue_threshold
+        self._job_logging_service = job_logging_service
+        self._device_comm_service = device_comm_service
+        self._active_jobs = {}  # Dictionary to store active jobs by ID
+        self._execution_lock = asyncio.Lock()
         self._running = False
+        self._handlers = {}
+        self._job_queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
         self._worker_task: Optional[asyncio.Task] = None
     
     async def schedule_job(
         self,
         job_type: str,
-        parameters: Dict[str, Any],
-        device_id: Optional[str] = None,
+        parameters: Dict[str, Any] = None,
         schedule_time: Optional[datetime] = None,
-        priority: int = 0
+        device_id: Optional[str] = None,
+        priority: int = 0,
+        recurrence: Optional[Dict[str, Any]] = None
     ) -> Job:
         """
-        Schedule a new job.
+        Schedule a job for execution.
         
         Args:
-            job_type: Type of job to schedule
+            job_type: Type of job (e.g., backup, command)
             parameters: Job parameters
-            device_id: ID of the device the job will run on
-            schedule_time: When to run the job (defaults to now)
-            priority: Job priority (higher number = higher priority)
+            schedule_time: When to execute the job (default: now)
+            device_id: ID of device job operates on
+            priority: Priority level (lower value = higher priority)
+            recurrence: Recurrence pattern for repeating jobs
             
         Returns:
-            Created Job instance
+            Scheduled job object
         """
         # Create job
         job = Job(
@@ -187,29 +207,29 @@ class AsyncSchedulerService:
             job_type=job_type,
             parameters=parameters,
             device_id=device_id,
-            scheduled_for=schedule_time or datetime.utcnow()
+            priority=priority,
+            status=JobStatus.QUEUED,
+            scheduled_for=schedule_time,
+            recurrence=recurrence
         )
         
         # Add to active jobs
         self._active_jobs[job.job_id] = job
         
-        # Add to job queue
-        await self._job_queue.put((-priority, job.scheduled_for.timestamp(), job))
+        # Add to priority queue
+        # Priority is calculated as: (job.priority, timestamp)
+        # This ensures that jobs with same priority are ordered by time
+        priority_tuple = (job.priority, time.time())
+        await self._job_queue.put((priority_tuple, job))
         
         # Log job creation
-        if self.job_logging_service:
-            await self.job_logging_service.log_entry(
+        if self._job_logging_service:
+            await self._job_logging_service.log_entry(
                 job_id=job.job_id,
                 message=f"Scheduled job: {job_type}",
-                category="job_lifecycle",
-                details={
-                    "device_id": device_id,
-                    "parameters": parameters,
-                    "scheduled_for": job.scheduled_for.isoformat()
-                }
+                category="job_lifecycle"
             )
         
-        logger.info(f"Scheduled job {job.job_id} (type: {job_type})")
         return job
     
     async def execute_job(self, job: Job) -> Dict[str, Any]:
@@ -228,8 +248,8 @@ class AsyncSchedulerService:
             job.started_at = datetime.utcnow()
             
             # Log job start
-            if self.job_logging_service:
-                await self.job_logging_service.log_entry(
+            if self._job_logging_service:
+                await self._job_logging_service.log_entry(
                     job_id=job.job_id,
                     message=f"Started job execution: {job.job_type}",
                     category="job_lifecycle"
@@ -254,8 +274,8 @@ class AsyncSchedulerService:
                 job.error = result["error"]
             
             # Log job completion
-            if self.job_logging_service:
-                await self.job_logging_service.log_entry(
+            if self._job_logging_service:
+                await self._job_logging_service.log_entry(
                     job_id=job.job_id,
                     message=f"Job execution {'completed' if success else 'failed'}: {job.job_type}",
                     level="INFO" if success else "ERROR",
@@ -272,8 +292,8 @@ class AsyncSchedulerService:
             job.error = str(e)
             
             # Log error
-            if self.job_logging_service:
-                await self.job_logging_service.log_entry(
+            if self._job_logging_service:
+                await self._job_logging_service.log_entry(
                     job_id=job.job_id,
                     message=f"Job execution failed: {str(e)}",
                     level="ERROR",
@@ -421,11 +441,32 @@ class AsyncSchedulerService:
         Returns:
             Dictionary with job status information, or None if not found
         """
-        if job_id not in self._active_jobs:
+        if not hasattr(self, '_active_jobs') or job_id not in self._active_jobs:
             return None
         
         job = self._active_jobs[job_id]
-        return job.to_dict()
+        status = {
+            "id": job.job_id,
+            "job_type": job.job_type,
+            "status": job.status.value if isinstance(job.status, JobStatus) else job.status,
+            "device_id": job.device_id,
+            "created_at": job.created_at.isoformat() if job.created_at else None,
+            "scheduled_for": job.scheduled_for.isoformat() if job.scheduled_for else None,
+            "started_at": job.started_at.isoformat() if job.started_at else None,
+            "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+            "parameters": job.parameters
+        }
+        
+        # Include result if available
+        if job.result:
+            status["result"] = job.result
+            
+        # Include error details for failed jobs
+        if (job.status == JobStatus.FAILED or 
+            (isinstance(job.status, str) and job.status.lower() == "failed")) and job.error:
+            status["error"] = job.error
+            
+        return status
     
     async def cancel_job(self, job_id: str) -> bool:
         """
@@ -451,8 +492,8 @@ class AsyncSchedulerService:
         job.completed_at = datetime.utcnow()
         
         # Log cancellation
-        if self.job_logging_service:
-            await self.job_logging_service.log_entry(
+        if self._job_logging_service:
+            await self._job_logging_service.log_entry(
                 job_id=job.job_id,
                 message="Job canceled",
                 category="job_lifecycle"
@@ -503,4 +544,118 @@ class AsyncSchedulerService:
                 self._job_queue.task_done()
             except Exception as e:
                 logger.exception(f"Error processing job: {e}")
-                await asyncio.sleep(1)  # Wait before retrying 
+                await asyncio.sleep(1)  # Wait before retrying
+
+    def _calculate_next_execution(self, recurrence_pattern: Dict[str, Any], base_time: Optional[datetime] = None) -> datetime:
+        """
+        Calculate the next execution time based on a recurrence pattern.
+        
+        Args:
+            recurrence_pattern: Dictionary with recurrence rules
+            base_time: Time to calculate from (defaults to now)
+            
+        Returns:
+            Next execution time
+        """
+        if base_time is None:
+            base_time = datetime.utcnow()
+            
+        pattern_type = recurrence_pattern.get("type", "daily")
+        
+        if pattern_type == "minutely":
+            interval = recurrence_pattern.get("interval", 60)  # Default to 60 minutes
+            return base_time + timedelta(minutes=interval)
+        elif pattern_type == "hourly":
+            interval = recurrence_pattern.get("interval", 1)  # Default to 1 hour
+            return base_time + timedelta(hours=interval)
+        elif pattern_type == "daily":
+            interval = recurrence_pattern.get("interval", 1)  # Default to 1 day
+            time_of_day = recurrence_pattern.get("time_of_day", "00:00")
+            
+            # Parse time of day
+            try:
+                hour, minute = map(int, time_of_day.split(':'))
+            except (ValueError, AttributeError):
+                hour, minute = 0, 0
+                
+            # Create target time for today
+            target = base_time.replace(
+                hour=hour, 
+                minute=minute, 
+                second=0,
+                microsecond=0
+            )
+            
+            # If target time already passed today, add interval days
+            if target <= base_time:
+                target += timedelta(days=interval)
+                
+            return target
+        elif pattern_type == "weekly":
+            interval = recurrence_pattern.get("interval", 1)  # Default to 1 week
+            day_of_week = recurrence_pattern.get("day_of_week", 0)  # 0 = Monday in Python
+            time_of_day = recurrence_pattern.get("time_of_day", "00:00")
+            
+            # Parse time of day
+            try:
+                hour, minute = map(int, time_of_day.split(':'))
+            except (ValueError, AttributeError):
+                hour, minute = 0, 0
+                
+            # Calculate days until the next specified day of week
+            current_day_of_week = base_time.weekday()
+            days_until_next = (day_of_week - current_day_of_week) % 7
+            
+            if days_until_next == 0:
+                # Same day, check if time already passed
+                target = base_time.replace(
+                    hour=hour, 
+                    minute=minute, 
+                    second=0,
+                    microsecond=0
+                )
+                
+                if target <= base_time:
+                    days_until_next = 7 * interval
+            else:
+                days_until_next = days_until_next + (7 * (interval - 1))
+                
+            return (base_time + timedelta(days=days_until_next)).replace(
+                hour=hour, 
+                minute=minute, 
+                second=0,
+                microsecond=0
+            )
+        elif pattern_type == "monthly":
+            interval = recurrence_pattern.get("interval", 1)  # Default to 1 month
+            day_of_month = recurrence_pattern.get("day_of_month", 1)
+            time_of_day = recurrence_pattern.get("time_of_day", "00:00")
+            
+            # Parse time of day
+            try:
+                hour, minute = map(int, time_of_day.split(':'))
+            except (ValueError, AttributeError):
+                hour, minute = 0, 0
+                
+            target_month = base_time.month + interval
+            target_year = base_time.year
+            
+            # Handle month overflow
+            while target_month > 12:
+                target_month -= 12
+                target_year += 1
+                
+            # Handle day of month (cap at max days in the month)
+            _, last_day = calendar.monthrange(target_year, target_month)
+            target_day = min(day_of_month, last_day)
+            
+            return datetime(
+                year=target_year,
+                month=target_month,
+                day=target_day,
+                hour=hour,
+                minute=minute
+            )
+        else:
+            # Unsupported pattern type, default to daily
+            return base_time + timedelta(days=1) 

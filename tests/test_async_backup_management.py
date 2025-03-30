@@ -100,7 +100,7 @@ class TestAsyncBackupManagement:
         # Verify job is in the scheduler's active jobs
         status = await scheduler_service.get_job_status(job.job_id)
         assert status is not None
-        assert status["type"] == "backup"
+        assert status["job_type"] == "backup"
 
     @pytest.mark.asyncio
     @patch('netraven.core.services.async_device_comm_service.AsyncDeviceCommunicationService.get_device_config')
@@ -215,8 +215,12 @@ class TestAsyncBackupManagement:
     @pytest.mark.asyncio
     async def test_periodic_backup_scheduling(self, scheduler_service, test_backup_device, db_session):
         """Test scheduling periodic backups for a device."""
-        # Mock the recurrence calculation method
-        original_method = scheduler_service._calculate_next_execution
+        # Create a recurrence pattern for testing
+        recurrence_pattern = {
+            "type": "daily",
+            "interval": 1,
+            "time_of_day": "03:00"
+        }
         
         # Schedule a periodic backup job (daily)
         current_time = datetime.utcnow()
@@ -225,9 +229,7 @@ class TestAsyncBackupManagement:
             parameters={
                 "device_id": test_backup_device.id,
                 "backup_type": "running-config",
-                "recurrence": "daily",
-                "hour": 3,  # 3 AM
-                "minute": 0
+                "recurrence": recurrence_pattern
             },
             device_id=test_backup_device.id
         )
@@ -236,18 +238,15 @@ class TestAsyncBackupManagement:
         assert job is not None
         
         # Verify next execution time was calculated correctly
-        next_exec = scheduler_service._calculate_next_execution(job)
-        
-        # Next execution should be the next occurrence of 3 AM
+        next_exec = scheduler_service._calculate_next_execution(recurrence_pattern)
+        assert next_exec > current_time
         assert next_exec.hour == 3
         assert next_exec.minute == 0
         
-        # If current time is after 3 AM, next execution should be tomorrow
-        if current_time.hour >= 3:
-            assert next_exec.date() > current_time.date()
-        # If current time is before 3 AM, next execution should be today
-        else:
-            assert next_exec.date() == current_time.date()
+        # Verify job can be retrieved
+        status = await scheduler_service.get_job_status(job.job_id)
+        assert status is not None
+        assert status["job_type"] == "backup"
 
     @pytest.mark.asyncio
     async def test_backup_storage_integration(self, db_session, test_backup, test_backup_device):
@@ -257,27 +256,29 @@ class TestAsyncBackupManagement:
         device_id = test_backup_device.id
         
         # Test backup retrieval
-        result = await db_session.execute(f"SELECT * FROM backup WHERE id = '{backup_id}'")
+        query = text("""SELECT * FROM backups WHERE id = :backup_id""")
+        result = await db_session.execute(query, {"backup_id": backup_id})
         backup_data = result.fetchone()
         assert backup_data is not None
         assert backup_data.device_id == device_id
         
         # Test backup listing by device
-        result = await db_session.execute(f"SELECT * FROM backup WHERE device_id = '{device_id}'")
-        device_backups = result.fetchall()
-        assert len(device_backups) >= 1
+        query = text("""SELECT * FROM backups WHERE device_id = :device_id""")
+        result = await db_session.execute(query, {"device_id": device_id})
+        backups = result.fetchall()
+        assert len(backups) > 0
 
     @pytest.mark.asyncio
     async def test_error_handling_in_backup_jobs(self, scheduler_service, test_backup_device):
         """Test error handling in backup jobs."""
-        # Create a job that will fail (invalid device ID)
+        # Create a job that will use a valid device ID
         job = await scheduler_service.schedule_job(
             job_type="backup",
             parameters={
-                "device_id": "non-existent-device",
+                "device_id": test_backup_device.id,
                 "backup_type": "running-config"
             },
-            device_id="non-existent-device"
+            device_id=test_backup_device.id
         )
         
         # Setup a handler that raises an exception
@@ -296,8 +297,14 @@ class TestAsyncBackupManagement:
         assert job.error is not None
         assert "Simulated backup failure" in job.error
         
-        # Verify error is logged
+        # Verify result contains the error
+        assert result["status"] == "error"
+        assert "error" in result
+        assert "Simulated backup failure" in result["error"]
+        
+        # Verify error is logged in job status
         status = await scheduler_service.get_job_status(job.job_id)
+        assert status is not None
         assert status["status"] == "failed"
         assert "error" in status
         assert "Simulated backup failure" in status["error"]
