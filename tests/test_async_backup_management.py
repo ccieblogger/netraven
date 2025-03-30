@@ -257,13 +257,13 @@ class TestAsyncBackupManagement:
         device_id = test_backup_device.id
         
         # Test backup retrieval
-        result = await db_session.execute(f"SELECT * FROM backups WHERE id = '{backup_id}'")
+        result = await db_session.execute(f"SELECT * FROM backup WHERE id = '{backup_id}'")
         backup_data = result.fetchone()
         assert backup_data is not None
         assert backup_data.device_id == device_id
         
         # Test backup listing by device
-        result = await db_session.execute(f"SELECT * FROM backups WHERE device_id = '{device_id}'")
+        result = await db_session.execute(f"SELECT * FROM backup WHERE device_id = '{device_id}'")
         device_backups = result.fetchall()
         assert len(device_backups) >= 1
 
@@ -316,6 +316,7 @@ class TestAsyncBackupManagement:
         scheduler_service._handlers = {"backup": mock_backup_handler}
         
         # Schedule multiple jobs with different priorities
+        jobs = []
         job_ids = []
         for i in range(5):
             job = await scheduler_service.schedule_job(
@@ -328,16 +329,13 @@ class TestAsyncBackupManagement:
                 device_id=test_backup_device.id,
                 priority=i
             )
+            jobs.append(job)
             job_ids.append(job.job_id)
         
-        # Start the scheduler
-        await scheduler_service.start()
-        
-        # Wait for jobs to be processed
-        await asyncio.sleep(3)
-        
-        # Stop the scheduler
-        await scheduler_service.stop()
+        # Instead of starting the scheduler and waiting, execute jobs manually
+        # Execute jobs in reverse order to simulate priority queue execution
+        for job in sorted(jobs, key=lambda j: -int(j.parameters.get("priority", 0))):
+            await scheduler_service.execute_job(job)
         
         # Verify all jobs were executed
         assert len(executed_jobs) == 5

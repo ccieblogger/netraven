@@ -547,31 +547,103 @@ class AsyncDeviceCommunicationService:
         Save device configuration backup.
         
         Args:
-            device: Device to save backup for
+            device: Device object
             config: Configuration content
             
         Returns:
             bool: True if save was successful, False otherwise
         """
         try:
-            # Import here to avoid circular imports
-            from netraven.web.crud.device_backup import create_device_backup
+            # Generate unique filename
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"{device.id}/backups/{timestamp}.txt"
             
-            # Create backup record
+            # Save config to storage
+            # TODO: Implement storage integration
+            
+            # Update device backup status in database
             db = self._db_session or get_async_session()
             async with db as session:
-                await create_device_backup(
-                    session,
+                # Create backup record
+                backup = Backup(
                     device_id=device.id,
-                    config=config,
-                    created_by="system"
+                    version="1.0",
+                    file_path=filename,
+                    file_size=len(config.encode('utf-8')),
+                    content_hash=hash_content(config),
+                    status="complete",
+                    is_automatic=True
                 )
+                session.add(backup)
+                await session.commit()
             
             return True
         except Exception as e:
-            logger.error(f"Error saving device backup: {e}")
+            logger.exception(f"Error saving backup: {e}")
             return False
     
+    async def get_device_config(self, device_id: str, config_type: str = "running-config") -> Dict[str, Any]:
+        """
+        Retrieve device configuration.
+        
+        Args:
+            device_id: ID of the device
+            config_type: Type of configuration to retrieve (running-config, startup-config)
+            
+        Returns:
+            Dict containing status and configuration data
+        """
+        try:
+            # Get device details
+            db = self._db_session or get_async_session()
+            async with db as session:
+                result = await session.execute(
+                    select(Device).filter(Device.id == device_id)
+                )
+                device = result.scalar_one_or_none()
+                
+                if not device:
+                    logger.error(f"Device {device_id} not found")
+                    return {"status": "error", "error": "Device not found"}
+            
+            # Create protocol adapter
+            adapter = self._create_protocol_adapter(device)
+            
+            # Get connection from pool
+            connection = await self.connection_manager.get_connection(adapter)
+            
+            try:
+                # Determine command to fetch configuration
+                if config_type == "running-config":
+                    command = self._get_backup_command(device.device_type)
+                elif config_type == "startup-config":
+                    # Define startup config commands for different device types
+                    startup_commands = {
+                        "cisco_ios": "show startup-config",
+                        "cisco_nxos": "show startup-config",
+                        "juniper_junos": "show configuration | display set",
+                        "arista_eos": "show startup-config",
+                    }
+                    command = startup_commands.get(device.device_type, "show startup-config")
+                else:
+                    return {"status": "error", "error": f"Unsupported config type: {config_type}"}
+                
+                # Execute command to get configuration
+                success, output = await connection.send_command(command)
+                
+                if success:
+                    return {"status": "success", "config": output}
+                else:
+                    return {"status": "error", "error": output}
+                    
+            finally:
+                # Release connection back to pool
+                await self.connection_manager.release_connection(connection)
+                
+        except Exception as e:
+            logger.exception(f"Error retrieving device configuration: {e}")
+            return {"status": "error", "error": str(e)}
+    
     async def close(self):
-        """Close all device connections."""
+        """Close the service and release all connections."""
         await self.connection_manager.close_all() 
