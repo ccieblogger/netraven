@@ -11,7 +11,7 @@ import asyncio
 import os
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock, AsyncMock
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from netraven.core.backup import hash_content
 from netraven.web.models.backup import Backup
@@ -170,9 +170,9 @@ class TestAsyncBackupManagement:
         
         # Query the database for the backup
         result_backup_id = result["backup_id"]
-        query = """
-        SELECT * FROM backup WHERE id = :backup_id
-        """
+        query = text("""
+        SELECT * FROM backups WHERE id = :backup_id
+        """)
         result = await db_session.execute(query, {"backup_id": result_backup_id})
         backup = result.fetchone()
         

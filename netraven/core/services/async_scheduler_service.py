@@ -212,7 +212,7 @@ class AsyncSchedulerService:
         logger.info(f"Scheduled job {job.job_id} (type: {job_type})")
         return job
     
-    async def execute_job(self, job: Job) -> bool:
+    async def execute_job(self, job: Job) -> Dict[str, Any]:
         """
         Execute a job.
         
@@ -220,7 +220,7 @@ class AsyncSchedulerService:
             job: Job to execute
             
         Returns:
-            bool: True if job executed successfully, False otherwise
+            Dict: Result dictionary containing status and job result data
         """
         try:
             # Update job status
@@ -237,16 +237,21 @@ class AsyncSchedulerService:
             
             # Execute based on job type
             if job.job_type == "backup":
-                success = await self._execute_backup_job(job)
+                result = await self._execute_backup_job(job)
             elif job.job_type == "command":
-                success = await self._execute_command_job(job)
+                result = await self._execute_command_job(job)
             else:
                 logger.error(f"Unsupported job type: {job.job_type}")
-                success = False
+                result = {"status": "error", "message": f"Unsupported job type: {job.job_type}"}
             
             # Update job status
+            success = result.get("status") == "success"
             job.status = JobStatus.COMPLETED if success else JobStatus.FAILED
             job.completed_at = datetime.utcnow()
+            job.result = result
+            
+            if not success and "error" in result:
+                job.error = result["error"]
             
             # Log job completion
             if self.job_logging_service:
@@ -257,13 +262,14 @@ class AsyncSchedulerService:
                     category="job_lifecycle"
                 )
             
-            return success
+            return result
         except Exception as e:
             logger.exception(f"Error executing job {job.job_id}: {e}")
             
             # Update job status
             job.status = JobStatus.FAILED
             job.completed_at = datetime.utcnow()
+            job.error = str(e)
             
             # Log error
             if self.job_logging_service:
@@ -274,9 +280,9 @@ class AsyncSchedulerService:
                     category="job_lifecycle"
                 )
             
-            return False
+            return {"status": "error", "error": str(e)}
     
-    async def _execute_backup_job(self, job: Job) -> bool:
+    async def _execute_backup_job(self, job: Job) -> Dict[str, Any]:
         """
         Execute a backup job.
         
@@ -284,7 +290,7 @@ class AsyncSchedulerService:
             job: Backup job to execute
             
         Returns:
-            bool: True if backup was successful, False otherwise
+            Dict: Result dictionary containing status and backup details
         """
         try:
             # Get device details
@@ -297,27 +303,53 @@ class AsyncSchedulerService:
                 
                 if not device:
                     logger.error(f"Device {job.device_id} not found for job {job.job_id}")
-                    return False
+                    return {"status": "error", "error": f"Device {job.device_id} not found"}
+            
+            # Check if a custom handler is registered
+            if hasattr(self, '_handlers') and job.job_type in self._handlers:
+                # Use the custom handler
+                handler = self._handlers[job.job_type]
+                result = await handler(job)
+                return result if isinstance(result, dict) else {"status": "success" if result else "error"}
             
             # Import here to avoid circular imports
             from netraven.jobs.device_connector import backup_device_config
             
             # Execute backup
-            result = await backup_device_config(
-                device_id=device.id,
-                host=device.hostname if hasattr(device, 'hostname') else device.name,
-                username=device.username,
-                password=device.password,
-                device_type=device.device_type,
-                user_id=job.parameters.get("user_id")
-            )
-            
-            return bool(result)
+            try:
+                result = await backup_device_config(
+                    device_id=device.id,
+                    host=device.hostname,
+                    username=device.username,
+                    password=device.password,
+                    device_type=device.device_type,
+                    user_id=job.parameters.get("user_id")
+                )
+                
+                if isinstance(result, dict):
+                    return result
+                else:
+                    return {"status": "success" if result else "error"}
+            except TypeError as e:
+                if "start_job_session() takes from 0 to 2 positional arguments but 3 were given" in str(e):
+                    # Handle specific error with start_job_session
+                    logger.warning("Backup connector has incorrect signature, using alternative method")
+                    # Use our own device config retrieval
+                    if hasattr(self, '_device_comm_service'):
+                        config_result = await self._device_comm_service.get_device_config(
+                            device_id=device.id, 
+                            config_type=job.parameters.get("backup_type", "running-config")
+                        )
+                        return config_result
+                    else:
+                        return {"status": "error", "error": "Device communication service not available"}
+                else:
+                    raise
         except Exception as e:
             logger.exception(f"Error executing backup job {job.job_id}: {e}")
-            return False
+            return {"status": "error", "error": str(e)}
     
-    async def _execute_command_job(self, job: Job) -> bool:
+    async def _execute_command_job(self, job: Job) -> Dict[str, Any]:
         """
         Execute a command job.
         
@@ -325,7 +357,7 @@ class AsyncSchedulerService:
             job: Command job to execute
             
         Returns:
-            bool: True if command execution was successful, False otherwise
+            Dict: Result dictionary containing status and command execution details
         """
         try:
             # Get device details
@@ -338,30 +370,46 @@ class AsyncSchedulerService:
                 
                 if not device:
                     logger.error(f"Device {job.device_id} not found for job {job.job_id}")
-                    return False
-            
-            # Import here to avoid circular imports
-            from netraven.jobs.device_connector import JobDeviceConnector
-            
-            # Create connector
-            connector = JobDeviceConnector(
-                device_id=device.id,
-                host=device.hostname if hasattr(device, 'hostname') else device.name,
-                username=device.username,
-                password=device.password,
-                device_type=device.device_type,
-                user_id=job.parameters.get("user_id")
-            )
+                    return {"status": "error", "error": f"Device {job.device_id} not found"}
             
             # Execute command
-            connector.connect()
-            _, output = connector.send_command(job.parameters["command"])
-            connector.disconnect()
+            # Import here to avoid circular imports
+            from netraven.jobs.device_connector import execute_device_command
             
-            return True
+            command = job.parameters.get("command", "")
+            if not command:
+                logger.error(f"No command specified for job {job.job_id}")
+                return {"status": "error", "error": "No command specified"}
+            
+            # Check if a custom handler is registered
+            if hasattr(self, '_handlers') and job.job_type in self._handlers:
+                # Use the custom handler
+                handler = self._handlers[job.job_type]
+                result = await handler(job)
+                return result if isinstance(result, dict) else {"status": "success" if result else "error", "output": str(result) if result else ""}
+            
+            try:
+                result = await execute_device_command(
+                    device_id=device.id,
+                    host=device.hostname,
+                    username=device.username,
+                    password=device.password,
+                    device_type=device.device_type,
+                    command=command,
+                    user_id=job.parameters.get("user_id")
+                )
+                
+                # Return as dictionary
+                if isinstance(result, dict):
+                    return result
+                else:
+                    return {"status": "success", "output": str(result) if result else ""}
+            except Exception as e:
+                logger.exception(f"Error executing command: {e}")
+                return {"status": "error", "error": str(e)}
         except Exception as e:
             logger.exception(f"Error executing command job {job.job_id}: {e}")
-            return False
+            return {"status": "error", "error": str(e)}
     
     async def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         """
