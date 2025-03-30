@@ -35,7 +35,7 @@ async def async_db_session():
     print(f"Scheduler Test: Detected {'Docker' if host == 'postgres' else 'local'} environment, using '{host}' as database host")
     
     # Connect to PostgreSQL database
-    database_url = f"postgresql+asyncpg://{host}:5432/netraven"
+    database_url = f"postgresql+asyncpg://postgres:postgres@{host}:5432/netraven"
     print(f"Scheduler Test: Connecting to PostgreSQL at {host}:5432/netraven")
     
     # Create engine

@@ -86,7 +86,7 @@ if DATABASE_IMPORTS_AVAILABLE:
         print(f"Test database: Detected {'Docker' if host == 'postgres' else 'local'} environment, using '{host}' as database host")
         
         # Connect to PostgreSQL database
-        database_url = f"postgresql+asyncpg://{host}:5432/netraven"
+        database_url = f"postgresql+asyncpg://postgres:postgres@{host}:5432/netraven"
         print(f"Test database: Connecting to PostgreSQL at {host}:5432/netraven")
         
         # Create the engine
