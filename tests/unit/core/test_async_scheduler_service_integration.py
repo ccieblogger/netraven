@@ -11,6 +11,7 @@ import pytest
 import uuid
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
+import os
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -23,19 +24,22 @@ from netraven.core.services.async_scheduler_service import (
 from netraven.core.services.async_job_logging_service import AsyncJobLoggingService
 from netraven.web.models.scheduled_job import ScheduledJob
 from netraven.web.models.device import Device
+from netraven.web.models.user import User
 
 
 @pytest.fixture
 async def async_db_session():
     """Create an async database session for testing."""
-    # Create in-memory SQLite database for testing
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    # Detect Docker environment
+    host = "postgres" if os.path.exists("/.dockerenv") else "localhost"
+    print(f"Scheduler Test: Detected {'Docker' if host == 'postgres' else 'local'} environment, using '{host}' as database host")
     
-    # Create tables
-    async with engine.begin() as conn:
-        # Import and create base
-        from netraven.web.database import Base
-        await conn.run_sync(Base.metadata.create_all)
+    # Connect to PostgreSQL database
+    database_url = f"postgresql+asyncpg://{host}:5432/netraven"
+    print(f"Scheduler Test: Connecting to PostgreSQL at {host}:5432/netraven")
+    
+    # Create engine
+    engine = create_async_engine(database_url)
     
     # Create async session factory
     async_session_factory = sessionmaker(
@@ -71,14 +75,34 @@ async def scheduler_service(mock_job_logging_service, async_db_session):
 
 
 @pytest.fixture
-async def test_device(async_db_session):
+async def test_user(async_db_session):
+    """Create a test user in the database."""
+    user = User(
+        id=str(uuid.uuid4()),
+        username="test-user",
+        email="test@example.com",
+        password_hash="hashed_test_password",
+        full_name="Test User",
+        is_active=True,
+        is_admin=False,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    async_db_session.add(user)
+    await async_db_session.commit()
+    return user
+
+
+@pytest.fixture
+async def test_device(async_db_session, test_user):
     """Create a test device in the database."""
     device = Device(
         id=str(uuid.uuid4()),
-        name="test-device",
-        host="192.168.1.1",
+        hostname="test-device",
+        ip_address="192.168.1.1",
         device_type="router",
-        description="Test device for integration tests"
+        description="Test device for integration tests",
+        owner_id=test_user.id
     )
     async_db_session.add(device)
     await async_db_session.commit()

@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.asyncio import NullPool
+from sqlalchemy.pool import NullPool
 from sqlalchemy import delete
 
 # Add the parent directory to the path so we can import the application
@@ -78,24 +78,22 @@ TEST_CONFIG = {
 
 # Conditionally define database fixtures only if imports are available
 if DATABASE_IMPORTS_AVAILABLE:
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="function")
     async def test_db():
-        """Create a test database."""
-        # Create a temporary file for the SQLite database
-        db_file = tempfile.NamedTemporaryFile(suffix=".db")
+        """Create a test database connection to PostgreSQL."""
+        # Detect Docker environment
+        host = "postgres" if os.path.exists("/.dockerenv") else "localhost"
+        print(f"Test database: Detected {'Docker' if host == 'postgres' else 'local'} environment, using '{host}' as database host")
         
-        # Create the SQLite URL
-        SQLALCHEMY_DATABASE_URL = f"sqlite+aiosqlite:///{db_file.name}"
+        # Connect to PostgreSQL database
+        database_url = f"postgresql+asyncpg://{host}:5432/netraven"
+        print(f"Test database: Connecting to PostgreSQL at {host}:5432/netraven")
         
         # Create the engine
         engine = create_async_engine(
-            SQLALCHEMY_DATABASE_URL,
+            database_url,
             poolclass=NullPool  # Don't pool connections for tests
         )
-        
-        # Create the tables
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
         
         # Create a session
         TestingAsyncSessionLocal = sessionmaker(
@@ -110,10 +108,7 @@ if DATABASE_IMPORTS_AVAILABLE:
         yield TestingAsyncSessionLocal, engine
         
         # Clean up
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
         await engine.dispose()
-        db_file.close()
 
     @pytest.fixture
     async def db_session(test_db):
@@ -167,16 +162,14 @@ if DATABASE_IMPORTS_AVAILABLE:
     async def test_device_data():
         """Create test device data."""
         return {
-            "name": "Test Device",
             "hostname": "test.example.com",
             "ip_address": "192.168.1.1",
             "device_type": "cisco_ios",
-            "protocol": "ssh",
             "port": 22,
             "username": "admin",
             "password": "password",
-            "enable_password": "enable",
-            "tags": ["test", "cisco"]
+            "description": "Test Device",
+            "enabled": True
         }
 
     @pytest.fixture
@@ -196,8 +189,8 @@ if DATABASE_IMPORTS_AVAILABLE:
         return {
             "username": "testuser",
             "email": "test@example.com",
+            "password_hash": "hashed_test_password",
             "full_name": "Test User",
-            "password": "testpass",
             "is_active": True,
             "is_admin": False
         }
@@ -233,9 +226,13 @@ if DATABASE_IMPORTS_AVAILABLE:
         return admin
 
     @pytest.fixture
-    async def test_device(db_session, test_device_data):
-        """Create a test device."""
-        device = Device(**test_device_data)
+    async def test_device(db_session, test_device_data, test_user):
+        """Create a test device with a valid owner."""
+        # Use the test_user for the owner_id
+        device_data = test_device_data.copy()
+        device_data["owner_id"] = test_user.id
+        
+        device = Device(**device_data)
         db_session.add(device)
         await db_session.commit()
         await db_session.refresh(device)
@@ -830,22 +827,6 @@ def test_user_data():
         "full_name": "Test User",
         "is_active": True,
         "is_superuser": False
-    }
-
-@pytest.fixture
-def test_device_data():
-    """Create test device data."""
-    return {
-        "name": "Test Device",
-        "hostname": "test.example.com",
-        "ip_address": "192.168.1.1",
-        "device_type": "cisco_ios",
-        "protocol": "ssh",
-        "port": 22,
-        "username": "admin",
-        "password": "password",
-        "enable_password": "enable",
-        "tags": ["test", "cisco"]
     }
 
 @pytest.fixture
