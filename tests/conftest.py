@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy import delete
+from sqlalchemy import text
 
 # Add the parent directory to the path so we can import the application
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -85,15 +86,27 @@ if DATABASE_IMPORTS_AVAILABLE:
         host = "postgres" if os.path.exists("/.dockerenv") else "localhost"
         print(f"Test database: Detected {'Docker' if host == 'postgres' else 'local'} environment, using '{host}' as database host")
         
-        # Connect to PostgreSQL database
-        database_url = f"postgresql+asyncpg://postgres:postgres@{host}:5432/netraven"
-        print(f"Test database: Connecting to PostgreSQL at {host}:5432/netraven")
+        # Get database credentials from environment or use defaults
+        postgres_user = os.environ.get("POSTGRES_USER", "postgres")
+        postgres_password = os.environ.get("POSTGRES_PASSWORD", "postgres")
+        postgres_db = os.environ.get("POSTGRES_DB", "netraven")
+        
+        # Connect to PostgreSQL database with credentials
+        database_url = f"postgresql+asyncpg://{postgres_user}:{postgres_password}@{host}:5432/{postgres_db}"
+        print(f"Test database: Connecting to PostgreSQL at {host}:5432/{postgres_db}")
         
         # Create the engine
         engine = create_async_engine(
             database_url,
             poolclass=NullPool  # Don't pool connections for tests
         )
+        
+        # Drop all tables and recreate them to ensure a clean database state
+        async with engine.begin() as conn:
+            print("Test database: Dropping all tables")
+            await conn.run_sync(Base.metadata.drop_all)
+            print("Test database: Creating tables")
+            await conn.run_sync(Base.metadata.create_all)
         
         # Create a session
         TestingAsyncSessionLocal = sessionmaker(
@@ -126,10 +139,25 @@ if DATABASE_IMPORTS_AVAILABLE:
     async def cleanup_test_data(db_session):
         """Clean up test data after each test."""
         yield
-        # Clean up all test data
-        for model in [User, Device, Backup, JobLog, ScheduledJob]:
-            await db_session.execute(delete(model))
-        await db_session.commit()
+        # Clean up all test data in the correct order to respect foreign key constraints
+        try:
+            print("Cleaning up test data...")
+            # First delete dependent models
+            for model in [JobLog, Backup, Device, ScheduledJob]:
+                await db_session.execute(delete(model))
+                await db_session.commit()
+            
+            # Then delete User model which other models depend on
+            await db_session.execute(delete(User))
+            await db_session.commit()
+            
+            # Verify cleanup was successful
+            user_count_result = await db_session.execute(text("SELECT COUNT(*) FROM users"))
+            user_count = user_count_result.scalar()
+            print(f"After cleanup: {user_count} users remaining")
+        except Exception as e:
+            print(f"Error during cleanup: {str(e)}")
+            await db_session.rollback()
 
     @pytest.fixture
     async def job_logging_service(db_session):
@@ -185,15 +213,19 @@ if DATABASE_IMPORTS_AVAILABLE:
 
     @pytest.fixture
     async def test_user_data():
-        """Create test user data."""
-        return {
-            "username": "testuser",
-            "email": "test@example.com",
+        """Create test user data with a unique email for each test."""
+        import uuid
+        unique_id = uuid.uuid4().hex[:8]
+        data = {
+            "username": f"testuser-{unique_id}",
+            "email": f"test-{unique_id}@example.com",
             "password_hash": "hashed_test_password",
             "full_name": "Test User",
             "is_active": True,
             "is_admin": False
         }
+        print(f"DEBUG Creating test_user_data from conftest.py fixture: {data}")
+        return data
 
     @pytest.fixture
     async def test_admin_data():
@@ -202,7 +234,7 @@ if DATABASE_IMPORTS_AVAILABLE:
             "username": "admin",
             "email": "admin@example.com",
             "full_name": "Admin User",
-            "password": "adminpass",
+            "password_hash": "hashed_admin_password",
             "is_active": True,
             "is_admin": True
         }
@@ -816,18 +848,6 @@ def mock_scheduler_service():
 def mock_device_comm_service():
     """Create a mock device communication service."""
     return MagicMock()
-
-@pytest.fixture
-def test_user_data():
-    """Create test user data."""
-    return {
-        "username": "testuser",
-        "email": "test@example.com",
-        "password": "testpassword",
-        "full_name": "Test User",
-        "is_active": True,
-        "is_superuser": False
-    }
 
 @pytest.fixture
 def test_job_data():

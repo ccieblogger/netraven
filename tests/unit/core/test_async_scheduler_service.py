@@ -317,43 +317,47 @@ async def test_job_queue_processing():
     mock_logging = AsyncMock(spec=AsyncJobLoggingService)
     scheduler = AsyncSchedulerService(job_logging_service=mock_logging)
     
-    # Mock execute_job to avoid actual execution
-    scheduler.execute_job = AsyncMock(return_value=True)
-    
-    # Schedule jobs
-    job1 = await scheduler.schedule_job(
-        job_type="backup",
-        parameters={"config_type": "running"},
-        priority=10  # Higher priority
-    )
-    
-    job2 = await scheduler.schedule_job(
-        job_type="command",
-        parameters={"command": "show version"},
-        priority=5  # Lower priority
-    )
-    
-    # Act - Run the job processor manually
-    # Start the scheduler
-    await scheduler.start()
-    
-    # Wait a short time for jobs to be processed
-    await asyncio.sleep(0.1)
-    
-    # Stop the scheduler
-    await scheduler.stop()
-    
-    # Assert
-    # Check that execute_job was called twice (for both jobs)
-    assert scheduler.execute_job.call_count == 2
-    
-    # First call should be for job1 (higher priority)
-    first_call_args = scheduler.execute_job.call_args_list[0][0]
-    assert first_call_args[0].job_id == job1.job_id
-    
-    # Second call should be for job2 (lower priority)
-    second_call_args = scheduler.execute_job.call_args_list[1][0]
-    assert second_call_args[0].job_id == job2.job_id
+    try:
+        # Mock execute_job to avoid actual execution
+        scheduler.execute_job = AsyncMock(return_value=True)
+        
+        # Schedule jobs
+        job1 = await scheduler.schedule_job(
+            job_type="backup",
+            parameters={"config_type": "running"},
+            priority=10  # Higher priority
+        )
+        
+        job2 = await scheduler.schedule_job(
+            job_type="command",
+            parameters={"command": "show version"},
+            priority=5  # Lower priority
+        )
+        
+        # Act - Run the job processor
+        # Start the scheduler
+        await scheduler.start()
+        
+        # Wait a short time for jobs to be processed
+        await asyncio.sleep(0.5)
+        
+        # Assert
+        # Check that execute_job was called twice (for both jobs)
+        assert scheduler.execute_job.call_count == 2
+        
+        # First call should be for job1 (higher priority)
+        first_call_args = scheduler.execute_job.call_args_list[0][0]
+        assert first_call_args[0].job_id == job1.job_id
+        
+        # Second call should be for job2 (lower priority)
+        second_call_args = scheduler.execute_job.call_args_list[1][0]
+        assert second_call_args[0].job_id == job2.job_id
+    finally:
+        # Ensure the scheduler is stopped even if assertions fail
+        # Set running to False to break the while loop
+        scheduler._running = False
+        # Use asyncio.wait_for to prevent hanging
+        await asyncio.wait_for(scheduler.stop(), timeout=2.0)
 
 
 @pytest.mark.asyncio

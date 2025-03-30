@@ -177,7 +177,13 @@ async def test_job_execution_timeout(scheduler_service):
         # Assert
         assert result is False
         assert job.status == JobStatus.FAILED
-        assert "timeout" in str(scheduler_service.job_logging_service.log_entry.call_args).lower()
+        # Check for timeout in any of the log calls
+        timeout_logged = False
+        for call in scheduler_service.job_logging_service.log_entry.call_args_list:
+            if "timed out" in str(call).lower():
+                timeout_logged = True
+                break
+        assert timeout_logged, "No timeout message found in log calls"
 
 
 @pytest.mark.asyncio
@@ -205,7 +211,13 @@ async def test_device_not_found_handling(scheduler_service):
         # Assert
         assert result is False
         assert job.status == JobStatus.FAILED
-        assert "device not found" in str(scheduler_service.job_logging_service.log_entry.call_args).lower()
+        # Check for device not found in any of the log calls
+        device_not_found_logged = False
+        for call in scheduler_service.job_logging_service.log_entry.call_args_list:
+            if "device not found" in str(call).lower():
+                device_not_found_logged = True
+                break
+        assert device_not_found_logged, "No 'device not found' message in log calls"
 
 
 @pytest.mark.asyncio

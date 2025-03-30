@@ -13,16 +13,24 @@ class TestAsyncCleanupMechanisms:
     @pytest.mark.asyncio
     async def test_cleanup_after_test(self, db_session, test_user_data):
         """Test that data is properly cleaned up after a test."""
+        # Debug: print test_user_data
+        print(f"DEBUG test_user_data: {test_user_data}")
+        
+        # First, verify the database is empty
+        query = text("SELECT COUNT(*) FROM users")
+        result = await db_session.execute(query)
+        initial_count = result.scalar()
+        assert initial_count == 0, f"Database should be empty, but found {initial_count} users"
+        
         # Add a user
         user = User(**test_user_data)
         db_session.add(user)
         await db_session.commit()
         
         # Verify user was added
-        query = text("SELECT COUNT(*) FROM users")
         result = await db_session.execute(query)
         count = result.scalar()
-        assert count == 1
+        assert count == 1, f"Expected 1 user but found {count}"
         
         # The cleanup fixture should automatically clean up this data after the test
 
@@ -104,16 +112,21 @@ class TestAsyncCleanupMechanisms:
         # Start a new session and transaction
         TestingAsyncSessionLocal, _ = test_db
         async with TestingAsyncSessionLocal() as session2:
-            # Roll back the transaction
-            async with session2.begin():
-                await session2.execute(text("DELETE FROM users"))
-                # This will be rolled back
-                raise Exception("Intentional exception to trigger rollback")
+            # Try to delete the users but roll back with an exception
+            try:
+                async with session2.begin():
+                    await session2.execute(text("DELETE FROM users"))
+                    # This will be rolled back
+                    raise Exception("Intentional exception to trigger rollback")
+            except Exception as e:
+                # Verify the exception message
+                assert str(e) == "Intentional exception to trigger rollback"
+                print("Caught expected exception for rollback test")
         
-        # Verify the user still exists
+        # Verify the user still exists after the rolled back deletion
         result = await db_session.execute(query)
         count = result.scalar()
-        assert count == 1  # Should still be 1, not 0
+        assert count == 1, "User should still exist after transaction rollback"
 
     @pytest.mark.asyncio
     async def test_bulk_cleanup(self, db_session, test_user_data):
