@@ -419,11 +419,37 @@ For more detailed frontend deployment instructions, see the [Frontend README](ne
 
 NetRaven includes comprehensive documentation to help you get started, understand the system architecture, and troubleshoot issues:
 
-- [Project Specifications](docs/project-specs.md): Detailed project goals and requirements
-- [Device Communication](docs/device_communication.md): How NetRaven communicates with network devices
-- [Logging System](docs/logging.md): Information about the logging infrastructure
-- [Web Frontend Design](docs/web-frontend-design.md): Frontend architecture and component design
-- [Troubleshooting Guide](docs/troubleshooting.md): Solutions for common issues, authentication setup, and verification steps
+### Documentation Structure
+
+The documentation is organized into three main categories:
+
+1. **Architecture Documentation** - System-level design and component interactions
+   - Overall system architecture
+   - Component design and interactions
+   - System requirements and specifications
+
+2. **Developer Guides** - How-to guides for implementing features and working with the codebase
+   - Development workflow
+   - Testing procedures
+   - Frontend development guides
+   - Backend development guides
+
+3. **Reference Documentation** - Technical reference for APIs, database schemas, and configuration
+   - API reference
+   - Database schema
+   - Configuration options
+   - Migration system
+
+For a complete overview of all available documentation, see the [Documentation Index](docs/index.md).
+
+Key documentation files:
+
+- [Project Specifications](docs/architecture/project-specs.md): Detailed project goals and requirements
+- [Device Communication](docs/implementation/device-communication.md): How NetRaven communicates with network devices
+- [Logging System](docs/reference/logging.md): Information about the logging infrastructure
+- [Web Frontend Design](docs/architecture/web-frontend-design.md): Frontend architecture and component design
+- [Troubleshooting Guide](docs/guides/troubleshooting.md): Solutions for common issues, authentication setup, and verification steps
+- [Database Migrations](docs/reference/database-migrations.md): Database migration system documentation
 
 ## License
 
