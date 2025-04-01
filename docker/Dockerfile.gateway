@@ -1,0 +1,39 @@
+# This Dockerfile is used to build the Device Gateway container for NetRaven.
+# The Device Gateway facilitates secure communication with network devices.
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install curl for health check
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir flask gunicorn
+
+# Create NetMiko logs directory with proper permissions
+RUN mkdir -p /tmp/netmiko_logs && chmod 777 /tmp/netmiko_logs
+
+# Copy only the needed files
+COPY netraven/ netraven/
+COPY docker/ docker/
+COPY scripts/ scripts/
+
+# Make scripts executable
+RUN chmod +x docker/entrypoint.sh scripts/*.py scripts/*.sh
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV SERVICE_TYPE=gateway
+ENV NETMIKO_LOG_DIR=/tmp/netmiko_logs
+
+# Expose port
+EXPOSE 8001
+
+# Run entrypoint
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
