@@ -86,23 +86,58 @@ docker-compose down -v
 
 ## Configuration
 
+NetRaven's Docker setup provides flexible configuration options through both configuration files and environment variables.
+
+### Configuration Files
+
+NetRaven uses YAML configuration files that are mounted into the containers:
+
+| File | Purpose | Container Mount Point |
+|------|---------|----------------------|
+| `config.yml` | Main application configuration | `/app/config.yml` |
+| `config/key_rotation.yaml` | Key rotation service configuration | Set via `CONFIG_FILE` env var |
+
+The standard Docker Compose setup includes these volume mappings:
+
+```yaml
+volumes:
+  - ./config.yml:/app/config.yml
+```
+
 ### Environment Variables
 
 You can customize the application behavior by setting environment variables in the `docker-compose.yml` file or creating a `.env` file in the `docker` directory.
 
-Common environment variables:
+#### Key Environment Variables
 
-- **NETRAVEN_ENV**: Environment (prod, test, dev)
-- **TOKEN_SECRET_KEY**: Secret key for JWT tokens
-- **TOKEN_EXPIRY_HOURS**: JWT token expiry time
-- **NETMIKO_PRESERVE_LOGS**: Whether to preserve network device session logs
+| Environment Variable | Purpose | Default |
+|----------------------|---------|---------|
+| `NETRAVEN_ENV` | Environment (production, development, test) | `production` |
+| `NETRAVEN_ENCRYPTION_KEY` | Key for encrypting sensitive data | None (Required) |
+| `TOKEN_SECRET_KEY` | Secret key for JWT tokens | None (Required) |
+| `NETRAVEN_WEB_DATABASE_TYPE` | Database type | `postgres` |
+| `NETRAVEN_WEB_DATABASE_HOST` | Database hostname | `postgres` |
+| `NETRAVEN_LOG_LEVEL` | Logging level | `INFO` |
 
-### Configuration Files
+For a comprehensive list of all supported environment variables, see the [Environment Variables Reference](../../reference/environment-variables.md).
 
-NetRaven uses YAML configuration files:
+### Configuration Precedence
 
-- **config.yml**: Main configuration file
-- **config/key_rotation.yaml**: Key rotation configuration
+Configuration values are applied in the following order (highest precedence first):
+
+1. Environment variables specified in Docker Compose
+2. Config file mounted as a volume
+3. Default values in code
+
+### Environment-Specific Configuration
+
+For development and testing environments:
+
+1. Set `NETRAVEN_ENV=development` or `NETRAVEN_ENV=test` in your environment variables
+2. Create an environment-specific configuration file (e.g., `config.development.yml`)
+3. Use `docker-compose.override.yml` for development-specific settings
+
+For more details on environment-specific configuration, see the [Environment Configuration Guide](../developer/environment-configuration.md).
 
 ## Volume Data
 
@@ -115,6 +150,21 @@ Data is persisted in Docker volumes:
 - **logs_data**: Application logs
 - **netraven_netmiko_logs**: Network device session logs
 
+### Volume Backup and Restore
+
+To backup volumes:
+
+```bash
+docker volume create backup_volume
+docker run --rm -v postgres-data:/source -v backup_volume:/backup alpine tar -czf /backup/postgres-data.tar.gz -C /source .
+```
+
+To restore volumes:
+
+```bash
+docker run --rm -v backup_volume:/backup -v postgres-data:/target alpine sh -c "cd /target && tar -xzf /backup/postgres-data.tar.gz"
+```
+
 ## Development with Docker
 
 For development, the `docker-compose.override.yml` file provides development-specific settings:
@@ -122,6 +172,21 @@ For development, the `docker-compose.override.yml` file provides development-spe
 - Mounts source code directories for live code editing
 - Sets environment variables for testing
 - Configures services for development mode
+
+### Hot-Reload Development
+
+For hot-reload development:
+
+```yaml
+# docker-compose.override.yml
+services:
+  api:
+    volumes:
+      - ../netraven:/app/netraven
+    environment:
+      - NETRAVEN_ENV=development
+      - NETRAVEN_WEB_DEBUG=true
+```
 
 ## Rebuilding Containers
 
@@ -177,4 +242,15 @@ If containers fail health checks:
 2. Verify container network connectivity
 3. Ensure required services are running
 
-For more details, see the [Docker README](../../docker/README.md). 
+### Configuration Issues
+
+If you experience configuration-related issues:
+
+1. Verify your configuration file is correctly mounted
+2. Check environment variables are correctly set
+3. Ensure configuration values are appropriate for the environment
+4. Look for configuration errors in the service logs
+
+For more details on configuration options, see the [Configuration Reference](../../reference/configuration.md).
+
+For more details on Docker setup, see the [Docker README](../../docker/README.md). 

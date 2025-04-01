@@ -48,7 +48,15 @@ User guides provide end-user documentation for using the NetRaven application.
 
 Reference documentation provides detailed information about the NetRaven APIs, configuration options, and database schema.
 
+- [Configuration Reference](reference/configuration.md) - Comprehensive configuration system documentation
+- [Environment Variables Reference](reference/environment-variables.md) - Complete list of environment variables
 - [Database Migrations](reference/database-migrations.md) - Guide to the database migration system
+
+### Configuration Documentation
+
+- [Core Settings](reference/configuration/core.md) - Core application configuration
+- [Web Service Settings](reference/configuration/web.md) - Web server and API configuration
+- [Environment Configuration Guide](guides/developer/environment-configuration.md) - Environment-specific configurations
 
 ## Getting Started
 
