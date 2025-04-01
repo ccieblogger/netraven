@@ -127,101 +127,6 @@ netraven/
 │       └── ...                # Frontend files
 ```
 
-## Environment Setup
-
-### Prerequisites
-
-- Python 3.10+
-- Docker and Docker Compose
-- Node.js and npm (if developing frontend without Docker)
-
-### Setting Up Your Environment
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/netraven.git
-   cd netraven
-   ```
-
-2. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. Install the package in development mode:
-   ```bash
-   pip install -e .
-   ```
-
-### Running the Application
-
-#### Using Docker Compose (Recommended)
-
-The easiest way to run the complete NetRaven environment is using Docker Compose:
-
-To start the application:
-
-```bash
-# Start all services
-docker compose up
-
-# Or to run in the background
-docker compose up -d
-```
-
-#### Testing Authentication
-
-For testing authentication, we provide a script to create an admin user:
-
-```bash
-# Run from the project root
-python3 scripts/create_admin.py [username] [password] [email]
-```
-
-By default, this creates a user with:
-- Username: admin
-- Password: adminpass123
-- Email: admin@example.com
-
-You can then use these credentials to log in through the frontend interface.
-
-#### Manual Setup (Alternative)
-
-If you prefer not to use Docker, you can:
-
-1. Start the API server:
-   ```bash
-   # Make sure you're in the virtual environment
-   source venv/bin/activate
-   
-   # Install dependencies if needed
-   pip install -e .
-   
-   # Start the FastAPI server
-   uvicorn netraven.web:app --reload --port 8000
-   ```
-
-2. Start the frontend (in a separate terminal):
-   ```bash
-   # Navigate to the frontend directory
-   cd netraven/web/frontend
-   
-   # Install dependencies
-   npm install
-   
-   # Start the development server
-   npm run serve
-   ```
-
-### Accessing the Application
-
-Once running, you can access:
-- Frontend: http://localhost:8080
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
-- API OpenAPI Spec: http://localhost:8000/openapi.json
-
 ## Components
 
 ### Core
@@ -238,6 +143,132 @@ The web interface provides:
 - User authentication and authorization
 - Scheduled backup jobs
 - Modern UI for configuration and monitoring
+
+## Docker Setup
+
+All Docker-related files are located in the `/docker` directory:
+
+```
+docker/
+├── Dockerfile.main            # Main application Dockerfile
+├── Dockerfile.api             # API service Dockerfile
+├── Dockerfile.gateway         # Device Gateway Dockerfile
+├── docker-compose.yml         # Main Docker Compose configuration
+├── docker-compose.override.yml # Development/test overrides
+└── README.md                  # Docker documentation
+```
+
+To run the application using Docker:
+
+```bash
+cd docker
+docker-compose up -d
+```
+
+For more details about the Docker setup, see the [Docker README](docker/README.md).
+
+## Development
+
+### Setting Up Your Environment
+
+1. Clone the repository
+2. Install dependencies: `pip install -e .`
+3. Start the server:
+   ```bash
+   cd docker
+   docker-compose up
+   ```
+
+### API Documentation
+
+When running, the API documentation is available at:
+- http://localhost:8000/docs
+
+## License
+
+MIT
+
+## Default Admin Credentials
+
+When NetRaven is first installed, a default admin user is created with the following credentials:
+
+- **Username**: admin
+- **Password**: NetRaven
+
+For security reasons, we strongly recommend changing this password after your first login.
+
+## Emergency Password Reset
+
+If you lose access to the admin account, an emergency password reset script is provided:
+
+```bash
+python scripts/reset_admin_password.py
+```
+
+This will reset the admin password back to the default "NetRaven". This script should only be used as an emergency measure to regain access to the system.
+
+**Security Note**: This script should be kept secure and only accessible to authorized personnel. After using it, immediately change the admin password.
+
+## Database Migrations
+
+NetRaven uses Alembic for database migrations. Migrations are automatically run when the application containers start up.
+
+### Running Migrations
+
+Migrations are handled automatically when you start the application with Docker Compose:
+
+```bash
+docker-compose up
+```
+
+The API container will run the migrations before starting the API service.
+
+### Creating New Migrations
+
+To create a new migration:
+
+1. Make changes to the SQLAlchemy models in the application
+2. Generate a new migration script:
+
+```bash
+# From the project root
+docker-compose exec api alembic -c netraven/web/migrations/alembic.ini revision --autogenerate -m "Description of changes"
+```
+
+3. Review the generated migration script in `netraven/web/migrations/versions/`
+
+For more details, see the [migrations README](netraven/web/migrations/README.md).
+
+## Authentication
+
+NetRaven supports two authentication methods:
+
+### JWT Token Authentication
+
+For user-based authentication, NetRaven uses JWT (JSON Web Token) authentication. This is primarily used for the web interface and API access by users.
+
+To obtain a token:
+
+```bash
+curl -X POST http://localhost:8000/api/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=NetRaven"
+```
+
+### API Key Authentication
+
+For service-to-service communication, NetRaven supports API key authentication. This is useful for integrating with other systems or for automated scripts.
+
+Use the API key in the `X-API-Key` header:
+
+```bash
+curl -X GET http://localhost:8000/api/health \
+  -H "X-API-Key: netraven-api-key"
+```
+
+The default API key is `netraven-api-key`, which can be changed in the configuration or by setting the `NETRAVEN_API_KEY` environment variable in the `docker-compose.yml` file.
+
+For more detailed API documentation, see [API Documentation](docs/api.md).
 
 ## Features
 
@@ -450,89 +481,3 @@ Key documentation files:
 - [Web Frontend Design](docs/architecture/web-frontend-design.md): Frontend architecture and component design
 - [Troubleshooting Guide](docs/guides/troubleshooting.md): Solutions for common issues, authentication setup, and verification steps
 - [Database Migrations](docs/reference/database-migrations.md): Database migration system documentation
-
-## License
-
-MIT
-
-## Default Admin Credentials
-
-When NetRaven is first installed, a default admin user is created with the following credentials:
-
-- **Username**: admin
-- **Password**: NetRaven
-
-For security reasons, we strongly recommend changing this password after your first login.
-
-## Emergency Password Reset
-
-If you lose access to the admin account, an emergency password reset script is provided:
-
-```bash
-python scripts/reset_admin_password.py
-```
-
-This will reset the admin password back to the default "NetRaven". This script should only be used as an emergency measure to regain access to the system.
-
-**Security Note**: This script should be kept secure and only accessible to authorized personnel. After using it, immediately change the admin password.
-
-## Database Migrations
-
-NetRaven uses Alembic for database migrations. Migrations are automatically run when the application containers start up.
-
-### Running Migrations
-
-Migrations are handled automatically when you start the application with Docker Compose:
-
-```bash
-docker-compose up
-```
-
-The API container will run the migrations before starting the API service.
-
-### Creating New Migrations
-
-To create a new migration:
-
-1. Make changes to the SQLAlchemy models in the application
-2. Generate a new migration script:
-
-```bash
-# From the project root
-docker-compose exec api alembic -c netraven/web/migrations/alembic.ini revision --autogenerate -m "Description of changes"
-```
-
-3. Review the generated migration script in `netraven/web/migrations/versions/`
-
-For more details, see the [migrations README](netraven/web/migrations/README.md).
-
-## Authentication
-
-NetRaven supports two authentication methods:
-
-### JWT Token Authentication
-
-For user-based authentication, NetRaven uses JWT (JSON Web Token) authentication. This is primarily used for the web interface and API access by users.
-
-To obtain a token:
-
-```bash
-curl -X POST http://localhost:8000/api/auth/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=NetRaven"
-```
-
-### API Key Authentication
-
-For service-to-service communication, NetRaven supports API key authentication. This is useful for integrating with other systems or for automated scripts.
-
-Use the API key in the `X-API-Key` header:
-
-```bash
-curl -X GET http://localhost:8000/api/health \
-  -H "X-API-Key: netraven-api-key"
-```
-
-The default API key is `netraven-api-key`, which can be changed in the configuration or by setting the `NETRAVEN_API_KEY` environment variable in the `docker-compose.yml` file.
-
-For more detailed API documentation, see [API Documentation](docs/api.md).

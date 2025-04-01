@@ -110,6 +110,76 @@ We identified several categories of scripts:
 - Preserved all scripts for reference while improving organization
 - Made it easier to identify essential scripts for system operation
 
+## Test Directory Documentation
+
+### Issue
+While the test directories (`/tests` and `/scripts/tests`) were well-organized, there was limited documentation explaining the relationship between these directories and how they should be used.
+
+### Analysis
+The project has two main test-related locations:
+- `/tests` - The main pytest test suite for automated testing
+- `/scripts/tests` - Standalone test scripts for development and debugging
+
+Many developers were unclear about when to use each directory and the purpose of each test type.
+
+### Changes Made
+1. Enhanced the main `/tests/README.md` to include information about the relationship with `/scripts/tests`
+2. Updated the `/scripts/tests/README.md` with more detailed information about the purpose of test scripts
+3. Created a comprehensive test directory map at `/docs/guides/developer/test_directory_map.md`
+4. Ensured documentation clearly explains the distinction between formal tests and test scripts
+
+### Impact
+- Clearer guidance for developers on where to place new tests
+- Better understanding of the testing structure across the project
+- Simplified navigation between test directories
+- Documented testing relationships without modifying code or moving files
+
+## Docker File Organization
+
+### Issue
+Docker-related files were scattered across multiple locations in the repository:
+- `/Dockerfile` - Main application Dockerfile
+- `/Dockerfile.api` - API service Dockerfile
+- `/Dockerfile.gateway` - Gateway service Dockerfile
+- `/docker-compose.yml` - Main Docker Compose configuration
+- `/docker-compose.override.yml` - Override configuration
+- `/docker/` - Directory with some Docker-related files but not all Dockerfiles
+
+This made it difficult to find all Docker-related files and understand the Docker setup as a whole.
+
+### Analysis
+Having Docker files spread across the repository:
+- Created confusion about where to find Docker-related configuration
+- Made it harder to understand the Docker service organization
+- Cluttered the root directory with files that logically belonged together
+
+The `/docker/` directory already existed but didn't contain all Docker-related files.
+
+### Changes Made
+1. Moved all Dockerfiles to the `/docker/` directory:
+   - `/Dockerfile` → `/docker/Dockerfile.main`
+   - `/Dockerfile.api` → `/docker/Dockerfile.api`
+   - `/Dockerfile.gateway` → `/docker/Dockerfile.gateway`
+2. Moved Docker Compose files to the `/docker/` directory:
+   - `/docker-compose.yml` → `/docker/docker-compose.yml`
+   - `/docker-compose.override.yml` → `/docker/docker-compose.override.yml`
+3. Created a comprehensive README in `/docker/README.md` explaining:
+   - Purpose of each Dockerfile
+   - Docker service architecture
+   - How to use the Docker setup
+4. Updated project documentation:
+   - Updated main `README.md` with new Docker file locations
+   - Created a Docker setup guide at `/docs/guides/docker-setup.md`
+
+### Impact
+- All Docker-related files consolidated in one location
+- Cleaner project root directory
+- Better organization of Docker configuration
+- Improved documentation of Docker architecture
+- Simplified path references for Docker-related files
+
 ## Next Steps
 - Continue with other directory structure cleanup tasks
-- Ensure all tests pass with the simplified directory structure 
+- Address configuration file organization
+- Improve overall documentation organization
+- Organize the archive directory 
