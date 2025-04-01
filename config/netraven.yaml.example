@@ -1,0 +1,54 @@
+# NetRaven Main Configuration File
+# This is an example configuration file that includes all configuration sections
+
+# Include core configuration files
+includes:
+  # Core configuration
+  - "core/logging.yaml"
+  - "core/backup.yaml"
+  - "core/security.yaml"
+  
+  # Web service configuration
+  - "web/server.yaml"
+  - "web/database.yaml"
+  - "web/api.yaml"
+  
+  # Integrations configuration
+  - "integrations/netbox.yaml"
+  - "integrations/git.yaml"
+  - "integrations/notifications.yaml"
+  - "integrations/ldap.yaml"
+
+# Core settings (can override included files)
+core:
+  # Base settings
+  log_level: "INFO"
+  encryption_key: "${NETRAVEN_ENCRYPTION_KEY}"
+  backup_dir: "/app/backups"
+  temp_dir: "/app/temp"
+  max_workers: 4
+  job_timeout: 3600
+  retry_attempts: 3
+  retry_delay: 5
+
+# Web service settings (can override included files)
+web:
+  # Server settings
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  
+  # Database specific overrides
+  database:
+    type: "sqlite"
+
+# Environment-specific settings
+environment:
+  # Environment type (development, testing, production)
+  type: "development"
+  
+  # Docker-specific settings
+  docker:
+    enabled: true
+    data_volume: "/data"
+    config_path: "/config" 

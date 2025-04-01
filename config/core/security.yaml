@@ -1,0 +1,64 @@
+# Security configuration for NetRaven
+
+security:
+  # Key management and rotation
+  key_rotation:
+    # Directory where encryption keys are stored
+    key_path: "data/keys"
+    
+    # Interval in days between key rotations
+    rotation_interval_days: 90
+    
+    # Whether to automatically rotate keys
+    automatic_rotation: true
+    
+    # Backup settings for keys
+    backup:
+      # Directory where key backups are stored
+      backup_path: "data/key_backups"
+      
+      # Whether to automatically create backups when rotating keys
+      auto_backup: true
+      
+      # Number of backups to keep
+      max_backups: 5
+  
+  # Encryption settings
+  encryption:
+    # Default algorithm to use for encryption
+    algorithm: "AES-256-GCM"
+    
+    # Rotate keys when compromised
+    force_rotation_on_compromise: true
+    
+    # Environment variable that can store the master key
+    master_key_env_var: "NETRAVEN_ENCRYPTION_KEY"
+  
+  # Password policy settings
+  password_policy:
+    min_length: 12
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_special_chars: true
+    password_history: 5
+    max_age_days: 90
+    prevent_common_passwords: true
+  
+  # Scheduled task configuration for security-related tasks
+  tasks:
+    key_rotation:
+      # Minimum age of keys in days before rotation
+      min_age_days: 85
+      
+      # Schedule settings
+      schedule:
+        type: "weekly"  # daily, weekly, monthly
+        day: "monday"   # Only for weekly and monthly schedules
+        time: "01:00"   # HH:MM format
+    
+    security_scan:
+      enabled: true
+      schedule:
+        type: "daily"
+        time: "02:00" 

@@ -1,0 +1,61 @@
+# Backup configuration for NetRaven
+
+backup:
+  # Base directory for storing device backups
+  directory: "data/backups"
+  
+  # Backup filename format using Python string formatting
+  format: "{hostname}_{date}_{time}.txt"
+  
+  # Maximum number of backup versions to keep per device
+  max_versions: 10
+  
+  # Default backup format
+  file_format: "text"  # Options: text, json, xml
+  
+  # Storage backend configuration
+  storage:
+    # Primary storage type
+    type: "local"  # Options: local, s3
+    
+    # Local storage settings
+    local:
+      path: "data/backups"
+      create_subdirs: true
+    
+    # S3 storage settings
+    s3:
+      enabled: false
+      bucket: ""
+      prefix: "netraven/backups"
+      region: "us-east-1"
+  
+  # Git integration for version control
+  git:
+    enabled: false
+    repo_url: ""  # Set to your repository URL to enable
+    branch: "main"
+    local_path: "data/git-repo"
+    commit_message: "Updated configuration for {hostname}"
+    author_name: "NetRaven Backup"
+    author_email: "backup@netraven.example.com"
+    ssh_key_path: ""
+  
+  # Backup scheduling
+  schedule:
+    enabled: true
+    type: "daily"  # Options: hourly, daily, weekly
+    time: "01:00"  # HH:MM format (for daily and weekly)
+    day: "sunday"  # For weekly schedule
+    
+  # Device selection for backups
+  devices:
+    selection: "all"  # Options: all, tagged, filtered
+    tags: []          # List of tags for selecting devices
+    filter: ""        # Filter expression for selecting devices
+    
+  # Failure handling
+  failure:
+    retry_count: 3
+    retry_delay: 60  # seconds
+    notify_on_failure: true 

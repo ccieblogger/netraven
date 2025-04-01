@@ -1,0 +1,56 @@
+# Web server configuration for NetRaven
+
+web:
+  # Server binding settings
+  host: "0.0.0.0"
+  port: 8000
+  
+  # Debug mode (disable in production)
+  debug: false
+  
+  # Workers and performance
+  workers: 4
+  worker_timeout: 120
+  keep_alive: 5
+  
+  # HTTPS/TLS settings
+  https:
+    enabled: false
+    cert_file: "certs/server.crt"
+    key_file: "certs/server.key"
+  
+  # CORS settings
+  cors:
+    allow_origins: ["*"]
+    allow_credentials: true
+    allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers: ["*"]
+  
+  # Static file serving
+  static:
+    enabled: true
+    url_path: "/static"
+    directory: "static"
+  
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+    burst: 10
+  
+  # Session configuration
+  session:
+    cookie_name: "netraven_session"
+    secret_key: "${SESSION_SECRET_KEY}"
+    max_age: 86400  # seconds (24 hours)
+    secure: true
+    http_only: true
+    same_site: "lax"  # options: lax, strict, none
+    idle_timeout: 3600  # seconds (1 hour)
+    regenerate_id: true
+  
+  # Proxy settings if behind a reverse proxy
+  proxy:
+    enabled: false
+    trusted_hosts: []
+    secure_headers: true 

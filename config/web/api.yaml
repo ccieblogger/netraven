@@ -1,0 +1,64 @@
+# API configuration for NetRaven web service
+
+api:
+  # API versioning
+  version: "v1"
+  prefix: "/api"
+  
+  # Documentation settings
+  docs:
+    enabled: true
+    url_path: "/docs"
+    title: "NetRaven API"
+    description: "API for network device management and configuration"
+    version: "1.0.0"
+    
+  # Authentication
+  authentication:
+    token_required: true
+    token_expiration: 86400  # seconds (24 hours)
+    jwt_algorithm: "HS256"
+    token_refresh_enabled: true
+    token_refresh_expires: 604800  # seconds (7 days)
+    
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 120
+    burst: 20
+    
+  # CORS settings specific to API
+  cors:
+    allow_origins: ["*"]
+    allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers: ["Authorization", "Content-Type"]
+    
+  # Response settings
+  response:
+    default_format: "json"
+    pretty_json: false
+    include_status: true
+    include_timestamp: true
+    
+  # Pagination defaults
+  pagination:
+    default_limit: 50
+    max_limit: 250
+    
+  # Filtering and sorting
+  filtering:
+    allowed_fields: ["id", "name", "created_at", "updated_at"]
+    allowed_operators: ["eq", "ne", "gt", "lt", "gte", "lte", "in", "contains"]
+    
+  # Caching
+  cache:
+    enabled: true
+    ttl: 300  # seconds
+    max_size: 1000  # entries
+    
+  # Logging
+  logging:
+    enabled: true
+    exclude_paths: ["/api/health", "/api/metrics"]
+    log_request_body: false
+    log_response_body: false 

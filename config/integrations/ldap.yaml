@@ -1,0 +1,71 @@
+# LDAP authentication configuration for NetRaven
+
+auth:
+  ldap:
+    # Connection settings
+    server: "ldap.example.com"
+    port: 389
+    use_ssl: false
+    use_tls: false
+    timeout: 10  # seconds
+    
+    # Bind settings (service account)
+    bind_dn: "cn=netraven,ou=service-accounts,dc=example,dc=org"
+    bind_password: "${LDAP_BIND_PASSWORD}"  # Set via environment variable
+    
+    # User search settings
+    search_base: "ou=users,dc=example,dc=org"
+    user_filter: "(uid={username})"
+    
+    # Group search settings
+    group_search_base: "ou=groups,dc=example,dc=org"
+    group_filter: "(cn=netraven*)"
+    
+    # Attribute mapping
+    attr_username: "uid"
+    attr_email: "mail"
+    attr_full_name: "displayName"
+    attr_first_name: "givenName"
+    attr_last_name: "sn"
+    
+    # Group mapping
+    group_attribute: "memberOf"
+    group_attribute_is_dn: true
+    group_dn_regex: "cn=([^,]+)"
+    
+    # Role mapping
+    role_mapping:
+      admin:
+        - "netraven-admins"
+      operator:
+        - "netraven-operators"
+      viewer:
+        - "netraven-viewers"
+    default_role: "viewer"
+    
+    # User creation and synchronization
+    auto_create_users: true
+    sync_user_attributes: true
+    sync_user_on_login: true
+    
+    # Cache settings
+    cache:
+      enabled: true
+      ttl: 300  # seconds
+      
+    # Connection pooling
+    connection_pool:
+      enabled: true
+      min_size: 2
+      max_size: 10
+      
+    # Advanced settings
+    advanced:
+      referrals: "follow"  # Options: follow, ignore
+      network_timeout: 30  # seconds
+      chase_referrals: true
+      
+    # Fallback settings
+    fallback:
+      enabled: true
+      fallback_to_local: true 

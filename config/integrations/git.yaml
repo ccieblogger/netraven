@@ -1,0 +1,65 @@
+# Git integration configuration for NetRaven
+
+git:
+  # General settings
+  enabled: false  # Set to true to enable git integration
+  repo_url: ""    # Git repository URL for configuration storage
+  branch: "main"  # Branch to use
+  local_path: ""  # Local path for git repository
+  
+  # Authentication settings
+  auth:
+    # SSH authentication (preferred)
+    ssh:
+      enabled: true
+      ssh_key_path: "~/.ssh/id_rsa"  # Path to SSH key
+      known_hosts_verify: true
+      
+    # HTTP authentication (fallback)
+    http:
+      enabled: false
+      username: ""
+      password: "${GIT_PASSWORD}"  # Set via environment variable
+      token: "${GIT_TOKEN}"  # Personal access token (alternative to password)
+  
+  # Commit settings
+  commit:
+    author_name: "NetRaven Backup"
+    author_email: "backup@example.com"
+    message_template: "Updated configuration for {hostname}"
+    sign_commits: false
+    gpg_key: ""
+    
+  # File organization
+  file_organization:
+    # Folder structure for device configurations
+    folder_structure: "{device_type}/{hostname}"  # Supports variables: device_type, hostname, platform, site
+    
+    # Filename format for configuration files
+    filename_format: "config.txt"  # Supports variables: hostname, timestamp
+    
+    # Whether to include timestamps in filenames
+    include_timestamp: false
+    
+  # Synchronization settings
+  sync:
+    # Pull before push to avoid conflicts
+    pull_before_push: true
+    
+    # How to handle conflicts
+    conflict_strategy: "ours"  # Options: ours, theirs, merge
+    
+    # Auto-retry on failure
+    retry_count: 3
+    retry_delay: 30  # seconds
+    
+  # Advanced options
+  advanced:
+    # Whether to initialize repository if it doesn't exist
+    init_if_not_exists: true
+    
+    # Garbage collection frequency (in days, 0 to disable)
+    gc_frequency: 30
+    
+    # Maximum file age before rotation/archiving (in days, 0 to disable)
+    max_file_age: 0 
