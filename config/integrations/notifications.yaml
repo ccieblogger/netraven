@@ -1,0 +1,96 @@
+# Notifications configuration for NetRaven
+
+notifications:
+  # General settings
+  enabled: true
+  methods:
+    - email
+    - webhook
+  
+  # Events that trigger notifications
+  events:
+    - backup_failed
+    - device_unreachable
+    - config_changed
+    - job_failed
+    - security_alert
+    - system_error
+    
+  # Email notification settings
+  email:
+    # SMTP server settings
+    server: "localhost"
+    port: 25
+    use_tls: false
+    use_ssl: false
+    username: "${SMTP_USERNAME}"  # Set via environment variable
+    password: "${SMTP_PASSWORD}"  # Set via environment variable
+    
+    # Email content
+    from_address: "netraven@example.com"
+    subject_prefix: "[NetRaven] "
+    include_stacktrace: false
+    
+    # Recipients
+    recipients:
+      - "admin@example.com"
+    cc: []
+    bcc: []
+    
+    # HTML formatting
+    html_format: true
+    template_dir: "templates/email"
+    
+    # Rate limiting
+    rate_limit:
+      enabled: true
+      max_per_hour: 20
+      
+  # Webhook notification settings
+  webhook:
+    # Endpoint settings
+    url: "https://example.com/webhook"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+      X-API-Key: "${WEBHOOK_API_KEY}"  # Set via environment variable
+    
+    # Request settings
+    timeout: 5  # seconds
+    verify_ssl: true
+    retry_count: 3
+    retry_delay: 10  # seconds
+    
+    # Payload formatting
+    format: "json"
+    include_metadata: true
+    
+    # Rate limiting
+    rate_limit:
+      enabled: true
+      max_per_minute: 10
+      
+  # Slack notification settings
+  slack:
+    enabled: false
+    webhook_url: "${SLACK_WEBHOOK_URL}"  # Set via environment variable
+    channel: "#network-alerts"
+    username: "NetRaven"
+    icon_emoji: ":raven:"
+    
+  # Microsoft Teams notification settings
+  teams:
+    enabled: false
+    webhook_url: "${TEAMS_WEBHOOK_URL}"  # Set via environment variable
+    
+  # Notification grouping and throttling
+  throttling:
+    enabled: true
+    group_similar: true
+    group_window: 300  # seconds
+    max_notifications_per_minute: 20
+    
+  # Schedule for summary notifications
+  summary:
+    enabled: true
+    schedule: "0 8 * * *"  # cron format (daily at 8:00) 

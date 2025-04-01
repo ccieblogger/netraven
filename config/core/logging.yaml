@@ -1,0 +1,54 @@
+# Logging configuration for NetRaven
+
+logging:
+  # Global log level
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  
+  # Log format (standard or JSON)
+  format: "standard"  # Options: json, standard
+  
+  # Console logging configuration
+  console:
+    enabled: true
+    level: "INFO"
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # File logging configuration
+  file:
+    enabled: true
+    path: "logs/netraven.log"
+    max_size_mb: 10
+    backup_count: 5
+    level: "DEBUG"
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Component-specific logging
+  components:
+    netbox:
+      level: "INFO"
+      file: "logs/netbox.log"
+    backup:
+      level: "DEBUG"
+      file: "logs/backup.log"
+    web:
+      level: "INFO"
+      file: "logs/web.log"
+  
+  # Asynchronous logging (improves performance)
+  async_logging: true
+  
+  # Sensitive data filtering patterns
+  sensitive_patterns:
+    - pattern: 'token=([^\\s]+)'
+      replacement: 'token=***'
+    - pattern: 'password=([^\\s]+)'
+      replacement: 'password=***'
+    - pattern: 'secret=([^\\s]+)'
+      replacement: 'secret=***'
+  
+  # Cloud logging providers (optional)
+  cloudwatch:
+    enabled: false
+    log_group: "netraven"
+    log_stream: "app"
+    region: "us-west-2" 

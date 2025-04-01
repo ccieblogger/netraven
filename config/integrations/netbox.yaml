@@ -1,0 +1,65 @@
+# Netbox integration configuration for NetRaven
+
+netbox:
+  # Connection settings
+  url: "https://netbox.example.com"  # Replace with your Netbox instance URL
+  verify_ssl: true
+  timeout: 30
+  api_token: "${NETBOX_API_TOKEN}"  # Set via environment variable
+  
+  # Data synchronization
+  sync:
+    enabled: true
+    interval: 3600  # seconds (1 hour)
+    on_startup: true
+    max_devices: 1000
+    timeout: 600  # seconds
+    
+  # Device query filters
+  devices_query:
+    status: "active"
+    role: "network-device"
+    site: ""  # Leave empty for all sites
+    
+  # Device attributes to import
+  device_attributes:
+    - "name"
+    - "status"
+    - "site"
+    - "rack"
+    - "position"
+    - "tenant"
+    - "device_type"
+    - "role"
+    - "platform"
+    - "serial"
+    - "asset_tag"
+    - "custom_fields"
+    
+  # Interface attributes to import
+  interface_attributes:
+    - "name"
+    - "type"
+    - "description"
+    - "enabled"
+    - "mac_address"
+    - "mtu"
+    
+  # IP address attributes to import
+  ip_attributes:
+    - "address"
+    - "status"
+    - "role"
+    - "dns_name"
+    - "description"
+    
+  # Credential mapping
+  credential_mapping:
+    source: "custom_field"  # Options: custom_field, tenant, platform, tag
+    field_name: "credential_group"
+    
+  # Error handling
+  error_handling:
+    retry_count: 3
+    retry_delay: 30  # seconds
+    stop_on_error: false 
