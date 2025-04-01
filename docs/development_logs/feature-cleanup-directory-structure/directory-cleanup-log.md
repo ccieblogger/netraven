@@ -75,6 +75,41 @@ The `netraven/web/backend/` directory followed the established package structure
 - Removed potential confusion for developers
 - Ensured all backend code follows the established package structure
 
+## Scripts Directory Organization
+
+### Issue
+The `scripts/` directory contained a mixture of:
+- Operational scripts needed for deployment and maintenance
+- Database management scripts
+- Test scripts that should be in the test directory
+- Temporary or one-off scripts
+
+This made it difficult to identify which scripts were essential versus temporary or for testing only.
+
+### Analysis
+We identified several categories of scripts:
+- Database-related scripts for schema management and backups
+- Maintenance scripts for system operations
+- Deployment scripts for Docker and container setup
+- Test scripts that should be separate from operational code
+- Potentially obsolete or one-off scripts
+
+### Changes Made
+1. Created a logical directory structure to organize scripts by purpose:
+   - `scripts/db/` - Database-related scripts
+   - `scripts/maintenance/` - System maintenance scripts
+   - `scripts/deployment/` - Docker and deployment-related scripts
+   - `scripts/tests/` - Test scripts separate from the main test suite
+   - `scripts/archive/` - Potentially obsolete scripts for future review
+2. Moved scripts to appropriate directories without modifying their content
+3. Ensured all scripts remained executable and functional
+
+### Impact
+- Better organization of scripts by purpose
+- Clearer distinction between operational and test scripts
+- Preserved all scripts for reference while improving organization
+- Made it easier to identify essential scripts for system operation
+
 ## Next Steps
 - Continue with other directory structure cleanup tasks
 - Ensure all tests pass with the simplified directory structure 
