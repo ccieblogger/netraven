@@ -2,6 +2,24 @@
 
 This directory contains standalone test scripts that are not part of the formal pytest test suite.
 
+## Purpose
+
+The scripts in this directory serve several distinct purposes:
+
+1. **Ad-hoc Testing**: Quick scripts to verify specific functionality during development
+2. **Debugging Tools**: Scripts to help diagnose issues in the system
+3. **Integration Verification**: Scripts to test integration with external systems
+4. **Performance Testing**: Scripts to evaluate system performance in specific scenarios
+
+These scripts complement the formal test suite in the `/tests` directory but are maintained separately to keep the formal test suite clean and organized.
+
+## Relationship to Main Test Suite
+
+- **Main Test Suite** (`/tests`): Structured pytest tests for automated verification and CI
+- **Test Scripts** (`/scripts/tests`): Standalone scripts for development, debugging, and ad-hoc testing
+
+The scripts here are generally more focused on specific scenarios or debugging needs, while the main test suite provides comprehensive test coverage for the application.
+
 ## Scripts
 
 ### Gateway Tests
@@ -28,6 +46,16 @@ This directory contains standalone test scripts that are not part of the formal 
 ### Other Tests
 - **test_key_rotation.py**: Tests key rotation
 - **test_scheduler.py**: Tests the scheduler
+
+## Running Scripts
+
+Most scripts in this directory can be run directly with Python:
+
+```bash
+python scripts/tests/test_gateway.py
+```
+
+Some scripts may require specific environment setup or configuration. Check the script header or comments for specific requirements.
 
 ## Note
 
