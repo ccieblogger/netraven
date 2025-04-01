@@ -14,8 +14,23 @@ tests/
   ├── integration/       # Integration tests for system functionality
   ├── utils/             # Utility functions for testing
   ├── mock/              # Mock data and services
+  ├── ci/                # CI-related test configurations
+  ├── core/              # Core functionality tests
   └── conftest.py        # Shared fixtures
 ```
+
+## Related Test Locations
+
+In addition to the main test suite in this directory, there are test-related files in other locations:
+
+```
+scripts/tests/          # Standalone test scripts 
+  ├── test_gateway.py   # Gateway API testing scripts
+  ├── test_netmiko.py   # NetMiko functionality tests
+  └── ...               # Other standalone scripts
+```
+
+The `scripts/tests/` directory contains standalone scripts used for development and debugging, while this directory contains the formal pytest test suite.
 
 ## Test Categories
 
