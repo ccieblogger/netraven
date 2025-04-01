@@ -53,7 +53,6 @@ The NetRaven project has two main locations for test-related files:
 ## Other Test-Related Locations
 
 ```
-/test-reports/                # Output location for test reports
 /test-artifacts/              # Generated files during testing
 ```
 
