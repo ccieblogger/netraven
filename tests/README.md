@@ -14,8 +14,6 @@ tests/
   ├── integration/       # Integration tests for system functionality
   ├── utils/             # Utility functions for testing
   ├── mock/              # Mock data and services
-  ├── ci/                # CI-related test configurations
-  ├── core/              # Core functionality tests
   └── conftest.py        # Shared fixtures
 ```
 
@@ -105,6 +103,45 @@ pytest tests/integration/test_system_functionality.py
 pytest --cov=netraven tests/
 ```
 
+## Development Workflow
+
+For NetRaven's single-developer workflow, follow these steps:
+
+1. Create a feature branch from develop
+   ```bash
+   git checkout develop
+   git pull
+   git checkout -b feature/my-feature
+   ```
+
+2. Implement changes and write tests in the feature branch
+
+3. Run tests to ensure your changes work correctly
+   ```bash
+   # Run specific tests for your feature
+   pytest tests/unit/path/to/tests/
+   ```
+
+4. When feature is complete, merge to integration branch
+   ```bash
+   git checkout integration
+   git pull
+   git merge feature/my-feature
+   ```
+
+5. Run full test suite in integration branch
+   ```bash
+   pytest tests/
+   ```
+
+6. When all tests pass, merge to develop
+   ```bash
+   git checkout develop
+   git pull
+   git merge integration
+   git push
+   ```
+
 ## Performance Testing
 
 The performance tests (`test_performance.py`) may take longer to run as they test system behavior under load. You can isolate slow tests with:
@@ -177,10 +214,6 @@ The system functionality tests verify:
 ## Mocking External Services
 
 For tests that require external services (e.g., network devices), mock implementations are provided in the `mock/` directory.
-
-## Continuous Integration
-
-These tests are automatically run in the CI pipeline on each pull request. Tests must pass before code can be merged.
 
 ## Test Data
 
