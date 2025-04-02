@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document provides a high-level overview of the intended architecture for the NetRaven system. It serves as a unified source of truth for developers to understand the target architecture state.
+This document provides a high-level overview of the architecture for the NetRaven system. It serves as a unified source of truth for developers to understand the target architecture state.
 
 ## System Overview
 
