@@ -29,8 +29,8 @@ services:
   # Backend API service
   api:
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: ..
+      dockerfile: docker/Dockerfile.api
       args:
         - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     environment:
@@ -73,8 +73,8 @@ services:
   # Scheduler service
   scheduler:
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: ..
+      dockerfile: docker/Dockerfile.api
       args:
         - NETRAVEN_ENV=${NETRAVEN_ENV:-test}
     volumes:
@@ -102,8 +102,8 @@ services:
   # Device Gateway service
   device_gateway:
     build:
-      context: .
-      dockerfile: Dockerfile.gateway
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
       args:
         - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     ports:
@@ -178,7 +178,7 @@ services:
 
   key-rotation:
     build:
-      context: .
+      context: ..
       dockerfile: docker/key-rotation.Dockerfile
       args:
         - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
