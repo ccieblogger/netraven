@@ -9,7 +9,7 @@ services:
     image: postgres:14-alpine
     volumes:
       - postgres-data:/var/lib/postgresql/data/
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
       - ./backups:/backups
     ports:
       - "5432:5432"
@@ -52,8 +52,8 @@ services:
       - ./test-artifacts:/app/test-artifacts
       - ./config.yml:/app/config.yml
       - netraven_netmiko_logs:/app/data/netmiko_logs
-      - ./netraven:/app/netraven
-      - ./scripts:/app/scripts
+      - ../netraven:/app/netraven
+      - ../scripts:/app/scripts
     ports:
       - "0.0.0.0:8000:8000"
     restart: unless-stopped
@@ -68,7 +68,7 @@ services:
     networks:
       - netraven-network
     # Use the new initialization script
-    entrypoint: ["/bin/bash", "-c", "ls -la /app/scripts/ && python -u /app/scripts/initialize_schema.py && /app/docker/entrypoint.sh"]
+    entrypoint: ["/bin/bash", "-c", "ls -la /app/scripts && python -u /app/scripts/initialize_schema.py && /app/docker/entrypoint.sh"]
 
   # Scheduler service
   scheduler:
@@ -109,11 +109,11 @@ services:
     ports:
       - "8001:8001"
     volumes:
-      - ./netraven:/app/netraven
+      - ../netraven:/app/netraven
       - token_data:/app/tokens
       - ./config.yml:/app/config.yml
       - netraven_netmiko_logs:/app/data/netmiko_logs
-      - ./scripts:/app/scripts
+      - ../scripts:/app/scripts
     environment:
       - API_URL=http://api:8000
       - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}

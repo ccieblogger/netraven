@@ -68,8 +68,9 @@ The feature branch has been merged into the integration branch `integration/post
 
 ## Known Issues
 
-- Full Docker testing environment requires complete Docker setup with all Dockerfiles in place
-- Local development environment lacks complete Docker configuration for comprehensive testing
+- Docker container initialization is failing due to missing or incompatible dependencies
+- We've identified and fixed several dependency issues (requests, PyJWT, FastAPI/Pydantic version compatibility, email-validator)
+- The initialization script is attempting to use components that have dependencies that might still be missing from requirements.txt
 
 ## Next Steps
 
@@ -80,3 +81,92 @@ The feature branch has been merged into the integration branch `integration/post
 5. Prepare final merge request to develop branch
 
 Once these steps are completed, the integration can be considered complete and ready for review. 
+
+## Summary of Changes
+
+1. **Base Class Consolidation**
+   - Consolidated dual SQLAlchemy Base classes into a single source of truth
+   - Moved credential models into web models package
+   - Updated relationship between Tag and CredentialTag
+
+2. **Schema Initialization Script**
+   - Created new `scripts/initialize_schema.py` script
+   - Removed runtime schema modifications
+   - Added database connection retry logic
+   - Implemented schema validation
+
+3. **Docker Configuration Update**
+   - Updated `docker-compose.yml` to use the new initialization script
+   - Added PostgreSQL backup volume
+   - Updated entrypoint to run initialization script
+
+4. **Docker Environment Dependencies**
+   - Added missing Python package requirements:
+     - requests (HTTP client library needed by GatewayClient)
+     - email-validator v2.x (updated to support Pydantic v2)
+     - FastAPI v0.104.0 (updated to support Pydantic v2)
+
+5. **Documentation Update**
+   - Created schema initialization documentation
+   - Updated PostgreSQL source of truth document
+   - Added Docker configuration details
+
+6. **Configuration Consolidation**
+   - Moved config.yml into the docker folder for better organization
+   - Consolidated requirements in the docker folder
+   - Ensured proper mounting of configuration files in Docker environment
+   - Simplified configuration management for Docker deployment
+
+## Testing Status
+
+- Unit tests for model integrity: ✅ Passed
+- Integration tests for schema initialization: ✅ Passed
+- Docker-based testing: 🔄 In Progress
+
+## Current Status and Issues
+
+### Resolved Issues
+- Fixed dual Base class issue by consolidating to a single Base
+- Fixed initialization script to properly handle database connection
+- Updated config.yml file placement by relocating it to the docker folder
+- Resolved dependency conflicts between FastAPI and Pydantic versions
+- Added missing Python package dependencies
+
+### Ongoing Work
+- Continuing to debug Docker container startup issues
+- Ensuring all necessary dependencies are included in requirements.txt
+- Testing comprehensive application initialization in Docker environment
+
+### Next Steps
+1. Complete Docker container startup debugging
+2. Run full test suite in Docker environment 
+3. Update documentation with lessons learned
+4. Prepare for final review and merge to main branch
+
+## Lessons Learned
+
+1. **Dependencies Management**
+   - Always ensure package dependencies are explicit in requirements.txt
+   - Consider using a dependency lock file for more deterministic builds
+   - Test container builds in clean environments regularly
+
+2. **Docker Configuration**
+   - Docker volumes need careful consideration for persistent data
+   - Initialization scripts should have proper retry logic for services
+   - Container startup sequence is critical for interdependent services
+
+3. **Documentation Importance**
+   - Maintaining up-to-date requirements documentation prevents issues
+   - Document the initialization sequence clearly for future developers
+   - Keep track of dependency version compatibility constraints
+
+## Docker Startup Debugging Progress
+
+Current focus has been on resolving issues with the API container startup. We've identified and addressed several dependency issues:
+
+1. Added missing `pyjwt` package in requirements.txt
+2. Updated FastAPI from version matching Pydantic v1 to version 0.104.0 to support Pydantic v2
+3. Updated email-validator from v1.x to v2.x to support Pydantic v2
+4. Added missing `requests` package required by the GatewayClient
+
+The container build process is now successful, but we're still resolving startup issues with the initialization script. 
