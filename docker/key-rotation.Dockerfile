@@ -17,6 +17,12 @@ RUN mkdir -p data/keys data/key_backups && \
 ENV PYTHONPATH=/app
 ENV NETRAVEN_ENV=production
 
+# Install required packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl build-essential && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Run as non-root user
 RUN useradd -m netuser
 RUN chown -R netuser:netuser /app
