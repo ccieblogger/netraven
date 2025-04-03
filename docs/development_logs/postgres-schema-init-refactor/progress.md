@@ -91,9 +91,9 @@ This implementation plan outlines a phased approach to refactor the PostgreSQL s
 
 ### Current Status
 - **Phase**: 2 - Base Class Consolidation
-- **Progress**: 10%
-- **Current Focus**: Beginning modification of credential store models
-- **Next Steps**: Move Credential and CredentialTag models to use main Base class
+- **Progress**: 80%
+- **Current Focus**: Testing changes to credential model consolidation
+- **Next Steps**: Run unit tests and finalize Phase 2
 
 ### Phase 1: Analysis & Preparation
 - [2025-04-02] Created feature branch `feature/postgres-schema-init-refactor`
@@ -155,7 +155,29 @@ This implementation plan outlines a phased approach to refactor the PostgreSQL s
 4. **Initialization Complexity**: The process involves both SQL scripts and Python code
 
 ### Phase 2: Base Class Consolidation
-- [2025-04-02] Starting work on refactoring credential store models
+- [2025-04-02] Started work on refactoring credential store models
+- [2025-04-02] Created new model structure in netraven/web/models/credential/
+- [2025-04-02] Created Credential and CredentialTag models using main Base class
+- [2025-04-02] Updated Tag model to include relationship with credential_tags
+- [2025-04-02] Modified credential_store.py to use the new models
+- [2025-04-02] Created unit tests to verify model integrity
+- [In Progress] Testing changes to ensure everything works correctly
+
+#### Changes Made
+1. **New Model Location**:
+   - Created new package `netraven/web/models/credential/`
+   - Moved Credential and CredentialTag models there
+
+2. **Relationship Updates**:
+   - Added proper foreign key from CredentialTag to Tag
+   - Added back-reference from Tag to CredentialTag
+   - Ensured proper cascade behavior
+
+3. **CredentialStore Class Updates**:
+   - Removed model definitions from credential_store.py
+   - Updated to import models from netraven.web.models.credential
+   - Simplified initialization method (no need to create tables)
+   - Updated encryption/decryption logic for clarity
 
 ### Phase 3: Schema Initialization Script
 - Not started
@@ -179,11 +201,11 @@ This implementation plan outlines a phased approach to refactor the PostgreSQL s
 - None significant
 
 ## Insights & Recommendations
-- The credential store models should be integrated with the main Base class
-- Schema initialization should use a single, consistent approach
-- The runtime schema modifications should be handled during initialization only, not as a separate step
+- Moving model definitions to a proper package structure improves code organization
+- The credential_tags relationship now properly references the tags table
+- The consolidated approach simplifies schema initialization
 
 ## Handoff Notes
 - Phase 1 (Analysis) complete
-- Starting Phase 2 (Base Class Consolidation)
-- Detailed mapping of all tables available in table_mapping.md 
+- Phase 2 (Base Class Consolidation) nearly complete
+- Before proceeding to Phase 3, need to run tests to verify that the changes work correctly 

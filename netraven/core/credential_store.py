@@ -15,77 +15,15 @@ from datetime import datetime, timedelta
 import base64
 import hashlib
 
-from sqlalchemy import create_engine, Column, String, DateTime, Integer, Boolean, ForeignKey, Text, Float, func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship, Session
+from sqlalchemy import create_engine, func
+from sqlalchemy.orm import sessionmaker, Session
 
 from netraven.core.logging import get_logger
 from netraven.core.config import get_config
+from netraven.web.models.credential import Credential, CredentialTag
 
 # Configure logging
 logger = get_logger("netraven.core.credential_store")
-
-# Create SQLAlchemy Base class for models
-Base = declarative_base()
-
-class Credential(Base):
-    """
-    Model for storing device credentials.
-    """
-    __tablename__ = "credentials"
-    
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String(255), nullable=False, index=True)
-    description = Column(Text, nullable=True)
-    username = Column(String(255), nullable=False)
-    password = Column(String(1024), nullable=True)  # Encrypted
-    use_keys = Column(Boolean, default=False)
-    key_file = Column(String(1024), nullable=True)
-    
-    # Track credential effectiveness
-    success_count = Column(Integer, default=0)
-    failure_count = Column(Integer, default=0)
-    last_used = Column(DateTime, nullable=True)
-    last_success = Column(DateTime, nullable=True)
-    last_failure = Column(DateTime, nullable=True)
-    
-    # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    credential_tags = relationship("CredentialTag", back_populates="credential", cascade="all, delete-orphan")
-    
-    def __repr__(self) -> str:
-        return f"<Credential {self.name} (id={self.id})>"
-
-class CredentialTag(Base):
-    """
-    Model for associating credentials with tags.
-    """
-    __tablename__ = "credential_tags"
-    
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    credential_id = Column(String(36), ForeignKey("credentials.id", ondelete="CASCADE"), nullable=False)
-    tag_id = Column(String(36), nullable=False)  # Removing ForeignKey constraint for tag_id
-    priority = Column(Float, default=0.0)  # Higher priority credentials are tried first
-    
-    # Track credential effectiveness for this tag
-    success_count = Column(Integer, default=0)
-    failure_count = Column(Integer, default=0)
-    last_used = Column(DateTime, nullable=True)
-    last_success = Column(DateTime, nullable=True)
-    last_failure = Column(DateTime, nullable=True)
-    
-    # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    credential = relationship("Credential", back_populates="credential_tags")
-    
-    def __repr__(self) -> str:
-        return f"<CredentialTag credential_id={self.credential_id} tag_id={self.tag_id}>"
 
 class CredentialStore:
     """
@@ -139,14 +77,12 @@ class CredentialStore:
         self._initialized = False
     
     def initialize(self) -> None:
-        """Initialize the credential store and create tables if they don't exist."""
+        """Initialize the credential store. Not needed for schema creation anymore as that's handled by the central init_db."""
         if self._initialized:
             return
         
         with self._lock:
-            # Create tables
-            Base.metadata.create_all(bind=self._engine)
-            logger.info("Credential store tables created")
+            logger.info("Credential store initialized")
             self._initialized = True
     
     def set_key_manager(self, key_manager) -> None:
@@ -248,81 +184,51 @@ class CredentialStore:
         if not text:
             return text
         
-        # Check if the text is a JSON string with encryption metadata
-        if not (text.startswith('{') and text.endswith('}')):
-            # Legacy format or plaintext - use default key
-            return self._decrypt_legacy(text)
-        
-        try:
-            from cryptography.fernet import Fernet
+        # If no encryption key and no key manager, assume plaintext
+        if not self._encryption_key and not self._key_manager:
+            return text
             
-            # Parse the metadata
+        try:
+            # First check if the text is a JSON string with encryption metadata
             try:
-                metadata = json.loads(text)
-                key_id = metadata.get("key_id")
-                encrypted_data = metadata.get("encrypted_data")
-                
-                if not key_id or not encrypted_data:
-                    # Invalid format, try legacy decryption
-                    return self._decrypt_legacy(text)
-                
-                # Decode the encrypted data
-                encrypted_bytes = base64.b64decode(encrypted_data)
-                
-                # Find the appropriate key
-                encryption_key = None
-                
-                if key_id == "default" and self._encryption_key:
-                    # Use the default encryption key
-                    encryption_key = self._derive_key_from_string(self._encryption_key)
-                elif self._key_manager:
-                    # Use the key from the key manager
-                    with self._key_manager._lock:
-                        encryption_key = self._key_manager._keys.get(key_id)
-                
-                if not encryption_key:
-                    logger.error(f"Decryption key with ID {key_id} not found")
+                data = json.loads(text)
+                if not isinstance(data, dict) or "encrypted_data" not in data:
+                    # Not a valid encrypted data format, return as-is
                     return text
                 
-                # Decrypt using the selected key
-                f = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
-                return f.decrypt(encrypted_bytes).decode()
-                
-            except json.JSONDecodeError:
-                # Not a valid JSON, try legacy decryption
-                return self._decrypt_legacy(text)
-                
+                key_id = data.get("key_id", "default")
+                encrypted_data = base64.b64decode(data["encrypted_data"])
+            except (json.JSONDecodeError, ValueError, TypeError):
+                # Not JSON or not Base64, assume it's plain text
+                return text
+            
+            # Get the appropriate key for decryption
+            decryption_key = None
+            
+            if key_id != "default" and self._key_manager:
+                # Retrieve the key from the key manager
+                with self._key_manager._lock:
+                    decryption_key = self._key_manager._keys.get(key_id)
+            else:
+                # Use the default encryption key
+                decryption_key = self._derive_key_from_string(self._encryption_key)
+            
+            if not decryption_key:
+                logger.error(f"Decryption key '{key_id}' not found")
+                return text
+            
+            # Decrypt the data
+            from cryptography.fernet import Fernet
+            
+            f = Fernet(decryption_key.encode() if isinstance(decryption_key, str) else decryption_key)
+            decrypted_bytes = f.decrypt(encrypted_data)
+            
+            return decrypted_bytes.decode()
         except ImportError:
-            logger.warning("cryptography module not available. Returning credentials as-is.")
+            logger.warning("cryptography module not available. Unable to decrypt credentials.")
             return text
         except Exception as e:
             logger.error(f"Error decrypting credential: {str(e)}")
-            return text
-    
-    def _decrypt_legacy(self, text: str) -> str:
-        """
-        Decrypt using the legacy format (without key metadata).
-        
-        Args:
-            text: Encrypted text in legacy format
-            
-        Returns:
-            Decrypted text
-        """
-        if not self._encryption_key:
-            return text
-        
-        try:
-            from cryptography.fernet import Fernet
-            # Generate a key from the encryption key
-            key = self._derive_key_from_string(self._encryption_key)
-            f = Fernet(key)
-            return f.decrypt(text.encode()).decode()
-        except ImportError:
-            logger.warning("cryptography module not available. Returning credentials as-is.")
-            return text
-        except Exception as e:
-            logger.error(f"Error decrypting credential with legacy method: {str(e)}")
             return text
     
     def reencrypt_all_credentials(
