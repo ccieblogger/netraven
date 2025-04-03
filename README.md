@@ -1,483 +1,403 @@
-# NetRaven Network Management Platform
+# NetRaven Architecture: Intended State
 
-NetRaven is a modern network management platform that provides device management, configuration backup, and monitoring capabilities.
+## Executive Summary
 
-## Recent Updates and Fixes
+This document provides a high-level overview of the architecture for the NetRaven system. It serves as a unified source of truth for developers to understand the target architecture state.
 
-### Phase 5: API and UI Integration
+## System Overview
 
-- **Credential Management System**: Enhanced credential management with a new Pinia store for state management
-- **Credential Dashboard**: Added a dedicated dashboard with statistics about credential usage and performance
-- **API Endpoints**: Implemented new endpoints for credential statistics and tag associations
-- **Credential Store Integration**: Improved integration between the credential store and device authentication
+NetRaven is a specialized network device configuration backup system designed as a deployable product for customer environments. It is not a centralized service or a continuously running system managed by the development team, but rather a containerized application intended to be deployed at customer sites.
 
-### Authentication and CORS Fixes
+The system is designed to:
+1. Communicate with network devices to retrieve running configurations and device information
+2. Store retrieved configurations in a Git repository for version control and historical tracking
+3. Provide API access to device configurations
 
-- **JWT Import Fix**: Added missing `jwt` import in `netraven/web/auth/__init__.py` to address token generation issues.
-- **JWT Decode Parameter Fix**: Updated all `jwt.decode()` calls to include the required `key` parameter, as it was a required argument in the `python-jose` library.
-- **CORS Configuration**: Enhanced CORS settings in `netraven/web/__init__.py` to explicitly allow frontend origins including localhost and development environments.
-- **Pydantic Compatibility**: Modified the `User` model in `netraven/web/models/auth.py` to use a regular string for the email field instead of `EmailStr` to ensure compatibility with Pydantic 2.4.2.
-- **Frontend Request Format**: Updated the login function in the frontend to send credentials in JSON format rather than form-urlencoded to align with the API's expectations.
+The architecture follows service-oriented principles, with distinct services handling specific domains of functionality. Each customer deployment will run its own independent instance of the complete system.
 
-### Gateway Connectivity Fixes
+## Core Architectural Principles
 
-- **Container Communication**: Fixed the Gateway API URLs in `netraven/web/routers/gateway.py` to use the service name `device_gateway` instead of `localhost` for proper Docker container communication.
-- **Authentication for Status Endpoints**: Modified Gateway API endpoints (`status`, `metrics`, `config`) to use optional authentication, allowing the frontend to access them without requiring explicit authentication.
-- **Gateway API Endpoints**: Added a new `/config` endpoint to the Gateway API to provide configuration information to the frontend.
+- **Service-Oriented Architecture**: Functionality is organized into distinct services with well-defined interfaces
+- **Centralized Control Flow**: Device interactions flow through a unified scheduler service
+- **Comprehensive Logging**: All operations are tracked through a centralized logging service
+- **Asynchronous Operations**: The system supports asynchronous execution for improved scalability
+- **Protocol Abstraction**: Device communication is abstracted to support multiple protocols
+- **Database Unification**: All persistent data is stored in a single PostgreSQL database
 
-### Frontend Component Fixes
+## Core Services
 
-- **MainLayout Structure**: Fixed the structure of the `MainLayout.vue` component by adding proper Vue template and script tags, resolving component rendering issues.
-- **Authentication Error Handling**: Improved error handling in the frontend API client to provide better feedback for authentication failures.
+### 1. Scheduler Service
 
-## Architecture Overview
+The Scheduler Service serves as the central coordination point for configuration backup operations.
 
-NetRaven consists of several microservices that work together:
+**Key Responsibilities**:
+- Scheduling configuration retrieval jobs
+- Task handler registration system
+- Job state management and monitoring
+- Priority-based job execution
+- Exposing functionality through REST API endpoints and CLI commands
 
-1. **API Service**: The main backend API built with FastAPI, providing authentication and core functionality.
-2. **Device Gateway**: A service that manages device connections and executes commands on network devices.
-3. **Frontend**: A Vue.js web interface for user interaction.
-4. **PostgreSQL Database**: Stores device information, configurations, and user data.
-5. **Scheduler**: Handles periodic tasks such as device discovery and configuration backups.
+### 2. Job Logging Service
 
-## Authentication System
+The Job Logging Service provides comprehensive logging for all configuration retrieval operations.
 
-The platform uses a unified JWT-based authentication system:
+**Key Responsibilities**:
+- Structured logging with consistent schema
+- Sensitive data filtering and redaction
+- Job session lifecycle management
+- Cross-component logging integration
+- Query capabilities for job history
 
-- JWT tokens are generated upon successful login with username/password
-- Tokens include user permissions as scopes
-- Tokens are validated across microservices using a shared secret
-- Gateway and API services communicate using pass-through authentication
+### 3. Device Communication Service
 
-## Development Environment
+The Device Communication Service handles all interactions with network devices, specifically for retrieving configurations and device information.
 
-The project uses Docker Compose for local development. To start the development environment:
+**Key Responsibilities**:
+- Protocol abstraction (SSH, Telnet, HTTP/REST)
+- Connection pooling and management
+- Unified error handling
+- Credential management integration
+- Device-specific command handling for configuration retrieval
+- Retrieval of device identifying information (serial numbers, hostnames)
 
-```bash
-docker-compose up -d
-```
+### 4. Credential Store
 
-The following services will be available:
+The Credential Store is implemented as part of the database schema and provides credential management functionality through database models and services.
 
-- Frontend: http://localhost:8080
-- API: http://localhost:8000
-- Gateway: http://localhost:8001
+**Key Responsibilities**:
+- Secure storage of authentication credentials
+- Tag-based credential association
+- Prioritized credential selection
+- Success/failure tracking
+- Integration with core database operations
 
-## Testing
+## Tagging System
 
-### Running Tests
+The tagging system is a fundamental organizational concept in NetRaven that enables flexible categorization of devices and association with credentials.
 
-NetRaven includes comprehensive tests for all functionality:
+**Key Features**:
+- Flat tag structure for device categorization (by type, location, role, etc.)
+- Many-to-many relationships between devices and tags
+- Tag-based credential association that allows credentials to be linked to specific device types
+- Basic credential prioritization within tags (numeric priority values)
+- Query capabilities for finding devices by tag
+- Filtering capabilities based on tags
 
-```bash
-# Install test dependencies
-pip install -r test-requirements.txt
-playwright install  # For UI tests
+**Implementation**:
+- Database models for tags, device-tag associations, and credential-tag associations
+- REST API endpoints for tag management
+- Service layer for tag operations
+- UI components for tag management and assignment
 
-# Run tests (with the application running in test mode)
-NETRAVEN_ENV=test docker-compose up -d
-pytest
+The tagging system serves as a critical link between devices and credentials, enabling NetRaven to intelligently select the appropriate authentication method for each device based on its tags.
 
-# Run specific test categories
-pytest tests/unit
-pytest tests/integration
-pytest tests/ui
-```
+## Database Architecture
 
-### Test Categories
+All components use a single PostgreSQL database with the following characteristics:
 
-- **Unit Tests**: Test individual functions and methods
-- **Integration Tests**: Test API endpoints and database interactions
-- **UI Tests**: End-to-end tests of the frontend using Playwright
+- Unified schema across all components (including credential storage)
+- Async-compatible ORM (SQLAlchemy)
+- Proper transaction management
+- Migrations managed through Alembic
 
-See [Testing Guide](docs/testing.md) for more details on writing and running tests.
-
-## Default Credentials
-
-For development and testing:
-
-- Username: admin
-- Password: NetRaven
-
-## Description
-
-This tool securely connects to Cisco network devices (routers, switches, firewalls, and WLCs), retrieves their running configurations, and backs them up to various storage destinations. It currently supports local file storage with Git integration for version control and AWS S3 remote storage for cloud backup.
-
-## Project Structure
-
-The project is organized into the following components:
+## Component Relationships
 
 ```
-netraven/
-├── core/                      # Core functionality
-│   ├── device_comm.py         # Device communication
-│   ├── storage.py             # Storage backends (Local, S3)
-│   └── ...                    # Other core modules
-├── web/                       # Web interface
-│   ├── backend/               # FastAPI backend
-│   │   ├── app/               # Application code
-│   │   │   ├── api/           # API endpoints
-│   │   │   ├── core/          # Backend core modules
-│   │   │   ├── db/            # Database models
-│   │   │   ├── schemas/       # Pydantic schemas
-│   │   │   └── storage/       # Storage adapters
-│   │   └── ...                # Backend files
-│   └── frontend/              # Vue.js frontend
-│       ├── src/               # Frontend source
-│       └── ...                # Frontend files
+┌───────────────────┐      ┌────────────────────┐      ┌────────────────────┐
+│                   │      │                    │      │                    │
+│   API Gateway     │─────►│  Scheduler Service │─────►│ Device Comm Service│
+│                   │      │                    │      │                    │
+└───────────────────┘      └────────────────────┘      └────────────────────┘
+        │                           │                          │
+        │                           │                          │
+        │                           ▼                          │
+        │                  ┌────────────────────┐             │
+        └─────────────────►│  Job Logging       │◄────────────┘
+                           │  Service           │
+                           │                    │
+                           └────────────────────┘
+                                    │
+                                    ▼
+                           ┌────────────────────────────────────┐
+                           │                                    │
+                           │              Database              │
+                           │    (includes Credential Store)     │
+                           │                                    │
+                           └────────────────────────────────────┘
 ```
 
-## Components
-
-### Core
-
-The core package provides the fundamental functionality for:
-- Connecting to network devices
-- Retrieving configurations
-- Storing backups in various backends (local filesystem, S3)
-
-### Web Interface
-
-The web interface provides:
-- REST API for managing devices, jobs, and backups
-- User authentication and authorization
-- Scheduled backup jobs
-- Modern UI for configuration and monitoring
-
-## Docker Setup
-
-All Docker-related files are located in the `/docker` directory:
+The Command Line Interface (CLI) components operate independently from the core services, providing administrative access through a separate interface:
 
 ```
-docker/
-├── Dockerfile.main            # Main application Dockerfile
-├── Dockerfile.api             # API service Dockerfile
-├── Dockerfile.gateway         # Device Gateway Dockerfile
-├── docker-compose.yml         # Main Docker Compose configuration
-├── docker-compose.override.yml # Development/test overrides
-└── README.md                  # Docker documentation
+┌────────────────────┐      ┌────────────────────────────────────┐
+│                    │      │                                    │
+│   CLI Components   │─────►│              Database              │
+│                    │      │    (includes Credential Store)     │
+└────────────────────┘      │                                    │
+                            └────────────────────────────────────┘
 ```
 
-To run the application using Docker:
+## Docker and Container Deployment Architecture
 
-```bash
-cd docker
-docker-compose up -d
+NetRaven is designed as a containerized application that runs exclusively in Docker containers. This architectural decision provides consistency, isolation, and portability across development, testing, and production environments.
+
+### Container Structure
+
+The application is structured as a set of interconnected containers:
+
+- **Main Application Container**: Contains the core NetRaven application (Python/FastAPI backend)
+- **Frontend Container**: Serves the Vue.js web interface
+- **Database Container**: Runs PostgreSQL for persistent storage
+- **Key Rotation Container**: Handles credential encryption key rotation
+- **CLI Container**: Provides command-line interface utilities for system administration
+
+### Container Relationships
+
+```
+┌───────────────────────────────────────────────────────────┐
+│                      Docker Network                        │
+│                                                           │
+│  ┌─────────────┐     ┌────────────┐     ┌──────────────┐  │
+│  │             │     │            │     │              │  │
+│  │   Frontend  │◄───►│    Main    │◄───►│   Database   │  │
+│  │    (Vue)    │     │ Application│     │ (PostgreSQL) │  │
+│  │             │     │            │     │              │  │
+│  └─────────────┘     └────────────┘     └──────────────┘  │
+│                           │                    ▲           │
+│                           ▼                    │           │
+│                    ┌────────────┐      ┌───────────────┐  │
+│                    │    Key     │      │               │  │
+│                    │  Rotation  │      │      CLI      │  │
+│                    │            │      │               │  │
+│                    └────────────┘      └───────────────┘  │
+│                                                           │
+└───────────────────────────────────────────────────────────┘
 ```
 
-For more details about the Docker setup, see the [Docker README](docker/README.md).
+### Development Environment
 
-## Development
+For development, the containers are orchestrated using Docker Compose with volumes mounted to enable real-time code changes without rebuilding containers:
 
-### Setting Up Your Environment
+- Source code is mounted into the main application container
+- Frontend code is mounted into the frontend container
+- Configuration files are mounted from the host's `/config` directory
 
-1. Clone the repository
-2. Install dependencies: `pip install -e .`
-3. Start the server:
-   ```bash
-   cd docker
-   docker-compose up
-   ```
+### Important Considerations
 
-### API Documentation
+1. **Path Resolution**: All file paths in the application must use container paths, not host paths
+2. **Network Access**: Containers communicate over the Docker network with service names as hostnames
+3. **Database Access**: Database connections use the database container's service name
+4. **Configuration Mounting**: Configuration files are mounted from the host system into the containers
+5. **Volume Persistence**: Database and backup data are persisted using Docker volumes
 
-When running, the API documentation is available at:
-- http://localhost:8000/docs
+### Build Process
 
-## License
+The build process is defined in the Dockerfiles located in the `/docker` directory:
 
-MIT
+- `Dockerfile.main`: Builds the main application container
+- `Dockerfile.frontend`: Builds the frontend container
+- Additional configuration in `docker-compose.yml`
 
-## Default Admin Credentials
+When developing new features, **always test within the Docker environment** to ensure compatibility with the production deployment architecture.
 
-When NetRaven is first installed, a default admin user is created with the following credentials:
+## Git Repository Integration
 
-- **Username**: admin
-- **Password**: NetRaven
+A key component of NetRaven is its integration with a Git repository for storing device configurations:
 
-For security reasons, we strongly recommend changing this password after your first login.
+- Local Git repository for configuration storage
+- Automatic commit of configuration changes
+- Historical tracking of configuration versions
+- Diffing capabilities for change analysis
+- Structured organization by device
 
-## Emergency Password Reset
+## Configuration System
 
-If you lose access to the admin account, an emergency password reset script is provided:
+The configuration system uses a dual approach to manage application settings:
 
-```bash
-python scripts/reset_admin_password.py
-```
+### 1. User/Admin Configurable Settings
 
-This will reset the admin password back to the default "NetRaven". This script should only be used as an emergency measure to regain access to the system.
+Settings that users or administrators are likely to change are stored in the database and exposed through the web UI:
 
-**Security Note**: This script should be kept secure and only accessible to authorized personnel. After using it, immediately change the admin password.
+- System preferences and behavior options
+- Default values for device operations
+- Notification settings
+- Backup scheduling defaults
+- UI customization options
 
-## Database Migrations
+These settings are:
+- Editable through a dedicated admin UI section
+- Stored in a `system_settings` table in the database
+- Cached appropriately for performance
+- Protected by role-based access controls
+- Accessible programmatically through a settings service
 
-NetRaven uses Alembic for database migrations. Migrations are automatically run when the application containers start up.
+### 2. Application Configuration
 
-### Running Migrations
+All other application settings that typically don't change after deployment are stored in the `/config` directory:
 
-Migrations are handled automatically when you start the application with Docker Compose:
+- **Core Settings**: Basic application configuration
+- **Web Service Settings**: Web server and API configuration 
+- **Component-specific Settings**: Settings for individual services
+- **Environment-specific Settings**: Configurations for different environments
 
-```bash
-docker-compose up
-```
+Configuration files are organized within the `/config` directory as follows:
+- `/config/netraven.yaml`: Main configuration file
+- `/config/settings/*.yaml`: Component-specific settings
+- `/config/environments/*.yaml`: Environment-specific settings
 
-The API container will run the migrations before starting the API service.
+All components load their non-user-configurable settings from this central location to ensure consistency across the application. Environment variables provide runtime overrides for configuration values when needed.
 
-### Creating New Migrations
+### Configuration Hierarchy
 
-To create a new migration:
+Settings are loaded in the following order of precedence:
+1. Environment variables (highest precedence)
+2. User/admin settings from the database
+3. Environment-specific configuration files
+4. Component-specific configuration files
+5. Main configuration file (lowest precedence)
 
-1. Make changes to the SQLAlchemy models in the application
-2. Generate a new migration script:
+This approach allows for flexibility in configuration while maintaining a clear separation between settings that should be user-configurable and those that are core to application function.
 
-```bash
-# From the project root
-docker-compose exec api alembic -c netraven/web/migrations/alembic.ini revision --autogenerate -m "Description of changes"
-```
+## Testing Methodology
 
-3. Review the generated migration script in `netraven/web/migrations/versions/`
+NetRaven is a deployable product, not a centralized service with a permanent running instance. This distinction is important for the testing approach. Testing should validate that the product functions correctly in its intended deployment environment without introducing unnecessary complexity.
 
-For more details, see the [migrations README](netraven/web/migrations/README.md).
+### Testing Pyramid
 
-## Authentication
+The testing strategy follows the testing pyramid model:
 
-NetRaven supports two authentication methods:
+1. **Unit Tests** (base of pyramid - highest quantity)
+   - Test individual functions, methods, and classes in isolation
+   - Mock external dependencies as needed for isolation
+   - Focus on code paths and edge cases
+   - Aim for high coverage (>80%)
 
-### JWT Token Authentication
+2. **Integration Tests** (middle of pyramid)
+   - Test interactions between components
+   - Test service interactions
+   - Focus on component contracts and interfaces
 
-For user-based authentication, NetRaven uses JWT (JSON Web Token) authentication. This is primarily used for the web interface and API access by users.
+3. **End-to-End Tests** (top of pyramid - lowest quantity)
+   - Test complete user flows
+   - Test through the API and UI
+   - Simulate actual device interactions with mock devices
+   - Focus on critical user journeys
 
-To obtain a token:
+### Testing Environment
 
-```bash
-curl -X POST http://localhost:8000/api/auth/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=NetRaven"
-```
+All tests must be executed in the Docker-based environment that matches the deployment environment:
 
-### API Key Authentication
+- Tests run inside the containerized environment
+- Tests use the actual PostgreSQL database that is part of the Docker setup
+- Database can be rebuilt and reinitialized for testing as needed
+- Mock services are provided for simulating network devices
 
-For service-to-service communication, NetRaven supports API key authentication. This is useful for integrating with other systems or for automated scripts.
+### Database Testing Approach
 
-Use the API key in the `X-API-Key` header:
+- **Use the standard PostgreSQL database**: All tests should use the same PostgreSQL database that the application will use in deployment
+- **Avoid alternative databases**: Do not introduce other database types (like SQLite) for testing, as this can lead to inconsistencies and codebase contamination
+- **Database initialization**: Create appropriate setup and teardown procedures to initialize the database to a known state before tests and clean up afterward
+- **Test isolation**: Ensure tests are properly isolated through transaction management or appropriate cleanup
 
-```bash
-curl -X GET http://localhost:8000/api/health \
-  -H "X-API-Key: netraven-api-key"
-```
+### Test Types and Organization
 
-The default API key is `netraven-api-key`, which can be changed in the configuration or by setting the `NETRAVEN_API_KEY` environment variable in the `docker-compose.yml` file.
+Tests are organized in the `/tests` directory with a structure that mirrors the application structure:
 
-For more detailed API documentation, see [API Documentation](docs/api.md).
+- `/tests/unit/`: Unit tests for isolated components
+- `/tests/integration/`: Tests for component interactions
+- `/tests/e2e/`: End-to-end tests for complete workflows
+- `/tests/fixtures/`: Shared test fixtures and utilities
 
-## Features
+### Test-Driven Development
 
-- **Device Management**: Add, edit, and organize network devices
-- **Configuration Backup**: Automated backup of device configurations
-- **Scheduled Jobs**: Schedule recurring backup and command execution tasks
-- **Job Logging**: Comprehensive logging of all operations
-- **Tag-based Organization**: Organize devices with tags and tag rules
-- **Device Gateway**: Secure gateway for device communication with metrics collection
+When developing new features or fixing bugs:
 
-### Scheduler Service
+1. Write tests first that define the expected behavior
+2. Implement the functionality to make the tests pass
+3. Refactor the code while ensuring tests continue to pass
 
-The Scheduler Service provides a centralized system for scheduling and executing jobs on network devices. It supports:
+### Asynchronous Testing
 
-- One-time and recurring job scheduling using cron expressions
-- Priority-based job queuing
-- Backup and command execution job types
-- Comprehensive job logging and status tracking
-- Command-line interface for job management
+For asynchronous components:
 
-To use the Scheduler CLI:
+- Use asynchronous testing patterns
+- Test both success and failure paths
+- Include timeout and cancellation scenarios
+- Ensure proper resource cleanup
 
-```bash
-# Show service status
-./netraven/cli/scheduler_cli.py status
+### Mocking External Dependencies
 
-# Schedule a backup job
-./netraven/cli/scheduler_cli.py backup --device-id device1 --host 192.168.1.1 --username admin --password secret --now
+When testing, mock only external systems that are not part of the NetRaven deployment:
 
-# Schedule a command execution job
-./netraven/cli/scheduler_cli.py command --device-id device1 --host 192.168.1.1 --username admin --password secret --command "show version" --now
+- Network devices should be mocked to simulate different device types and responses
+- External services should be replaced with mock implementations
+- System resources like time can be virtualized for deterministic testing
 
-# List all jobs
-./netraven/cli/scheduler_cli.py list
+Tests should use the actual implementation of internal components (database, file system within the container, etc.) whenever possible to ensure the product functions correctly in its intended deployment environment.
 
-# Show job details
-./netraven/cli/scheduler_cli.py show <job_id>
+### Test Execution
 
-# Cancel a job
-./netraven/cli/scheduler_cli.py cancel <job_id>
-```
+Tests should be executed in the following contexts:
 
-For more information about the Scheduler Service, see the [development documentation](docs/aidocs/development/phase2_scheduler_service.md).
+1. **Development**: Developers must run tests in the Docker environment before submitting changes
+2. **Pre-Deployment**: All tests should be run and pass before packaging the product for delivery
 
-## Architecture
+All test code must maintain the same quality standards as application code.
 
-NetRaven consists of several components:
+## Directory Structure
 
-1. **Web API**: FastAPI-based REST API for device management and job control
-2. **Scheduler**: Background service for executing scheduled jobs
-3. **Device Gateway**: Secure gateway for device communication
-4. **Frontend**: Vue.js-based web interface
-5. **Database**: PostgreSQL database for storing device information, backups, and logs
+The intended directory structure follows clear organization principles:
 
-## Gateway Integration
+- `/netraven/core`: Core functionality and shared components
+- `/netraven/core/services`: Service implementations (Job Logging, Scheduler, etc.)
+- `/netraven/web`: Web interface and API components
+- `/cli`: Command-line interface components and utilities
+- `/cli/bin`: Command-line executable scripts
+- `/config`: Configuration files
+- `/docs`: Documentation organized by type
+- `/scripts`: Utility scripts organized by purpose
+- `/tests`: Comprehensive test suite
 
-NetRaven includes a Device Gateway service that provides a secure way to communicate with network devices. The gateway offers several benefits:
+## Coding Principles
 
-- **Centralized Access**: All device connections go through a single point, simplifying security management
-- **Metrics Collection**: Comprehensive metrics on device connections, commands, and errors
-- **Secure API**: JWT-based authentication for secure access
-- **Scheduler Integration**: Seamless integration with the job scheduling system
+All developers working on the NetRaven project must adhere to the following principles:
 
-### Gateway Configuration
+### 1. Code Quality and Maintainability
 
-The gateway can be configured in the `config.yml` file:
+- **Prefer Simple Solutions**: Always opt for straightforward and uncomplicated approaches to problem-solving. Simple code is easier to understand, test, and maintain.
 
-```yaml
-gateway:
-  url: http://localhost:8001
-  api_key: your-api-key-here
-  use_by_default: false
-  connect_timeout: 30
-  command_timeout: 60
-  max_retries: 3
-  retry_delay: 5
-```
+- **Avoid Code Duplication**: Eliminate redundant code by checking for existing functionality before introducing new implementations. Follow the DRY (Don't Repeat Yourself) principle to enhance maintainability.
 
-### Using the Gateway
+- **Refactor Large Files**: Keep individual files concise, ideally under 200-300 lines of code. When files exceed this length, refactor to improve readability and manageability.
 
-To use the gateway for device operations:
+### 2. Change Management
 
-1. Ensure the gateway service is running
-2. Set `use_by_default: true` in the config or use the `--use-gateway` flag with the scheduler
-3. Monitor gateway metrics through the web interface at `/gateway`
+- **Scope of Changes**: Only implement changes that are explicitly requested or directly related to the task at hand. Unnecessary modifications can introduce errors and complicate code reviews.
 
-### Gateway API
+- **Introduce New Patterns Cautiously**: When addressing bugs or issues, exhaust all options within the existing implementation before introducing new patterns or technologies. If a new approach is necessary, ensure that the old implementation is removed to prevent duplicate logic and legacy code.
 
-The gateway provides the following API endpoints:
+- **Code Refactoring Process**: Code refactoring, enhancements, or changes of any significance should be done in a git feature branch and reintroduced back into the codebase through an integration branch after all changes have been successfully tested.
 
-- `/health`: Health check endpoint
-- `/status`: Gateway status information
-- `/metrics`: Detailed metrics about gateway operations
-- `/check-device`: Check device connectivity
-- `/connect`: Connect to a device
-- `/execute`: Execute a command on a device
-- `/backup`: Backup device configuration
+### 3. Resource Management
 
-## Logging System
+- **Clean Up Temporary Resources**: Remove temporary files or code when they are no longer needed to maintain a clean and efficient codebase.
 
-NetRaven includes a sophisticated logging system with the following features:
+- **Avoid Temporary Scripts in Files**: Refrain from writing scripts directly into files, especially if they are intended for one-time or temporary use. This practice helps maintain code clarity and organization.
 
-### Component-Specific Logging
-- **Frontend Logs**: Dedicated log files for frontend-related events (`logs/frontend.log`)
-- **Backend Logs**: API and backend server logs (`logs/backend.log`)
-- **Authentication Logs**: Security-related authentication events (`logs/auth.log`)
-- **Jobs Logs**: Scheduled backup tasks and operations (`logs/jobs.log`)
-- **Main Application Log**: Comprehensive log of all activities (`logs/netraven.log`)
+### 4. Testing Practices
 
-### Log Rotation
-NetRaven supports two types of log rotation:
+- **Use Mock Data Appropriately**: Employ mocking data exclusively for testing purposes. Avoid using mock or fake data in development or production environments to ensure data integrity and reliability.
 
-1. **Size-based Rotation** (Default)
-   - Logs rotate when they reach a specified size (default: 10MB)
-   - Configurable number of backup files to keep (default: 5)
+- **Test Coverage**: Strive for comprehensive test coverage of new functionality, with particular attention to edge cases and error conditions.
 
-2. **Time-based Rotation**
-   - Rotate logs based on time intervals (hourly, daily, midnight, weekly)
-   - Configurable in `config.yml` by setting `rotation_when` and `rotation_interval`
-   - Example for daily rotation at midnight:
-     ```yaml
-     logging:
-       file:
-         rotation_when: midnight
-         rotation_interval: 1
-     ```
+### 5. Communication and Collaboration
 
-### Advanced Features
-- **JSON Structured Logging**: Optional JSON-formatted logs for integration with log analysis tools
-- **Sensitive Data Redaction**: Automatic redaction of passwords and other sensitive information
-- **Configurable Log Levels**: Different verbosity levels for console and file outputs
+- **Propose and Await Approval for Plans**: When tasked with updates, enhancements, creation, or issue resolution, present a detailed plan outlining the proposed changes. Break the plan into phases to manage complexity and await approval before proceeding.
 
-### Testing Log Rotation
+- **Seek Permission Before Advancing Phases**: Before moving on to the next phase of your plan, always obtain approval to ensure alignment with project goals and stakeholder expectations.
 
-To test and demonstrate log rotation, you can use the included script:
-```bash
-# Test time-based rotation (rotates logs every minute)
-python scripts/test_time_rotation.py
-```
+- **Version Control Practices**: After successfully completing each phase, perform a git state check, commit the changes, and push them to the repository. This ensures a reliable version history and facilitates collaboration.
 
-## Requirements
+- **Document Processes Clearly**: Without being overly verbose, provide clear explanations of your actions during coding, testing, or implementing changes. This transparency aids understanding and knowledge sharing among team members.
 
-- Python 3.10+
-- Required Python packages (see requirements.txt)
-- Git (for local version control)
-- AWS credentials (for S3 storage)
-
-## Production Deployment Preparation
-
-Before deploying NetRaven to production, ensure you complete the following checklist:
-
-### Backend Preparation
-1. **Update Configuration**: Set production-appropriate values in configuration files
-2. **Database Migrations**: Ensure all migrations are applied
-3. **Security Review**: Validate that JWT secret keys and other sensitive information are securely managed
-
-### Frontend Preparation
-1. **Resolve Linting Issues**: 
-   - Run ESLint and fix any issues:
-   ```bash
-   cd netraven/web/frontend
-   npm run lint -- --fix
-   ```
-   
-2. **Update Configuration**:
-   - Modify `vue.config.js` to enable appropriate settings
-   - Set API endpoint URLs in the environment configuration
-
-3. **Build and Test**:
-   - Perform a local production build:
-   ```bash
-   npm run build
-   ```
-   - Verify the build outputs in the `dist` directory
-
-For more detailed frontend deployment instructions, see the [Frontend README](netraven/web/frontend/README.md#linting-and-production-preparation).
-
-## Documentation
-
-NetRaven includes comprehensive documentation to help you get started, understand the system architecture, and troubleshoot issues:
-
-### Documentation Structure
-
-The documentation is organized into three main categories:
-
-1. **Architecture Documentation** - System-level design and component interactions
-   - Overall system architecture
-   - Component design and interactions
-   - System requirements and specifications
-
-2. **Developer Guides** - How-to guides for implementing features and working with the codebase
-   - Development workflow
-   - Testing procedures
-   - Frontend development guides
-   - Backend development guides
-
-3. **Reference Documentation** - Technical reference for APIs, database schemas, and configuration
-   - API reference
-   - Database schema
-   - Configuration options
-   - Migration system
-
-For a complete overview of all available documentation, see the [Documentation Index](docs/index.md).
-
-Key documentation files:
-
-- [Project Specifications](docs/architecture/project-specs.md): Detailed project goals and requirements
-- [Device Communication](docs/implementation/device-communication.md): How NetRaven communicates with network devices
-- [Logging System](docs/reference/logging.md): Information about the logging infrastructure
-- [Web Frontend Design](docs/architecture/web-frontend-design.md): Frontend architecture and component design
-- [Troubleshooting Guide](docs/guides/troubleshooting.md): Solutions for common issues, authentication setup, and verification steps
-- [Database Migrations](docs/reference/database-migrations.md): Database migration system documentation
+- **Development Log**: Always maintain a log of your changes, insights, and any other relevant information another developer could use to pick up where you left off to complete the current task. Store this log in the `./docs/development_logs/` folder in a folder named after the feature branch you are working on. 
