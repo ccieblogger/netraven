@@ -68,7 +68,7 @@ services:
     networks:
       - netraven-network
     # Use the new initialization script
-    entrypoint: ["/bin/bash", "-c", "python /app/scripts/initialize_schema.py && /app/docker/entrypoint.sh"]
+    entrypoint: ["/bin/bash", "-c", "ls -la /app/scripts/ && python -u /app/scripts/initialize_schema.py && /app/docker/entrypoint.sh"]
 
   # Scheduler service
   scheduler:
