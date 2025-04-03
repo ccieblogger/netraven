@@ -2,8 +2,8 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
+# Copy requirements and install dependencies
+COPY docker/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code

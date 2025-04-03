@@ -11,8 +11,8 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
+# Copy and install requirements
+COPY docker/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir flask gunicorn
 

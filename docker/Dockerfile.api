@@ -28,8 +28,8 @@ RUN mkdir -p /.local /.cache && \
 WORKDIR /app
 
 # Copy dependencies files
-COPY requirements.txt .
-COPY test-requirements.txt .
+COPY docker/requirements.txt .
+COPY docker/test-requirements.txt .
 
 # Install dependencies based on environment
 RUN pip install --no-cache-dir -r requirements.txt && \
