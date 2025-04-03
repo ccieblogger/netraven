@@ -10,6 +10,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data/
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./backups:/backups
     ports:
       - "5432:5432"
     restart: unless-stopped
@@ -66,8 +67,8 @@ services:
       retries: 3
     networks:
       - netraven-network
-    # Use entrypoint.sh directly without trying to modify /tmp/netmiko_logs
-    entrypoint: ["/bin/bash", "-c", "python /app/scripts/ensure_schema.py && /app/docker/entrypoint.sh"]
+    # Use the new initialization script
+    entrypoint: ["/bin/bash", "-c", "python /app/scripts/initialize_schema.py && /app/docker/entrypoint.sh"]
 
   # Scheduler service
   scheduler:

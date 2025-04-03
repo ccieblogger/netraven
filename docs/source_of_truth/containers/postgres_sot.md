@@ -37,6 +37,26 @@ The PostgreSQL schema is designed to support all NetRaven functionality with a c
 - Credentials have many tags through credential_tags (many-to-many)
 - Jobs have many log entries (one-to-many)
 
+## Schema Initialization
+
+The database schema is initialized through a hybrid approach:
+
+1. **SQL Initialization Scripts**:
+   - Basic PostgreSQL setup (extensions, schema creation)
+   - Run automatically when the container starts
+
+2. **SQLAlchemy Models**:
+   - Define table structures, relationships, and constraints
+   - All models use a single Base class for consistency
+   - Tables are created by a dedicated initialization script
+
+3. **Initialization Process**:
+   - PostgreSQL container starts and runs SQL initialization script
+   - API container runs Python initialization script before startup
+   - Default data (e.g., tags) is created during initialization
+
+This approach ensures a consistent schema across all deployments while maintaining flexibility for development.
+
 ## Performance Characteristics
 
 The PostgreSQL container is configured for optimal performance in the NetRaven application context:
@@ -127,11 +147,11 @@ The PostgreSQL container implements data persistence through the following mecha
    - Additional volume mount for database backups
    - Example: `./backups:/backups`
    - Enables customers to perform and manage backups
+   - Includes backup script for easy backup creation
 
 3. **Initialization**:
    - Initial schema created through initialization scripts
-   - Schema version tracked in database
-   - No auto-migration (fixed schema for product releases)
+   - Tables defined via SQLAlchemy models for consistency
 
 ## Containerization Details
 
