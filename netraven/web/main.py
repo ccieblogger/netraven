@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from netraven.web.database import get_async_session, init_db, close_db
 from netraven.core.services.service_factory import get_service_factory
+# Import the main API router
+from netraven.web.api import api_router
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +37,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include the main API router with a prefix
+app.include_router(api_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup_event():
