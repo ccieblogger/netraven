@@ -20,7 +20,13 @@ from sqlalchemy.orm import sessionmaker, Session
 
 from netraven.core.logging import get_logger
 from netraven.core.config import get_config
-from netraven.web.models.credential import Credential, CredentialTag
+
+# Remove the direct import of models to avoid circular imports
+# from netraven.web.models.credential import Credential, CredentialTag
+
+# Create instance store for singleton pattern
+_credential_store_instance = None
+_credential_store_lock = threading.Lock()
 
 # Configure logging
 logger = get_logger("netraven.core.credential_store")
@@ -372,6 +378,47 @@ class CredentialStore:
             db.close()
             raise
     
+    def get_credential(self, credential_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a credential by ID.
+        
+        Args:
+            credential_id: Credential ID
+            
+        Returns:
+            Credential information as a dictionary if found, None otherwise
+        """
+        # Import models inside method to avoid circular imports
+        from netraven.web.models.credential import Credential, CredentialTag
+        
+        db = self.get_db()
+        try:
+            # Get the credential from the database
+            credential = db.query(Credential).filter(Credential.id == credential_id).first()
+            if not credential:
+                return None
+            
+            # Convert to dictionary format (exclude password)
+            result = {
+                "id": credential.id,
+                "name": credential.name,
+                "username": credential.username,
+                "description": credential.description,
+                "use_keys": credential.use_keys,
+                "key_file": credential.key_file,
+                "success_count": credential.success_count,
+                "failure_count": credential.failure_count,
+                "last_used": credential.last_used,
+                "last_success": credential.last_success,
+                "last_failure": credential.last_failure,
+                "created_at": credential.created_at,
+                "updated_at": credential.updated_at,
+            }
+            
+            return result
+        finally:
+            db.close()
+    
     def add_credential(
         self, 
         name: str, 
@@ -386,99 +433,62 @@ class CredentialStore:
         Add a credential to the store.
         
         Args:
-            name: Name of the credential
-            username: Username for the credential
-            password: Password for the credential
+            name: Human-readable name for the credential
+            username: Username for authentication
+            password: Password for authentication (will be encrypted)
             use_keys: Whether to use key-based authentication
-            key_file: Path to the SSH key file
-            description: Description of the credential
-            tags: List of tag IDs to associate with the credential
+            key_file: Path to the key file for key-based authentication
+            description: Optional description of the credential
+            tags: Optional list of tag IDs to associate with
             
         Returns:
             ID of the created credential
         """
-        self.initialize()
+        # Import models inside method to avoid circular imports
+        from netraven.web.models.credential import Credential, CredentialTag
         
-        # Encrypt password if provided
-        encrypted_password = self._encrypt(password) if password else None
+        # Encrypt the password if provided
+        encrypted_password = None
+        if password:
+            encrypted_password = self._encrypt(password)
         
+        # Create the credential
+        cred_id = str(uuid.uuid4())
+        credential = Credential(
+            id=cred_id,
+            name=name,
+            username=username,
+            password=encrypted_password,
+            use_keys=use_keys,
+            key_file=key_file,
+            description=description,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        # Save to database
         db = self.get_db()
         try:
-            # Create credential
-            credential = Credential(
-                name=name,
-                username=username,
-                password=encrypted_password,
-                use_keys=use_keys,
-                key_file=key_file,
-                description=description
-            )
-            
             db.add(credential)
-            db.commit()
-            db.refresh(credential)
             
-            # Add tags if provided
+            # Associate with tags if provided
             if tags:
                 for tag_id in tags:
-                    tag_association = CredentialTag(
-                        credential_id=credential.id,
-                        tag_id=tag_id
+                    cred_tag = CredentialTag(
+                        credential_id=cred_id,
+                        tag_id=tag_id,
+                        priority=0.0,  # Default priority
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
                     )
-                    db.add(tag_association)
-                
-                db.commit()
+                    db.add(cred_tag)
             
-            logger.info(f"Added credential '{name}' with ID {credential.id}")
-            return credential.id
+            db.commit()
+            return cred_id
         except Exception as e:
             db.rollback()
             logger.error(f"Error adding credential: {str(e)}")
             raise
-        finally:
-            db.close()
-    
-    def get_credential(self, credential_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get a credential by ID.
-        
-        Args:
-            credential_id: ID of the credential
-            
-        Returns:
-            Credential data with decrypted password, or None if not found
-        """
-        self.initialize()
-        
-        db = self.get_db()
-        try:
-            credential = db.query(Credential).filter(Credential.id == credential_id).first()
-            
-            if not credential:
-                return None
-            
-            # Decrypt password if present
-            password = self._decrypt(credential.password) if credential.password else None
-            
-            return {
-                "id": credential.id,
-                "name": credential.name,
-                "username": credential.username,
-                "password": password,
-                "use_keys": credential.use_keys,
-                "key_file": credential.key_file,
-                "description": credential.description,
-                "success_count": credential.success_count,
-                "failure_count": credential.failure_count,
-                "last_used": credential.last_used.isoformat() if credential.last_used else None,
-                "last_success": credential.last_success.isoformat() if credential.last_success else None,
-                "last_failure": credential.last_failure.isoformat() if credential.last_failure else None,
-                "created_at": credential.created_at.isoformat(),
-                "updated_at": credential.updated_at.isoformat()
-            }
-        except Exception as e:
-            logger.error(f"Error retrieving credential: {str(e)}")
-            return None
         finally:
             db.close()
     
@@ -600,28 +610,29 @@ class CredentialStore:
     
     def delete_credential(self, credential_id: str) -> bool:
         """
-        Delete a credential.
+        Delete a credential from the store.
         
         Args:
             credential_id: ID of the credential to delete
             
         Returns:
-            True if deleted successfully, False otherwise
+            True if deleted, False if not found or error
         """
-        self.initialize()
+        # Import models inside method to avoid circular imports
+        from netraven.web.models.credential import Credential
         
         db = self.get_db()
         try:
+            # Get the credential from the database
             credential = db.query(Credential).filter(Credential.id == credential_id).first()
-            
             if not credential:
-                logger.warning(f"Credential not found: {credential_id}")
                 return False
             
+            # Delete the credential (cascade will handle tags)
             db.delete(credential)
             db.commit()
             
-            logger.info(f"Deleted credential: {credential_id}")
+            logger.info(f"Deleted credential: {credential.name} (ID: {credential_id})")
             return True
         except Exception as e:
             db.rollback()
@@ -1008,54 +1019,84 @@ class CredentialStore:
         finally:
             db.close()
 
-# Module-level initialization function
+# Module-level functions for accessing the singleton instance
 def create_credential_store(config=None):
     """
-    Create and initialize a credential store based on configuration.
-    
-    This utility function centralizes credential store creation and provides
-    a consistent way to initialize credential stores throughout the application.
+    Create and initialize a credential store instance.
     
     Args:
         config: Optional configuration dictionary
-            
-    Returns:
-        CredentialStore: An instance of the credential store
-    """
-    if config is None:
-        from netraven.core.config import get_config
-        config = get_config().get('credential_store', {})
-        
-    store_type = config.get('type', 'default')
     
-    if store_type == 'encrypted':
-        from netraven.core.encryption import get_encryption_key
-        encryption_key = get_encryption_key()
-        return CredentialStore(
-            encryption_key=encryption_key,
-            database_url=config.get('database_url'),
-        )
-    elif store_type == 'memory' and os.environ.get("NETRAVEN_ENV") == "test":
-        return CredentialStore(
-            in_memory=True,
-        )
-    else:
-        return CredentialStore()
-
-# Create global instance
-credential_store = None
+    Returns:
+        Initialized CredentialStore instance
+    """
+    global _credential_store_instance
+    
+    with _credential_store_lock:
+        if _credential_store_instance is None:
+            # Get config if not provided
+            if config is None:
+                from netraven.core.config import get_config
+                config = get_config().get("core", {}).get("credential_store", {})
+            
+            # Get encryption key
+            encryption_key = os.environ.get("NETRAVEN_ENCRYPTION_KEY", None)
+            if encryption_key is None:
+                encryption_key = get_encryption_key()
+            
+            # Get database URL from environment or config
+            db_url = os.environ.get("CREDENTIAL_STORE_DB_URL", None)
+            
+            # If no URL is provided, use PostgreSQL from config
+            if db_url is None:
+                # NetRaven only supports PostgreSQL
+                pg_config = config.get("postgres", {})
+                if not pg_config:
+                    # Get from main config
+                    from netraven.core.config import get_config
+                    web_config = get_config().get("web", {}).get("database", {})
+                    if web_config.get("type") == "postgres":
+                        pg_config = web_config.get("postgres", {})
+                
+                if not pg_config:
+                    # Use default PostgreSQL settings
+                    pg_config = {
+                        "host": "localhost",
+                        "port": 5432,
+                        "database": "netraven",
+                        "user": "netraven",
+                        "password": "netraven"
+                    }
+                
+                # Construct PostgreSQL URL
+                host = pg_config.get("host", "localhost")
+                port = pg_config.get("port", 5432)
+                database = pg_config.get("database", "netraven")
+                user = pg_config.get("user", "netraven")
+                password = pg_config.get("password", "netraven")
+                
+                db_url = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+            
+            logger.info(f"Creating credential store with database URL: {db_url.split('@')[0].split(':')[0]}:*****@{db_url.split('@')[1]}")
+            
+            # Create and initialize credential store
+            store = CredentialStore(db_url=db_url, encryption_key=encryption_key)
+            store.initialize()
+            _credential_store_instance = store
+        
+        return _credential_store_instance
 
 def get_credential_store():
     """
-    Get the global credential store instance.
+    Get the singleton credential store instance.
     
     Returns:
-        CredentialStore: The global credential store instance
+        CredentialStore instance
     """
-    global credential_store
+    global _credential_store_instance
     
-    if credential_store is None:
-        credential_store = create_credential_store()
-        credential_store.initialize()
-    
-    return credential_store 
+    with _credential_store_lock:
+        if _credential_store_instance is None:
+            return create_credential_store()
+        
+        return _credential_store_instance 

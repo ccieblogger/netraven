@@ -11,7 +11,7 @@ import sys
 import uuid
 import logging
 from datetime import datetime
-import sqlite3
+import sqlalchemy
 
 # Add project root to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -22,6 +22,7 @@ from netraven.core.credential_store import (
     get_credential_store
 )
 from netraven.core.config import get_config
+from netraven.web.database import SessionLocal, Base
 
 # Configure logging
 logging.basicConfig(
@@ -30,45 +31,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def ensure_tag_table(db_path):
-    """Create the tags table if it doesn't exist."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+def ensure_tag_table():
+    """
+    Create the tags table if it doesn't exist.
     
-    # Check if tags table exists
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tags'")
-    if not cursor.fetchone():
-        logger.info("Creating tags table")
-        cursor.execute('''
-        CREATE TABLE tags (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT,
-            color TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
-    
-    # Check if credential_tags table exists
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='credential_tags'")
-    if not cursor.fetchone():
-        logger.info("Creating credential_tags table")
-        cursor.execute('''
-        CREATE TABLE credential_tags (
-            credential_id TEXT,
-            tag_id TEXT,
-            priority INTEGER DEFAULT 0,
-            success_count INTEGER DEFAULT 0,
-            failure_count INTEGER DEFAULT 0,
-            PRIMARY KEY (credential_id, tag_id),
-            FOREIGN KEY (credential_id) REFERENCES credentials(id),
-            FOREIGN KEY (tag_id) REFERENCES tags(id)
-        )
-        ''')
-    
-    conn.commit()
-    conn.close()
+    This function is no longer needed as the tables are handled by SQLAlchemy migrations,
+    but kept for reference. The tags and credential_tags tables are now handled by the 
+    web models initialization.
+    """
+    logger.info("Tag tables are managed by SQLAlchemy ORM - nothing to do here")
 
 def add_default_credentials(store):
     """Add default credentials to the credential store."""
@@ -76,35 +47,32 @@ def add_default_credentials(store):
     
     # Admin credential
     admin_id = str(uuid.uuid4())
-    store.add_credential({
-        "id": admin_id,
-        "name": "Admin",
-        "username": "admin",
-        "password": "admin_password",
-        "description": "Administrator credentials with highest privileges"
-    })
+    store.add_credential(
+        name="Admin",
+        username="admin",
+        password="admin_password",
+        description="Administrator credentials with highest privileges"
+    )
     logger.info(f"Added Admin credential (ID: {admin_id})")
     
     # Backup credential
     backup_id = str(uuid.uuid4())
-    store.add_credential({
-        "id": backup_id,
-        "name": "Backup",
-        "username": "backup",
-        "password": "backup_password",
-        "description": "Backup user with read-only access for configuration backups"
-    })
+    store.add_credential(
+        name="Backup",
+        username="backup",
+        password="backup_password",
+        description="Backup user with read-only access for configuration backups"
+    )
     logger.info(f"Added Backup credential (ID: {backup_id})")
     
     # Monitor credential
     monitor_id = str(uuid.uuid4())
-    store.add_credential({
-        "id": monitor_id,
-        "name": "Monitor",
-        "username": "monitor",
-        "password": "monitor_password",
-        "description": "Monitor user with minimal read-only access for monitoring"
-    })
+    store.add_credential(
+        name="Monitor",
+        username="monitor",
+        password="monitor_password",
+        description="Monitor user with minimal read-only access for monitoring"
+    )
     logger.info(f"Added Monitor credential (ID: {monitor_id})")
     
     return {
@@ -113,39 +81,54 @@ def add_default_credentials(store):
         "monitor_id": monitor_id
     }
 
-def add_default_tags(db_path):
+def add_default_tags():
     """Add default tags to the database."""
     logger.info("Adding default tags")
     
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    from netraven.web.models.tag import Tag
     
-    # Router tag
-    router_id = str(uuid.uuid4())
-    cursor.execute(
-        "INSERT INTO tags (id, name, description, color) VALUES (?, ?, ?, ?)",
-        (router_id, "Routers", "Network routers", "#FF5733")
-    )
-    logger.info(f"Added Routers tag (ID: {router_id})")
-    
-    # Switch tag
-    switch_id = str(uuid.uuid4())
-    cursor.execute(
-        "INSERT INTO tags (id, name, description, color) VALUES (?, ?, ?, ?)",
-        (switch_id, "Switches", "Network switches", "#3386FF")
-    )
-    logger.info(f"Added Switches tag (ID: {switch_id})")
-    
-    # Firewall tag
-    firewall_id = str(uuid.uuid4())
-    cursor.execute(
-        "INSERT INTO tags (id, name, description, color) VALUES (?, ?, ?, ?)",
-        (firewall_id, "Firewalls", "Network firewalls", "#33FF57")
-    )
-    logger.info(f"Added Firewalls tag (ID: {firewall_id})")
-    
-    conn.commit()
-    conn.close()
+    session = SessionLocal()
+    try:
+        # Router tag
+        router_id = str(uuid.uuid4())
+        router_tag = Tag(
+            id=router_id,
+            name="Routers",
+            description="Network routers",
+            color="#FF5733"
+        )
+        session.add(router_tag)
+        logger.info(f"Added Routers tag (ID: {router_id})")
+        
+        # Switch tag
+        switch_id = str(uuid.uuid4())
+        switch_tag = Tag(
+            id=switch_id,
+            name="Switches",
+            description="Network switches",
+            color="#3386FF"
+        )
+        session.add(switch_tag)
+        logger.info(f"Added Switches tag (ID: {switch_id})")
+        
+        # Firewall tag
+        firewall_id = str(uuid.uuid4())
+        firewall_tag = Tag(
+            id=firewall_id,
+            name="Firewalls",
+            description="Network firewalls",
+            color="#33FF57"
+        )
+        session.add(firewall_tag)
+        logger.info(f"Added Firewalls tag (ID: {firewall_id})")
+        
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error adding tags: {str(e)}")
+        raise
+    finally:
+        session.close()
     
     return {
         "router_id": router_id,
@@ -153,36 +136,48 @@ def add_default_tags(db_path):
         "firewall_id": firewall_id
     }
 
-def associate_credentials_with_tags(db_path, credential_ids, tag_ids):
+def associate_credentials_with_tags(credential_ids, tag_ids):
     """Associate credentials with tags and set priorities."""
     logger.info("Associating credentials with tags")
     
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    from netraven.web.models.credential import CredentialTag
     
-    # Associate admin credentials with all device types (highest priority)
-    for tag_id in tag_ids.values():
-        cursor.execute(
-            "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (?, ?, ?)",
-            (credential_ids["admin_id"], tag_id, 100)
-        )
-    
-    # Associate backup credentials with all device types (medium priority)
-    for tag_id in tag_ids.values():
-        cursor.execute(
-            "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (?, ?, ?)",
-            (credential_ids["backup_id"], tag_id, 50)
-        )
-    
-    # Associate monitor credentials with all device types (lowest priority)
-    for tag_id in tag_ids.values():
-        cursor.execute(
-            "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (?, ?, ?)",
-            (credential_ids["monitor_id"], tag_id, 10)
-        )
-    
-    conn.commit()
-    conn.close()
+    session = SessionLocal()
+    try:
+        # Associate admin credentials with all device types (highest priority)
+        for tag_id in tag_ids.values():
+            cred_tag = CredentialTag(
+                credential_id=credential_ids["admin_id"],
+                tag_id=tag_id,
+                priority=100
+            )
+            session.add(cred_tag)
+        
+        # Associate backup credentials with all device types (medium priority)
+        for tag_id in tag_ids.values():
+            cred_tag = CredentialTag(
+                credential_id=credential_ids["backup_id"],
+                tag_id=tag_id,
+                priority=50
+            )
+            session.add(cred_tag)
+        
+        # Associate monitor credentials with all device types (lowest priority)
+        for tag_id in tag_ids.values():
+            cred_tag = CredentialTag(
+                credential_id=credential_ids["monitor_id"],
+                tag_id=tag_id,
+                priority=10
+            )
+            session.add(cred_tag)
+        
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error associating credentials with tags: {str(e)}")
+        raise
+    finally:
+        session.close()
     
     logger.info("Credentials associated with tags")
 
@@ -191,27 +186,9 @@ def main():
     try:
         # Get credential store
         store = get_credential_store()
+        logger.info(f"Using credential store with database URL: {store._db_url}")
         
-        # Get database path from store
-        db_path = store.db_path if hasattr(store, 'db_path') else None
-        if not db_path:
-            # Use the database URL from the store if available
-            if hasattr(store, 'database_url') and store.database_url and store.database_url.startswith('sqlite:///'):
-                db_path = store.database_url[10:]  # Strip sqlite:///
-            else:
-                # Default to a path in the data directory
-                config = get_config()
-                data_dir = config.get("data_directory", "data")
-                if not os.path.isabs(data_dir):
-                    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-                    data_dir = os.path.join(project_root, data_dir)
-                db_path = os.path.join(data_dir, "credentials.db")
-                os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        
-        logger.info(f"Using credential store database at {db_path}")
-        
-        # Ensure the tags and credential_tags tables exist
-        ensure_tag_table(db_path)
+        # No need to check for database path since we're using PostgreSQL now
         
         # Check if credentials already exist
         credentials = store.list_credentials()
@@ -223,10 +200,10 @@ def main():
         credential_ids = add_default_credentials(store)
         
         # Add default tags
-        tag_ids = add_default_tags(db_path)
+        tag_ids = add_default_tags()
         
         # Associate credentials with tags
-        associate_credentials_with_tags(db_path, credential_ids, tag_ids)
+        associate_credentials_with_tags(credential_ids, tag_ids)
         
         # Print summary
         logger.info("Credential store initialization completed successfully")

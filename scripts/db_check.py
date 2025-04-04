@@ -85,6 +85,61 @@ def show_database_info():
         logger.info(f"PostgreSQL user: {pg_config['user']}")
     
     logger.info(f"SQLAlchemy URL: {engine.url}")
+    
+    return db_config
+
+def verify_postgres_only():
+    """
+    Verify that the configuration is set to use PostgreSQL only.
+    
+    Returns:
+        bool: True if PostgreSQL is configured, False if another database type is configured
+    """
+    config, _ = load_config(get_default_config_path())
+    db_config = config["web"]["database"]
+    
+    if db_config['type'] != 'postgres':
+        logger.error(f"Invalid database type: {db_config['type']}. NetRaven only supports PostgreSQL.")
+        return False
+    
+    # Check if essential PostgreSQL configuration is present
+    pg_config = db_config.get('postgres', {})
+    missing_config = []
+    for required in ['host', 'port', 'database', 'user', 'password']:
+        if not pg_config.get(required):
+            missing_config.append(required)
+    
+    if missing_config:
+        logger.error(f"Missing required PostgreSQL configuration: {', '.join(missing_config)}")
+        return False
+    
+    logger.info("PostgreSQL configuration verified")
+    return True
+
+def check_required_tables():
+    """
+    Check if all required tables exist in the database.
+    
+    Returns:
+        bool: True if all required tables exist, False otherwise
+    """
+    required_tables = [
+        "users", "devices", "tags", "credentials", "credential_tags",
+        "backups", "job_logs", "job_log_entries", "scheduled_jobs", 
+        "admin_settings", "audit_logs"
+    ]
+    
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+    
+    missing_tables = [t for t in required_tables if t not in existing_tables]
+    
+    if missing_tables:
+        logger.error(f"Missing required tables: {', '.join(missing_tables)}")
+        return False
+    
+    logger.info("All required tables exist")
+    return True
 
 def main():
     """Main entry point for the script."""
@@ -96,14 +151,33 @@ def main():
         action="store_true",
         help="Initialize database schema"
     )
+    parser.add_argument(
+        "--postgres-only",
+        action="store_true",
+        help="Verify that PostgreSQL is the only database configured and fail if any SQLite configuration is found"
+    )
+    parser.add_argument(
+        "--check-tables",
+        action="store_true",
+        help="Check if all required tables exist in the database"
+    )
     
     args = parser.parse_args()
     
     # Show database configuration
-    show_database_info()
+    db_config = show_database_info()
+    
+    # Verify PostgreSQL-only configuration if requested
+    if args.postgres_only and not verify_postgres_only():
+        logger.error("PostgreSQL-only check failed - exiting")
+        return 1
     
     # Check database connection
     if not check_database_connection():
+        return 1
+    
+    # Check required tables if requested
+    if args.check_tables and not check_required_tables():
         return 1
     
     # Initialize database if requested

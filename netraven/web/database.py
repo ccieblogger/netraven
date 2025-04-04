@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, AsyncGenerator, Generator
 from datetime import datetime
+from sqlalchemy import create_engine, text
 
 # Import internal modules
 from netraven.core.config import get_default_config_path, load_config
@@ -28,23 +29,14 @@ db_config = config["web"]["database"]
 db_type = db_config["type"]
 
 # Create database URL based on configuration
-if db_type == "sqlite":
-    db_path = db_config["sqlite"]["path"]
-    # Make sure the path is absolute
-    if not os.path.isabs(db_path):
-        # Use the current working directory as base, not the config directory
-        db_path = os.path.abspath(db_path)
-        # Ensure the directory exists
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
-elif db_type == "postgres":
+if db_type == "postgres":
     pg_config = db_config["postgres"]
     DATABASE_URL = f"postgresql+asyncpg://{pg_config['user']}:{pg_config['password']}@{pg_config['host']}:{pg_config['port']}/{pg_config['database']}"
-elif db_type == "mysql":
-    mysql_config = db_config["mysql"]
-    DATABASE_URL = f"mysql+aiomysql://{mysql_config['user']}:{mysql_config['password']}@{mysql_config['host']}:{mysql_config['port']}/{mysql_config['database']}"
+    # Use the postgresql dialect without specifying psycopg2 which requires a separate install
+    SYNC_DATABASE_URL = f"postgresql://{pg_config['user']}:{pg_config['password']}@{pg_config['host']}:{pg_config['port']}/{pg_config['database']}"
 else:
-    raise ValueError(f"Unsupported database type: {db_type}")
+    # As per architecture requirements, only PostgreSQL is supported
+    raise ValueError(f"Unsupported database type: {db_type}. NetRaven only supports PostgreSQL.")
 
 # Create SQLAlchemy async engine
 engine = create_async_engine(
@@ -57,10 +49,32 @@ engine = create_async_engine(
     pool_pre_ping=True  # Enable connection health checks
 )
 
+# Create synchronous engine for compatibility with synchronous code
+# Use the default postgresql driver rather than psycopg2 specifically
+sync_engine = create_engine(
+    SYNC_DATABASE_URL,
+    echo=config["web"].get("debug", False),
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+    # Use the default driver
+    future=True
+)
+
 # Create async sessionmaker
 AsyncSessionLocal = sessionmaker(
     engine,
     class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
+)
+
+# Create synchronous sessionmaker for compatibility
+SessionLocal = sessionmaker(
+    sync_engine,
     expire_on_commit=False,
     autocommit=False,
     autoflush=False
@@ -127,10 +141,12 @@ def get_db() -> Generator[Session, None, None]:
     Yields:
         Session: SQLAlchemy session
     """
-    # For import compatibility only - this will be properly implemented
-    # in synchronous environments, but here we're using async so we just
-    # need the import to succeed
-    yield None
+    # Use the synchronous session for compatibility
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 async def init_db():
     """

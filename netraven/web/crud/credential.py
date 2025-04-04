@@ -11,13 +11,13 @@ import uuid
 from datetime import datetime
 from sqlalchemy import func
 
-# Import credential store
-from netraven.core.credential_store import get_credential_store, CredentialTag, Credential
+# Import credential store function only, not the models
+from netraven.core.credential_store import get_credential_store
+# Import models directly from web.models
+from netraven.web.models.credential import Credential, CredentialTag
 from netraven.web.models.tag import Tag
 from netraven.web.schemas.credential import CredentialCreate, CredentialUpdate, CredentialTagAssociation
 from netraven.web.crud.device import get_device
-# Import models for credential_stats function
-from netraven.core import credential_store as models
 
 # Create logger
 from netraven.core.logging import get_logger
@@ -715,12 +715,12 @@ async def get_credential_stats(db: Session) -> Dict[str, Any]:
         
         try:
             # Get total counts
-            total_credentials = cs_db.query(models.Credential).count()
+            total_credentials = cs_db.query(Credential).count()
             
             # Query to get sum of success and failure counts
             counts = cs_db.query(
-                func.sum(models.Credential.success_count).label("total_success"),
-                func.sum(models.Credential.failure_count).label("total_failure")
+                func.sum(Credential.success_count).label("total_success"),
+                func.sum(Credential.failure_count).label("total_failure")
             ).first()
             
             total_success = counts.total_success or 0
@@ -734,10 +734,10 @@ async def get_credential_stats(db: Session) -> Dict[str, Any]:
                 
             # Get most successful credentials (at least 5 attempts and success rate > 0)
             most_successful = []
-            most_successful_query = cs_db.query(models.Credential).filter(
-                (models.Credential.success_count + models.Credential.failure_count) >= 5
+            most_successful_query = cs_db.query(Credential).filter(
+                (Credential.success_count + Credential.failure_count) >= 5
             ).order_by(
-                (models.Credential.success_count / (models.Credential.success_count + models.Credential.failure_count)).desc()
+                (Credential.success_count / (Credential.success_count + Credential.failure_count)).desc()
             ).limit(5)
             
             for cred in most_successful_query:
@@ -755,11 +755,11 @@ async def get_credential_stats(db: Session) -> Dict[str, Any]:
             
             # Get least successful credentials (at least 5 attempts and success rate < 100)
             least_successful = []
-            least_successful_query = cs_db.query(models.Credential).filter(
-                (models.Credential.success_count + models.Credential.failure_count) >= 5,
-                models.Credential.failure_count > 0
+            least_successful_query = cs_db.query(Credential).filter(
+                (Credential.success_count + Credential.failure_count) >= 5,
+                Credential.failure_count > 0
             ).order_by(
-                (models.Credential.success_count / (models.Credential.success_count + models.Credential.failure_count)).asc()
+                (Credential.success_count / (Credential.success_count + Credential.failure_count)).asc()
             ).limit(5)
             
             for cred in least_successful_query:

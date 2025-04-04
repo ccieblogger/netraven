@@ -14,8 +14,11 @@ from netraven.web.database import Base
 from netraven.web.models import user, device, job_log, scheduled_job, tag
 from netraven.web.models.tag import TagRule
 
-# Set test database URL - use in-memory SQLite for tests
-TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test.db")
+# Set test database URL - use PostgreSQL for tests as required by architecture
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", 
+    "postgresql+asyncpg://netraven:netraven@localhost:5432/netraven_test"
+)
 
 # Create test engine with appropriate parameters
 engine = create_async_engine(
