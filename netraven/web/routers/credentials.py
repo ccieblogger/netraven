@@ -1,291 +1,257 @@
 """
-Credentials router for the NetRaven web interface.
+Credentials router for managing device credentials.
 
-This module provides endpoints for managing device credentials,
-including listing, adding, updating, removing, and testing credentials.
+This module provides endpoints for creating, retrieving, updating, and 
+deleting credentials for device access. It supports various credential types
+including username/password, SSH keys, SNMP, and API tokens.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Path, status, Body
-from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import authentication dependencies
-from netraven.web.auth import (
-    get_current_principal, 
-    UserPrincipal, 
-    require_scope
-)
-from netraven.web.database import get_db
-
-# Import schemas and CRUD functions
+from netraven.web.database import get_async_session
 from netraven.web.schemas.credential import (
-    CredentialCreate, CredentialUpdate, CredentialOut, CredentialWithTags,
-    CredentialTagAssociation, CredentialTagAssociationOut,
-    CredentialTest, CredentialTestResult, CredentialBulkOperation,
-    CredentialStats, TagCredentialStats, SmartCredentialRequest, SmartCredentialResponse
+    CredentialCreate, 
+    CredentialUpdate, 
+    CredentialResponse,
+    CredentialWithSecretsResponse
 )
-from netraven.web.crud import (
-    get_credentials, get_credential, create_credential, update_credential, delete_credential,
-    get_credentials_by_tag, associate_credential_with_tag, remove_credential_from_tag,
-    test_credential, bulk_associate_credentials_with_tags, bulk_remove_credentials_from_tags,
-    get_credential_stats
-)
-
-# Import the credential store
-from netraven.core.credential_store import get_credential_store
-
-# Create logger
+from netraven.core.services.service_factory import ServiceFactory
+from netraven.web.auth import UserPrincipal, get_current_principal
+from netraven.web.auth.permissions import require_scope, require_ownership
 from netraven.core.logging import get_logger
-logger = get_logger("netraven.web.routers.credentials")
 
-# Create router
-router = APIRouter(prefix="", tags=["credentials"])
+logger = get_logger(__name__)
 
-@router.get("/", response_model=List[CredentialWithTags])
-async def get_credentials_endpoint(
-    skip: int = Query(0, description="Number of records to skip", ge=0),
-    limit: int = Query(100, description="Maximum number of records to return", ge=1, le=1000),
-    include_tags: bool = Query(True, description="Whether to include tag information"),
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("read:credentials"))
-) -> List[Dict[str, Any]]:
+router = APIRouter(prefix="/credentials", tags=["credentials"])
+
+# Helper function to extract credential owner ID for permission checks
+async def get_credential_owner_id(
+    credential_id: str = Path(..., description="The ID of the credential"),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+) -> str:
     """
-    Get all credentials.
+    Extract the owner ID of a credential for permission checking.
     
     Args:
-        skip: Number of records to skip
-        limit: Maximum number of records to return
-        include_tags: Whether to include tag information
-        db: Database session
-        current_principal: The authenticated user
+        credential_id: The credential ID
+        session: Database session
+        factory: Service factory
         
     Returns:
-        List[Dict[str, Any]]: List of credentials
+        str: Owner ID of the credential
+        
+    Raises:
+        HTTPException: If credential not found
+    """
+    credential = await factory.credential_service.get_credential(credential_id)
+    
+    if not credential:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Credential with ID {credential_id} not found"
+        )
+    
+    return credential.owner_id
+
+@router.post("/", response_model=CredentialResponse, status_code=status.HTTP_201_CREATED)
+async def create_credential(
+    credential: CredentialCreate,
+    principal: UserPrincipal = Depends(require_scope("write:credentials")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+):
+    """
+    Create a new credential.
+    
+    This endpoint requires the write:credentials scope.
     """
     try:
-        logger.info(f"User {current_principal.username} is requesting credentials list")
-        return get_credentials(db, skip=skip, limit=limit, include_tags=include_tags)
+        # Set owner ID to current user
+        credential_data = credential.model_dump()
+        credential_data["owner_id"] = principal.id
+        
+        # Create credential using service
+        new_credential = await factory.credential_service.create_credential(credential_data)
+        
+        logger.info(f"Credential created: id={new_credential.id}, type={new_credential.type}, user={principal.username}")
+        return new_credential
     except Exception as e:
-        logger.error(f"Error retrieving credentials: {str(e)}")
+        logger.error(f"Error creating credential: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving credentials: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error creating credential: {str(e)}"
         )
 
-@router.get("/stats", response_model=CredentialStats)
-async def get_credential_stats_endpoint(
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("read:credentials"))
-) -> Dict[str, Any]:
+@router.get("/", response_model=List[CredentialResponse])
+async def list_credentials(
+    skip: int = 0,
+    limit: int = 100,
+    type: Optional[str] = Query(None, description="Filter by credential type"),
+    tag_id: Optional[str] = Query(None, description="Filter by tag ID"),
+    include_secrets: bool = Query(False, description="Include secret fields (requires special permission)"),
+    principal: UserPrincipal = Depends(require_scope("read:credentials")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+):
     """
-    Get global credential usage statistics.
+    List credentials with optional filtering.
     
-    Args:
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: Credential usage statistics
+    This endpoint requires the read:credentials scope.
+    Admin users can see all credentials, while regular users only see their own.
     """
     try:
-        credential_store = get_credential_store()
-        if not credential_store:
+        # Only return credentials owned by the current user unless they're an admin
+        filter_params = {}
+        if type:
+            filter_params["type"] = type
+        if tag_id:
+            filter_params["tag_id"] = tag_id
+        if not principal.is_admin:
+            filter_params["owner_id"] = principal.id
+        
+        # Check special permission for including secrets
+        if include_secrets and not principal.has_scope("admin:credentials"):
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Credential store is not available"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to view credential secrets"
             )
         
-        stats = credential_store.get_credential_stats()
-        logger.info(f"User {current_principal.username} retrieved credential statistics")
-        return stats
+        # Get credentials using service
+        credentials = await factory.credential_service.list_credentials(
+            skip=skip, 
+            limit=limit, 
+            filter_params=filter_params
+        )
+        
+        # If including secrets is requested and permitted, use the service to get credentials with secrets
+        if include_secrets:
+            credentials_with_secrets = []
+            for cred in credentials:
+                cred_with_secrets = await factory.credential_service.get_credential_with_secrets(cred.id)
+                if cred_with_secrets:
+                    credentials_with_secrets.append(cred_with_secrets)
+            return credentials_with_secrets
+        
+        return credentials
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error retrieving credential statistics: {str(e)}")
+        logger.error(f"Error listing credentials: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving credential statistics: {str(e)}"
+            detail=f"Error listing credentials: {str(e)}"
         )
 
-@router.get("/stats/tag/{tag_id}", response_model=TagCredentialStats)
-async def get_tag_credential_stats_endpoint(
-    tag_id: str = Path(..., description="ID of the tag"),
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("read:credentials"))
-) -> Dict[str, Any]:
+@router.get("/{credential_id}", response_model=CredentialResponse)
+async def get_credential(
+    credential_id: str,
+    include_secrets: bool = Query(False, description="Include secret fields (requires special permission)"),
+    principal: UserPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_ownership(get_credential_owner_id))
+):
     """
-    Get credential usage statistics for a specific tag.
+    Get a specific credential by ID.
     
-    Args:
-        tag_id: ID of the tag
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: Credential usage statistics for the tag
+    This endpoint requires ownership of the credential or admin permissions.
     """
     try:
-        credential_store = get_credential_store()
-        if not credential_store:
+        # Check special permission for including secrets
+        if include_secrets and not principal.has_scope("admin:credentials"):
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Credential store is not available"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to view credential secrets"
             )
         
-        stats = credential_store.get_tag_credential_stats(tag_id)
-        logger.info(f"User {current_principal.username} retrieved credential statistics for tag {tag_id}")
-        return stats
-    except Exception as e:
-        logger.error(f"Error retrieving credential statistics for tag {tag_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving credential statistics: {str(e)}"
-        )
-
-@router.get("/{credential_id}", response_model=CredentialWithTags)
-async def get_credential_endpoint(
-    credential_id: str = Path(..., description="ID of the credential"),
-    include_tags: bool = Query(True, description="Whether to include tag information"),
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("read:credentials"))
-) -> Dict[str, Any]:
-    """
-    Get a credential by ID.
-    
-    Args:
-        credential_id: ID of the credential
-        include_tags: Whether to include tag information
-        db: Database session
-        current_principal: The authenticated user
+        # Get credential with or without secrets
+        if include_secrets:
+            credential = await factory.credential_service.get_credential_with_secrets(credential_id)
+        else:
+            credential = await factory.credential_service.get_credential(credential_id)
         
-    Returns:
-        Dict[str, Any]: Credential details
-    """
-    try:
-        credential = get_credential(db, credential_id=credential_id, include_tags=include_tags)
         if not credential:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Credential with ID {credential_id} not found"
             )
         
-        logger.info(f"User {current_principal.username} retrieved credential {credential_id}")
         return credential
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving credential {credential_id}: {str(e)}")
+        logger.error(f"Error getting credential {credential_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving credential: {str(e)}"
+            detail=f"Error getting credential: {str(e)}"
         )
 
-@router.post("/", response_model=CredentialWithTags, status_code=status.HTTP_201_CREATED)
-async def create_credential_endpoint(
-    credential: CredentialCreate,
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("write:credentials"))
-) -> Dict[str, Any]:
-    """
-    Create a new credential.
-    
-    Args:
-        credential: Credential creation data
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: Created credential
-    """
-    try:
-        new_credential = create_credential(db, credential=credential)
-        logger.info(f"User {current_principal.username} created credential {new_credential['id']}")
-        return new_credential
-    except Exception as e:
-        logger.error(f"Error creating credential: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating credential: {str(e)}"
-        )
-
-@router.put("/{credential_id}", response_model=CredentialWithTags)
-async def update_credential_endpoint(
-    credential_id: str = Path(..., description="ID of the credential"),
-    credential: CredentialUpdate = None,
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("write:credentials"))
-) -> Dict[str, Any]:
+@router.put("/{credential_id}", response_model=CredentialResponse)
+async def update_credential(
+    credential_id: str,
+    credential_update: CredentialUpdate,
+    principal: UserPrincipal = Depends(require_scope("write:credentials")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_ownership(get_credential_owner_id))
+):
     """
     Update a credential.
     
-    Args:
-        credential_id: ID of the credential
-        credential: Credential update data
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: Updated credential
+    This endpoint requires the write:credentials scope and ownership of the credential.
     """
     try:
-        # Check if credential exists
-        existing = get_credential(db, credential_id=credential_id)
-        if not existing:
+        # Update credential using service
+        updated_credential = await factory.credential_service.update_credential(
+            credential_id, 
+            credential_update.model_dump(exclude_unset=True)
+        )
+        
+        if not updated_credential:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Credential with ID {credential_id} not found"
             )
         
-        # Update the credential
-        updated_credential = update_credential(db, credential_id=credential_id, credential=credential)
-        if not updated_credential:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to update credential {credential_id}"
-            )
-        
-        logger.info(f"User {current_principal.username} updated credential {credential_id}")
+        logger.info(f"Credential updated: id={credential_id}, user={principal.username}")
         return updated_credential
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating credential {credential_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error updating credential: {str(e)}"
         )
 
 @router.delete("/{credential_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_credential_endpoint(
-    credential_id: str = Path(..., description="ID of the credential"),
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("write:credentials"))
-) -> None:
+async def delete_credential(
+    credential_id: str,
+    principal: UserPrincipal = Depends(require_scope("delete:credentials")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_ownership(get_credential_owner_id))
+):
     """
     Delete a credential.
     
-    Args:
-        credential_id: ID of the credential
-        db: Database session
-        current_principal: The authenticated user
+    This endpoint requires the delete:credentials scope and ownership of the credential.
     """
     try:
-        # Check if credential exists
-        existing = get_credential(db, credential_id=credential_id)
-        if not existing:
+        # Delete credential using service
+        result = await factory.credential_service.delete_credential(credential_id)
+        
+        if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Credential with ID {credential_id} not found"
             )
         
-        # Delete the credential
-        success = delete_credential(db, credential_id=credential_id)
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to delete credential {credential_id}"
-            )
-        
-        logger.info(f"User {current_principal.username} deleted credential {credential_id}")
+        logger.info(f"Credential deleted: id={credential_id}, user={principal.username}")
+        return None
     except HTTPException:
         raise
     except Exception as e:
@@ -295,402 +261,133 @@ async def delete_credential_endpoint(
             detail=f"Error deleting credential: {str(e)}"
         )
 
-@router.get("/tag/{tag_id}", response_model=List[CredentialWithTags])
-async def get_credentials_by_tag_endpoint(
-    tag_id: str = Path(..., description="ID of the tag"),
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("read:credentials"))
-) -> List[Dict[str, Any]]:
+@router.post("/{credential_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def add_tag_to_credential(
+    credential_id: str,
+    tag_id: str,
+    principal: UserPrincipal = Depends(require_scope("write:credentials")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_ownership(get_credential_owner_id))
+):
     """
-    Get all credentials associated with a tag.
+    Add a tag to a credential.
     
-    Args:
-        tag_id: ID of the tag
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        List[Dict[str, Any]]: List of credentials
+    This endpoint requires the write:credentials scope and ownership of the credential.
     """
     try:
-        credentials = get_credentials_by_tag(db, tag_id=tag_id)
-        logger.info(f"User {current_principal.username} retrieved credentials for tag {tag_id}")
-        return credentials
-    except Exception as e:
-        logger.error(f"Error retrieving credentials for tag {tag_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving credentials for tag: {str(e)}"
-        )
-
-@router.post("/tag", response_model=CredentialTagAssociationOut)
-async def associate_credential_with_tag_endpoint(
-    association: CredentialTagAssociation,
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("write:credentials"))
-) -> Dict[str, Any]:
-    """
-    Associate a credential with a tag.
-    
-    Args:
-        association: Credential-tag association data
-        db: Database session
-        current_principal: The authenticated user
+        # Add tag to credential using service
+        result = await factory.credential_service.add_tag_to_credential(credential_id, tag_id)
         
-    Returns:
-        Dict[str, Any]: Association details
-    """
-    try:
-        result = associate_credential_with_tag(db, association=association)
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Credential or tag not found"
+                detail=f"Credential with ID {credential_id} or tag with ID {tag_id} not found"
             )
         
-        logger.info(f"User {current_principal.username} associated credential {association.credential_id} with tag {association.tag_id}")
-        return result
+        logger.info(f"Tag {tag_id} added to credential {credential_id} by user {principal.username}")
+        return None
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error associating credential with tag: {str(e)}")
+        logger.error(f"Error adding tag {tag_id} to credential {credential_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error associating credential with tag: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error adding tag to credential: {str(e)}"
         )
 
-@router.delete("/tag/{credential_id}/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_credential_from_tag_endpoint(
-    credential_id: str = Path(..., description="ID of the credential"),
-    tag_id: str = Path(..., description="ID of the tag"),
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("write:credentials"))
-) -> None:
+@router.delete("/{credential_id}/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_tag_from_credential(
+    credential_id: str,
+    tag_id: str,
+    principal: UserPrincipal = Depends(require_scope("write:credentials")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_ownership(get_credential_owner_id))
+):
     """
-    Remove a credential from a tag.
+    Remove a tag from a credential.
     
-    Args:
-        credential_id: ID of the credential
-        tag_id: ID of the tag
-        db: Database session
-        current_principal: The authenticated user
+    This endpoint requires the write:credentials scope and ownership of the credential.
     """
     try:
-        success = remove_credential_from_tag(db, credential_id=credential_id, tag_id=tag_id)
-        if not success:
+        # Remove tag from credential using service
+        result = await factory.credential_service.remove_tag_from_credential(credential_id, tag_id)
+        
+        if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Association between credential {credential_id} and tag {tag_id} not found"
+                detail=f"Credential with ID {credential_id} or tag with ID {tag_id} not found"
             )
         
-        logger.info(f"User {current_principal.username} removed credential {credential_id} from tag {tag_id}")
+        logger.info(f"Tag {tag_id} removed from credential {credential_id} by user {principal.username}")
+        return None
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error removing credential from tag: {str(e)}")
+        logger.error(f"Error removing tag {tag_id} from credential {credential_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error removing credential from tag: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error removing tag from credential: {str(e)}"
         )
 
-@router.post("/test/{credential_id}", response_model=CredentialTestResult)
-async def test_credential_endpoint(
-    credential_id: str = Path(..., description="ID of the credential"),
-    test_data: CredentialTest = None,
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("read:credentials"))
-) -> Dict[str, Any]:
+@router.get("/{credential_id}/tags", response_model=List[str])
+async def list_credential_tags(
+    credential_id: str,
+    principal: UserPrincipal = Depends(require_scope("read:credentials")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_ownership(get_credential_owner_id))
+):
     """
-    Test a credential against a device.
+    List all tags associated with a credential.
     
-    Args:
-        credential_id: ID of the credential
-        test_data: Test parameters
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: Test result
+    This endpoint requires the read:credentials scope and ownership of the credential.
     """
     try:
-        # Check if credential exists
-        existing = get_credential(db, credential_id=credential_id)
-        if not existing:
+        # Get credential tags using service
+        tags = await factory.credential_service.get_credential_tags(credential_id)
+        
+        if tags is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Credential with ID {credential_id} not found"
             )
         
-        # If test_data is None, initialize with empty object
-        if test_data is None:
-            test_data = CredentialTest()
-        
-        # Test the credential
-        result = test_credential(
-            db, 
-            credential_id=credential_id,
-            device_id=test_data.device_id,
-            hostname=test_data.hostname,
-            device_type=test_data.device_type,
-            port=test_data.port or 22
-        )
-        
-        logger.info(f"User {current_principal.username} tested credential {credential_id}: {'success' if result['success'] else 'failure'}")
-        return result
+        return tags
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error testing credential {credential_id}: {str(e)}")
+        logger.error(f"Error listing tags for credential {credential_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error testing credential: {str(e)}"
+            detail=f"Error listing credential tags: {str(e)}"
         )
 
-@router.post("/bulk/tag", response_model=Dict[str, Any])
-async def bulk_associate_credentials_with_tags_endpoint(
-    bulk_operation: CredentialBulkOperation,
-    priority: float = Query(0.0, description="Priority for the associations"),
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("write:credentials"))
-) -> Dict[str, Any]:
+@router.post("/{credential_id}/validate", status_code=status.HTTP_200_OK)
+async def validate_credential(
+    credential_id: str,
+    principal: UserPrincipal = Depends(require_scope("read:credentials")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_ownership(get_credential_owner_id))
+):
     """
-    Associate multiple credentials with multiple tags.
+    Validate a credential against a device or service.
     
-    Args:
-        bulk_operation: Bulk operation data
-        priority: Priority for the associations
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: Operation results
+    This endpoint requires the read:credentials scope and ownership of the credential.
     """
     try:
-        result = bulk_associate_credentials_with_tags(
-            db, 
-            credential_ids=bulk_operation.credential_ids,
-            tag_ids=bulk_operation.tag_ids,
-            priority=priority
-        )
+        # Validate credential using service
+        validation_result = await factory.credential_service.validate_credential(credential_id)
         
-        logger.info(f"User {current_principal.username} performed bulk tag association: {result['successful_operations']} successful, {result['failed_operations']} failed")
-        return result
-    except Exception as e:
-        logger.error(f"Error associating credentials with tags in bulk: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error associating credentials with tags in bulk: {str(e)}"
-        )
-
-@router.delete("/bulk/tag", response_model=Dict[str, Any])
-async def bulk_remove_credentials_from_tags_endpoint(
-    bulk_operation: CredentialBulkOperation,
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("write:credentials"))
-) -> Dict[str, Any]:
-    """
-    Remove multiple credentials from multiple tags.
-    
-    Args:
-        bulk_operation: Bulk operation data
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: Operation results
-    """
-    try:
-        result = bulk_remove_credentials_from_tags(
-            db, 
-            credential_ids=bulk_operation.credential_ids,
-            tag_ids=bulk_operation.tag_ids
-        )
-        
-        logger.info(f"User {current_principal.username} performed bulk tag removal: {result['successful_operations']} successful, {result['failed_operations']} failed")
-        return result
-    except Exception as e:
-        logger.error(f"Error removing credentials from tags in bulk: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error removing credentials from tags in bulk: {str(e)}"
-        )
-
-@router.post("/smart-select", response_model=SmartCredentialResponse)
-async def get_smart_credentials_endpoint(
-    request: SmartCredentialRequest,
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("read:credentials"))
-) -> Dict[str, Any]:
-    """
-    Get a list of credentials for a tag, intelligently ranked based on success rates.
-    
-    This endpoint uses a smart algorithm that considers:
-    - Historical success rate (75% weight)
-    - Manual priority settings (15% weight)
-    - Recency of successful use (10% weight)
-    
-    Args:
-        request: Smart credential request parameters
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: List of ranked credentials with explanatory data
-    """
-    try:
-        credential_store = get_credential_store()
-        if not credential_store:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Credential store is not available"
-            )
-        
-        credentials = credential_store.get_smart_credentials_for_tag(
-            tag_id=request.tag_id,
-            limit=request.limit
-        )
-        
-        # Create explanation of ranking algorithm
-        explanation = {
-            "algorithm": "Smart ranking algorithm",
-            "weights": {
-                "success_rate": "75%",
-                "manual_priority": "15%",
-                "recency": "10%"
-            },
-            "factors_considered": [
-                "Historical success/failure rate with this tag",
-                "Manually set credential priority",
-                "How recently the credential was used successfully"
-            ],
-            "recommendation": "Credentials are ordered by their computed score. Try them in order."
-        }
-        
-        logger.info(f"User {current_principal.username} retrieved smart credentials for tag {request.tag_id}")
-        return {
-            "credentials": credentials,
-            "explanation": explanation
-        }
-    except Exception as e:
-        logger.error(f"Error retrieving smart credentials for tag {request.tag_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving smart credentials: {str(e)}"
-        )
-
-@router.post("/optimize-priorities/{tag_id}", response_model=Dict[str, Any])
-async def optimize_credential_priorities_endpoint(
-    tag_id: str = Path(..., description="ID of the tag to optimize priorities for"),
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("write:credentials"))
-) -> Dict[str, Any]:
-    """
-    Automatically adjust credential priorities for a tag based on success rates.
-    
-    This endpoint will re-prioritize credentials based on historical success rates
-    and recent usage patterns.
-    
-    Args:
-        tag_id: ID of the tag
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: Result of the optimization operation
-    """
-    try:
-        credential_store = get_credential_store()
-        if not credential_store:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Credential store is not available"
-            )
-        
-        success = credential_store.optimize_credential_priorities(tag_id)
-        
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to optimize credential priorities for tag {tag_id}"
-            )
-        
-        # Get credentials after optimization to return the new priorities
-        credentials = credential_store.get_credentials_by_tag(tag_id)
-        
-        logger.info(f"User {current_principal.username} optimized credential priorities for tag {tag_id}")
-        return {
-            "success": True,
-            "message": f"Successfully optimized credential priorities for tag {tag_id}",
-            "tag_id": tag_id,
-            "credentials": credentials
-        }
+        logger.info(f"Credential validation for {credential_id}: {validation_result}")
+        return {"valid": validation_result, "message": "Credential validation successful"}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error optimizing credential priorities for tag {tag_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error optimizing credential priorities: {str(e)}"
-        )
-
-@router.post("/reencrypt", response_model=Dict[str, Any])
-async def reencrypt_credentials_endpoint(
-    batch_size: int = Query(100, description="Number of credentials to process in each batch"),
-    db: Session = Depends(get_db),
-    current_principal: UserPrincipal = Depends(require_scope("write:credentials"))
-) -> Dict[str, Any]:
-    """
-    Re-encrypt all credentials with the current encryption key.
-    
-    This endpoint processes credentials in batches for better performance
-    and provides detailed statistics about the operation.
-    
-    Args:
-        batch_size: Number of credentials to process in each batch
-        db: Database session
-        current_principal: The authenticated user
-        
-    Returns:
-        Dict[str, Any]: Statistics about the re-encryption operation
-    """
-    try:
-        # Only admins should be able to trigger re-encryption
-        if not current_principal.has_role("admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only administrators can re-encrypt credentials"
-            )
-        
-        credential_store = get_credential_store()
-        if not credential_store:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Credential store is not available"
-            )
-        
-        # Define a progress callback
-        async def progress_callback(current, total, batch_number, status):
-            # In a real implementation, this might update a progress indicator
-            # or send a websocket message with progress information
-            logger.info(f"Re-encryption progress: {current}/{total} credentials (batch {batch_number}), status: {status}")
-        
-        # Perform the re-encryption
-        result = credential_store.reencrypt_all_credentials(
-            batch_size=batch_size,
-            progress_callback=progress_callback
-        )
-        
-        logger.info(f"User {current_principal.username} completed credential re-encryption: {result}")
+        logger.error(f"Error validating credential {credential_id}: {str(e)}")
         return {
-            "success": result['success'],
-            "message": "Credential re-encryption completed",
-            "details": result
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error during credential re-encryption: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error during credential re-encryption: {str(e)}"
-        ) 
+            "valid": False,
+            "message": f"Validation failed: {str(e)}"
+        } 

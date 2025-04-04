@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from netraven.web.database import get_db
-from netraven.web.auth import get_current_principal, require_scope, UserPrincipal
+from netraven.web.auth import UserPrincipal, get_current_principal
+from netraven.web.auth.permissions import require_scope, require_admin
 from netraven.web.models.audit_log import AuditLog
 from netraven.web.schemas.audit_log import (
     AuditLogResponse, 
@@ -17,31 +18,34 @@ from netraven.web.schemas.audit_log import (
     AuditLogList
 )
 from netraven.web.services.audit_service import AuditService
+from netraven.core.logging import get_logger
 
 # Create router
-router = APIRouter(prefix="", tags=["audit logs"])
+router = APIRouter(prefix="/audit-logs", tags=["audit logs"])
+
+# Initialize logger
+logger = get_logger(__name__)
 
 
 @router.get("/", response_model=AuditLogList)
 async def list_audit_logs(
     request: Request,
-    event_type: Optional[str] = None,
-    event_name: Optional[str] = None,
-    actor_id: Optional[str] = None,
-    target_id: Optional[str] = None,
-    status: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db),
-    principal: UserPrincipal = Depends(require_scope(["admin:audit"]))
+    event_type: Optional[str] = Query(None, description="Filter by event type"),
+    event_name: Optional[str] = Query(None, description="Filter by event name"),
+    actor_id: Optional[str] = Query(None, description="Filter by actor ID"),
+    target_id: Optional[str] = Query(None, description="Filter by target ID"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    start_date: Optional[str] = Query(None, description="Filter by start date (ISO format)"),
+    end_date: Optional[str] = Query(None, description="Filter by end date (ISO format)"),
+    skip: int = Query(0, description="Number of records to skip", ge=0),
+    limit: int = Query(50, description="Maximum number of records to return", ge=1, le=100),
+    principal: UserPrincipal = Depends(require_admin("admin:audit")),
+    db: Session = Depends(get_db)
 ):
     """
     List audit log entries with filtering and pagination.
     
-    This endpoint requires admin:audit scope and returns audit log entries
-    that match the specified filter criteria.
+    This endpoint requires admin privileges with the admin:audit scope.
     """
     # Build filter params from query parameters
     filter_params = AuditLogFilter(
@@ -72,6 +76,8 @@ async def list_audit_logs(
             limit=limit
         )
         
+        logger.info(f"Audit logs listed: user={principal.username}, count={len(result['items'])}, total={result['total']}")
+        
         # Return the result
         return AuditLogList(
             items=result["items"],
@@ -90,6 +96,8 @@ async def list_audit_logs(
             request=request
         )
         
+        logger.error(f"Error listing audit logs: {str(e)}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving audit logs: {str(e)}"
@@ -100,13 +108,13 @@ async def list_audit_logs(
 async def get_audit_log(
     audit_log_id: str,
     request: Request,
-    db: Session = Depends(get_db),
-    principal: UserPrincipal = Depends(require_scope(["admin:audit"]))
+    principal: UserPrincipal = Depends(require_admin("admin:audit")),
+    db: Session = Depends(get_db)
 ):
     """
     Get a specific audit log entry by ID.
     
-    This endpoint requires admin:audit scope and returns a single audit log entry.
+    This endpoint requires admin privileges with the admin:audit scope.
     """
     try:
         # Get the audit log
@@ -125,6 +133,8 @@ async def get_audit_log(
                 request=request
             )
             
+            logger.warning(f"Audit log not found: id={audit_log_id}, user={principal.username}")
+            
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Audit log with ID {audit_log_id} not found"
@@ -141,9 +151,10 @@ async def get_audit_log(
             request=request
         )
         
+        logger.info(f"Audit log retrieved: id={audit_log_id}, user={principal.username}")
+        
         return audit_log
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
         # Log error to audit logs
@@ -157,6 +168,8 @@ async def get_audit_log(
             status="error",
             request=request
         )
+        
+        logger.error(f"Error retrieving audit log: id={audit_log_id}, error={str(e)}")
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

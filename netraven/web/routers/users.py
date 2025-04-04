@@ -1,54 +1,65 @@
 """
-Users router for the NetRaven web interface.
+Users router for managing user accounts.
 
-This module provides user-related endpoints for the API.
+This module provides endpoints for creating, retrieving, updating, and
+deleting user accounts, as well as managing user preferences and passwords.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
-from sqlalchemy.exc import IntegrityError
 
-from netraven.web.database import get_db
-from netraven.web.models.user import User as UserModel
-from netraven.web.schemas.user import User, UserCreate, UserUpdate, ChangePassword, UpdateNotificationPreferences
-from netraven.web.crud import get_user, get_users, update_user, delete_user, create_user, get_user_by_username, get_user_by_email
-from netraven.web.auth import (
-    get_current_principal, 
-    UserPrincipal, 
-    require_scope,
-    check_user_access,
-    optional_auth
+from netraven.web.database import get_async_session
+from netraven.web.schemas.user import (
+    User, 
+    UserCreate, 
+    UserUpdate, 
+    ChangePassword, 
+    UpdateNotificationPreferences
 )
-from netraven.web.models.auth import User as UserAuth
+from netraven.web.auth import UserPrincipal, get_current_principal, optional_auth
+from netraven.web.auth.permissions import (
+    require_scope, 
+    require_admin, 
+    require_self_or_admin
+)
 from netraven.core.logging import get_logger
+from netraven.core.services.service_factory import ServiceFactory
 
-# Create logger
-logger = get_logger("netraven.web.routers.users")
+logger = get_logger(__name__)
+router = APIRouter(prefix="/users", tags=["users"])
 
-# Create router
-router = APIRouter(prefix="", tags=["users"])
-
-@router.get("/me", response_model=User)
-async def get_current_user_endpoint(
-    current_principal: UserPrincipal = Depends(get_current_principal)
-) -> Dict[str, Any]:
+# Helper function to extract user ID for permission checks
+async def get_user_id(
+    user_id: str = Path(..., description="The ID of the user"),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+) -> str:
     """
-    Get the current user.
+    Extract the user ID for permission checking.
     
     Args:
-        current_principal: The authenticated user
+        user_id: The user ID
+        session: Database session
+        factory: Service factory
         
     Returns:
-        Dict[str, Any]: Current user details
+        str: ID of the user
+    """
+    return user_id
+
+@router.get("/me", response_model=User)
+async def get_current_user(
+    principal: UserPrincipal = Depends(get_current_principal)
+) -> Dict[str, Any]:
+    """
+    Get the current authenticated user's profile.
     """
     try:
-        # No permission check needed - users can always access their own profile
-        logger.info(f"Access granted: user={current_principal.username}, resource=users/me, action=get")
-        return current_principal.user
+        logger.info(f"Access granted: user={principal.username}, resource=users/me, action=get")
+        return principal.user
     except Exception as e:
-        # Standardized error handling
-        logger.exception(f"Error retrieving current user: {str(e)}")
+        logger.error(f"Error retrieving current user: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving current user: {str(e)}"
@@ -56,389 +67,341 @@ async def get_current_user_endpoint(
 
 @router.get("/", response_model=List[User])
 async def list_users(
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> List[Dict[str, Any]]:
+    skip: int = Query(0, description="Number of records to skip", ge=0),
+    limit: int = Query(100, description="Maximum number of records to return", ge=1, le=1000),
+    principal: UserPrincipal = Depends(require_scope("admin:users")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+) -> List[User]:
     """
     List all users.
     
-    Args:
-        current_principal: The authenticated user
-        db: Database session
-        
-    Returns:
-        List[Dict[str, Any]]: List of users
+    This endpoint requires the admin:users scope.
     """
-    # Standardized permission check
-    if not current_principal.has_scope("admin:users") and not current_principal.is_admin:
-        logger.warning(f"Access denied: user={current_principal.username}, " 
-                     f"resource=users, scope=admin:users, reason=insufficient_permissions")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions: admin:users required"
-        )
-    
     try:
-        users = get_users(db)
-        logger.info(f"Access granted: user={current_principal.username}, resource=users, scope=admin:users, count={len(users)}")
+        users = await factory.user_service.list_users(skip=skip, limit=limit)
+        
+        logger.info(f"Access granted: user={principal.username}, resource=users, action=list, count={len(users)}")
         return users
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
     except Exception as e:
-        # Standardized error handling
-        logger.exception(f"Error listing users: {str(e)}")
+        logger.error(f"Error listing users: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error listing users: {str(e)}"
         )
 
 @router.get("/{user_id}", response_model=User)
-async def get_user_endpoint(
+async def get_user(
     user_id: str,
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+    principal: UserPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_self_or_admin(get_user_id))
+) -> User:
     """
     Get a user by ID.
     
-    Args:
-        user_id: The user ID
-        current_principal: The authenticated user
-        db: Database session
-        
-    Returns:
-        Dict[str, Any]: User details
-        
-    Raises:
-        HTTPException: If the user is not found or current user is not authorized
+    This endpoint requires either the admin:users scope or the requesting user
+    to be the same as the requested user.
     """
     try:
-        # Use check_user_access to handle permission checks
-        user = check_user_access(
-            principal=current_principal,
-            user_id_or_obj=user_id,
-            required_scope="admin:users",
-            db=db,
-            allow_self_access=True
-        )
+        user = await factory.user_service.get_user_by_id(user_id)
         
-        # Standardized access granted log
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=user:{user_id}, scope=admin:users, action=get")
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {user_id} not found"
+            )
+
+        logger.info(f"Access granted: user={principal.username}, resource=user:{user_id}, action=get")
         return user
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        # Standardized error handling
-        logger.exception(f"Error retrieving user details: {str(e)}")
+        logger.error(f"Error retrieving user {user_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving user details: {str(e)}"
+            detail=f"Error retrieving user: {str(e)}"
         )
 
 @router.put("/{user_id}", response_model=User)
-async def update_user_endpoint(
+async def update_user(
     user_id: str,
     user_data: UserUpdate,
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+    principal: UserPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_self_or_admin(get_user_id))
+) -> User:
     """
     Update a user.
     
-    Args:
-        user_id: The user ID
-        user_data: The updated user data
-        current_principal: The authenticated user
-        db: Database session
-        
-    Returns:
-        Dict[str, Any]: Updated user details
-        
-    Raises:
-        HTTPException: If the user is not found or current user is not authorized
+    This endpoint requires either the admin:users scope or the requesting user
+    to be the same as the user being updated.
+    
+    Regular users cannot grant themselves admin privileges or deactivate their accounts.
     """
     try:
-        # Use check_user_access to handle permission checks
-        existing_user = check_user_access(
-            principal=current_principal,
-            user_id_or_obj=user_id,
-            required_scope="admin:users",
-            db=db,
-            allow_self_access=True
+        # Prevent non-admins from making themselves admin or changing active status
+        if not principal.is_admin:
+            if user_data.is_admin is not None and user_data.is_admin:
+                logger.warning(f"Access denied: user={principal.username} attempted to grant admin to {user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, 
+                    detail="Cannot grant admin privileges"
+                )
+            if user_data.is_active is not None and not user_data.is_active:
+                logger.warning(f"Access denied: user={principal.username} attempted to deactivate {user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, 
+                    detail="Cannot deactivate user"
+                )
+        
+        # Call the service to update the user
+        updated_user = await factory.user_service.update_user(
+            user_id, 
+            user_data.model_dump(exclude_unset=True)
         )
         
-        # Update user
-        updated_user = update_user(db, user_id, user_data.dict(exclude_unset=True))
-        
-        # Standardized access granted log
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=user:{user_id}, scope=admin:users, action=update")
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {user_id} not found"
+            )
+
+        logger.info(f"User updated: id={user_id}, user={principal.username}")
         return updated_user
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        # Standardized error handling
-        logger.exception(f"Error updating user: {str(e)}")
+        logger.error(f"Error updating user {user_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error updating user: {str(e)}"
         )
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user_endpoint(
+async def delete_user(
     user_id: str,
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> None:
+    principal: UserPrincipal = Depends(require_scope("admin:users")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+):
     """
     Delete a user.
     
-    Args:
-        user_id: The user ID
-        current_principal: The authenticated user
-        db: Database session
-        
-    Raises:
-        HTTPException: If the user is not found or current user is not authorized
+    This endpoint requires the admin:users scope.
+    Users cannot delete themselves.
     """
     try:
-        # Use check_user_access to handle permission checks, but don't allow self-access
-        existing_user = check_user_access(
-            principal=current_principal,
-            user_id_or_obj=user_id,
-            required_scope="admin:users",
-            db=db,
-            allow_self_access=False  # Users shouldn't delete themselves
-        )
-        
-        # Delete user
-        delete_user(db, user_id)
-        
-        # Standardized access granted log
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=user:{user_id}, scope=admin:users, action=delete")
+        # Prevent self-deletion
+        if principal.id == user_id:
+            logger.warning(f"Access denied: user={principal.username} attempted self-deletion")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Users cannot delete themselves"
+            )
+
+        result = await factory.user_service.delete_user(user_id)
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {user_id} not found"
+            )
+
+        logger.info(f"User deleted: id={user_id}, user={principal.username}")
+        return None
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        # Standardized error handling
-        logger.exception(f"Error deleting user: {str(e)}")
+        logger.error(f"Error deleting user {user_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error deleting user: {str(e)}"
         )
 
 @router.post("/", response_model=User, status_code=status.HTTP_201_CREATED)
-async def create_user_endpoint(
+async def create_user(
     user_data: UserCreate,
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+    principal: UserPrincipal = Depends(require_scope("admin:users")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+) -> User:
     """
     Create a new user.
     
-    Args:
-        user_data: The user data
-        current_principal: The authenticated user
-        db: Database session
-        
-    Returns:
-        Dict[str, Any]: Created user details
-        
-    Raises:
-        HTTPException: If the user already exists or current user is not authorized
+    This endpoint requires the admin:users scope.
     """
-    # Standardized permission check
-    if not current_principal.has_scope("admin:users") and not current_principal.is_admin:
-        logger.warning(f"Access denied: user={current_principal.username}, " 
-                     f"resource=users, scope=admin:users, reason=insufficient_permissions")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions: admin:users required"
-        )
-    
     try:
-        # Check if username already exists
-        existing_user = get_user_by_username(db, user_data.username)
-        if existing_user:
-            logger.warning(f"User creation failed: user={current_principal.username}, " 
-                         f"username={user_data.username}, reason=username_exists")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"User with username '{user_data.username}' already exists"
-            )
+        new_user = await factory.user_service.create_user(user_data)
         
-        # Create user
-        new_user = create_user(db, user_data)
-        
-        # Standardized access granted log
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=users, scope=admin:users, action=create")
+        logger.info(f"User created: id={new_user.id}, username={new_user.username}, user={principal.username}")
         return new_user
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
     except Exception as e:
-        # Standardized error handling
-        logger.exception(f"Error creating user: {str(e)}")
+        logger.error(f"Error creating user: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error creating user: {str(e)}"
         )
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 async def register_user(
     user_data: UserCreate,
-    db: Session = Depends(get_db),
-    # Use optional_auth to check if a user is authenticated
-    current_principal: Optional[UserPrincipal] = Depends(optional_auth())
-) -> Dict[str, Any]:
+    factory: ServiceFactory = Depends(ServiceFactory),
+    session: AsyncSession = Depends(get_async_session),
+    principal: Optional[UserPrincipal] = Depends(optional_auth())
+) -> User:
     """
-    Register a new user without requiring authentication.
-    This endpoint can be configured to be enabled/disabled based on application settings.
+    Register a new user without requiring authentication (if enabled).
     
-    Args:
-        user_data: The user data
-        db: Database session
-        current_principal: The authenticated user (optional)
-        
-    Returns:
-        Dict[str, Any]: Created user details
-        
-    Raises:
-        HTTPException: If the user already exists or registration is disabled
+    This endpoint allows self-registration if enabled in the system settings.
     """
-    # Check if self-registration is enabled (based on configuration)
-    # This could be controlled via environment variables or configuration settings
-    allow_self_registration = True  # This should come from configuration
-    
-    # If self-registration is disabled, only admins can register users
-    if not allow_self_registration:
-        if not current_principal or (not current_principal.has_scope("admin:users") and not current_principal.is_admin):
-            logger.warning(f"Self-registration is disabled and user does not have admin permissions")
+    try:
+        # TODO: Get this setting from config/environment variable
+        allow_self_registration = True 
+        is_admin_request = principal is not None and (principal.is_admin or principal.has_scope("admin:users"))
+
+        # Check if registration is allowed
+        if not allow_self_registration and not is_admin_request:
+            logger.warning(f"Self-registration attempt failed: Registration is disabled")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Self-registration is disabled. Please contact an administrator."
+                detail="Self-registration is disabled"
             )
-    
-    try:
-        # Check if username already exists
-        existing_user = get_user_by_username(db, user_data.username)
-        if existing_user:
-            logger.warning(f"User registration failed: username={user_data.username}, reason=username_exists")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"User with username '{user_data.username}' already exists"
-            )
-        
-        # Check if email already exists
-        existing_email = get_user_by_email(db, user_data.email)
-        if existing_email:
-            logger.warning(f"User registration failed: email={user_data.email}, reason=email_exists")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"User with email '{user_data.email}' already exists"
-            )
-        
-        # Set default permissions and admin status for self-registered users
-        # By default, self-registered users should not be admins
-        if not current_principal or not current_principal.is_admin:
+
+        # For security, enforce non-admin status for self-registered users
+        if not is_admin_request:
             user_data.is_admin = False
-        
-        # Create user
-        new_user = create_user(db, user_data)
+
+        # Create the user with limited active status based on config
+        # TODO: Get auto_activate setting from config
+        auto_activate = True
+        if not is_admin_request and not auto_activate:
+            user_data.is_active = False
+
+        new_user = await factory.user_service.create_user(user_data)
         
         # Log the registration
-        logger.info(f"User registered successfully: username={user_data.username}")
+        requester = "admin" if is_admin_request else "self-registration"
+        logger.info(f"User registered: id={new_user.id}, username={new_user.username}, requestor={requester}")
         
         return new_user
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except IntegrityError as e:
-        logger.warning(f"User registration failed due to integrity error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error registering user: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this username or email already exists"
-        )
-    except Exception as e:
-        # Standardized error handling
-        logger.exception(f"Error registering user: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error registering user: {str(e)}"
         )
 
-@router.patch("/{user_id}/notification-preferences")
+@router.patch("/{user_id}/password", status_code=status.HTTP_200_OK)
+async def change_password(
+    user_id: str,
+    password_data: ChangePassword,
+    principal: UserPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_self_or_admin(get_user_id))
+) -> Dict[str, str]:
+    """
+    Change a user's password.
+    
+    This endpoint requires either the admin:users scope or the requesting user
+    to be the same as the user whose password is being changed.
+    
+    Admins can change passwords without providing the current password.
+    """
+    try:
+        is_self = principal.id == user_id
+        admin_bypass = principal.is_admin and not is_self
+        
+        # Admins don't need to provide current password
+        if is_self and not password_data.current_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is required"
+            )
+            
+        # Verify current password if this is a self-change
+        if is_self and not admin_bypass:
+            # Call service to validate the current password
+            valid = await factory.user_service.validate_password(
+                user_id, 
+                password_data.current_password
+            )
+            if not valid:
+                logger.warning(f"Password change failed: id={user_id}, user={principal.username}, reason=invalid_current_password")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Current password is incorrect"
+                )
+        
+        # Call service to update the password
+        success = await factory.user_service.update_password(
+            user_id, 
+            password_data.new_password
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {user_id} not found"
+            )
+        
+        action_type = "admin_reset" if admin_bypass else "self_change"
+        logger.info(f"Password changed: id={user_id}, user={principal.username}, action={action_type}")
+        
+        return {
+            "status": "success",
+            "message": "Password successfully updated"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error changing password for user {user_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error changing password: {str(e)}"
+        )
+
+@router.patch("/{user_id}/notification-preferences", response_model=User)
 async def update_notification_preferences(
     user_id: str,
     preferences: UpdateNotificationPreferences,
-    current_user: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-):
+    principal: UserPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory),
+    _: str = Depends(require_self_or_admin(get_user_id))
+) -> User:
     """
-    Update the notification preferences for a user.
+    Update a user's notification preferences.
     
-    Args:
-        user_id: ID of the user to update
-        preferences: New notification preferences
-        current_user: Current authenticated user
-        db: Database session
+    This endpoint requires either the admin:users scope or the requesting user
+    to be the same as the user whose preferences are being updated.
+    """
+    try:
+        updated_user = await factory.user_service.update_notification_preferences(
+            user_id, 
+            preferences.model_dump()
+        )
         
-    Returns:
-        Updated user information
-    """
-    # Check if the user has permission to update this user's preferences
-    if not current_user.is_admin and current_user.id != user_id:
-        logger.warning(f"User {current_user.username} attempted to update notification preferences for user {user_id}")
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {user_id} not found"
+            )
+        
+        logger.info(f"Notification preferences updated: id={user_id}, user={principal.username}")
+        return updated_user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating notification preferences for user {user_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to update this user's notification preferences"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating notification preferences: {str(e)}"
         )
-    
-    # Get the user
-    user = get_user(db, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with ID {user_id} not found"
-        )
-    
-    # Update notification preferences
-    # Initialize if not already set
-    if not user.notification_preferences:
-        user.notification_preferences = {
-            "email_notifications": True,
-            "email_on_job_completion": True,
-            "email_on_job_failure": True,
-            "notification_frequency": "immediate"
-        }
-    
-    # Update each preference if provided
-    if preferences.email_notifications is not None:
-        user.notification_preferences["email_notifications"] = preferences.email_notifications
-    
-    if preferences.email_on_job_completion is not None:
-        user.notification_preferences["email_on_job_completion"] = preferences.email_on_job_completion
-    
-    if preferences.email_on_job_failure is not None:
-        user.notification_preferences["email_on_job_failure"] = preferences.email_on_job_failure
-    
-    if preferences.notification_frequency is not None:
-        user.notification_preferences["notification_frequency"] = preferences.notification_frequency
-    
-    # Save changes
-    db.commit()
-    
-    logger.info(f"Updated notification preferences for user {user.username}")
-    
-    # Return updated user
-    return {
-        "id": user.id,
-        "username": user.username,
-        "notification_preferences": user.notification_preferences
-    } 
+
+# Clean up unused imports if all endpoints are refactored
+# from sqlalchemy.orm import Session
+# from netraven.web.database import get_db 

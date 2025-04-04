@@ -10,9 +10,11 @@ All implementation work will adhere to the following principles:
 
 1. **Incremental Changes**: Changes will be made incrementally to ensure stability throughout the refactoring process.
 2. **Backward Compatibility**: Maintain backward compatibility wherever possible to minimize disruption.
-3. **Test-Driven Approach**: Use tests to validate changes and ensure functionality is preserved.
+3. **Test-Driven Approach**: Use tests to validate changes and ensure functionality is preserved. Unit and integration tests relevant to the changes should be developed or updated *during* each phase.
 4. **Documentation**: Document all significant changes, decisions, and rationales.
 5. **Code Review**: All changes will be subject to code review before final integration.
+6. **Development Logging**: Maintain a detailed log entry summarizing actions, decisions, and outcomes in the development log file (`./docs/development_logs/feature_api_container_refactor/README.md` or a phase-specific file) upon the completion of *each phase*.
+7. **Version Control**: Commit changes to the `feature/api_container_refactor` branch upon successful completion of each phase, using clear commit messages indicating the phase completed.
 
 ## Phased Implementation
 
@@ -96,33 +98,35 @@ The refactoring will be implemented in the following phases:
 2. Implement token refresh mechanism
 3. Create comprehensive scope-based authorization
 4. Standardize permission checking across all endpoints
-5. Implement consistent rate limiting for all endpoints
+5. Ensure rate limiting logic is encapsulated within the `AsyncAuthService`.
 
 **Implementation Approach**:
 - Refactor authentication to support token refresh and proper expiration
 - Implement scope-based permission model
 - Create reusable decorators for permission checking
-- Standardize rate limiting implementation
+- Standardize rate limiting *logic placement* within the service layer.
 
 **Expected Outcomes**:
 - Comprehensive token-based authentication
 - Consistent permission enforcement across all endpoints
-- Proper rate limiting to prevent abuse
+- Proper rate limiting *logic structure* in place (persistent store deferred).
 - Improved security through standardized authentication handling
 
 ### Phase 5: Error Handling and Validation
 
-**Objective**: Implement standardized error handling and validation across all endpoints.
+**Objective**: Implement standardized error handling and validation across all endpoints, including refactoring core services needed for logging.
 
 **Tasks**:
+0. Refactor `AuditService` (`netraven/web/services/audit_service.py`) to be an asynchronous class, instantiable via the `ServiceFactory`, accepting an `AsyncSession`, and update its methods accordingly. Integrate the refactored service into the `ServiceFactory` correctly.
 1. Create standardized error response format
 2. Implement comprehensive request validation
-3. Standardize error logging with proper redaction
+3. Standardize error logging with proper redaction (leveraging refactored `AuditService` and `JobLoggingService`)
 4. Create global exception handling middleware
 5. Ensure consistent error codes and messages
 
 **Implementation Approach**:
-- Develop exception classes for different error types
+- Prioritize Task 5.0 (AuditService refactoring).
+- Develop exception classes for different error types.
 - Implement global exception handler middleware
 - Create standard validation approach using Pydantic models
 - Ensure all endpoints use standard error response format
@@ -132,20 +136,23 @@ The refactoring will be implemented in the following phases:
 - Improved user experience through better error messages
 - Enhanced security through proper error handling
 - Simplified debugging through standardized error logging
+- Fully asynchronous and integrated `AuditService`.
 
 ### Phase 6: Asynchronous Operation
 
-**Objective**: Ensure consistent asynchronous operation across the API container.
+**Objective**: Ensure consistent asynchronous operation across the API container, including core utilities and helpers.
 
 **Tasks**:
 1. Refactor remaining synchronous database operations to async
-2. Ensure proper async resource management
-3. Implement async-friendly error handling
-4. Optimize async performance for common operations
-5. Ensure proper handling of async dependencies
+2. Ensure core utility functions (e.g., `authenticate_user`) and helper classes/modules (e.g., `token_store`) interacting with I/O are fully asynchronous or wrapped appropriately for non-blocking execution.
+3. Ensure proper async resource management
+4. Implement async-friendly error handling
+5. Optimize async performance for common operations
+6. Ensure proper handling of async dependencies between services
 
 **Implementation Approach**:
 - Convert synchronous database operations to async
+- Wrap blocking I/O calls in `asyncio.to_thread` if immediate async alternatives are not available
 - Implement proper async context management
 - Ensure proper cancellation and timeout handling
 - Optimize async performance where possible
@@ -155,6 +162,7 @@ The refactoring will be implemented in the following phases:
 - Improved performance and scalability
 - Proper resource management in async context
 - Consistent async patterns across the codebase
+- Core utilities and helpers are non-blocking.
 
 ### Phase 7: API Documentation and Testing
 
@@ -212,6 +220,7 @@ The phases should be implemented in the order presented, as each phase builds up
 - Phase 6 (Asynchronous Operation) depends on the completion of Phase 2 and Phase 5
 - Phase 7 (Documentation and Testing) should be implemented incrementally throughout other phases
 - Phase 8 (Containerization) can be implemented independently of other phases
+- Phase 5.0 (AuditService Refactor) should ideally be completed before significant error handling or audit logging logic is finalized in other services.
 
 ## Risk Assessment and Mitigation
 
@@ -233,10 +242,10 @@ The following risks have been identified for this refactoring effort:
 
 The refactoring will be accompanied by a comprehensive testing strategy:
 
-1. **Unit Tests**: Test individual components in isolation
-2. **Integration Tests**: Test interactions between components
-3. **System Tests**: Test complete API workflows
-4. **Performance Tests**: Validate performance characteristics
+1. **Unit Tests**: Test individual components in isolation. Relevant tests will be added/updated during each implementation phase.
+2. **Integration Tests**: Test interactions between components. Relevant tests will be added/updated during each implementation phase.
+3. **System Tests**: Test complete API workflows, primarily developed during Phase 7 but based on functionality completed in earlier phases.
+4. **Performance Tests**: Validate performance characteristics, conducted after major refactoring phases.
 
 All tests will be executed in the Docker-based environment that matches the deployment environment to ensure consistency.
 

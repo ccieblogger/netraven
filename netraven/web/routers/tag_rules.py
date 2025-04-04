@@ -1,320 +1,289 @@
 """
-Tag Rules router for the NetRaven web interface.
+Tag Rules router for managing dynamic tag rules.
 
-This module provides endpoints for managing dynamic tag rules,
-including creating, testing, and applying rules.
+This module provides endpoints for creating, retrieving, updating, and
+deleting tag rules, as well as for testing and applying rules to devices.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
 
-# Import authentication dependencies
-from netraven.web.auth import (
-    get_current_principal, 
-    UserPrincipal, 
-    require_scope,
-    check_tag_rule_access,
-    check_tag_access
-)
-from netraven.web.models.auth import User
-from netraven.web.database import get_db
-
-# Import schemas and CRUD functions
+from netraven.web.database import get_async_session
 from netraven.web.schemas.tag_rule import (
-    TagRule, TagRuleCreate, TagRuleUpdate, TagRuleTest, TagRuleTestResult
+    TagRule as TagRuleSchema, 
+    TagRuleCreate, 
+    TagRuleUpdate, 
+    TagRuleTest, 
+    TagRuleTestResult
 )
-from netraven.web.crud import (
-    get_tag_rules, get_tag_rule, create_tag_rule, update_tag_rule, delete_tag_rule,
-    apply_rule, test_rule, get_tag
-)
-
-# Create logger
+from netraven.web.auth import UserPrincipal, get_current_principal
+from netraven.web.auth.permissions import require_scope, require_admin
+from netraven.core.services.service_factory import ServiceFactory
 from netraven.core.logging import get_logger
-logger = get_logger("netraven.web.routers.tag_rules")
 
-# Create router
-router = APIRouter(prefix="", tags=["tag-rules"])
+logger = get_logger(__name__)
+router = APIRouter(prefix="/tag-rules", tags=["tag-rules"])
 
-@router.get("", response_model=List[TagRule])
+@router.get("/", response_model=List[TagRuleSchema])
 async def list_tag_rules(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    tag_id: Optional[str] = Query(None, title="Filter by tag ID"),
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> List[Dict[str, Any]]:
+    skip: int = Query(0, description="Number of records to skip", ge=0),
+    limit: int = Query(100, description="Maximum number of records to return", ge=1, le=1000),
+    tag_id: Optional[str] = Query(None, description="Filter rules by tag ID"),
+    principal: UserPrincipal = Depends(require_scope("read:tag_rules")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+) -> List[TagRuleSchema]:
     """
     List all tag rules.
     
-    This endpoint returns a list of all tag rules with optional pagination and filtering.
+    This endpoint requires the read:tag_rules scope.
     """
-    # Check permission using standardized pattern
-    if not current_principal.has_scope("read:tag_rules") and not current_principal.is_admin:
-        logger.warning(f"Access denied: user={current_principal.username}, " 
-                     f"resource=tag_rules, scope=read:tag_rules, reason=insufficient_permissions")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions: read:tag_rules required"
-        )
-    
     try:
-        # If filtering by tag_id, verify access to that tag
+        # If filtering by tag_id, verify the tag exists
         if tag_id:
-            check_tag_access(
-                principal=current_principal,
-                tag_id_or_obj=tag_id,
-                required_scope="read:tags",
-                db=db
-            )
+            tag = await factory.tag_service.get_tag_by_id(tag_id)
+            if not tag:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Tag with ID {tag_id} not found"
+                )
         
         # Get rules with filtering
-        rules = get_tag_rules(db, skip=skip, limit=limit, tag_id=tag_id)
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=tag_rules, scope=read:tag_rules, count={len(rules)}")
+        rules = await factory.tag_rule_service.list_rules(
+            tag_id=tag_id, 
+            skip=skip, 
+            limit=limit
+        )
+        
+        logger.info(f"Tag rules listed: user={principal.username}, count={len(rules)}, tag_filter={tag_id or 'none'}")
         return rules
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.exception(f"Error listing tag rules: {str(e)}")
+        logger.error(f"Error listing tag rules: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error listing tag rules: {str(e)}"
         )
 
-@router.post("", response_model=TagRule, status_code=status.HTTP_201_CREATED)
-async def create_tag_rule_endpoint(
-    rule: TagRuleCreate,
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+@router.post("/", response_model=TagRuleSchema, status_code=status.HTTP_201_CREATED)
+async def create_tag_rule(
+    rule_data: TagRuleCreate,
+    principal: UserPrincipal = Depends(require_scope(["write:tag_rules", "read:tags"])),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+) -> TagRuleSchema:
     """
     Create a new tag rule.
     
-    This endpoint creates a new tag rule with the provided details.
+    This endpoint requires the write:tag_rules and read:tags scopes.
     """
-    # Check permission using standardized pattern
-    if not current_principal.has_scope("write:tag_rules") and not current_principal.is_admin:
-        logger.warning(f"Access denied: user={current_principal.username}, " 
-                     f"resource=tag_rules, scope=write:tag_rules, reason=insufficient_permissions")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions: write:tag_rules required"
-        )
-    
     try:
-        # Check if tag exists and user has access to it
-        check_tag_access(
-            principal=current_principal,
-            tag_id_or_obj=rule.tag_id,
-            required_scope="read:tags",
-            db=db
-        )
+        # Verify the tag exists
+        tag = await factory.tag_service.get_tag_by_id(rule_data.tag_id)
+        if not tag:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tag with ID {rule_data.tag_id} not found"
+            )
         
         # Create the tag rule
-        created_rule = create_tag_rule(db, rule)
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=tag_rule:{created_rule.id}, scope=write:tag_rules, action=create")
+        created_rule = await factory.tag_rule_service.create_rule(rule_data)
+        
+        logger.info(f"Tag rule created: id={created_rule.id}, tag_id={rule_data.tag_id}, user={principal.username}")
         return created_rule
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.exception(f"Error creating tag rule: {str(e)}")
+        logger.error(f"Error creating tag rule: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error creating tag rule: {str(e)}"
         )
 
-@router.get("/{rule_id}", response_model=TagRule)
-async def get_tag_rule_endpoint(
-    rule_id: str = Path(..., title="Rule ID"),
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+@router.get("/{rule_id}", response_model=TagRuleSchema)
+async def get_tag_rule(
+    rule_id: str = Path(..., description="The ID of the tag rule"),
+    principal: UserPrincipal = Depends(require_scope("read:tag_rules")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+) -> TagRuleSchema:
     """
     Get a specific tag rule by ID.
     
-    This endpoint returns details for a specific tag rule.
+    This endpoint requires the read:tag_rules scope.
     """
     try:
-        # Use our permission check function 
-        rule = check_tag_rule_access(
-            principal=current_principal,
-            rule_id_or_obj=rule_id,
-            required_scope="read:tag_rules",
-            db=db
-        )
+        rule = await factory.tag_rule_service.get_rule_by_id(rule_id)
         
+        if not rule:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tag rule with ID {rule_id} not found"
+            )
+        
+        logger.info(f"Tag rule retrieved: id={rule_id}, user={principal.username}")
         return rule
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.exception(f"Error retrieving tag rule: {str(e)}")
+        logger.error(f"Error retrieving tag rule {rule_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving tag rule: {str(e)}"
         )
 
-@router.put("/{rule_id}", response_model=TagRule)
-async def update_tag_rule_endpoint(
+@router.put("/{rule_id}", response_model=TagRuleSchema)
+async def update_tag_rule(
+    rule_id: str,
     rule_data: TagRuleUpdate,
-    rule_id: str = Path(..., title="Rule ID"),
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+    principal: UserPrincipal = Depends(require_scope(["write:tag_rules", "read:tags"])),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+) -> TagRuleSchema:
     """
     Update a specific tag rule.
     
-    This endpoint updates a specific tag rule with the provided details.
+    This endpoint requires the write:tag_rules and read:tags scopes.
     """
     try:
-        # Use our permission check function for the rule
-        rule = check_tag_rule_access(
-            principal=current_principal,
-            rule_id_or_obj=rule_id,
-            required_scope="write:tag_rules",
-            db=db
-        )
-        
-        # If tag_id is being updated, check access to the new tag
-        if rule_data.tag_id and rule_data.tag_id != rule.tag_id:
-            check_tag_access(
-                principal=current_principal,
-                tag_id_or_obj=rule_data.tag_id,
-                required_scope="read:tags",
-                db=db
-            )
+        # If tag_id is provided in the update, verify it exists
+        if rule_data.tag_id:
+            tag = await factory.tag_service.get_tag_by_id(rule_data.tag_id)
+            if not tag:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Tag with ID {rule_data.tag_id} not found"
+                )
         
         # Update the rule
-        updated_rule = update_tag_rule(db, rule_id, rule_data)
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=tag_rule:{updated_rule.id}, scope=write:tag_rules, action=update")
+        updated_rule = await factory.tag_rule_service.update_rule(
+            rule_id, 
+            rule_data.model_dump(exclude_unset=True)
+        )
+        
+        if not updated_rule:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tag rule with ID {rule_id} not found"
+            )
+        
+        logger.info(f"Tag rule updated: id={rule_id}, user={principal.username}")
         return updated_rule
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.exception(f"Error updating tag rule: {str(e)}")
+        logger.error(f"Error updating tag rule {rule_id}: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error updating tag rule: {str(e)}"
         )
 
 @router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_tag_rule_endpoint(
-    rule_id: str = Path(..., title="Rule ID"),
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> None:
+async def delete_tag_rule(
+    rule_id: str,
+    principal: UserPrincipal = Depends(require_scope("delete:tag_rules")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+):
     """
     Delete a specific tag rule.
     
-    This endpoint deletes a specific tag rule.
+    This endpoint requires the delete:tag_rules scope.
     """
     try:
-        # Use our permission check function
-        rule = check_tag_rule_access(
-            principal=current_principal,
-            rule_id_or_obj=rule_id,
-            required_scope="write:tag_rules",
-            db=db
-        )
+        result = await factory.tag_rule_service.delete_rule(rule_id)
         
-        # Delete the rule
-        delete_tag_rule(db, rule_id)
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=tag_rule:{rule.id}, scope=write:tag_rules, action=delete")
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tag rule with ID {rule_id} not found"
+            )
+        
+        logger.info(f"Tag rule deleted: id={rule_id}, user={principal.username}")
+        return None
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.exception(f"Error deleting tag rule: {str(e)}")
+        logger.error(f"Error deleting tag rule {rule_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error deleting tag rule: {str(e)}"
         )
 
 @router.post("/{rule_id}/apply", status_code=status.HTTP_200_OK)
-async def apply_tag_rule_endpoint(
-    rule_id: str = Path(..., title="Rule ID"),
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
+async def apply_tag_rule(
+    rule_id: str,
+    principal: UserPrincipal = Depends(require_scope("exec:tag_rules")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
 ) -> Dict[str, Any]:
     """
     Apply a tag rule to all devices.
     
-    This endpoint applies a specific tag rule to all devices that match the rule's criteria.
+    This endpoint requires the exec:tag_rules scope.
+    It applies the rule to all devices matching the rule criteria.
     """
     try:
-        # Use our permission check functions for the rule and for write access to tags
-        rule = check_tag_rule_access(
-            principal=current_principal,
-            rule_id_or_obj=rule_id,
-            required_scope="read:tag_rules",
-            db=db
-        )
-        
-        # Check write access to tags
-        if not current_principal.has_scope("write:tags") and not current_principal.is_admin:
-            logger.warning(f"Access denied: user={current_principal.username}, " 
-                         f"resource=tags, scope=write:tags, reason=insufficient_permissions")
+        # Verify rule exists
+        rule = await factory.tag_rule_service.get_rule_by_id(rule_id)
+        if not rule:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions: write:tags required to apply tag rules"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tag rule with ID {rule_id} not found"
             )
         
         # Apply the rule
-        result = apply_rule(db, rule_id)
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=tag_rule:{rule.id}, scope=write:tags, action=apply, "
-                  f"matched_count={result.get('matched_count', 0)}")
+        result = await factory.tag_rule_service.apply_rule(rule_id)
+        
+        matched_count = result.get("matched_count", 0)
+        updated_count = result.get("updated_count", 0)
+        logger.info(f"Tag rule applied: id={rule_id}, user={principal.username}, matched={matched_count}, updated={updated_count}")
         return result
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.exception(f"Error applying tag rule: {str(e)}")
+        logger.error(f"Error applying tag rule {rule_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error applying tag rule: {str(e)}"
         )
 
 @router.post("/test", response_model=TagRuleTestResult)
-async def test_tag_rule_endpoint(
-    rule_test: TagRuleTest,
-    current_principal: UserPrincipal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+async def test_tag_rule(
+    rule_test_data: TagRuleTest,
+    principal: UserPrincipal = Depends(require_scope("read:tag_rules")),
+    session: AsyncSession = Depends(get_async_session),
+    factory: ServiceFactory = Depends(ServiceFactory)
+) -> TagRuleTestResult:
     """
     Test a tag rule against devices.
     
-    This endpoint tests a tag rule against devices without actually applying it.
+    This endpoint requires the read:tag_rules scope.
+    It tests the rule against devices without actually applying it.
     """
-    # Check permission using standardized pattern
-    if not current_principal.has_scope("read:tag_rules") and not current_principal.is_admin:
-        logger.warning(f"Access denied: user={current_principal.username}, " 
-                     f"resource=tag_rules, scope=read:tag_rules, reason=insufficient_permissions")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions: read:tag_rules required"
-        )
-    
-    try:    
+    try:
+        # Verify tag exists if tag_id is provided
+        if rule_test_data.tag_id:
+            tag = await factory.tag_service.get_tag_by_id(rule_test_data.tag_id)
+            if not tag:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Tag with ID {rule_test_data.tag_id} not found"
+                )
+        
         # Test the rule
-        result = test_rule(db, rule_test.rule_criteria.dict())
-        logger.info(f"Access granted: user={current_principal.username}, " 
-                  f"resource=tag_rules, scope=read:tag_rules, action=test, "
-                  f"matched_count={result.get('matched_count', 0)}")
+        result = await factory.tag_rule_service.test_rule(rule_test_data)
+        
+        matched_count = len(result.matched_devices)
+        logger.info(f"Tag rule tested: user={principal.username}, matched_devices={matched_count}")
         return result
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.exception(f"Error testing tag rule: {str(e)}")
+        logger.error(f"Error testing tag rule: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error testing tag rule: {str(e)}"
         ) 

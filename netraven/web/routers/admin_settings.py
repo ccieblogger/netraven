@@ -6,12 +6,12 @@ All endpoints require admin privileges.
 """
 
 from typing import Dict, List, Optional, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
 from sqlalchemy.orm import Session
 
 from netraven.web.database import get_db
-from netraven.web.auth.jwt import get_current_user_with_scopes
-from netraven.web.models.user import User
+from netraven.web.auth import UserPrincipal, get_current_principal
+from netraven.web.auth.permissions import require_scope, require_admin
 from netraven.web.schemas.admin_settings import (
     AdminSettingCreate, AdminSettingUpdate, AdminSettingOut, 
     AdminSettingValueUpdate, AdminSettingsByCategoryOut,
@@ -26,14 +26,12 @@ from netraven.core.logging import get_logger
 
 # Create router
 router = APIRouter(
-    prefix="/api/admin-settings",
-    tags=["admin settings"],
-    dependencies=[Depends(get_current_user_with_scopes(["admin:settings"]))],
-    responses={401: {"description": "Unauthorized"}}
+    prefix="/admin-settings",
+    tags=["admin settings"]
 )
 
 # Logger
-logger = get_logger("netraven.web.routers.admin_settings")
+logger = get_logger(__name__)
 
 
 @router.get(
@@ -44,19 +42,13 @@ logger = get_logger("netraven.web.routers.admin_settings")
 )
 async def get_admin_settings_endpoint(
     search: AdminSettingSearch = Depends(),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_scopes(["admin:settings"]))
+    principal: UserPrincipal = Depends(require_admin("admin:settings")),
+    db: Session = Depends(get_db)
 ):
     """
     Get all admin settings with pagination and filtering.
     
-    Args:
-        search: Search parameters
-        db: Database session
-        current_user: Current authenticated user with admin scope
-        
-    Returns:
-        Paginated list of admin settings
+    This endpoint requires admin privileges with the admin:settings scope.
     """
     # Calculate pagination
     skip = (search.page - 1) * search.page_size
@@ -71,13 +63,16 @@ async def get_admin_settings_endpoint(
     )
     
     # Count total items for pagination
-    total_query = db.query(get_admin_settings.__func__)
-    if search.category:
-        total_query = total_query.filter_by(category=search.category)
-    total = len(get_admin_settings(db=db, category=search.category, search=search.key_contains))
+    total = len(get_admin_settings(
+        db=db, 
+        category=search.category, 
+        search=search.key_contains
+    ))
     
     # Calculate total pages
     pages = (total + search.page_size - 1) // search.page_size if total > 0 else 1
+    
+    logger.info(f"Admin settings listed: user={principal.username}, count={len(settings)}, category={search.category or 'all'}")
     
     return AdminSettingListOut(
         items=settings,
@@ -95,20 +90,20 @@ async def get_admin_settings_endpoint(
     description="Get all admin settings grouped by category"
 )
 async def get_admin_settings_by_category_endpoint(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_scopes(["admin:settings"]))
+    principal: UserPrincipal = Depends(require_admin("admin:settings")),
+    db: Session = Depends(get_db)
 ):
     """
     Get admin settings grouped by category.
     
-    Args:
-        db: Database session
-        current_user: Current authenticated user with admin scope
-        
-    Returns:
-        Dictionary of admin settings grouped by category
+    This endpoint requires admin privileges with the admin:settings scope.
     """
-    return get_admin_settings_by_category(db)
+    settings_by_category = get_admin_settings_by_category(db)
+    
+    total_settings = sum(len(settings) for settings in settings_by_category.values())
+    logger.info(f"Admin settings by category listed: user={principal.username}, categories={len(settings_by_category)}, total_settings={total_settings}")
+    
+    return settings_by_category
 
 
 @router.get(
@@ -119,26 +114,22 @@ async def get_admin_settings_by_category_endpoint(
 )
 async def get_admin_setting_endpoint(
     setting_id: str = Path(..., description="ID of the admin setting"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_scopes(["admin:settings"]))
+    principal: UserPrincipal = Depends(require_admin("admin:settings")),
+    db: Session = Depends(get_db)
 ):
     """
     Get a specific admin setting by ID.
     
-    Args:
-        setting_id: ID of the admin setting
-        db: Database session
-        current_user: Current authenticated user with admin scope
-        
-    Returns:
-        The admin setting
-        
-    Raises:
-        HTTPException: If the setting is not found
+    This endpoint requires admin privileges with the admin:settings scope.
     """
     setting = get_admin_setting(db, setting_id)
     if not setting:
-        raise HTTPException(status_code=404, detail="Admin setting not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"Admin setting with ID {setting_id} not found"
+        )
+    
+    logger.info(f"Admin setting retrieved: id={setting_id}, key={setting.key}, user={principal.username}")
     return setting
 
 
@@ -150,57 +141,48 @@ async def get_admin_setting_endpoint(
 )
 async def get_admin_setting_by_key_endpoint(
     key: str = Path(..., description="Key of the admin setting"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_scopes(["admin:settings"]))
+    principal: UserPrincipal = Depends(require_admin("admin:settings")),
+    db: Session = Depends(get_db)
 ):
     """
     Get a specific admin setting by key.
     
-    Args:
-        key: Key of the admin setting
-        db: Database session
-        current_user: Current authenticated user with admin scope
-        
-    Returns:
-        The admin setting
-        
-    Raises:
-        HTTPException: If the setting is not found
+    This endpoint requires admin privileges with the admin:settings scope.
     """
     setting = get_admin_setting_by_key(db, key)
     if not setting:
-        raise HTTPException(status_code=404, detail="Admin setting not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"Admin setting with key '{key}' not found"
+        )
+    
+    logger.info(f"Admin setting retrieved by key: key={key}, id={setting.id}, user={principal.username}")
     return setting
 
 
 @router.post(
     "/",
     response_model=AdminSettingOut,
-    status_code=201,
+    status_code=status.HTTP_201_CREATED,
     summary="Create admin setting",
     description="Create a new admin setting"
 )
 async def create_admin_setting_endpoint(
     setting: AdminSettingCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_scopes(["admin:settings"]))
+    principal: UserPrincipal = Depends(require_admin("admin:settings")),
+    db: Session = Depends(get_db)
 ):
     """
     Create a new admin setting.
     
-    Args:
-        setting: Admin setting data
-        db: Database session
-        current_user: Current authenticated user with admin scope
-        
-    Returns:
-        The created admin setting
+    This endpoint requires admin privileges with the admin:settings scope.
     """
     db_setting = create_admin_setting(db, setting)
+    
     logger.info(
-        f"Admin setting created: {setting.key}",
-        extra={"user_id": str(current_user.id), "setting_key": setting.key}
+        f"Admin setting created: key={setting.key}, category={setting.category}, user={principal.username}"
     )
+    
     return db_setting
 
 
@@ -213,32 +195,25 @@ async def create_admin_setting_endpoint(
 async def update_admin_setting_endpoint(
     setting_update: AdminSettingUpdate,
     setting_id: str = Path(..., description="ID of the admin setting"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_scopes(["admin:settings"]))
+    principal: UserPrincipal = Depends(require_admin("admin:settings")),
+    db: Session = Depends(get_db)
 ):
     """
     Update an existing admin setting.
     
-    Args:
-        setting_update: Updated admin setting data
-        setting_id: ID of the admin setting to update
-        db: Database session
-        current_user: Current authenticated user with admin scope
-        
-    Returns:
-        The updated admin setting
-        
-    Raises:
-        HTTPException: If the setting is not found
+    This endpoint requires admin privileges with the admin:settings scope.
     """
     setting = update_admin_setting(db, setting_id, setting_update)
     if not setting:
-        raise HTTPException(status_code=404, detail="Admin setting not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"Admin setting with ID {setting_id} not found"
+        )
     
     logger.info(
-        f"Admin setting updated: {setting.key}",
-        extra={"user_id": str(current_user.id), "setting_key": setting.key}
+        f"Admin setting updated: id={setting_id}, key={setting.key}, user={principal.username}"
     )
+    
     return setting
 
 
@@ -251,71 +226,65 @@ async def update_admin_setting_endpoint(
 async def update_admin_setting_value_endpoint(
     value_update: AdminSettingValueUpdate,
     key: str = Path(..., description="Key of the admin setting"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_scopes(["admin:settings"]))
+    principal: UserPrincipal = Depends(require_admin("admin:settings")),
+    db: Session = Depends(get_db)
 ):
     """
     Update the value of an admin setting by key.
     
-    Args:
-        value_update: Updated value data
-        key: Key of the admin setting to update
-        db: Database session
-        current_user: Current authenticated user with admin scope
-        
-    Returns:
-        The updated admin setting
-        
-    Raises:
-        HTTPException: If the setting is not found
+    This endpoint requires admin privileges with the admin:settings scope.
     """
     setting = update_admin_setting_value(db, key, value_update.value)
     if not setting:
-        raise HTTPException(status_code=404, detail="Admin setting not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"Admin setting with key '{key}' not found"
+        )
     
     logger.info(
-        f"Admin setting value updated: {key}",
-        extra={"user_id": str(current_user.id), "setting_key": key}
+        f"Admin setting value updated: key={key}, user={principal.username}"
     )
+    
     return setting
 
 
 @router.delete(
     "/{setting_id}",
-    status_code=204,
+    status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete admin setting",
     description="Delete an admin setting"
 )
 async def delete_admin_setting_endpoint(
     setting_id: str = Path(..., description="ID of the admin setting"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_scopes(["admin:settings"]))
+    principal: UserPrincipal = Depends(require_admin("admin:settings")),
+    db: Session = Depends(get_db)
 ):
     """
     Delete an admin setting.
     
-    Args:
-        setting_id: ID of the admin setting to delete
-        db: Database session
-        current_user: Current authenticated user with admin scope
-        
-    Raises:
-        HTTPException: If the setting is not found
+    This endpoint requires admin privileges with the admin:settings scope.
     """
-    # Get the setting first for logging
+    # Get the setting first for logging purposes
     setting = get_admin_setting(db, setting_id)
     if not setting:
-        raise HTTPException(status_code=404, detail="Admin setting not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"Admin setting with ID {setting_id} not found"
+        )
     
-    # Delete the setting
-    result = delete_admin_setting(db, setting_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Admin setting not found")
+    # Now delete it
+    delete_result = delete_admin_setting(db, setting_id)
+    if not delete_result:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Failed to delete admin setting"
+        )
     
     logger.info(
-        f"Admin setting deleted: {setting.key}",
-        extra={"user_id": str(current_user.id), "setting_key": setting.key}
+        f"Admin setting deleted: id={setting_id}, key={setting.key}, user={principal.username}"
     )
+    
+    return None
 
 
 @router.post(
@@ -325,23 +294,18 @@ async def delete_admin_setting_endpoint(
     description="Initialize or restore default admin settings"
 )
 async def initialize_default_settings_endpoint(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_scopes(["admin:settings"]))
+    principal: UserPrincipal = Depends(require_admin("admin:settings")),
+    db: Session = Depends(get_db)
 ):
     """
     Initialize or restore default admin settings.
     
-    Args:
-        db: Database session
-        current_user: Current authenticated user with admin scope
-        
-    Returns:
-        List of created or updated admin settings
+    This endpoint requires admin privileges with the admin:settings scope.
     """
     settings = initialize_default_settings(db)
     
     logger.info(
-        "Default admin settings initialized",
-        extra={"user_id": str(current_user.id), "count": len(settings)}
+        f"Default admin settings initialized: count={len(settings)}, user={principal.username}"
     )
+    
     return settings 

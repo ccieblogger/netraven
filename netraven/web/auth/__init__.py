@@ -6,13 +6,14 @@ implementing a unified token-based authentication system.
 """
 
 import os
+import time
+import uuid
 from typing import Optional, Dict, List, Any, Callable, Awaitable, Union
 from datetime import datetime, timedelta
 
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status, Request, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt as jose_jwt  # Renamed to avoid conflicts with local module
-import jwt as pyjwt  # Import the PyJWT library explicitly
+import jwt
 
 from netraven.core.auth import (
     validate_token,
@@ -24,8 +25,9 @@ from netraven.core.auth import (
 )
 from netraven.core.token_store import token_store
 from netraven.core.logging import get_logger
-from netraven.core.config import get_config
+from netraven.core.config import get_config, settings
 from netraven.web.models.auth import User, ServiceAccount
+from netraven.web.auth.permissions import has_permission
 
 # Remove the circular import from here
 # from netraven.web.auth.permissions import check_device_access
@@ -58,45 +60,150 @@ __all__ = [
     "check_scheduled_job_access"
 ]
 
-class Principal:
-    """Base class for authentication principals (users or services)."""
+class UserPrincipal:
+    """
+    Represents an authenticated user or service.
     
-    def __init__(self, subject: str, scopes: List[str], principal_type: str):
-        self.subject = subject
+    Contains identity and permission information extracted from JWT token.
+    Provides methods for checking permissions and scopes.
+    """
+    
+    def __init__(
+        self,
+        username: str,
+        id: str,
+        scopes: List[str],
+        is_admin: bool = False,
+        token_id: Optional[str] = None,
+        token_type: str = "access",
+        token_issued_at: Optional[int] = None,
+        token_expires_at: Optional[int] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ):
+        """
+        Initialize a UserPrincipal.
+        
+        Args:
+            username: Username for this principal
+            id: User ID for this principal
+            scopes: List of permission scopes for this principal
+            is_admin: Whether this principal has admin privileges
+            token_id: ID of the JWT token (jti claim)
+            token_type: Type of token (access, refresh, etc.)
+            token_issued_at: Timestamp when token was issued
+            token_expires_at: Timestamp when token expires
+            metadata: Additional metadata for this principal
+        """
+        self.username = username
+        self.id = id
         self.scopes = scopes
-        self.principal_type = principal_type
+        self.is_admin = is_admin
+        self.token_id = token_id
+        self.token_type = token_type
+        self.token_issued_at = token_issued_at
+        self.token_expires_at = token_expires_at
+        self.metadata = metadata or {}
     
     def has_scope(self, required_scope: str) -> bool:
-        """Check if the principal has a specific scope."""
-        return has_required_scopes(self.scopes, [required_scope])
-
-
-class UserPrincipal(Principal):
-    """User principal for authenticated users."""
-    
-    def __init__(self, user: User):
-        super().__init__(user.username, user.permissions, "user")
-        self.user = user
-        self.is_admin = user.is_active and ("admin:*" in user.permissions)
-        self.id = user.id if hasattr(user, 'id') else user.username  # Use real ID if available
+        """
+        Check if principal has a required scope.
         
-    @property
-    def username(self) -> str:
-        """Get the username."""
-        return self.subject
+        Args:
+            required_scope: Scope to check
+            
+        Returns:
+            bool: True if principal has scope, False otherwise
+        """
+        return has_permission(self.scopes, required_scope)
+    
+    def has_any_scope(self, required_scopes: List[str]) -> bool:
+        """
+        Check if principal has any of the required scopes.
+        
+        Args:
+            required_scopes: List of scopes to check
+            
+        Returns:
+            bool: True if principal has any of the scopes, False otherwise
+        """
+        if not required_scopes:
+            return True
+            
+        return any(self.has_scope(scope) for scope in required_scopes)
+    
+    def has_all_scopes(self, required_scopes: List[str]) -> bool:
+        """
+        Check if principal has all required scopes.
+        
+        Args:
+            required_scopes: List of scopes to check
+            
+        Returns:
+            bool: True if principal has all scopes, False otherwise
+        """
+        if not required_scopes:
+            return True
+            
+        return all(self.has_scope(scope) for scope in required_scopes)
+    
+    @classmethod
+    def from_token_payload(cls, payload: Dict[str, Any]) -> "UserPrincipal":
+        """
+        Create UserPrincipal from JWT token payload.
+        
+        Args:
+            payload: JWT token payload
+            
+        Returns:
+            UserPrincipal: Principal created from token payload
+        """
+        # Extract standard JWT claims
+        jti = payload.get("jti")
+        sub = payload.get("sub")
+        username = payload.get("preferred_username", sub)
+        scope_str = payload.get("scope", "")
+        
+        # Parse scopes from space-delimited string
+        scopes = scope_str.split() if isinstance(scope_str, str) else scope_str
+        
+        # Check for admin role
+        is_admin = "admin" in scopes or "admin:*" in scopes
+        
+        # Extract other useful claims
+        iat = payload.get("iat")
+        exp = payload.get("exp")
+        token_type = payload.get("token_type", "access")
+        
+        # Store additional claims as metadata
+        metadata = {k: v for k, v in payload.items() if k not in 
+                   ["jti", "iat", "exp", "sub", "scope", "token_type", "preferred_username"]}
+        
+        return cls(
+            username=username,
+            id=sub,
+            scopes=scopes,
+            is_admin=is_admin,
+            token_id=jti,
+            token_type=token_type,
+            token_issued_at=iat,
+            token_expires_at=exp,
+            metadata=metadata
+        )
 
+    def __str__(self) -> str:
+        """String representation of the principal."""
+        return f"UserPrincipal(username={self.username}, id={self.id}, is_admin={self.is_admin})"
 
-class ServicePrincipal(Principal):
+class ServicePrincipal:
     """Service principal for authenticated services."""
     
     def __init__(self, service: ServiceAccount):
-        super().__init__(service.name, service.permissions, "service")
         self.service = service
         
     @property
     def service_name(self) -> str:
         """Get the service name."""
-        return self.subject
+        return self.service.name
 
 
 def get_token_from_request(request: Request) -> Optional[str]:
@@ -137,7 +244,7 @@ async def get_user(username: str, scopes: List[str]) -> UserPrincipal:
             if db_user:
                 # Use the real user but with the scopes from the token
                 db_user.permissions = scopes
-                return UserPrincipal(db_user)
+                return UserPrincipal.from_token_payload(db_user.to_dict())
         finally:
             db.close()
     except Exception as e:
@@ -151,7 +258,7 @@ async def get_user(username: str, scopes: List[str]) -> UserPrincipal:
         permissions=scopes,
         is_active=True
     )
-    return UserPrincipal(user)
+    return UserPrincipal.from_token_payload(user.to_dict())
 
 
 async def get_service_account(name: str, scopes: List[str]) -> ServicePrincipal:
@@ -180,14 +287,14 @@ async def get_service_account(name: str, scopes: List[str]) -> ServicePrincipal:
 
 async def get_current_principal(
     request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+    token: Optional[str] = Depends(get_token_from_request)
 ) -> Union[UserPrincipal, ServicePrincipal]:
     """
     Get the current authenticated principal (user or service).
     
     Args:
         request: FastAPI request object
-        credentials: OAuth2 bearer credentials
+        token: JWT token from Authorization header
         
     Returns:
         Union[UserPrincipal, ServicePrincipal]: The authenticated principal
@@ -195,13 +302,6 @@ async def get_current_principal(
     Raises:
         HTTPException: If authentication fails
     """
-    # Get token from OAuth2 scheme or directly from request
-    token = None
-    if credentials:
-        token = credentials.credentials
-    else:
-        token = get_token_from_request(request)
-        
     if not token:
         logger.warning(f"No token provided for {request.url}")
         raise HTTPException(
@@ -213,69 +313,27 @@ async def get_current_principal(
     try:
         logger.info(f"Processing auth token for {request.url.path}")
         
-        # For debugging purposes, decode the token without validation first
-        try:
-            logger.info(f"Raw token: {token[:20]}...")
-            payload = jose_jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
-            logger.info(f"Token payload: {payload}")
-        except Exception as e:
-            logger.warning(f"Error decoding token: {str(e)}")
-            
-        # DEBUG: Check token store status
-        logger.info(f"Token store type: {token_store._store_type}")
-        logger.info(f"Token store initialized: {token_store._initialized}")
-        token_count = len(token_store._tokens)
-        logger.info(f"Token store has {token_count} tokens")
-            
-        # Use simpler validation for development environment
-        payload = None
+        # Decode token
+        payload = jwt.decode(
+            token, 
+            TOKEN_SECRET_KEY, 
+            algorithms=[TOKEN_ALGORITHM]
+        )
         
-        # In development mode, just decode the token without full validation
-        # This works around issues with token store persistence between restarts
-        if os.environ.get("NETRAVEN_ENV", "").lower() in ("dev", "development", "testing", "test"):
-            logger.info("Using development mode token validation")
-            try:
-                # Skip token store validation in dev mode
-                payload = pyjwt.decode(token, TOKEN_SECRET_KEY, algorithms=[TOKEN_ALGORITHM])
-                logger.info(f"Dev mode token validation succeeded for {payload.get('sub', 'unknown')}")
-            except Exception as e:
-                logger.error(f"Dev mode token validation failed: {str(e)}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-        else:
-            # Production validation with token store check
-            try:
-                payload = validate_token(token)
-            except AuthError as e:
-                logger.warning(f"Token validation failed: {str(e)}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=str(e),
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-        
-        if not payload:
-            logger.error("No payload after token validation")
+        # Verify token type
+        token_type = payload.get("token_type")
+        if token_type != "access":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token validation failed",
+                detail="Invalid token type. Access token required.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
+        
         # Get principal based on token type
-        token_type = payload.get("type")
-        subject = payload.get("sub")
-        scopes = payload.get("scope", [])
-        
-        logger.info(f"Creating principal for {token_type}:{subject} with scopes: {scopes}")
-        
         if token_type == "user":
-            return await get_user(subject, scopes)
+            return await get_user(payload["sub"], payload["scope"])
         elif token_type == "service":
-            return await get_service_account(subject, scopes)
+            return await get_service_account(payload["sub"], payload["scope"])
         else:
             logger.warning(f"Unknown token type: {token_type}")
             raise HTTPException(
@@ -283,20 +341,11 @@ async def get_current_principal(
                 detail="Invalid token type",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-    except AuthError as e:
-        logger.warning(f"Authentication error: {str(e)} for {request.url}")
+    except jwt.PyJWTError as e:
+        logger.warning(f"JWT validation error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(f"Unexpected authentication error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication error",
+            detail="Invalid authentication token",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -315,14 +364,21 @@ def require_scope(required_scopes: Union[str, List[str]]):
     if isinstance(required_scopes, str):
         required_scopes = [required_scopes]
         
-    async def dependency(principal: Principal = Depends(get_current_principal)):
-        for scope in required_scopes:
-            if not principal.has_scope(scope):
-                logger.warning(f"Insufficient permissions for {principal.subject}: missing {scope}")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Insufficient permissions",
-                )
+    async def dependency(principal: Union[UserPrincipal, ServicePrincipal] = Depends(get_current_principal)):
+        if isinstance(principal, UserPrincipal):
+            for scope in required_scopes:
+                if not principal.has_scope(scope):
+                    logger.warning(f"Insufficient permissions for {principal.username}: missing {scope}")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Insufficient permissions",
+                    )
+        elif isinstance(principal, ServicePrincipal):
+            logger.warning(f"Service principal does not support scope checking")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Service principal does not support scope checking",
+            )
         return principal
     return dependency
 
@@ -337,20 +393,20 @@ def optional_auth(required_scopes: Optional[List[str]] = None) -> Callable:
     Returns:
         Callable: FastAPI dependency that optionally authenticates
     """
-    async def dependency(request: Request, credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)) -> Optional[Principal]:
-        # If no credentials provided, return None
-        if not credentials and not get_token_from_request(request):
+    async def dependency(request: Request, token: Optional[str] = Depends(get_token_from_request)) -> Optional[Union[UserPrincipal, ServicePrincipal]]:
+        # If no token provided, return None
+        if not token:
             return None
             
         try:
             # Try to authenticate
-            principal = await get_current_principal(request, credentials)
+            principal = await get_current_principal(request, token)
             
             # If authentication successful and scopes required, check them
-            if required_scopes and principal:
+            if required_scopes and isinstance(principal, UserPrincipal):
                 for scope in required_scopes:
                     if not principal.has_scope(scope):
-                        logger.warning(f"Insufficient permissions for {principal.subject}: missing {scope}")
+                        logger.warning(f"Insufficient permissions for {principal.username}: missing {scope}")
                         raise HTTPException(
                             status_code=status.HTTP_403_FORBIDDEN,
                             detail="Insufficient permissions",
@@ -455,7 +511,7 @@ def create_user_token(user: User) -> str:
     )
     
     # Store token metadata
-    token_data = pyjwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
+    token_data = jwt.decode(token, TOKEN_SECRET_KEY, algorithms=[TOKEN_ALGORITHM])
     token_store.add_token(token_data["jti"], {
         "sub": user.username,
         "type": "user",
@@ -491,7 +547,7 @@ def create_service_token(
     )
     
     # Store token metadata
-    token_data = pyjwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
+    token_data = jwt.decode(token, TOKEN_SECRET_KEY, algorithms=[TOKEN_ALGORITHM])
     token_store.add_token(token_data["jti"], {
         "sub": service_name,
         "type": "service",
