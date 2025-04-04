@@ -20,8 +20,17 @@ This document summarizes the status of the PostgreSQL schema initialization refa
 ### Docker Configuration
 - Updated `docker-compose.yml` to use the new initialization script
 - Added backup volume configuration for PostgreSQL container
-- Created backup script for database backups
+- Added backup script mounting to PostgreSQL container
+- Ensured proper permissions for backup script execution
 - Ensured consistent initialization sequence across environments
+
+### Backup Functionality
+- Created enhanced `backup_db.sh` script for database backups
+- Mounted backup script to PostgreSQL container at `/usr/local/bin/backup_db.sh`
+- Made backup script executable during container startup
+- Ensured script uses environment variables for configuration flexibility
+- Added automatic cleanup of old backups for proper retention management
+- Designed for integration with NetRaven's scheduler service rather than cron
 
 ### Documentation
 - Created schema initialization documentation in `docs/schema_initialization.md`
@@ -169,4 +178,18 @@ Current focus has been on resolving issues with the API container startup. We've
 3. Updated email-validator from v1.x to v2.x to support Pydantic v2
 4. Added missing `requests` package required by the GatewayClient
 
-The container build process is now successful, but we're still resolving startup issues with the initialization script. 
+The container build process is now successful, but we're still resolving startup issues with the initialization script.
+
+## Architectural Issues Identified
+
+During debugging of the API container, we discovered significant architectural discrepancies between the current implementation and the intended architecture as defined in the source of truth documentation:
+
+1. **Role Separation Violation**: The API container is currently implementing device interaction capabilities that should be exclusive to the Device Gateway container according to the architecture documentation.
+
+2. **NetMiko Integration**: The API container includes direct NetMiko logs and device connector functionality initialization, which contradicts the intended separation of concerns.
+
+3. **Health Check Failure**: API container health checks are failing because the FastAPI service is not properly binding to the expected port or address.
+
+4. **Connection Management**: The API container is handling device connections directly instead of delegating to the Device Gateway as defined in the architecture.
+
+These issues represent a significant deviation from the intended architecture and will need to be addressed in a separate refactoring effort. For the current PostgreSQL refactoring project, we recommend proceeding with merging the completed work while noting these architectural issues for future resolution. 
