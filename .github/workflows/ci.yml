@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/docker/requirements.txt') }}
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
@@ -48,7 +48,7 @@ jobs:
         run: pip install flake8
       
       - name: Install requirements
-        run: pip install -r requirements.txt -v
+        run: pip install -r docker/requirements.txt -v
 
       - name: Run flake8 linting
         run: flake8 .

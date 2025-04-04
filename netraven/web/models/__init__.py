@@ -13,8 +13,10 @@ from netraven.web.models.tag import Tag, TagRule
 from netraven.web.models.job_log import JobLog, JobLogEntry
 from netraven.web.models.scheduled_job import ScheduledJob
 from netraven.web.models.admin_settings import AdminSetting
+from netraven.web.models.credential import Credential, CredentialTag
 
 __all__ = [
     'User', 'Device', 'Backup', 'Tag', 'TagRule', 
-    'JobLog', 'JobLogEntry', 'ScheduledJob', 'AdminSetting'
+    'JobLog', 'JobLogEntry', 'ScheduledJob', 'AdminSetting',
+    'Credential', 'CredentialTag'
 ] 

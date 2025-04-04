@@ -20,6 +20,15 @@ The Docker Compose configuration files define the multi-container deployment:
 
 ## Docker Services
 
+### PostgreSQL Database
+
+The PostgreSQL database service provides the central data storage:
+
+- Schema initialization via SQL scripts and Python code
+- Data persistence through named volumes
+- Automated backup capability
+- Extended with pgcrypto and uuid-ossp extensions
+
 ### API Service
 
 The API service (`Dockerfile.api`) provides the primary backend functionality:
@@ -87,11 +96,35 @@ cd docker
 docker-compose logs -f
 ```
 
+## Database Initialization
+
+The database schema is initialized through a two-stage process:
+
+1. The PostgreSQL container runs `scripts/init-db.sql` on startup to:
+   - Create necessary extensions
+   - Set up the schema
+
+2. The API container runs `scripts/initialize_schema.py` before starting to:
+   - Create all tables defined by SQLAlchemy models
+   - Validate schema integrity
+   - Initialize default data
+
+## Database Backups
+
+To create a database backup:
+
+```bash
+docker exec netraven-postgres /app/scripts/backup_db.sh
+```
+
+The backup will be stored in the `backups` volume mounted to the container.
+
 ## Volumes
 
 The Docker Compose configuration defines several volumes for persistent data:
 
 - **postgres-data**: PostgreSQL database files
+- **backups**: Database backup files
 - **logs_data**: Application logs
 - **token_data**: Authentication tokens
 - **api-data**: API service data

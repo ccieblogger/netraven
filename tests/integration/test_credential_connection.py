@@ -3,8 +3,8 @@ import unittest
 import pytest
 from unittest.mock import patch, MagicMock
 import uuid
-import sqlite3
 import tempfile
+import psycopg2
 
 from netraven.core.credential_store import (
     Credential,
@@ -30,17 +30,38 @@ def mock_netmiko_connection():
 
 
 @pytest.fixture
-def temp_db_file():
-    """Create a temporary SQLite database file."""
-    fd, db_path = tempfile.mkstemp(suffix='.db')
-    os.close(fd)
+def temp_postgres_db():
+    """Create a temporary PostgreSQL database for testing."""
+    db_name = f"netraven_test_{uuid.uuid4().hex[:8]}"
     
-    # Set up the database schema
-    conn = sqlite3.connect(db_path)
+    # Connect to postgres to create test database
+    conn = psycopg2.connect(
+        host=os.environ.get("POSTGRES_TEST_HOST", "localhost"),
+        port=os.environ.get("POSTGRES_TEST_PORT", "5432"),
+        user=os.environ.get("POSTGRES_TEST_USER", "netraven"),
+        password=os.environ.get("POSTGRES_TEST_PASSWORD", "netraven"),
+        database="postgres"
+    )
+    conn.autocommit = True
     cursor = conn.cursor()
     
+    # Create test database
+    cursor.execute(f"CREATE DATABASE {db_name}")
+    conn.close()
+    
+    # Connect to the new database
+    test_conn = psycopg2.connect(
+        host=os.environ.get("POSTGRES_TEST_HOST", "localhost"),
+        port=os.environ.get("POSTGRES_TEST_PORT", "5432"),
+        user=os.environ.get("POSTGRES_TEST_USER", "netraven"),
+        password=os.environ.get("POSTGRES_TEST_PASSWORD", "netraven"),
+        database=db_name
+    )
+    test_conn.autocommit = True
+    test_cursor = test_conn.cursor()
+    
     # Create credentials table
-    cursor.execute('''
+    test_cursor.execute('''
     CREATE TABLE credentials (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -55,7 +76,7 @@ def temp_db_file():
     ''')
     
     # Create tags table
-    cursor.execute('''
+    test_cursor.execute('''
     CREATE TABLE tags (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -67,7 +88,7 @@ def temp_db_file():
     ''')
     
     # Create credential_tags table
-    cursor.execute('''
+    test_cursor.execute('''
     CREATE TABLE credential_tags (
         credential_id TEXT,
         tag_id TEXT,
@@ -80,19 +101,32 @@ def temp_db_file():
     )
     ''')
     
-    conn.commit()
-    conn.close()
+    test_conn.close()
     
-    yield db_path
+    # Return connection parameters for the test database
+    connection_string = f"postgresql://netraven:netraven@localhost:5432/{db_name}"
+    yield connection_string
     
     # Clean up after the test
-    if os.path.exists(db_path):
-        os.unlink(db_path)
+    cleanup_conn = psycopg2.connect(
+        host=os.environ.get("POSTGRES_TEST_HOST", "localhost"),
+        port=os.environ.get("POSTGRES_TEST_PORT", "5432"),
+        user=os.environ.get("POSTGRES_TEST_USER", "netraven"),
+        password=os.environ.get("POSTGRES_TEST_PASSWORD", "netraven"),
+        database="postgres"
+    )
+    cleanup_conn.autocommit = True
+    cleanup_cursor = cleanup_conn.cursor()
+    
+    # Drop the test database
+    cleanup_cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
+    cleanup_conn.close()
 
 
-def populate_test_data(db_path):
+def populate_test_data(connection_string):
     """Populate the database with test data."""
-    conn = sqlite3.connect(db_path)
+    conn = psycopg2.connect(connection_string)
+    conn.autocommit = True
     cursor = conn.cursor()
     
     # Add test tags
@@ -100,12 +134,12 @@ def populate_test_data(db_path):
     switch_tag_id = str(uuid.uuid4())
     
     cursor.execute(
-        "INSERT INTO tags (id, name, description, color) VALUES (?, ?, ?, ?)",
+        "INSERT INTO tags (id, name, description, color) VALUES (%s, %s, %s, %s)",
         (router_tag_id, "Routers", "Network routers", "#FF5733")
     )
     
     cursor.execute(
-        "INSERT INTO tags (id, name, description, color) VALUES (?, ?, ?, ?)",
+        "INSERT INTO tags (id, name, description, color) VALUES (%s, %s, %s, %s)",
         (switch_tag_id, "Switches", "Network switches", "#3386FF")
     )
     
@@ -115,52 +149,51 @@ def populate_test_data(db_path):
     readonly_cred_id = str(uuid.uuid4())
     
     cursor.execute(
-        "INSERT INTO credentials (id, name, username, password, description) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO credentials (id, name, username, password, description) VALUES (%s, %s, %s, %s, %s)",
         (admin_cred_id, "Admin", "admin", "admin_password", "Administrator credentials")
     )
     
     cursor.execute(
-        "INSERT INTO credentials (id, name, username, password, description) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO credentials (id, name, username, password, description) VALUES (%s, %s, %s, %s, %s)",
         (backup_cred_id, "Backup", "backup", "backup_password", "Backup credentials")
     )
     
     cursor.execute(
-        "INSERT INTO credentials (id, name, username, password, description) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO credentials (id, name, username, password, description) VALUES (%s, %s, %s, %s, %s)",
         (readonly_cred_id, "ReadOnly", "readonly", "readonly_password", "Read-only credentials")
     )
     
     # Associate credentials with tags
     # Admin credential has highest priority for routers
     cursor.execute(
-        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (?, ?, ?)",
+        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (%s, %s, %s)",
         (admin_cred_id, router_tag_id, 100)
     )
     
     # Backup credential has medium priority for routers
     cursor.execute(
-        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (?, ?, ?)",
+        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (%s, %s, %s)",
         (backup_cred_id, router_tag_id, 50)
     )
     
     # Read-only credential has lowest priority for routers
     cursor.execute(
-        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (?, ?, ?)",
+        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (%s, %s, %s)",
         (readonly_cred_id, router_tag_id, 10)
     )
     
     # Admin credential has highest priority for switches
     cursor.execute(
-        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (?, ?, ?)",
+        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (%s, %s, %s)",
         (admin_cred_id, switch_tag_id, 100)
     )
     
     # Backup credential has medium priority for switches
     cursor.execute(
-        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (?, ?, ?)",
+        "INSERT INTO credential_tags (credential_id, tag_id, priority) VALUES (%s, %s, %s)",
         (backup_cred_id, switch_tag_id, 50)
     )
     
-    conn.commit()
     conn.close()
     
     return {
@@ -173,14 +206,15 @@ def populate_test_data(db_path):
 
 
 @pytest.fixture
-def setup_credential_store(temp_db_file):
+def setup_credential_store(temp_postgres_db):
     """Set up a credential store with test data."""
-    test_ids = populate_test_data(temp_db_file)
+    test_ids = populate_test_data(temp_postgres_db)
     
     # Create and configure the credential store
-    with patch('netraven.core.credential_store._credential_store', None):
-        # Create a real credential store that uses the test database
-        store = create_credential_store("sqlite", {"database": temp_db_file})
+    with patch('netraven.core.credential_store._credential_store_instance', None):
+        # Create a credential store that uses the test database
+        store = CredentialStore(db_url=temp_postgres_db, encryption_key="test-key")
+        store.initialize()
         
         # Return the store and test IDs
         yield store, test_ids

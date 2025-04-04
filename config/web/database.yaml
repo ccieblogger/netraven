@@ -1,15 +1,9 @@
 # Database configuration for NetRaven web service
 
 database:
-  # Database type
-  type: "sqlite"  # Options: sqlite, postgres, mysql
+  # Database type - NetRaven only supports PostgreSQL
+  type: "postgres"
   
-  # SQLite configuration
-  sqlite:
-    path: "data/netraven.db"
-    timeout: 30
-    journal_mode: "WAL"  # Options: DELETE, TRUNCATE, PERSIST, MEMORY, WAL, OFF
-    
   # PostgreSQL configuration
   postgres:
     host: "localhost"
@@ -18,18 +12,6 @@ database:
     user: "netraven"
     password: "${DB_PASSWORD}"  # Set via environment variable
     ssl_mode: "prefer"  # Options: disable, allow, prefer, require, verify-ca, verify-full
-    connection_timeout: 30
-    pool_size: 5
-    max_overflow: 10
-    
-  # MySQL configuration
-  mysql:
-    host: "localhost"
-    port: 3306
-    database: "netraven"
-    user: "netraven"
-    password: "${DB_PASSWORD}"  # Set via environment variable
-    charset: "utf8mb4"
     connection_timeout: 30
     pool_size: 5
     max_overflow: 10

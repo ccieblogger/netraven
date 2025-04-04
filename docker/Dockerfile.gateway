@@ -5,14 +5,14 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install curl for health check
+# Install curl and other utilities including PostgreSQL dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
+    apt-get install -y --no-install-recommends curl build-essential libpq-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
+# Copy and install requirements
+COPY docker/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir flask gunicorn
 

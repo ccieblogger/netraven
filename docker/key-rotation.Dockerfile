@@ -2,8 +2,8 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
+# Copy requirements and install dependencies
+COPY docker/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
@@ -16,6 +16,12 @@ RUN mkdir -p data/keys data/key_backups && \
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV NETRAVEN_ENV=production
+
+# Install required packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl build-essential && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Run as non-root user
 RUN useradd -m netuser

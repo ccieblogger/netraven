@@ -40,7 +40,13 @@ web:
   
   # Database specific overrides
   database:
-    type: "sqlite"
+    type: "postgres"
+    postgres:
+      host: "localhost"
+      port: 5432
+      database: "netraven"
+      user: "netraven"
+      password: "${DB_PASSWORD}"
 
 # Environment-specific settings
 environment:

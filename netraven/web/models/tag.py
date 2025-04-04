@@ -40,6 +40,7 @@ class Tag(Base):
     # Relationships
     devices = relationship("Device", secondary=device_tags, back_populates="tags")
     rules = relationship("TagRule", back_populates="tag", cascade="all, delete-orphan")
+    credential_tags = relationship("CredentialTag", back_populates="tag")
     
     def __repr__(self) -> str:
         return f"<Tag {self.name}>"

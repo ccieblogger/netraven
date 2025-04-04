@@ -9,7 +9,9 @@ services:
     image: postgres:14-alpine
     volumes:
       - postgres-data:/var/lib/postgresql/data/
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ../scripts/backup_db.sh:/usr/local/bin/backup_db.sh
+      - ./backups:/backups
     ports:
       - "5432:5432"
     restart: unless-stopped
@@ -22,14 +24,18 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    # Make the backup script executable when the container starts
+    command: >
+      bash -c "chmod +x /usr/local/bin/backup_db.sh
+      && docker-entrypoint.sh postgres"
     networks:
       - netraven-network
 
   # Backend API service
   api:
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: ..
+      dockerfile: docker/Dockerfile.api
       args:
         - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     environment:
@@ -46,13 +52,14 @@ services:
       - ALLOW_CREDENTIALS=true
       - NETMIKO_LOG_DIR=/app/data/netmiko_logs
       - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
+      - SERVICE_TYPE=api
     volumes:
       - api-data:/app/data
       - ./test-artifacts:/app/test-artifacts
       - ./config.yml:/app/config.yml
       - netraven_netmiko_logs:/app/data/netmiko_logs
-      - ./netraven:/app/netraven
-      - ./scripts:/app/scripts
+      - ../netraven:/app/netraven
+      - ../scripts:/app/scripts
     ports:
       - "0.0.0.0:8000:8000"
     restart: unless-stopped
@@ -64,16 +71,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 30s
     networks:
       - netraven-network
-    # Use entrypoint.sh directly without trying to modify /tmp/netmiko_logs
-    entrypoint: ["/bin/bash", "-c", "python /app/scripts/ensure_schema.py && /app/docker/entrypoint.sh"]
+    # Initialize database and start API server
+    entrypoint: ["/bin/bash", "-c", "python -u /app/scripts/initialize_schema.py && /app/docker/entrypoint.sh"]
 
   # Scheduler service
   scheduler:
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: ..
+      dockerfile: docker/Dockerfile.api
       args:
         - NETRAVEN_ENV=${NETRAVEN_ENV:-test}
     volumes:
@@ -101,23 +109,24 @@ services:
   # Device Gateway service
   device_gateway:
     build:
-      context: .
-      dockerfile: Dockerfile.gateway
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
       args:
         - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
     ports:
       - "8001:8001"
     volumes:
-      - ./netraven:/app/netraven
+      - ../netraven:/app/netraven
       - token_data:/app/tokens
       - ./config.yml:/app/config.yml
       - netraven_netmiko_logs:/app/data/netmiko_logs
-      - ./scripts:/app/scripts
+      - ../scripts:/app/scripts
     environment:
       - API_URL=http://api:8000
       - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}
       - NETMIKO_LOG_DIR=/app/data/netmiko_logs
       - NETMIKO_PRESERVE_LOGS=${NETMIKO_PRESERVE_LOGS:-false}
+      - SERVICE_TYPE=gateway
     restart: unless-stopped
     depends_on:
       postgres:
@@ -127,6 +136,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 30s
     cap_drop:
       - ALL
     cap_add:
@@ -177,7 +187,7 @@ services:
 
   key-rotation:
     build:
-      context: .
+      context: ..
       dockerfile: docker/key-rotation.Dockerfile
       args:
         - NETRAVEN_ENV=${NETRAVEN_ENV:-prod}

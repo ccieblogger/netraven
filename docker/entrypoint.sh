@@ -12,8 +12,30 @@ else
     echo "NetMiko logs directory already exists: $NETMIKO_LOG_DIR"
 fi
 
-# Initialize database
-python -m netraven.scripts.init_container
+# Set environment variable to indicate we are running in a container
+export NETRAVEN_CONTAINER=true
+
+# Check if environment variables are set
+if [ -z "$POSTGRES_HOST" ] || [ -z "$POSTGRES_USER" ] || [ -z "$POSTGRES_PASSWORD" ] || [ -z "$POSTGRES_DB" ]; then
+    echo "ERROR: One or more required PostgreSQL environment variables are not set."
+    echo "Required: POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB"
+    exit 1
+fi
+
+# Check if database is already initialized before running init container
+echo "Checking database connection and schema..."
+if ! python -m scripts.db_check --postgres-only; then
+    echo "Database connection failed or schema validation failed"
+    echo "Running database initialization..."
+    # Initialize database
+    python -m netraven.scripts.init_container
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Database initialization failed"
+        exit 1
+    fi
+else
+    echo "Database connection and schema validation successful"
+fi
 
 # Run database migrations if needed (placeholder for future use)
 # alembic upgrade head
