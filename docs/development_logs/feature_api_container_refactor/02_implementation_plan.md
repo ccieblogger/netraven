@@ -250,6 +250,16 @@ The refactoring will be considered complete when the following criteria are met:
 4. Documentation is complete and accurate
 5. Container configuration meets all security and performance requirements
 
+## Getting Started Guide
+
+For developers working on this refactoring, here's a quick guide to get started:
+
+1. **Understand the Architecture**: Review the source of truth documents to understand the intended design
+2. **Examine Current Implementation**: Explore the relevant files starting with `/netraven/web/`
+3. **Run the Container**: Test the current functionality using Docker Compose
+4. **Begin with Phase 1**: Start by addressing the inconsistencies in the API structure
+5. **Document Changes**: Update the development logs as you progress
+
 ## Project Coding Principles
 
 All implementation work will adhere to the project's coding principles as outlined in the README.md document for this refactoring effort. 
