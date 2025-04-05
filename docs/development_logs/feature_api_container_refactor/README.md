@@ -224,4 +224,31 @@ Current progress:
 - Phase 7: Completed ✅
 - Phase 8: Completed ✅
 
-**This concludes the planned refactoring work for the API container.** 
+**This concludes the planned refactoring work for the API container.**
+
+## Next Steps (Post-Refactor)
+
+With the completion of the 8 planned refactoring phases for the API container, the following steps are recommended:
+
+1.  **Thorough Testing:**
+    *   Execute the complete test suite (`pytest tests/` or similar command) within the containerized environment (`docker-compose up --build -d test_db api ...`).
+    *   Pay close attention to integration tests (`tests/integration/`) and the new system workflow tests (`tests/integration/test_system_functionality.py`).
+    *   Identify and fix any regressions or failing tests.
+
+2.  **Code Review:**
+    *   Create a Pull Request (PR) on GitHub for the `feature/api-container-refactor` branch, targeting the appropriate integration branch (e.g., `develop`).
+    *   Clearly summarize the changes and link to this development log in the PR description.
+    *   Assign reviewers to examine the code for adherence to principles, architectural alignment, correctness, and potential issues.
+
+3.  **Address Feedback:**
+    *   Collaborate with reviewers and incorporate any feedback provided on the PR.
+    *   Ensure all discussions are resolved and necessary changes are committed to the feature branch.
+
+4.  **Merge:**
+    *   Once the PR is approved and all automated checks (CI/CD pipelines, tests) pass, merge the `feature/api-container-refactor` branch into the target integration branch.
+
+5.  **Future Work Planning:**
+    *   Review the technical debt documentation created during the refactor (e.g., `rate_limiting_tech_debt.md`).
+    *   Search the codebase for any remaining `TODO` comments added during the refactoring.
+    *   Create new issues or tasks in the project management system to address identified technical debt (like persistent rate limiting) and other potential enhancements.
+    *   Consider the next container or area designated for refactoring according to the overall project plan. 
