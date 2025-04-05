@@ -85,71 +85,62 @@ Phase 3 focused on establishing a consistent architecture for service integratio
 - Improved testability through better service boundaries
 - More maintainable code structure for future enhancements
 
-### Phase 4: Authentication and Authorization (In Progress)
+### Phase 4: Authentication and Authorization (Completed [Date])
 
-Phase 4 focuses on enhancing the authentication and authorization mechanisms, including token management, rate limiting, and application of permission decorators across the API.
+**Objective**: Implement comprehensive authentication and authorization with proper token management and rate limiting.
 
-**Key Actions (Completed):**
-- Created token management module with asynchronous token store
-- Enhanced permission system with hierarchical scope checking
-- Implemented standardized permission decorators (`require_scope`, `require_ownership`, etc.)
-- Created technical debt documentation for rate limiting enhancements
-- Applied permission decorators to multiple routers:
-  - `credentials.py`: Implemented proper permission checks using decorators
-  - `devices.py`: Standardized permission enforcement with appropriate decorators
-  - `tags.py`: Applied consistent permission pattern with scope and ownership checks
-  - `users.py`: Enhanced with self-or-admin checks and proper scope verification
-  - `job_logs.py`: Added job log ownership verification and proper scope requirements
-  - `tag_rules.py`: Implemented scope-based permissions for dynamic tag rule management
-  - `backups.py`: Added device-based ownership checks for backup operations
-  - `admin_settings.py`: Applied admin-only access controls for system settings
-  - `audit_logs.py`: Implemented admin-only access controls for audit log viewing
+**Developer Note (Continuation)**: This phase was picked up after initial work applying permission decorators.
 
-**Key Actions (In Progress):**
-- Enhance in-memory rate limiting implementation
-- Implement token validation middleware
-- Add integration tests for token lifecycle
-- Update API documentation with security details
+**Key Actions (Completed in this session):**
+- **Enhanced Rate Limiter:**
+  - Created `netraven/web/auth/rate_limiting.py` with `AsyncRateLimiter` class.
+  - Implemented TTL-based cleanup, size limits, IP+identifier tracking, and progressive backoff.
+  - Integrated cleanup task into app startup/shutdown (`netraven/web/main.py`).
+  - Applied rate limiting via `rate_limit_dependency` to `/auth/login` and `/auth/refresh` endpoints.
+  - **Insight:** Discovered `/users/reset-password` endpoint mentioned in plan did not exist; skipped applying rate limit there.
+- **Token Validation Middleware:**
+  - Created `netraven/web/middleware/token_validation.py`.
+  - Implemented middleware to centralize JWT validation (Bearer header/cookie) using `AsyncAuthService`.
+  - Attaches validated `UserPrincipal` to `request.state.principal`.
+  - Added middleware to the application stack (`netraven/web/main.py`).
+- **Refactored Auth Dependencies:**
+  - Updated `get_current_principal` and `optional_auth` in `netraven/web/auth/__init__.py`.
+  - These dependencies now retrieve the principal from `request.state`, removing redundant token validation logic within them.
+- **Integration Tests:**
+  - Added tests to `tests/integration/test_auth_advanced.py` covering token lifecycle: login, validation (valid/invalid/expired), refresh, revocation/logout.
+  - Used `httpx.AsyncClient` for async testing.
+- **API Documentation:**
+  - Verified that FastAPI's auto-generated OpenAPI docs should correctly reflect Bearer authentication due to the use of `get_current_principal` dependency. No explicit documentation code changes made.
 
-**Outcomes (So Far):**
-- Standardized permission checks across all routers
-- Improved security with consistent enforcement of permissions
-- Enhanced code maintainability through decorator pattern
-- Better documentation of permission requirements in router methods
-- Cleaner separation of authorization logic from business logic
-- Improved resource ownership verification for all resources
-- Consistent logging format for security events across all endpoints
+**Outcomes:**
+- Centralized and robust token validation via middleware.
+- Enhanced, albeit in-memory, rate limiting applied to key auth endpoints.
+- Simplified auth dependencies in routes.
+- Improved test coverage for core authentication flows.
 
-**Next Steps:**
-- Implement the in-memory rate limiting enhancements
-- Create token validation middleware
-- Add integration tests for token management
-- Update API documentation with security details
+### Phase 5: Error Handling and Validation (Completed [Date])
 
-**Current Technical Debt Decision Record**:
-1. **Rate Limiting Implementation**:
-   - **Current State**: The application uses a simple in-memory rate limiting solution without persistence.
-   - **Limitations**: This approach doesn't work well in distributed environments and loses state on application restart.
-   - **Decision**: For this refactoring phase, we will enhance the in-memory solution with better tracking and cleanup, but not introduce external dependencies.
-   - **Future Direction**: A separate effort will be needed to implement a database-backed or Redis-backed persistent rate limiting solution.
-   - **Justification**: Complete refactoring of the rate limiting system falls outside the scope of the current API container refactoring effort. The enhanced in-memory solution provides adequate protection while maintaining the current architecture.
+**Objective**: Implement standardized error handling, validation, and logging across the API.
 
-**Updated Phase 4 Plan**:
-1. ✅ Apply permission decorators to all routers (Completed)
-2. Enhance the existing in-memory rate limiting implementation (1-2 days)
-3. Create token validation middleware (2 days)
-4. Add integration tests for token lifecycle (3 days)
-5. Update API documentation (2 days)
+**Key Actions:**
+- **Refactored `AuditService`:**
+  - Renamed and refactored `netraven/web/services/audit_service.py` to `AsyncAuditService`.
+  - Converted methods to `async`, used `AsyncSession`, and updated DB queries (using `select`).
+  - Integrated `AsyncAuditService` into the `ServiceFactory` (`netraven/core/services/service_factory.py`), making it injectable.
+- **Standardized Error Schema:**
+  - Created `netraven/web/schemas/errors.py` defining `StandardErrorResponse` and `FieldValidationError` Pydantic models.
+- **Global Error Handling Middleware:**
+  - Created `netraven/web/middleware/error_handling.py` with `GlobalErrorHandlingMiddleware`.
+  - Catches `RequestValidationError`, `HTTPException`, and generic `Exception`.
+  - Formats errors using `StandardErrorResponse` schema.
+  - Performs standardized logging based on error type.
+  - Added middleware to the application stack (`netraven/web/main.py`).
 
-**Outcomes (Current)**:
-- More robust and secure authentication system
-- Better token lifecycle management with proper refresh flows
-- Comprehensive scope-based authorization with hierarchical permissions
-- Standardized permission checking across endpoints
-- Improved token storage with TTL support
-- Consistent decorator-based approach to authorization across all API endpoints
-
-Once Phase 4 is complete, we will be ready to proceed to Phase 5: Performance Optimization.
+**Outcomes:**
+- Consistent, structured error responses across the entire API.
+- Centralized handling and logging of application exceptions.
+- `AuditService` is now asynchronous and properly integrated with the service layer.
+- Improved maintainability and debugging through standardized error handling.
 
 ## Summary
 
@@ -159,8 +150,10 @@ Current progress:
 - Phase 1: Completed ✅
 - Phase 2: Completed ✅
 - Phase 3: Completed ✅
-- Phase 4: In Progress 🔄 (75% complete)
-- Phase 5: Not Started ⏳
+- Phase 4: Completed ✅
+- Phase 5: Completed ✅
 - Phase 6: Not Started ⏳
+- Phase 7: Not Started ⏳
+- Phase 8: Not Started ⏳
 
 We will continue to update these development logs as we progress through the remaining phases of the refactoring effort. 

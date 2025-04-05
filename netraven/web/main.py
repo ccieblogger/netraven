@@ -14,6 +14,12 @@ from netraven.web.database import get_async_session, init_db, close_db
 from netraven.core.services.service_factory import get_service_factory
 # Import the main API router
 from netraven.web.api import api_router
+# Import rate limiter startup/shutdown
+from netraven.web.auth.rate_limiting import start_rate_limit_cleanup, stop_rate_limit_cleanup
+# Import Token Validation Middleware
+from netraven.web.middleware.token_validation import TokenValidationMiddleware
+# Import Global Error Handling Middleware
+from netraven.web.middleware.error_handling import GlobalErrorHandlingMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +44,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add Global Error Handling Middleware (early in the stack)
+app.add_middleware(GlobalErrorHandlingMiddleware)
+
+# Add Token Validation Middleware (add this before CORS or other middleware that might depend on auth)
+app.add_middleware(TokenValidationMiddleware)
+
 # Include the main API router with a prefix
 app.include_router(api_router, prefix="/api/v1")
 
@@ -48,8 +60,11 @@ async def startup_event():
         # Initialize database
         await init_db()
         logger.info("Database initialized successfully")
+        # Start rate limiter cleanup task
+        await start_rate_limit_cleanup()
+        logger.info("Rate limiter cleanup task started")
     except Exception as e:
-        logger.error(f"Error initializing database: {e}")
+        logger.error(f"Error during startup: {e}")
         raise
 
 @app.on_event("shutdown")
@@ -59,8 +74,11 @@ async def shutdown_event():
         # Close database connections
         await close_db()
         logger.info("Database connections closed")
+        # Stop rate limiter cleanup task
+        await stop_rate_limit_cleanup()
+        logger.info("Rate limiter cleanup task stopped")
     except Exception as e:
-        logger.error(f"Error closing database connections: {e}")
+        logger.error(f"Error during shutdown: {e}")
 
 @app.get("/health")
 async def health_check(db: AsyncSession = Depends(get_async_session)) -> Dict[str, Any]:

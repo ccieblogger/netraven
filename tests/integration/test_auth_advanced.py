@@ -14,8 +14,13 @@ import uuid
 import json
 import time
 from datetime import datetime, timedelta
+from typing import Tuple, Dict, Any
+
+from httpx import AsyncClient # Use httpx for async requests
+import jwt # To decode tokens for inspection
 
 from tests.utils.api_test_utils import create_auth_headers, create_test_api_token
+from netraven.core.config import settings # For token secret
 
 
 def test_service_token_generation(app_config, admin_token):
@@ -602,4 +607,211 @@ def test_token_validation(app_config, api_token):
         f"{app_config['api_url']}/api/users/me",
         headers=malformed_headers
     )
-    assert malformed_response.status_code in [401, 403], f"Malformed token accepted: {malformed_response.status_code}" 
+    assert malformed_response.status_code in [401, 403], f"Malformed token accepted: {malformed_response.status_code}"
+
+# --- New Token Lifecycle Tests ---
+
+@pytest.fixture(scope="module")
+def user_credentials() -> Dict[str, str]:
+    """Provides standard user credentials for testing."""
+    # Ensure these credentials match a user seeded in your test DB
+    return {"username": "testuser", "password": "testpassword"}
+
+@pytest.fixture(scope="module")
+async def get_tokens(async_client: AsyncClient, user_credentials: Dict[str, str]) -> Tuple[str, str]:
+    """Fixture to log in and get initial access and refresh tokens."""
+    login_data = {
+        "username": user_credentials["username"],
+        "password": user_credentials["password"],
+    }
+    response = await async_client.post("/api/v1/auth/login", data=login_data)
+    response.raise_for_status() # Ensure login was successful
+    token_data = response.json()
+    assert "access_token" in token_data
+    assert "refresh_token" in token_data
+    return token_data["access_token"], token_data["refresh_token"]
+
+@pytest.mark.asyncio
+async def test_successful_login_and_token_issuance(async_client: AsyncClient, user_credentials: Dict[str, str]):
+    """Test successful login returns valid access and refresh tokens."""
+    login_data = {
+        "username": user_credentials["username"],
+        "password": user_credentials["password"],
+    }
+    response = await async_client.post("/api/v1/auth/login", data=login_data)
+    
+    assert response.status_code == 200
+    token_data = response.json()
+    
+    assert "access_token" in token_data
+    assert "refresh_token" in token_data
+    assert token_data["token_type"] == "bearer"
+    assert "expires_in" in token_data
+    assert "refresh_expires_in" in token_data
+    assert "jti" in token_data
+    
+    # Optionally decode and check claims (adjust secret as needed)
+    try:
+        access_payload = jwt.decode(
+            token_data["access_token"], 
+            settings.TOKEN_SECRET_KEY, 
+            algorithms=[settings.TOKEN_ALGORITHM],
+            options={"verify_aud": False} # Adjust if audience is used
+        )
+        assert access_payload["sub"] == user_credentials["username"]
+        assert "scope" in access_payload
+        assert access_payload.get("token_type") == "access"
+
+        refresh_payload = jwt.decode(
+            token_data["refresh_token"], 
+            settings.TOKEN_SECRET_KEY, 
+            algorithms=[settings.TOKEN_ALGORITHM],
+            options={"verify_aud": False}
+        )
+        assert refresh_payload["sub"] == user_credentials["username"]
+        assert refresh_payload.get("token_type") == "refresh"
+        
+    except jwt.PyJWTError as e:
+        pytest.fail(f"Token decoding failed: {e}")
+
+@pytest.mark.asyncio
+async def test_access_protected_endpoint_with_valid_token(async_client: AsyncClient, get_tokens: Tuple[str, str]):
+    """Test accessing a protected endpoint with a valid token."""
+    access_token, _ = get_tokens
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    # Use /users/me as a sample protected endpoint
+    response = await async_client.get("/api/v1/users/me", headers=headers)
+    
+    assert response.status_code == 200
+    user_info = response.json()
+    assert "username" in user_info
+    assert user_info["username"] # Check it matches logged in user if possible
+
+@pytest.mark.asyncio
+async def test_access_protected_endpoint_without_token(async_client: AsyncClient):
+    """Test accessing protected endpoint without any token fails."""
+    response = await async_client.get("/api/v1/users/me")
+    assert response.status_code == 401
+    assert "WWW-Authenticate" in response.headers # Middleware should add this
+
+@pytest.mark.asyncio
+async def test_access_protected_endpoint_with_invalid_token(async_client: AsyncClient):
+    """Test accessing protected endpoint with an invalid/malformed token fails."""
+    headers = {"Authorization": "Bearer invalid-token-string"}
+    response = await async_client.get("/api/v1/users/me", headers=headers)
+    assert response.status_code == 401
+    assert "WWW-Authenticate" in response.headers
+    error_detail = response.json().get("detail")
+    assert "Invalid token" in error_detail or "Not authenticated" in error_detail
+
+@pytest.mark.asyncio
+async def test_access_protected_endpoint_with_expired_token(async_client: AsyncClient, user_credentials: Dict[str, str]):
+    """Test accessing protected endpoint with an expired token fails."""
+    # Create a token with a very short expiry (e.g., -1 second)
+    expired_payload = {
+        "sub": user_credentials["username"],
+        "exp": datetime.utcnow() - timedelta(seconds=1),
+        "iat": datetime.utcnow() - timedelta(minutes=1),
+        "token_type": "access",
+        "scope": "read:*", # Add necessary scopes
+        "jti": str(uuid.uuid4())
+    }
+    expired_token = jwt.encode(expired_payload, settings.TOKEN_SECRET_KEY, algorithm=settings.TOKEN_ALGORITHM)
+    
+    headers = {"Authorization": f"Bearer {expired_token}"}
+    response = await async_client.get("/api/v1/users/me", headers=headers)
+    
+    assert response.status_code == 401
+    assert "WWW-Authenticate" in response.headers
+    error_detail = response.json().get("detail")
+    assert "Token has expired" in error_detail
+
+@pytest.mark.asyncio
+async def test_successful_token_refresh(async_client: AsyncClient, get_tokens: Tuple[str, str]):
+    """Test successfully refreshing an access token using a refresh token."""
+    _, refresh_token = get_tokens
+    
+    refresh_data = {"refresh_token": refresh_token}
+    # Allow some time if expiry is very short
+    # time.sleep(1)
+    response = await async_client.post("/api/v1/auth/refresh", json=refresh_data)
+    
+    assert response.status_code == 200
+    new_token_data = response.json()
+    
+    assert "access_token" in new_token_data
+    assert "refresh_token" in new_token_data # Check if rotation is enabled
+    assert new_token_data["token_type"] == "bearer"
+    
+    # Verify the new access token works
+    new_access_token = new_token_data["access_token"]
+    headers = {"Authorization": f"Bearer {new_access_token}"}
+    me_response = await async_client.get("/api/v1/users/me", headers=headers)
+    assert me_response.status_code == 200
+
+@pytest.mark.asyncio
+async def test_refresh_with_invalid_refresh_token(async_client: AsyncClient):
+    """Test refreshing with an invalid/malformed refresh token fails."""
+    refresh_data = {"refresh_token": "invalid-refresh-token"}
+    response = await async_client.post("/api/v1/auth/refresh", json=refresh_data)
+    assert response.status_code == 401 # Expecting unauthorized
+    error_detail = response.json().get("detail")
+    assert "Invalid token" in error_detail or "Invalid refresh token" in error_detail
+
+@pytest.mark.asyncio
+async def test_refresh_with_expired_refresh_token(async_client: AsyncClient, user_credentials: Dict[str, str]):
+    """Test refreshing with an expired refresh token fails."""
+     # Create an expired refresh token
+    expired_payload = {
+        "sub": user_credentials["username"],
+        "exp": datetime.utcnow() - timedelta(seconds=1),
+        "iat": datetime.utcnow() - timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES + 1),
+        "token_type": "refresh",
+        "jti": str(uuid.uuid4())
+    }
+    expired_refresh_token = jwt.encode(expired_payload, settings.TOKEN_SECRET_KEY, algorithm=settings.TOKEN_ALGORITHM)
+
+    refresh_data = {"refresh_token": expired_refresh_token}
+    response = await async_client.post("/api/v1/auth/refresh", json=refresh_data)
+    assert response.status_code == 401
+    error_detail = response.json().get("detail")
+    assert "Token has expired" in error_detail or "Refresh token expired" in error_detail
+
+@pytest.mark.asyncio
+async def test_refresh_with_revoked_access_token_after_refresh(async_client: AsyncClient, get_tokens: Tuple[str, str]):
+    """Test that the original access token is invalid after a refresh."""
+    access_token, refresh_token = get_tokens
+    
+    # Refresh the token
+    refresh_data = {"refresh_token": refresh_token}
+    refresh_response = await async_client.post("/api/v1/auth/refresh", json=refresh_data)
+    assert refresh_response.status_code == 200
+    
+    # Try using the *original* access token again
+    original_headers = {"Authorization": f"Bearer {access_token}"}
+    me_response = await async_client.get("/api/v1/users/me", headers=original_headers)
+    
+    # Assuming token revocation/store check happens
+    assert me_response.status_code == 401 
+    error_detail = me_response.json().get("detail")
+    # Detail might vary based on implementation (Invalid token, Token not found, etc.)
+    assert "Invalid token" in error_detail or "Token not found" in error_detail
+
+@pytest.mark.asyncio
+async def test_logout_revokes_token(async_client: AsyncClient, get_tokens: Tuple[str, str]):
+    """Test that the /logout endpoint revokes the current access token."""
+    access_token, _ = get_tokens
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    # Logout
+    logout_response = await async_client.post("/api/v1/auth/logout", headers=headers)
+    assert logout_response.status_code == 200
+    
+    # Try using the token again
+    me_response = await async_client.get("/api/v1/users/me", headers=headers)
+    assert me_response.status_code == 401
+    error_detail = me_response.json().get("detail")
+    assert "Invalid token" in error_detail or "Token not found" in error_detail or "Token has been revoked" in error_detail
+
+# Add more tests as needed, e.g., for logout-all, specific scope interactions, cookie handling 

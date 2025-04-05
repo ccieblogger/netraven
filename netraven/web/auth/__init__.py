@@ -21,9 +21,10 @@ from netraven.core.auth import (
     has_required_scopes,
     create_token,
     AuthError,
-    verify_password
+    verify_password,
+    Principal
 )
-from netraven.core.token_store import token_store
+from netraven.core.services.token.async_token_store import TokenValidationError, TokenExpiredError, TokenNotFoundError
 from netraven.core.logging import get_logger
 from netraven.core.config import get_config, settings
 from netraven.web.models.auth import User, ServiceAccount
@@ -57,7 +58,8 @@ __all__ = [
     "check_tag_rule_access",
     "check_job_log_access",
     "check_user_access",
-    "check_scheduled_job_access"
+    "check_scheduled_job_access",
+    "UserPrincipal"
 ]
 
 class UserPrincipal:
@@ -190,6 +192,20 @@ class UserPrincipal:
             metadata=metadata
         )
 
+    @property
+    def user(self) -> Optional[Dict[str, Any]]:
+        """Return a dictionary representation suitable for API response (if needed)."""
+        # This might need refinement based on actual User model structure
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.metadata.get("email"),
+            "full_name": self.metadata.get("full_name"),
+            "is_admin": self.is_admin,
+            "scopes": self.scopes, 
+            # Add other relevant fields from metadata if available
+        }
+
     def __str__(self) -> str:
         """String representation of the principal."""
         return f"UserPrincipal(username={self.username}, id={self.id}, is_admin={self.is_admin})"
@@ -217,137 +233,43 @@ def get_token_from_request(request: Request) -> Optional[str]:
         Optional[str]: The extracted token or None
     """
     auth_header = request.headers.get("Authorization")
-    return extract_token_from_header(auth_header)
-
-
-async def get_user(username: str, scopes: List[str]) -> UserPrincipal:
-    """
-    Get a user by username.
-    
-    This fetches the user from the database if possible, otherwise creates a dummy user.
-    
-    Args:
-        username: The username to lookup
-        scopes: The scopes from the token
-        
-    Returns:
-        UserPrincipal: The user principal
-    """
-    # Try to get the user from the database
-    try:
-        from netraven.web.database import SessionLocal
-        from netraven.web.crud import get_user_by_username
-        
-        db = SessionLocal()
-        try:
-            db_user = get_user_by_username(db, username)
-            if db_user:
-                # Use the real user but with the scopes from the token
-                db_user.permissions = scopes
-                return UserPrincipal.from_token_payload(db_user.to_dict())
-        finally:
-            db.close()
-    except Exception as e:
-        logger.warning(f"Error getting user from database: {str(e)}")
-        logger.warning("Falling back to dummy user")
-    
-    # Fallback to a dummy user with the given scopes if DB query fails
-    user = User(
-        username=username,
-        email=f"{username}@example.com",
-        permissions=scopes,
-        is_active=True
-    )
-    return UserPrincipal.from_token_payload(user.to_dict())
-
-
-async def get_service_account(name: str, scopes: List[str]) -> ServicePrincipal:
-    """
-    Get a service account by name.
-    
-    This would typically query a database for service account information.
-    For simplicity, we're creating a dummy service account with the given scopes.
-    
-    Args:
-        name: The service account name
-        scopes: The scopes from the token
-        
-    Returns:
-        ServicePrincipal: The service principal
-    """
-    # In a real implementation, this would query the database
-    # For now, we'll create a dummy service account with the given scopes
-    service = ServiceAccount(
-        name=name,
-        permissions=scopes,
-        is_active=True
-    )
-    return ServicePrincipal(service)
+    scheme, token = get_authorization_scheme_param(auth_header) if auth_header else (None, None)
+    if scheme and scheme.lower() == "bearer":
+        return token
+    # If using cookies, check there too (optional)
+    if settings.USE_AUTH_COOKIES and not token:
+        token = request.cookies.get("access_token")
+        return token
+    return None
 
 
 async def get_current_principal(
-    request: Request,
-    token: Optional[str] = Depends(get_token_from_request)
-) -> Union[UserPrincipal, ServicePrincipal]:
+    request: Request
+) -> Principal:
     """
-    Get the current authenticated principal (user or service).
+    FastAPI dependency to get the current authenticated principal.
     
-    Args:
-        request: FastAPI request object
-        token: JWT token from Authorization header
-        
-    Returns:
-        Union[UserPrincipal, ServicePrincipal]: The authenticated principal
-        
-    Raises:
-        HTTPException: If authentication fails
+    Retrieves the principal object attached to the request state by the
+    TokenValidationMiddleware.
+    
+    Raises HTTPException 401 if no principal is found on the request state,
+    indicating that authentication is required but was not successful.
     """
-    if not token:
-        logger.warning(f"No token provided for {request.url}")
+    principal = getattr(request.state, "principal", None)
+    
+    if principal is None:
+        logger.debug("No principal found on request state. Authentication required.")
+        # This dependency assumes authentication IS required. 
+        # If optional auth is needed, use optional_auth dependency.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    try:
-        logger.info(f"Processing auth token for {request.url.path}")
-        
-        # Decode token
-        payload = jwt.decode(
-            token, 
-            TOKEN_SECRET_KEY, 
-            algorithms=[TOKEN_ALGORITHM]
+            headers={"WWW-Authenticate": "Bearer"}, # Indicate Bearer is expected
         )
         
-        # Verify token type
-        token_type = payload.get("token_type")
-        if token_type != "access":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type. Access token required.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # Get principal based on token type
-        if token_type == "user":
-            return await get_user(payload["sub"], payload["scope"])
-        elif token_type == "service":
-            return await get_service_account(payload["sub"], payload["scope"])
-        else:
-            logger.warning(f"Unknown token type: {token_type}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-    except jwt.PyJWTError as e:
-        logger.warning(f"JWT validation error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    # Log access - maybe move this to middleware or decorator? 
+    # logger.info(f"Principal accessed: {principal}") 
+    return principal
 
 
 def require_scope(required_scopes: Union[str, List[str]]):
@@ -364,7 +286,7 @@ def require_scope(required_scopes: Union[str, List[str]]):
     if isinstance(required_scopes, str):
         required_scopes = [required_scopes]
         
-    async def dependency(principal: Union[UserPrincipal, ServicePrincipal] = Depends(get_current_principal)):
+    async def dependency(principal: Principal = Depends(get_current_principal)):
         if isinstance(principal, UserPrincipal):
             for scope in required_scopes:
                 if not principal.has_scope(scope):
@@ -383,40 +305,22 @@ def require_scope(required_scopes: Union[str, List[str]]):
     return dependency
 
 
-def optional_auth(required_scopes: Optional[List[str]] = None) -> Callable:
+def optional_auth() -> Callable[..., Awaitable[Optional[Principal]]]:
     """
-    Create a dependency that optionally authenticates.
-    
-    Args:
-        required_scopes: Optional list of required scopes if authentication is provided
-        
-    Returns:
-        Callable: FastAPI dependency that optionally authenticates
+    FastAPI dependency for optional authentication.
+
+    If a valid token is provided, returns the principal.
+    If no token or an invalid token is provided, returns None.
+    Endpoint logic must handle the None case.
     """
-    async def dependency(request: Request, token: Optional[str] = Depends(get_token_from_request)) -> Optional[Union[UserPrincipal, ServicePrincipal]]:
-        # If no token provided, return None
-        if not token:
-            return None
-            
-        try:
-            # Try to authenticate
-            principal = await get_current_principal(request, token)
-            
-            # If authentication successful and scopes required, check them
-            if required_scopes and isinstance(principal, UserPrincipal):
-                for scope in required_scopes:
-                    if not principal.has_scope(scope):
-                        logger.warning(f"Insufficient permissions for {principal.username}: missing {scope}")
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Insufficient permissions",
-                        )
-            
-            return principal
-        except HTTPException:
-            # If authentication fails, return None instead of raising an exception
-            return None
-    
+    async def dependency(request: Request) -> Optional[Principal]:
+        """Retrieves principal from request state if available."""
+        principal = getattr(request.state, "principal", None)
+        if principal:
+            logger.debug(f"Optional auth: Principal found: {principal}")
+        else:
+            logger.debug("Optional auth: No principal found on request state.")
+        return principal
     return dependency
 
 

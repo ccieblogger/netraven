@@ -45,6 +45,9 @@ from netraven.web.services.notification_service import NotificationService
 # DB Dependency
 from netraven.web.database import get_async_session
 
+# Import the refactored AsyncAuditService
+from netraven.web.services.audit_service import AsyncAuditService
+
 logger = logging.getLogger(__name__)
 
 
@@ -83,7 +86,7 @@ class ServiceFactory:
         self._scheduler_client: Optional[SchedulerClient] = None
         
         # Web Services
-        self._audit_service: Optional[Any] = None # Placeholder for AuditService (sync issues)
+        self._audit_service: Optional[AsyncAuditService] = None # Placeholder for AsyncAuditService
         self._notification_service: Optional[NotificationService] = None
     
         # Initialize non-async or singleton services if needed immediately
@@ -323,22 +326,26 @@ class ServiceFactory:
         return self._notification_service
 
     @property
-    def audit_service(self) -> Any: # Return Any for now
+    def audit_service(self) -> AsyncAuditService:
         """
-        Get the audit service instance. (Placeholder)
-        NOTE: AuditService requires refactoring for async and factory integration.
-
+        Get the audit logging service instance.
+        
         Returns:
-            AuditService instance (currently Any)
+            AsyncAuditService instance
         """
         if self._audit_service is None:
-            # TODO: Refactor AuditService to be async and instantiable
-            # For now, return None or raise NotImplementedError to prevent usage
-            # self._audit_service = AuditService(db_session=self._db_session) # Example future init
-            logger.warning("AuditService accessed via factory, but requires refactoring. Returning None.")
-            # Or raise NotImplementedError("AuditService requires refactoring for async/factory use.")
-            return None
+            if self._db_session is None:
+                raise ValueError("Database session is required to initialize AsyncAuditService")
+            self._audit_service = AsyncAuditService(self._db_session)
         return self._audit_service
+
+    @property
+    def rate_limiter(self) -> AsyncRateLimiter: # Assuming RateLimiter is needed
+        """Get the rate limiter instance."""
+        # Return the singleton instance directly for now
+        # This could be made configurable later if needed
+        from netraven.web.auth.rate_limiting import rate_limiter
+        return rate_limiter
     
     async def close(self):
         """Close all service connections and cleanup resources."""

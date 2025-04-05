@@ -8,9 +8,10 @@ to the audit log for compliance and security monitoring.
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 from fastapi import Request
+import logging # Use standard logging
 
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import desc, func, select, and_, or_ # Import select for async queries
 
 from netraven.core.logging import get_logger
 from netraven.web.models.audit_log import AuditLog
@@ -18,19 +19,24 @@ from netraven.web.schemas.audit_log import AuditLogCreate, AuditLogFilter
 
 
 logger = get_logger("netraven.web.services.audit")
+# Use standard logger for general info/errors within the service
+service_logger = logging.getLogger(__name__)
 
 
-class AuditService:
+class AsyncAuditService:
     """
-    Service for managing audit log entries.
+    Asynchronous service for managing audit log entries.
     
     This service provides methods for creating and querying audit log entries,
-    with support for filtering and pagination.
+    with support for filtering and pagination using an AsyncSession.
     """
     
-    @staticmethod
-    def log_event(
-        db: Session,
+    def __init__(self, db: AsyncSession):
+        """Initialize the service with an async database session."""
+        self.db = db
+    
+    async def log_event(
+        self,
         event_type: str,
         event_name: str,
         actor_id: Optional[str] = None,
@@ -43,10 +49,9 @@ class AuditService:
         request: Optional[Request] = None
     ) -> AuditLog:
         """
-        Log an event to the audit log.
+        Log an event to the audit log asynchronously.
         
         Args:
-            db: Database session
             event_type: Type of event (auth, admin, key, data)
             event_name: Specific event name (login, logout, etc.)
             actor_id: ID of the user or system component that initiated the action
@@ -99,32 +104,30 @@ class AuditService:
             created_at=datetime.utcnow()
         )
         
-        # Save to database
-        db.add(audit_log)
-        db.commit()
-        db.refresh(audit_log)
+        # Save to database asynchronously
+        self.db.add(audit_log)
+        await self.db.commit()
+        await self.db.refresh(audit_log)
         
         # Also log to application logs for immediate visibility
         log_message = f"AUDIT: {event_type}:{event_name} by {actor_id}"
         if status != "success":
-            logger.warning(f"{log_message} - {status.upper()}: {description}")
+            service_logger.warning(f"{log_message} - {status.upper()}: {description}")
         else:
-            logger.info(f"{log_message}: {description}")
+            service_logger.info(f"{log_message}: {description}")
             
         return audit_log
     
-    @staticmethod
-    def get_audit_logs(
-        db: Session,
+    async def get_audit_logs(
+        self,
         filter_params: Optional[AuditLogFilter] = None,
         skip: int = 0,
         limit: int = 100
     ) -> Dict[str, Any]:
         """
-        Get audit log entries with filtering and pagination.
+        Get audit log entries with filtering and pagination asynchronously.
         
         Args:
-            db: Database session
             filter_params: Filter parameters for querying logs
             skip: Number of records to skip for pagination
             limit: Maximum number of records to return
@@ -132,7 +135,8 @@ class AuditService:
         Returns:
             Dictionary with items (list of logs) and total count
         """
-        query = db.query(AuditLog)
+        # Base query using select() for async execution
+        stmt = select(AuditLog)
         
         # Apply filters if provided
         if filter_params:
@@ -140,66 +144,77 @@ class AuditService:
             
             if filter_params.event_type:
                 filters.append(AuditLog.event_type == filter_params.event_type)
+                stmt = stmt.where(AuditLog.event_type == filter_params.event_type)
                 
             if filter_params.event_name:
                 filters.append(AuditLog.event_name == filter_params.event_name)
+                stmt = stmt.where(AuditLog.event_name == filter_params.event_name)
                 
             if filter_params.actor_id:
                 filters.append(AuditLog.actor_id == filter_params.actor_id)
+                stmt = stmt.where(AuditLog.actor_id == filter_params.actor_id)
                 
             if filter_params.target_id:
                 filters.append(AuditLog.target_id == filter_params.target_id)
+                stmt = stmt.where(AuditLog.target_id == filter_params.target_id)
                 
             if filter_params.status:
                 filters.append(AuditLog.status == filter_params.status)
+                stmt = stmt.where(AuditLog.status == filter_params.status)
                 
             if filter_params.start_date:
                 filters.append(AuditLog.created_at >= filter_params.start_date)
+                stmt = stmt.where(AuditLog.created_at >= filter_params.start_date)
                 
             if filter_params.end_date:
                 filters.append(AuditLog.created_at <= filter_params.end_date)
+                stmt = stmt.where(AuditLog.created_at <= filter_params.end_date)
                 
             if filters:
-                query = query.filter(and_(*filters))
+                stmt = stmt.filter(and_(*filters))
         
-        # Get total count for pagination
-        total = query.count()
+        # Get total count for pagination before applying limit/offset
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total_result = await self.db.execute(count_stmt)
+        total = total_result.scalar_one()
         
-        # Apply sorting and pagination
-        query = (
-            query
+        # Apply sorting, offset, and limit to the main query
+        stmt = (
+            stmt
             .order_by(desc(AuditLog.created_at))
             .offset(skip)
             .limit(limit)
         )
         
         # Execute query
-        items = query.all()
+        result = await self.db.execute(stmt)
+        items = result.scalars().all()
         
         return {
             "items": items,
-            "total": total
+            "total": total,
+            "skip": skip,
+            "limit": limit
         }
     
-    @staticmethod
-    def get_audit_log_by_id(db: Session, audit_log_id: str) -> Optional[AuditLog]:
+    async def get_audit_log_by_id(self, audit_log_id: str) -> Optional[AuditLog]:
         """
         Get an audit log entry by ID.
         
         Args:
-            db: Database session
             audit_log_id: ID of the audit log entry
             
         Returns:
             The audit log entry if found, None otherwise
         """
-        return db.query(AuditLog).filter(AuditLog.id == audit_log_id).first()
+        stmt = select(AuditLog).where(AuditLog.id == audit_log_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
     
     # Shortcut methods for common audit events
     
-    @staticmethod
-    def log_auth_event(
-        db: Session,
+    async def log_auth_event(
+        self,
         event_name: str,
         actor_id: Optional[str] = None,
         actor_type: str = "user",
@@ -212,7 +227,6 @@ class AuditService:
         Log an authentication event.
         
         Args:
-            db: Database session
             event_name: Authentication event (login, logout, password_change, etc.)
             actor_id: User ID or service name
             actor_type: Type of actor (user, service, system)
@@ -224,8 +238,7 @@ class AuditService:
         Returns:
             The created audit log entry
         """
-        return AuditService.log_event(
-            db=db,
+        return await self.log_event(
             event_type="auth",
             event_name=event_name,
             actor_id=actor_id,
@@ -236,9 +249,8 @@ class AuditService:
             request=request
         )
     
-    @staticmethod
-    def log_admin_event(
-        db: Session,
+    async def log_admin_event(
+        self,
         event_name: str,
         actor_id: str,
         target_id: Optional[str] = None,
@@ -252,7 +264,6 @@ class AuditService:
         Log an administrative action.
         
         Args:
-            db: Database session
             event_name: Admin event (user_create, role_change, settings_update, etc.)
             actor_id: ID of the admin user
             target_id: ID of the affected resource
@@ -265,8 +276,7 @@ class AuditService:
         Returns:
             The created audit log entry
         """
-        return AuditService.log_event(
-            db=db,
+        return await self.log_event(
             event_type="admin",
             event_name=event_name,
             actor_id=actor_id,
@@ -279,9 +289,8 @@ class AuditService:
             request=request
         )
     
-    @staticmethod
-    def log_key_event(
-        db: Session,
+    async def log_key_event(
+        self,
         event_name: str,
         actor_id: Optional[str] = None,
         actor_type: str = "system",
@@ -295,7 +304,6 @@ class AuditService:
         Log a key management event.
         
         Args:
-            db: Database session
             event_name: Key event (key_rotation, key_generation, etc.)
             actor_id: ID of the user or service
             actor_type: Type of actor
@@ -308,8 +316,7 @@ class AuditService:
         Returns:
             The created audit log entry
         """
-        return AuditService.log_event(
-            db=db,
+        return await self.log_event(
             event_type="key",
             event_name=event_name,
             actor_id=actor_id,
@@ -322,9 +329,8 @@ class AuditService:
             request=request
         )
     
-    @staticmethod
-    def log_data_event(
-        db: Session,
+    async def log_data_event(
+        self,
         event_name: str,
         actor_id: Optional[str] = None,
         actor_type: str = "user",
@@ -339,7 +345,6 @@ class AuditService:
         Log a data access or modification event.
         
         Args:
-            db: Database session
             event_name: Data event (read, create, update, delete)
             actor_id: ID of the user or service
             actor_type: Type of actor
@@ -353,8 +358,7 @@ class AuditService:
         Returns:
             The created audit log entry
         """
-        return AuditService.log_event(
-            db=db,
+        return await self.log_event(
             event_type="data",
             event_name=event_name,
             actor_id=actor_id,

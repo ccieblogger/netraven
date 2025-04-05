@@ -30,6 +30,7 @@ from netraven.web.auth import (
     UserPrincipal,
 )
 from netraven.web.auth.permissions import require_scope, require_admin
+from netraven.web.auth.rate_limiting import rate_limit_dependency, reset_rate_limit_for_identifier, AsyncRateLimiter, get_rate_limiter
 from netraven.core.logging import get_logger
 
 # Set up logger
@@ -112,6 +113,9 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: AsyncSession = Depends(get_async_session),
     factory: ServiceFactory = Depends(ServiceFactory),
+    # Apply rate limit dependency
+    # Extract identifier ('username') from form_data
+    _: str = Depends(lambda request: rate_limit_dependency('username', request, form_data=form_data))
 ):
     """
     Authenticate user and issue access and refresh tokens.
@@ -150,6 +154,9 @@ async def login(
                 "user_agent": user_agent
             }
         )
+        
+        # Reset rate limit on successful login
+        await factory.rate_limiter.reset_attempts(login_request.username, request)
         
         # Extract the user info from the token response
         access_token = token_data["access_token"]
@@ -211,6 +218,9 @@ async def refresh_token(
     refresh_request: RefreshTokenRequest,
     session: AsyncSession = Depends(get_async_session),
     factory: ServiceFactory = Depends(ServiceFactory),
+    # Apply rate limit dependency
+    # Use a generic identifier for refresh attempts as user is not known yet
+    _: str = Depends(lambda request: rate_limit_dependency('refresh_token_endpoint', request))
 ):
     """
     Refresh an access token using a valid refresh token.
