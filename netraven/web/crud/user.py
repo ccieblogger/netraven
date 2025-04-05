@@ -9,8 +9,9 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select # Import select for async queries
 
 from netraven.web.models.user import User
 from netraven.web.schemas.user import UserCreate, UserUpdate
@@ -19,7 +20,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_user(db: Session, user_id: str) -> Optional[User]:
+async def get_user(db: AsyncSession, user_id: str) -> Optional[User]:
     """
     Get a user by ID.
     
@@ -31,9 +32,10 @@ def get_user(db: Session, user_id: str) -> Optional[User]:
         User object if found, None otherwise
     """
     logger.debug(f"Getting user with id: {user_id}")
-    return db.query(User).filter(User.id == user_id).first()
+    result = await db.execute(select(User).filter(User.id == user_id))
+    return result.scalar_one_or_none()
 
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
+async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     """
     Get a user by email.
     
@@ -45,9 +47,10 @@ def get_user_by_email(db: Session, email: str) -> Optional[User]:
         User object if found, None otherwise
     """
     logger.debug(f"Getting user with email: {email}")
-    return db.query(User).filter(User.email == email).first()
+    result = await db.execute(select(User).filter(User.email == email))
+    return result.scalar_one_or_none()
 
-def get_user_by_username(db: Session, username: str) -> Optional[User]:
+async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
     """
     Get a user by username.
     
@@ -59,9 +62,10 @@ def get_user_by_username(db: Session, username: str) -> Optional[User]:
         User object if found, None otherwise
     """
     logger.debug(f"Getting user with username: {username}")
-    return db.query(User).filter(User.username == username).first()
+    result = await db.execute(select(User).filter(User.username == username))
+    return result.scalar_one_or_none()
 
-def get_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
+async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[User]:
     """
     Get a list of users with pagination.
     
@@ -74,9 +78,10 @@ def get_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
         List of User objects
     """
     logger.debug(f"Getting users with skip={skip}, limit={limit}")
-    return db.query(User).offset(skip).limit(limit).all()
+    result = await db.execute(select(User).offset(skip).limit(limit))
+    return result.scalars().all()
 
-def create_user(db: Session, user: UserCreate) -> User:
+async def create_user(db: AsyncSession, user: UserCreate) -> User:
     """
     Create a new user.
     
@@ -93,12 +98,12 @@ def create_user(db: Session, user: UserCreate) -> User:
     logger.info(f"Creating new user with username: {user.username}")
     
     # Check if user already exists
-    db_user = get_user_by_username(db, user.username)
+    db_user = await get_user_by_username(db, user.username)
     if db_user:
         logger.warning(f"User with username {user.username} already exists")
         raise IntegrityError("User with this username already exists", None, None)
     
-    db_user = get_user_by_email(db, user.email)
+    db_user = await get_user_by_email(db, user.email)
     if db_user:
         logger.warning(f"User with email {user.email} already exists")
         raise IntegrityError("User with this email already exists", None, None)
@@ -120,16 +125,16 @@ def create_user(db: Session, user: UserCreate) -> User:
     
     try:
         db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
+        await db.commit()
+        await db.refresh(db_user)
         logger.info(f"User created successfully: {db_user.username}")
         return db_user
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(f"Error creating user: {e}")
         raise
 
-def update_user(db: Session, user_id: str, user_update: UserUpdate) -> Optional[User]:
+async def update_user(db: AsyncSession, user_id: str, user_update: UserUpdate) -> Optional[User]:
     """
     Update an existing user.
     
@@ -146,21 +151,21 @@ def update_user(db: Session, user_id: str, user_update: UserUpdate) -> Optional[
     """
     logger.info(f"Updating user with id: {user_id}")
     
-    db_user = get_user(db, user_id)
+    db_user = await get_user(db, user_id)
     if not db_user:
         logger.warning(f"User with id {user_id} not found")
         return None
     
     # Check if update would create a duplicate username
     if user_update.username and user_update.username != db_user.username:
-        existing_username = get_user_by_username(db, user_update.username)
+        existing_username = await get_user_by_username(db, user_update.username)
         if existing_username:
             logger.warning(f"Cannot update: username {user_update.username} already exists")
             raise IntegrityError("User with this username already exists", None, None)
     
     # Check if update would create a duplicate email
     if user_update.email and user_update.email != db_user.email:
-        existing_email = get_user_by_email(db, user_update.email)
+        existing_email = await get_user_by_email(db, user_update.email)
         if existing_email:
             logger.warning(f"Cannot update: email {user_update.email} already exists")
             raise IntegrityError("User with this email already exists", None, None)
@@ -180,16 +185,16 @@ def update_user(db: Session, user_id: str, user_update: UserUpdate) -> Optional[
     db_user.updated_at = datetime.utcnow()
     
     try:
-        db.commit()
-        db.refresh(db_user)
+        await db.commit()
+        await db.refresh(db_user)
         logger.info(f"User updated successfully: {db_user.username}")
         return db_user
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(f"Error updating user: {e}")
         raise
 
-def update_user_last_login(db: Session, user_id: str) -> Optional[User]:
+async def update_user_last_login(db: AsyncSession, user_id: str) -> Optional[User]:
     """
     Update a user's last login timestamp.
     
@@ -202,7 +207,7 @@ def update_user_last_login(db: Session, user_id: str) -> Optional[User]:
     """
     logger.debug(f"Updating last login for user with id: {user_id}")
     
-    db_user = get_user(db, user_id)
+    db_user = await get_user(db, user_id)
     if not db_user:
         logger.warning(f"User with id {user_id} not found")
         return None
@@ -210,15 +215,15 @@ def update_user_last_login(db: Session, user_id: str) -> Optional[User]:
     db_user.last_login = datetime.utcnow()
     
     try:
-        db.commit()
-        db.refresh(db_user)
+        await db.commit()
+        await db.refresh(db_user)
         return db_user
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(f"Error updating user last login: {e}")
         raise
 
-def delete_user(db: Session, user_id: str) -> bool:
+async def delete_user(db: AsyncSession, user_id: str) -> bool:
     """
     Delete a user.
     
@@ -231,17 +236,17 @@ def delete_user(db: Session, user_id: str) -> bool:
     """
     logger.info(f"Deleting user with id: {user_id}")
     
-    db_user = get_user(db, user_id)
+    db_user = await get_user(db, user_id)
     if not db_user:
         logger.warning(f"User with id {user_id} not found")
         return False
     
     try:
         db.delete(db_user)
-        db.commit()
+        await db.commit()
         logger.info(f"User deleted successfully: {db_user.username}")
         return True
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(f"Error deleting user: {e}")
         raise 

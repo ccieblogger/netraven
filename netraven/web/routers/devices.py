@@ -32,6 +32,7 @@ from netraven.web.auth.permissions import (
     require_device_access
 )
 from netraven.core.logging import get_logger
+from netraven.web.schemas.errors import StandardErrorResponse
 
 logger = get_logger(__name__)
 
@@ -67,7 +68,17 @@ async def get_device_owner_id(
     
     return device.owner_id
 
-@router.get("/", response_model=List[DeviceSchema])
+@router.get(
+    "/", 
+    response_model=List[DeviceSchema],
+    summary="List Devices",
+    description="Retrieve a list of network devices. Admins see all devices, regular users see only their own.",
+    response_description="A list of devices matching the query.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"model": StandardErrorResponse, "description": "Authentication required"},
+        status.HTTP_403_FORBIDDEN: {"model": StandardErrorResponse, "description": "Insufficient permissions"},
+    }
+)
 async def list_devices(
     skip: int = Query(0, description="Number of records to skip", ge=0),
     limit: int = Query(100, description="Maximum number of records to return", ge=1, le=1000),
@@ -103,9 +114,20 @@ async def list_devices(
             detail=f"Error listing devices: {str(e)}"
         )
 
-@router.get("/{device_id}", response_model=DeviceSchema)
+@router.get(
+    "/{device_id}", 
+    response_model=DeviceSchema,
+    summary="Get Device by ID",
+    description="Retrieve details for a specific network device by its unique ID.",
+    response_description="Details of the specified device.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"model": StandardErrorResponse, "description": "Authentication required"},
+        status.HTTP_403_FORBIDDEN: {"model": StandardErrorResponse, "description": "Insufficient permissions (not owner or admin)"},
+        status.HTTP_404_NOT_FOUND: {"model": StandardErrorResponse, "description": "Device not found"},
+    }
+)
 async def get_device(
-    device_id: str,
+    device_id: str = Path(..., description="The unique ID of the device to retrieve"),
     principal: UserPrincipal = Depends(get_current_principal),
     session: AsyncSession = Depends(get_async_session),
     factory: ServiceFactory = Depends(ServiceFactory),
@@ -136,7 +158,20 @@ async def get_device(
             detail=f"Error retrieving device: {str(e)}"
         )
 
-@router.post("/", response_model=DeviceSchema, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", 
+    response_model=DeviceSchema, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Device",
+    description="Register a new network device in the system.",
+    response_description="The newly created device details.",
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": StandardErrorResponse, "description": "Invalid device data provided"},
+        status.HTTP_401_UNAUTHORIZED: {"model": StandardErrorResponse, "description": "Authentication required"},
+        status.HTTP_403_FORBIDDEN: {"model": StandardErrorResponse, "description": "Insufficient permissions (missing write:devices scope)"},
+        status.HTTP_422_UNPROCESSABLE_ENTITY: {"model": StandardErrorResponse, "description": "Validation error in input data"},
+    }
+)
 async def create_device(
     device_data: DeviceCreate,
     principal: UserPrincipal = Depends(require_scope("write:devices")),
@@ -161,17 +196,30 @@ async def create_device(
             detail=f"Error creating device: {str(e)}"
         )
 
-@router.put("/{device_id}", response_model=DeviceSchema)
+@router.put(
+    "/{device_id}", 
+    response_model=DeviceSchema,
+    summary="Update Device",
+    description="Update details for an existing network device.",
+    response_description="The updated device details.",
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": StandardErrorResponse, "description": "Invalid device data provided"},
+        status.HTTP_401_UNAUTHORIZED: {"model": StandardErrorResponse, "description": "Authentication required"},
+        status.HTTP_403_FORBIDDEN: {"model": StandardErrorResponse, "description": "Insufficient permissions (not owner or missing scope)"},
+        status.HTTP_404_NOT_FOUND: {"model": StandardErrorResponse, "description": "Device not found"},
+        status.HTTP_422_UNPROCESSABLE_ENTITY: {"model": StandardErrorResponse, "description": "Validation error in input data"},
+    }
+)
 async def update_device(
-    device_id: str,
     device_data: DeviceUpdate,
+    device_id: str = Path(..., description="The unique ID of the device to update"),
     principal: UserPrincipal = Depends(require_scope("write:devices")),
     session: AsyncSession = Depends(get_async_session),
     factory: ServiceFactory = Depends(ServiceFactory),
     _: str = Depends(require_ownership(get_device_owner_id))
 ) -> DeviceSchema:
     """
-    Update a device.
+    Update an existing network device.
     
     This endpoint requires the write:devices scope and ownership of the device.
     """
@@ -198,9 +246,20 @@ async def update_device(
             detail=f"Error updating device: {str(e)}"
         )
 
-@router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{device_id}", 
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete Device",
+    description="Remove a network device from the system.",
+    response_description="No content returned on successful deletion.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"model": StandardErrorResponse, "description": "Authentication required"},
+        status.HTTP_403_FORBIDDEN: {"model": StandardErrorResponse, "description": "Insufficient permissions (not owner or missing scope)"},
+        status.HTTP_404_NOT_FOUND: {"model": StandardErrorResponse, "description": "Device not found"},
+    }
+)
 async def delete_device(
-    device_id: str,
+    device_id: str = Path(..., description="The unique ID of the device to delete"),
     principal: UserPrincipal = Depends(require_scope("delete:devices")),
     session: AsyncSession = Depends(get_async_session),
     factory: ServiceFactory = Depends(ServiceFactory),
@@ -231,9 +290,20 @@ async def delete_device(
             detail=f"Error deleting device: {str(e)}"
         )
 
-@router.post("/{device_id}/backup", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/{device_id}/backup", 
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Trigger Device Backup",
+    description="Initiate a configuration backup job for the specified device.",
+    response_description="Confirmation that the backup job has been scheduled.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"model": StandardErrorResponse, "description": "Authentication required"},
+        status.HTTP_403_FORBIDDEN: {"model": StandardErrorResponse, "description": "Insufficient permissions (not owner or missing scope)"},
+        status.HTTP_404_NOT_FOUND: {"model": StandardErrorResponse, "description": "Device not found"},
+    }
+)
 async def create_device_backup(
-    device_id: str,
+    device_id: str = Path(..., description="The unique ID of the device to back up"),
     principal: UserPrincipal = Depends(require_scope(["write:devices", "exec:backup"])),
     session: AsyncSession = Depends(get_async_session),
     factory: ServiceFactory = Depends(ServiceFactory),

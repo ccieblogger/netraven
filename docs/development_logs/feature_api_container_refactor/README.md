@@ -142,9 +142,77 @@ Phase 3 focused on establishing a consistent architecture for service integratio
 - `AuditService` is now asynchronous and properly integrated with the service layer.
 - Improved maintainability and debugging through standardized error handling.
 
+### Phase 6: Asynchronous Operation (Completed [Date])
+
+**Objective**: Ensure the entire API container operates asynchronously wherever I/O is involved.
+
+**Key Actions:**
+- **Verified Async Operations:** Reviewed services (`AsyncAuthService`, `AsyncTokenStore`, etc.) and routers to confirm usage of `async/await` and `AsyncSession` for database operations.
+- **Refactored `authenticate_user`:** Converted the core `authenticate_user` function (`netraven/web/auth/__init__.py`) to be asynchronous, use `AsyncSession`, and call async CRUD helpers.
+- **Refactored User CRUD:** Converted user CRUD functions (`netraven/web/crud/user.py`) to be asynchronous.
+- **Updated `AsyncAuthService`:** Removed `asyncio.to_thread` wrapper previously used for `authenticate_user`.
+- **Removed Redis Dependency:** Based on clarification that Redis is not currently used, refactored `AsyncTokenStore` (`netraven/core/services/token/async_token_store.py`) to remove all Redis-related code, imports, configuration checks, and fallback logic, leaving only the in-memory implementation.
+  - **Decision Justification:** Simplifies the codebase, removes potential confusion for future developers, and avoids maintaining unused optional code paths, aligning with the principle of simple solutions.
+
+**Outcomes:**
+- Core authentication flow is now fully asynchronous.
+- `AsyncTokenStore` is simplified and solely uses in-memory storage, reflecting the current project requirements.
+- Increased confidence that I/O operations within the API container are non-blocking.
+
+### Phase 7: API Documentation and Testing (Completed [Date])
+
+**Objective**: Enhance API documentation and testing coverage.
+
+**Key Actions:**
+- **OpenAPI Documentation:**
+  - Enhanced OpenAPI definitions for `/auth` and `/devices` endpoints (as examples) by adding summaries, descriptions, response descriptions, and standardized error responses (`StandardErrorResponse`).
+  - Added descriptions to path parameters.
+- **Unit Testing:**
+  - Added unit tests for `GlobalErrorHandlingMiddleware` (`tests/unit/middleware/test_error_handling.py`) covering various exception types.
+- **Integration/System Testing:**
+  - Added async fixtures (`async_client`, `test_user`, `logged_in_client`) to `tests/integration/test_system_functionality.py`.
+  - Added a basic system workflow test (`test_basic_user_workflow`) covering login, resource access (success/fail), and logout.
+
+**Outcomes:**
+- Improved clarity and usability of the auto-generated API documentation.
+- Increased test coverage for error handling and core authentication flows.
+- Established a foundation for further system workflow tests.
+
+### Phase 8: Containerization and Configuration Enhancement (Completed [Date])
+
+**Objective**: Improve Docker configuration, security, and efficiency.
+
+**Key Actions:**
+- **Optimized Dockerfile (`docker/Dockerfile.api`):**
+  - Refactored to use a multi-stage build to reduce final image size.
+  - Updated `COPY` instructions to be more specific, improving layer caching.
+  - Ensured proper non-root user setup (`netraven`).
+  - Switched default `CMD` to use `gunicorn` with `uvicorn` workers.
+- **Improved Health Check:**
+  - Enhanced the `/health` endpoint (`netraven/web/main.py`) to perform a database connectivity check.
+  - Configured the Dockerfile `HEALTHCHECK` instruction to use the improved endpoint.
+- **Verified Volumes & Config:**
+  - Reviewed `docker-compose.yml`.
+  - Confirmed persistent data/config volumes are correctly defined.
+  - **Recommendation:** Highlighted that development-specific source code volume mounts (`../netraven:/app/netraven`, etc.) **must be removed** from the compose file used for production deployment.
+
+**Outcomes:**
+- More optimized and potentially smaller Docker image for the API service.
+- More reliable container health checking including database connectivity.
+- Clearer separation between development and production container configuration needs regarding volume mounts.
+
 ## Summary
 
-The API container refactoring project aims to improve the maintainability, security, and performance of the NetRaven API. Through a phased approach, we have made significant progress in establishing better service architecture, enhancing authentication and authorization mechanisms, and improving overall code quality.
+The API container refactoring project aimed to improve the maintainability, security, performance, and architectural alignment of the NetRaven API. Through a phased approach, significant progress was made:
+
+- Established consistent service architecture (`ServiceFactory`, async services).
+- Implemented robust authentication (JWT, middleware, rate limiting) and authorization (scope-based decorators).
+- Standardized error handling and logging.
+- Ensured fully asynchronous I/O operations.
+- Removed unused optional dependencies (Redis).
+- Enhanced testing coverage (unit, integration, system workflow).
+- Improved API documentation (OpenAPI).
+- Optimized Docker containerization.
 
 Current progress:
 - Phase 1: Completed ✅
@@ -152,8 +220,8 @@ Current progress:
 - Phase 3: Completed ✅
 - Phase 4: Completed ✅
 - Phase 5: Completed ✅
-- Phase 6: Not Started ⏳
-- Phase 7: Not Started ⏳
-- Phase 8: Not Started ⏳
+- Phase 6: Completed ✅
+- Phase 7: Completed ✅
+- Phase 8: Completed ✅
 
-We will continue to update these development logs as we progress through the remaining phases of the refactoring effort. 
+**This concludes the planned refactoring work for the API container.** 

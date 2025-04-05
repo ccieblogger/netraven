@@ -32,6 +32,7 @@ from netraven.web.auth import (
 from netraven.web.auth.permissions import require_scope, require_admin
 from netraven.web.auth.rate_limiting import rate_limit_dependency, reset_rate_limit_for_identifier, AsyncRateLimiter, get_rate_limiter
 from netraven.core.logging import get_logger
+from netraven.web.schemas.errors import StandardErrorResponse
 
 # Set up logger
 logger = get_logger(__name__)
@@ -98,15 +99,24 @@ class UserInfoResponse(BaseModel):
 
 class ActiveTokenResponse(BaseModel):
     """Model for active token responses."""
-    jti: str
-    issued_at: datetime
-    expires_at: datetime
-    device_info: Dict[str, Any] = {}
-    is_current: bool = False
-    last_used: Optional[datetime] = None
-    token_type: str = "access"
+    jti: str = Field(..., description="Unique Token Identifier (JWT ID)")
+    issued_at: datetime = Field(..., description="Timestamp when the token was issued")
+    expires_at: datetime = Field(..., description="Timestamp when the token expires")
+    device_info: Dict[str, Any] = Field({}, description="Information about the device/client associated with the token")
+    is_current: bool = Field(False, description="Indicates if this token is the one currently being used for the request")
+    last_used: Optional[datetime] = Field(None, description="Timestamp when the token was last used (if tracked)")
+    token_type: str = Field("access", description="Type of token (e.g., access, refresh)")
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login", 
+    response_model=TokenResponse,
+    summary="User Login",
+    description="Authenticate a user via username and password (OAuth2 Password Grant Flow) and receive access and refresh tokens.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"model": StandardErrorResponse, "description": "Invalid username or password"},
+        status.HTTP_429_TOO_MANY_REQUESTS: {"model": StandardErrorResponse, "description": "Rate limit exceeded"},
+    }
+)
 async def login(
     request: Request,
     response: Response,
@@ -211,7 +221,16 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh", 
+    response_model=TokenResponse,
+    summary="Refresh Access Token",
+    description="Obtain a new access token using a valid refresh token.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"model": StandardErrorResponse, "description": "Invalid or expired refresh token"},
+        status.HTTP_429_TOO_MANY_REQUESTS: {"model": StandardErrorResponse, "description": "Rate limit exceeded"},
+    }
+)
 async def refresh_token(
     request: Request,
     response: Response,
@@ -299,39 +318,45 @@ async def refresh_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-@router.post("/logout")
+@router.post(
+    "/logout", 
+    status_code=status.HTTP_200_OK, # Return 200 OK on successful logout
+    summary="User Logout",
+    description="Revokes the current access token used for the request.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"model": StandardErrorResponse, "description": "Authentication required or token invalid"},
+    }
+)
 async def logout(
-    request: Request,
-    response: Response,
     principal: UserPrincipal = Depends(get_current_principal),
-    factory: ServiceFactory = Depends(ServiceFactory),
+    factory: ServiceFactory = Depends(ServiceFactory)
 ):
     """
-    Log out the current user by revoking their tokens.
-    
-    This will revoke the current access token and its associated refresh token.
+    Revoke the current user's token (logout).
     """
-    # Get the token ID from the principal
     token_id = principal.token_id
-    
     if not token_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No token ID found in principal"
+        logger.warning(f"Logout attempt failed: No token ID found in principal for user {principal.username}")
+        # Even if no JTI, proceed as if logged out from client perspective
+        return {"message": "Logout processed (no specific token ID found)"}
+        
+    success = await factory.token_store.revoke_token(token_id)
+    if success:
+        logger.info(f"User {principal.username} logged out successfully (token {token_id} revoked)." )
+        await factory.audit_service.log_auth_event(
+            event_name="logout_success",
+            actor_id=principal.id,
+            actor_type="user",
+            status="success",
+            description=f"User {principal.username} logged out.",
+            event_metadata={"token_id": token_id}
         )
-    
-    # Revoke the token
-    result = await factory.auth_service.revoke_token(token_id)
-    
-    # Clear cookies if they were used
-    if settings.USE_AUTH_COOKIES:
-        response.delete_cookie(key="access_token")
-        response.delete_cookie(key="refresh_token")
-    
-    # Log the logout
-    logger.info(f"Logout: username={principal.username}, id={principal.id}")
-    
-    return {"detail": "Successfully logged out"}
+        return {"message": "Logout successful"}
+    else:
+        # This case might be unlikely if token validation passed
+        logger.error(f"Logout attempt failed for user {principal.username}: could not revoke token {token_id}")
+        # Still return success to the client, as the intent is handled
+        return {"message": "Logout processed (token revocation encountered an issue)"}
 
 @router.post("/logout-all", status_code=status.HTTP_200_OK)
 async def logout_all_devices(

@@ -1,69 +1,96 @@
 # This Dockerfile is used to build the Backend API container for NetRaven.
 # The API serves as the central communication layer for the application.
 
-FROM python:3.10-slim
+# Stage 1: Build stage
+FROM python:3.10-slim as builder
 
-# Add build argument for environment
+WORKDIR /build-env
+
+# Install build-time system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy requirements first for caching
+COPY docker/requirements.txt docker/test-requirements.txt ./
+
+# Install base dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Separate layer for test dependencies, controlled by build arg
 ARG NETRAVEN_ENV=prod
+RUN if [ "$NETRAVEN_ENV" = "test" ]; then \
+        echo "Installing test dependencies..." && \
+        pip install --no-cache-dir -r test-requirements.txt; \
+    fi
 
-# Install curl for health check and other utilities, including libpq-dev for PostgreSQL support
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl build-essential libpq-dev && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# --- 
 
-# Create a non-root user and group
+# Stage 2: Final runtime stage
+FROM python:3.10-slim as final
+
+# Install runtime system dependencies (minimal)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user and group first
 RUN groupadd -g 1001 netraven && \
     useradd -u 1001 -g netraven -m -s /bin/bash netraven
 
-# Create directories for non-root operations
-RUN mkdir -p /app /app/logs /app/data /app/test-artifacts /tmp/netmiko_logs && \
-    chown -R netraven:netraven /app && \
-    chmod 777 /tmp/netmiko_logs
-
-# Create Python cache directories with appropriate permissions
-RUN mkdir -p /.local /.cache && \
-    chmod -R 777 /.local /.cache
-
 WORKDIR /app
 
-# Copy dependencies files
-COPY docker/requirements.txt .
-COPY docker/test-requirements.txt .
+# Copy virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
 
-# Install dependencies based on environment
-RUN pip install --no-cache-dir -r requirements.txt && \
-    if [ "$NETRAVEN_ENV" = "test" ]; then \
-        echo "Installing test dependencies..." && \
-        pip install --no-cache-dir -r test-requirements.txt && \
-        # Clean up
-        apt-get clean && \
-        rm -rf /var/lib/apt/lists/*; \
-    fi
+# Copy only necessary application code and scripts
+COPY --chown=netraven:netraven netraven /app/netraven/
+COPY --chown=netraven:netraven alembic /app/alembic/
+COPY --chown=netraven:netraven alembic.ini /app/alembic.ini
+COPY --chown=netraven:netraven scripts /app/scripts/
+COPY --chown=netraven:netraven docker/entrypoint.sh /app/docker/entrypoint.sh
 
-# Copy only the needed files
-COPY netraven/ netraven/
-COPY docker/ docker/
-COPY tests/ tests/
-COPY scripts/ scripts/
+# Create necessary directories and ensure ownership
+# Config dir might be mounted, but create placeholder
+RUN mkdir -p /app/logs /app/data/netmiko_logs /app/test-artifacts /app/config && \
+    chown -R netraven:netraven /app/logs /app/data /app/test-artifacts /app/config
 
-# Make entrypoint and scripts executable
-RUN chmod +x docker/entrypoint.sh
-RUN chmod +x scripts/*.py scripts/*.sh
+# Make entrypoint executable
+RUN chmod +x /app/docker/entrypoint.sh
+# Note: Making scripts executable might be better done within the scripts/ dir or entrypoint itself
 
 # Set environment variables
-ENV PYTHONPATH=/app
-ENV SERVICE_TYPE=api
-ENV BUILD_ENVIRONMENT=${NETRAVEN_ENV}
-ENV NETMIKO_LOG_DIR=/tmp/netmiko_logs
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    NETRAVEN_CONFIG_DIR=/app/config \
+    NETRAVEN_LOG_LEVEL=INFO \
+    NETMIKO_LOG_DIR=/app/data/netmiko_logs \
+    PYTHONDONTWRITEBYTECODE=1
+# PYTHONPATH=/app # Handled by WORKDIR and venv path
+# SERVICE_TYPE=api # Can be set in docker-compose
+# BUILD_ENVIRONMENT=${NETRAVEN_ENV} # Not needed at runtime
+# NETMIKO_LOG_DIR is set above, comment explains reasoning
 
-# Set permissions for test artifacts directory
-RUN chmod 777 /app/test-artifacts
+# Switch to non-root user
+USER netraven
 
 EXPOSE 8000
 
-# Run as non-root user for health checks, etc.
-USER netraven
+# Healthcheck using the enhanced /health endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
-# Run entrypoint
-ENTRYPOINT ["/app/docker/entrypoint.sh"]
+# Run entrypoint (defined in docker-compose.yml, so CMD can be default)
+# CMD should ideally just run the application if entrypoint handles setup
+# ENTRYPOINT is set in docker-compose, this CMD might be overridden
+# Using gunicorn as recommended previously
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "netraven.web.main:app", "--bind", "0.0.0.0:8000"]

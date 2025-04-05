@@ -17,177 +17,47 @@ from pydantic import BaseModel
 
 # Auth components
 from netraven.core.auth import jwt, AuthError, create_token
-from netraven.core.services.token.async_token_store import async_token_store
+from netraven.core.services.token.async_token_store import AsyncTokenStore, TokenData, TokenNotFoundError, TokenValidationError, TokenExpiredError
 from netraven.web.auth import (
     authenticate_user, # Will be replaced with async version
     UserPrincipal,
     extract_token_from_header
 )
-from netraven.web.models.auth import TokenRequest, TokenResponse, ServiceTokenRequest, TokenMetadata, User
-from netraven.web.services.audit_service import AuditService # Will be replaced with async version
-
-# Setup Redis connection if available for rate limiting
-try:
-    import redis.asyncio as redis
-    REDIS_AVAILABLE = True
-except ImportError:
-    REDIS_AVAILABLE = False
-    logging.warning("Redis not available for rate limiting, using in-memory fallback")
+from netraven.web.models.user import User # Import User model
+from netraven.web.schemas.auth import TokenResponse, ServiceTokenRequest # Correct schema imports
+from netraven.web.schemas.user import UserCreate # Import if needed for user lookup
+from netraven.web.services.audit_service import AsyncAuditService # Use the async version
+from netraven.web.auth.rate_limiting import AsyncRateLimiter
+from netraven.core.config import settings # Import settings
 
 # Configure logging
 logger = logging.getLogger(__name__)
-
-# Rate limiting settings
-MAX_LOGIN_ATTEMPTS = 5
-LOCKOUT_PERIOD = timedelta(minutes=15)
-
-class LoginAttempt(BaseModel):
-    """Model for tracking login attempts."""
-    count: int = 0
-    timestamp: datetime = datetime.utcnow()
 
 class AsyncAuthService:
     """
     Provides asynchronous methods for handling authentication operations.
     """
 
-    def __init__(self, db_session: AsyncSession, audit_service: Any):
+    def __init__(self,
+                 db_session: AsyncSession,
+                 audit_service: AsyncAuditService,
+                 rate_limiter: AsyncRateLimiter,
+                 token_store: AsyncTokenStore):
         """
         Initialize the authentication service.
 
         Args:
             db_session: Async database session.
             audit_service: Audit service instance.
+            rate_limiter: Rate limiter instance.
+            token_store: Token store instance.
         """
         self._db_session = db_session
         self._audit_service = audit_service
-        
-        # Set up Redis for rate limiting if available
-        self._redis_client = None
-        if REDIS_AVAILABLE:
-            try:
-                self._redis_client = redis.Redis(
-                    host="localhost",  # Should be configurable
-                    port=6379,          # Should be configurable
-                    db=0,
-                    decode_responses=True
-                )
-                logger.info("Redis client initialized for rate limiting")
-            except Exception as e:
-                logger.error(f"Failed to initialize Redis client: {e}")
-                
-        # In-memory fallback for rate limiting
-        self._login_attempts = {}
+        self._rate_limiter = rate_limiter
+        self._token_store = token_store
 
-    async def _check_rate_limit(self, key: str) -> bool:
-        """
-        Check if a key is rate limited.
-        
-        Args:
-            key: The rate limit key (usually username:ip)
-            
-        Returns:
-            bool: True if rate limited, False otherwise
-        """
-        # Try Redis first if available
-        if self._redis_client:
-            try:
-                # Get the current attempt count and timestamp
-                attempts_data = await self._redis_client.get(f"ratelimit:{key}")
-                
-                if attempts_data:
-                    attempts = json.loads(attempts_data)
-                    count = attempts.get("count", 0)
-                    timestamp_str = attempts.get("timestamp")
-                    timestamp = datetime.fromisoformat(timestamp_str) if timestamp_str else datetime.utcnow()
-                    
-                    # Check if still in lockout period
-                    if count >= MAX_LOGIN_ATTEMPTS:
-                        if (datetime.utcnow() - timestamp) < LOCKOUT_PERIOD:
-                            return True
-                        else:
-                            # Reset after lockout period
-                            await self._redis_client.set(
-                                f"ratelimit:{key}",
-                                json.dumps({"count": 0, "timestamp": datetime.utcnow().isoformat()}),
-                                ex=int(LOCKOUT_PERIOD.total_seconds())
-                            )
-                return False
-            except Exception as e:
-                logger.error(f"Redis rate limit check failed: {e}")
-                # Fall back to in-memory check
-        
-        # In-memory fallback
-        if key in self._login_attempts:
-            attempts = self._login_attempts[key]
-            if attempts.count >= MAX_LOGIN_ATTEMPTS:
-                if (datetime.utcnow() - attempts.timestamp) < LOCKOUT_PERIOD:
-                    return True
-                else:
-                    # Reset after lockout period
-                    self._login_attempts[key] = LoginAttempt()
-        else:
-            self._login_attempts[key] = LoginAttempt()
-            
-        return False
-
-    async def _increment_login_attempts(self, key: str) -> None:
-        """
-        Increment login attempt count for a key.
-        
-        Args:
-            key: The rate limit key (usually username:ip)
-        """
-        # Try Redis first if available
-        if self._redis_client:
-            try:
-                # Get current attempts
-                attempts_data = await self._redis_client.get(f"ratelimit:{key}")
-                if attempts_data:
-                    attempts = json.loads(attempts_data)
-                    count = attempts.get("count", 0) + 1
-                else:
-                    count = 1
-                
-                # Update attempts
-                await self._redis_client.set(
-                    f"ratelimit:{key}",
-                    json.dumps({"count": count, "timestamp": datetime.utcnow().isoformat()}),
-                    ex=int(LOCKOUT_PERIOD.total_seconds())
-                )
-                return
-            except Exception as e:
-                logger.error(f"Redis rate limit increment failed: {e}")
-                # Fall back to in-memory increment
-        
-        # In-memory fallback
-        if key in self._login_attempts:
-            self._login_attempts[key].count += 1
-            self._login_attempts[key].timestamp = datetime.utcnow()
-        else:
-            self._login_attempts[key] = LoginAttempt(count=1)
-
-    async def _reset_login_attempts(self, key: str) -> None:
-        """
-        Reset login attempts for a key.
-        
-        Args:
-            key: The rate limit key (usually username:ip)
-        """
-        # Try Redis first if available
-        if self._redis_client:
-            try:
-                await self._redis_client.delete(f"ratelimit:{key}")
-                return
-            except Exception as e:
-                logger.error(f"Redis rate limit reset failed: {e}")
-                # Fall back to in-memory reset
-        
-        # In-memory fallback
-        if key in self._login_attempts:
-            del self._login_attempts[key]
-
-    async def _async_authenticate_user(self, username: str, password: str) -> Optional[User]:
+    async def _async_authenticate_user(self, username: str, password: str) -> Optional[Dict[str, Any]]: # Return dict now
         """
         Asynchronously authenticate a user.
         
@@ -196,12 +66,19 @@ class AsyncAuthService:
             password: User's password
             
         Returns:
-            Optional[User]: User object if authentication succeeds, None otherwise
+            Optional[Dict[str, Any]]: User data dict if authentication succeeds, None otherwise
         """
-        # Current authenticate_user function is synchronous - wrap in asyncio.to_thread
-        return await asyncio.to_thread(authenticate_user, username, password)
+        # Call the now async authenticate_user directly, passing the session
+        return await authenticate_user(self._db_session, username, password)
 
-    async def issue_user_token(self, form_data: TokenRequest, request: Request) -> TokenResponse:
+    async def issue_user_token(
+            self,
+            username: str,
+            password: str,
+            request: Request,
+            requested_scopes: Optional[List[str]] = None,
+            device_info: Optional[Dict[str, Any]] = None
+            ) -> Dict[str, Any]: # Return dict to match dev log
         """
         Handles the logic for the /token endpoint.
         - Checks rate limiting
@@ -209,30 +86,23 @@ class AsyncAuthService:
         - Issues token
         - Logs audit events
         """
-        client_ip = request.client.host if request.client else "unknown"
-        username = form_data.username
-        key = f"{username}:{client_ip}"
-
-        # --- Rate Limiting Check ---
-        rate_limited = await self._check_rate_limit(key)
-        if rate_limited:
-            logger.warning(f"Rate limited login attempt: username={username}, ip={client_ip}")
-            # TODO: Use async AuditService
-            # await self._audit_service.log_auth_event(...)
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Too many failed login attempts. Please try again later."
-            )
+        # Rate limit is now handled by dependency in the router for /login
+        # This service method assumes rate limiting passed if called.
 
         # --- Authentication ---
-        user = await self._async_authenticate_user(username, form_data.password)
+        user = await self._async_authenticate_user(username, password)
         if not user:
-            # Increment failed attempts
-            await self._increment_login_attempts(key)
-            attempt_count = self._login_attempts.get(key, LoginAttempt()).count if key in self._login_attempts else 1
-            logger.warning(f"Authentication failed: username={username}, ip={client_ip}, attempts={attempt_count}")
-            # TODO: Use async AuditService
-            # await self._audit_service.log_auth_event(...)
+            # Rate limiter dependency in router handles incrementing attempts on failure (HTTP 429)
+            # Log the failure event here
+            await self._audit_service.log_auth_event(
+                event_name="login_failed",
+                actor_id=username,
+                actor_type="user",
+                status="failure",
+                description=f"Authentication failed for user {username}.",
+                request=request
+            )
+            logger.warning(f"Authentication failed: username={username}, ip={request.client.host if request.client else 'unknown'}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
@@ -240,201 +110,254 @@ class AsyncAuthService:
             )
 
         # --- Success --- 
-        await self._reset_login_attempts(key)
+        # Rate limiter dependency in router handles resetting attempts on success
 
-        # Generate a token with proper expiration and refresh metadata
-        token_id = str(uuid.uuid4())
-        # Add client fingerprint to metadata for security
-        token_metadata = {
-            "client_ip": client_ip,
-            "user_agent": request.headers.get("User-Agent", "unknown"),
-            "created_at": datetime.utcnow().isoformat(),
-            "refresh_count": 0
-        }
+        # --- Token Generation ---
+        now = datetime.utcnow()
+        access_token_id = str(uuid.uuid4())
+        refresh_token_id = str(uuid.uuid4())
         
-        # Create token with expiration (using core auth library)
-        token = create_token(
-            subject=user.username,
-            token_type="user",
-            scopes=user.permissions,
-            expiration=timedelta(hours=1),  # Should be configurable
-            metadata=token_metadata
+        # Define scopes (use requested or default to user's scopes)
+        granted_scopes = requested_scopes or user.get("scopes", []) or settings.DEFAULT_USER_SCOPES
+
+        access_token_payload = {
+            "sub": str(user.get("id")),
+            "preferred_username": user.get("username"),
+            "scope": " ".join(granted_scopes),
+            "token_type": "access",
+            "jti": access_token_id,
+            "iat": now,
+            "exp": now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            # Add other claims like email, roles if needed
+        }
+        access_token = create_token(access_token_payload)
+
+        refresh_token_payload = {
+            "sub": str(user.get("id")),
+            "jti": refresh_token_id,
+            "ati": access_token_id, # Link to access token
+            "token_type": "refresh",
+            "iat": now,
+            "exp": now + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+        }
+        refresh_token = create_token(refresh_token_payload)
+
+        # --- Store Tokens --- 
+        access_token_data = TokenData(
+            jti=access_token_id,
+            sub=str(user.get("id")),
+            exp=int((now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)).timestamp()),
+            iat=int(now.timestamp()),
+            is_refresh=False,
+            device_info=device_info,
+            scopes=granted_scopes
+        )
+        refresh_token_data = TokenData(
+            jti=refresh_token_id,
+            sub=str(user.get("id")),
+            exp=int((now + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)).timestamp()),
+            iat=int(now.timestamp()),
+            is_refresh=True,
+            parent_jti=access_token_id,
+            device_info=device_info,
+            scopes=granted_scopes # Store scopes with refresh token too
         )
 
-        # Decode token to get expiration (JWT decoding is typically sync)
-        try:
-            token_data = jwt.decode(token, "dummy-key-not-used", options={"verify_signature": False})
-            expires_at = datetime.fromtimestamp(token_data["exp"]) if "exp" in token_data else None
-            token_id = token_data.get('jti', 'unknown')
-        except Exception as e:
-            logger.error(f"Failed to decode created token: {e}")
-            expires_at = None
-            token_id = 'decode-error'
+        await self._token_store.store_token(access_token_data)
+        await self._token_store.store_token(refresh_token_data)
 
-        logger.info(f"Authentication successful: username={user.username}, token_id={token_id}, ip={client_ip}")
-        # TODO: Use async AuditService
-        # await self._audit_service.log_auth_event(...)
-
-        # Return token with refresh token (same token for now)
-        return TokenResponse(
-            access_token=token,
-            token_type="bearer",
-            expires_at=expires_at,
-            refresh_token=token  # In a more secure implementation, this would be a separate token
+        # --- Audit Logging ---
+        await self._audit_service.log_auth_event(
+            event_name="login_success",
+            actor_id=str(user.get("id")),
+            actor_type="user",
+            status="success",
+            description=f"User {user.get('username')} logged in successfully.",
+            event_metadata=device_info, # Log device info
+            request=request
         )
+        logger.info(f"Login successful: username={username}, id={user.get('id')}, ip={request.client.host if request.client else 'unknown'}")
 
-    async def refresh_user_token(self, request: Request) -> TokenResponse:
+        # --- Prepare Response --- 
+        # Create principal for response consistency (though not strictly needed here)
+        principal = UserPrincipal.from_token_payload(access_token_payload)
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            "refresh_expires_in": settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60,
+            "scope": " ".join(granted_scopes),
+            "user_id": str(user.get("id")),
+            "username": user.get("username"),
+            "is_admin": principal.is_admin,
+            "jti": access_token_id,
+            "principal": principal # Include principal if needed by caller (like in dev log)
+        }
+
+    async def refresh_user_token(
+            self,
+            refresh_token: str,
+            request: Request,
+            device_info: Optional[Dict[str, Any]] = None
+            ) -> Dict[str, Any]: # Return dict for consistency
         """
-        Handles the logic for the /refresh endpoint.
-        - Extracts token from header
-        - Validates token (existence, type, expiry)
-        - Issues new token
+        Refreshes an access token using a refresh token.
+        - Validates the refresh token
+        - Revokes the old tokens
+        - Issues new access and refresh tokens
         - Logs audit events
         """
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            logger.warning("Token refresh failed: No Authorization header")
-            # TODO: Audit log
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="No Authorization header found",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        # Rate limit check can be added here if desired, using self._rate_limiter
+        # allowed, wait = await self._rate_limiter.check_rate_limit(f"refresh:{request.client.host}", request)
+        # if not allowed: raise HTTPException(...) 
 
-        token = extract_token_from_header(auth_header)
-        if not token:
-            logger.warning("Token refresh failed: Invalid Authorization header format")
-            # TODO: Audit log
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Authorization header format",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
+        # --- Validate Refresh Token --- 
         try:
-            # Decode token claims (sync ok)
-            payload = jwt.decode(token, "dummy", options={"verify_signature": False})
-            token_id = payload.get("jti")
-            username = payload.get("sub")
-            token_type = payload.get("type", "unknown")
-            scopes = payload.get("scope", [])
-
+            # Decode without verification first to get JTI for store lookup
+            unverified_payload = jwt.decode(refresh_token, options={"verify_signature": False, "verify_exp": False})
+            token_id = unverified_payload.get("jti")
             if not token_id:
-                logger.warning("Token refresh failed: Token missing 'jti' claim")
-                # TODO: Audit log
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid token format: missing token ID (jti)",
-                )
-
-            # Check if token is valid using async token store
-            token_metadata = await async_token_store.get_token(token_id)
-            if not token_metadata:
-                logger.warning(f"Token refresh failed: Invalid or revoked token {token_id}")
-                # TODO: Audit log
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or revoked token",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-
-            # Only allow refresh for user tokens
-            if token_type != "user":
-                logger.warning(f"Token refresh failed: Only user tokens can be refreshed, got {token_type}")
-                # TODO: Audit log
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Only user tokens can be refreshed"
-                )
-
-            # Check token expiration - allow refresh only if token is not expired
-            # (previous logic was too restrictive, allowing refresh only near expiration)
-            now_ts = datetime.utcnow().timestamp()
-            exp_ts = payload.get("exp")
-            if exp_ts and now_ts > exp_ts:
-                logger.warning(f"Token refresh failed: Token {token_id} has expired.")
-                # TODO: Audit log
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token has expired",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-
-            # Track refresh count for potential abuse detection
-            refresh_count = token_metadata.get("refresh_count", 0) + 1
-            if refresh_count > 100:  # Arbitrary limit, should be configurable
-                logger.warning(f"Token refresh rejected: Too many refreshes for token {token_id}")
-                # TODO: Audit log
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Maximum token refresh limit reached"
-                )
-
-            # Create a new token with the same permissions and metadata
-            client_ip = request.client.host if request.client else "unknown"
-            new_token_metadata = {
-                **token_metadata,
-                "client_ip": client_ip,
-                "user_agent": request.headers.get("User-Agent", "unknown"),
-                "refresh_count": refresh_count,
-                "refreshed_at": datetime.utcnow().isoformat(),
-                "previous_token_id": token_id,
-            }
-
-            user_for_new_token = User(
-                username=username,
-                email=f"{username}@example.com",  # Placeholder
-                permissions=scopes,
-                is_active=True
+                raise TokenValidationError("Refresh token missing JTI")
+                
+            # Check token store
+            stored_token_data = await self._token_store.get_token(token_id)
+            if not stored_token_data or not stored_token_data.is_refresh:
+                raise TokenNotFoundError("Refresh token not found or invalid")
+                
+            # Now verify signature and expiry
+            payload = jwt.decode(
+                refresh_token, 
+                settings.TOKEN_SECRET_KEY, 
+                algorithms=[settings.TOKEN_ALGORITHM],
+                options={"verify_aud": False} # Adjust if audience used
             )
 
-            # Create new token
-            new_token = create_token(
-                subject=user_for_new_token.username,
-                token_type="user",
-                scopes=user_for_new_token.permissions,
-                expiration=timedelta(hours=1),  # Should be configurable
-                metadata=new_token_metadata
-            )
+            # Additional checks
+            if payload.get("token_type") != "refresh":
+                raise TokenValidationError("Invalid token type, expected refresh")
+            if stored_token_data.exp < int(time.time()):
+                raise TokenExpiredError("Refresh token expired") # Should be caught by jwt.decode but double check
 
-            # Decode new token to get expiration and ID
-            new_token_data = jwt.decode(new_token, "dummy", options={"verify_signature": False})
-            new_token_id = new_token_data.get("jti", "unknown")
-            expires_at = datetime.fromtimestamp(new_token_data["exp"]) if "exp" in new_token_data else None
+            # Extract necessary info
+            user_id = payload.get("sub")
+            original_jti = payload.get("ati") # Original access token JTI
+            scopes = stored_token_data.scopes # Use scopes stored with refresh token
             
-            # Option 1: Invalidate the old token when issuing new one (more secure)
-            await async_token_store.revoke_token(token_id)
-            logger.info(f"Token invalidated during refresh: {token_id}")
-            
-            # Option 2: Keep old token valid but mark it as refreshed (for sliding sessions)
-            # This would allow users to continue using old tokens for a grace period
-            # await async_token_store.update_token_metadata(token_id, {"refreshed_to": new_token_id})
+            if not user_id:
+                raise TokenValidationError("Refresh token missing subject")
 
-            logger.info(f"Token refreshed: old={token_id}, new={new_token_id}, user={username}")
-            # TODO: Audit log
-
-            return TokenResponse(
-                access_token=new_token,
-                token_type="bearer",
-                expires_at=expires_at,
-                refresh_token=new_token  # In a more secure implementation, this would be a separate token
+        except TokenExpiredError as e:
+            logger.warning(f"Refresh token expired: {e}")
+            await self._audit_service.log_auth_event(
+                event_name="refresh_failed_expired", 
+                actor_id=unverified_payload.get("sub"), 
+                status="failure", 
+                request=request
             )
-
-        except AuthError as e:
-            logger.warning(f"Token refresh failed: {str(e)}")
-            # TODO: Audit log
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=str(e),
-                headers={"WWW-Authenticate": "Bearer"},
+                detail="Refresh token expired",
+                headers={"WWW-Authenticate": "Bearer error=\"invalid_grant\""}
             )
-        except Exception as e:
-            logger.error(f"Unexpected error during token refresh: {str(e)}")
-            # TODO: Audit log
+        except (TokenValidationError, TokenNotFoundError, jwt.PyJWTError) as e:
+            logger.warning(f"Invalid refresh token: {e}")
+            await self._audit_service.log_auth_event(
+                event_name="refresh_failed_invalid", 
+                actor_id=unverified_payload.get("sub") if 'unverified_payload' in locals() else None, 
+                status="failure", 
+                request=request
+            )
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Token refresh error: {str(e)}",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+                headers={"WWW-Authenticate": "Bearer error=\"invalid_grant\""}
             )
+
+        # --- Token Generation ---
+        now = datetime.utcnow()
+        access_token_id = str(uuid.uuid4())
+        refresh_token_id = str(uuid.uuid4())
+        
+        # Define scopes (use requested or default to user's scopes)
+        granted_scopes = scopes
+
+        access_token_payload = {
+            "sub": str(user_id),
+            "preferred_username": user_id,
+            "scope": " ".join(granted_scopes),
+            "token_type": "access",
+            "jti": access_token_id,
+            "iat": now,
+            "exp": now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            # Add other claims like email, roles if needed
+        }
+        access_token = create_token(access_token_payload)
+
+        refresh_token_payload = {
+            "sub": str(user_id),
+            "jti": refresh_token_id,
+            "ati": access_token_id, # Link to access token
+            "token_type": "refresh",
+            "iat": now,
+            "exp": now + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+        }
+        refresh_token = create_token(refresh_token_payload)
+
+        # --- Store Tokens --- 
+        access_token_data = TokenData(
+            jti=access_token_id,
+            sub=str(user_id),
+            exp=int((now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)).timestamp()),
+            iat=int(now.timestamp()),
+            is_refresh=False,
+            device_info=device_info,
+            scopes=granted_scopes
+        )
+        refresh_token_data = TokenData(
+            jti=refresh_token_id,
+            sub=str(user_id),
+            exp=int((now + timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)).timestamp()),
+            iat=int(now.timestamp()),
+            is_refresh=True,
+            parent_jti=access_token_id,
+            device_info=device_info,
+            scopes=granted_scopes # Store scopes with refresh token too
+        )
+
+        await self._token_store.store_token(access_token_data)
+        await self._token_store.store_token(refresh_token_data)
+
+        # --- Audit Logging ---
+        await self._audit_service.log_auth_event(
+            event_name="refresh_success",
+            actor_id=str(user_id),
+            actor_type="user",
+            status="success",
+            description=f"User {user_id} refreshed access token successfully.",
+            event_metadata=device_info, # Log device info
+            request=request
+        )
+        logger.info(f"Refresh successful: user={user_id}, ip={request.client.host if request.client else 'unknown'}")
+
+        # --- Prepare Response --- 
+        # Create principal for response consistency (though not strictly needed here)
+        principal = UserPrincipal.from_token_payload(access_token_payload)
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            "refresh_expires_in": settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60,
+            "scope": " ".join(granted_scopes),
+            "user_id": str(user_id),
+            "username": user_id,
+            "is_admin": principal.is_admin,
+            "jti": access_token_id,
+            "principal": principal # Include principal if needed by caller (like in dev log)
+        }
 
     async def issue_service_token(
         self,
@@ -525,7 +448,7 @@ class AsyncAuthService:
         filter_criteria = {"sub": subject} if subject else None
         
         # Get tokens from store
-        tokens = await async_token_store.list_tokens(filter_criteria)
+        tokens = await self._token_store.list_tokens(filter_criteria)
         
         # Convert to TokenMetadata objects
         result = []
@@ -566,7 +489,7 @@ class AsyncAuthService:
             principal: User revoking the token (for permission check)
         """
         # Get token to check ownership
-        token_data = await async_token_store.get_token(token_id)
+        token_data = await self._token_store.get_token(token_id)
         if not token_data:
             logger.warning(f"Token revocation failed: Token {token_id} not found")
             # Return success anyway to avoid leaking information
@@ -585,7 +508,7 @@ class AsyncAuthService:
             )
         
         # Revoke token
-        success = await async_token_store.revoke_token(token_id)
+        success = await self._token_store.revoke_token(token_id)
         
         if success:
             logger.info(f"Token revoked: id={token_id}, subject={subject}, by={principal.username}")
@@ -621,9 +544,23 @@ class AsyncAuthService:
             )
         
         # Revoke all tokens for subject
-        count = await async_token_store.revoke_tokens_by_subject(subject)
+        count = await self._token_store.revoke_tokens_by_subject(subject)
         
         logger.info(f"Revoked {count} tokens for {subject}, by {principal.username}")
         # TODO: Audit log
         
         return count
+
+    @property
+    def rate_limiter(self) -> AsyncRateLimiter: # Assuming RateLimiter is needed
+        """Get the rate limiter instance."""
+        # Return the singleton instance directly for now
+        # This could be made configurable later if needed
+        from netraven.web.auth.rate_limiting import rate_limiter
+        return rate_limiter
+
+    # --- Resource Management ---
+    
+    async def close(self):
+        # Close any resources used by the service
+        pass

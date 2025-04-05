@@ -17,6 +17,7 @@ import os
 import tempfile
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
+from typing import Dict, Tuple
 
 from fastapi.testclient import TestClient
 from netraven.web.app import app
@@ -31,6 +32,58 @@ from tests.utils.api_test_utils import create_auth_headers
 # Test client
 client = TestClient(app)
 
+# Test client - Use httpx for async tests
+from httpx import AsyncClient
+import pytest_asyncio
+
+# Use the actual app for integration tests
+from netraven.web.main import app 
+
+# --- Fixtures ---
+
+@pytest_asyncio.fixture(scope="module")
+async def async_client() -> AsyncClient:
+    """Provides an async test client."""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        yield client
+
+@pytest_asyncio.fixture(scope="module")
+async def test_user(async_client: AsyncClient) -> Dict[str, Any]:
+    """Creates a standard user for testing system flows."""
+    # Requires admin privileges to create users - assumes an admin exists
+    # TODO: Use a proper admin fixture or ensure admin exists in test DB setup
+    
+    # For now, skip user creation if admin setup is complex, assume testuser exists
+    # username = f"systest-{uuid.uuid4().hex[:6]}"
+    # user_data = {
+    #     "username": username,
+    #     "email": f"{username}@example.com",
+    #     "password": "testpassword",
+    #     "is_admin": False,
+    #     "is_active": True
+    # }
+    # Need admin token here
+    # response = await async_client.post("/api/v1/users", json=user_data, headers=admin_headers)
+    # response.raise_for_status()
+    # return response.json()
+    
+    # Assume 'testuser' with password 'testpassword' exists from seeding/conftest
+    return {"username": "testuser", "password": "testpassword"}
+
+@pytest_asyncio.fixture(scope="module")
+async def logged_in_client(async_client: AsyncClient, test_user: Dict[str, Any]) -> Tuple[AsyncClient, str]:
+    """Provides an authenticated async client and the access token."""
+    login_data = {
+        "username": test_user["username"],
+        "password": test_user["password"],
+    }
+    response = await async_client.post("/api/v1/auth/login", data=login_data)
+    response.raise_for_status()
+    token = response.json()["access_token"]
+    async_client.headers = {"Authorization": f"Bearer {token}"}
+    yield async_client, token
+    # Teardown: remove auth headers after tests in this scope are done
+    async_client.headers = {}
 
 @pytest.fixture
 def admin_token():
@@ -733,3 +786,43 @@ def test_scheduled_tasks_execution_stats(mock_scheduler, admin_token, monkeypatc
         assert data["failed_executions"] == 3
         assert "task_stats" in data
         assert "last_failed_tasks" in data 
+
+# --- New System Workflow Test ---
+
+@pytest.mark.asyncio
+async def test_basic_user_workflow(logged_in_client: Tuple[AsyncClient, str]):
+    """Tests a simple user flow: login, access resource, logout."""
+    client, access_token = logged_in_client # Client already has auth header
+    
+    # 1. Access a protected resource (e.g., /users/me)
+    response_me = await client.get("/api/v1/users/me")
+    assert response_me.status_code == 200
+    user_info = response_me.json()
+    assert "username" in user_info
+    # assert user_info["username"] == test_user["username"] # Verify username if test_user fixture provided it
+    
+    # 2. List devices (should be allowed with default scope)
+    response_devices = await client.get("/api/v1/devices")
+    assert response_devices.status_code == 200
+    assert isinstance(response_devices.json(), list)
+    
+    # 3. Attempt an admin action (should fail)
+    response_admin = await client.get("/api/v1/users/") # List all users requires admin
+    assert response_admin.status_code == 403 # Forbidden
+    
+    # 4. Logout
+    response_logout = await client.post("/api/v1/auth/logout")
+    assert response_logout.status_code == 200
+    assert "Logout successful" in response_logout.json().get("message", "")
+    
+    # 5. Verify token is now invalid
+    response_me_after_logout = await client.get("/api/v1/users/me") # Auth header is still set from fixture
+    assert response_me_after_logout.status_code == 401 # Unauthorized
+    
+    # 6. Verify accessing without token still fails
+    client.headers = {} # Remove auth header
+    response_me_no_token = await client.get("/api/v1/users/me")
+    assert response_me_no_token.status_code == 401
+
+# Add more complex workflow tests as needed
+# e.g., create device -> assign tag -> create backup -> view backup -> delete device 

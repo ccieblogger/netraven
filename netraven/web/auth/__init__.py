@@ -324,62 +324,62 @@ def optional_auth() -> Callable[..., Awaitable[Optional[Principal]]]:
     return dependency
 
 
-def authenticate_user(username: str, password: str) -> Optional[User]:
+async def authenticate_user(db: AsyncSession, username: str, password: str) -> Optional[User]:
     """
     Authenticate a user with username and password.
     
     Args:
+        db: Async database session
         username: The username
         password: The password
         
     Returns:
         Optional[User]: The authenticated user or None
     """
-    # Get database session
     try:
-        from netraven.web.database import SessionLocal
-        from netraven.web.crud import get_user_by_username
-        
-        db = SessionLocal()
-        try:
-            # Find user in database
-            db_user = get_user_by_username(db, username)
-            
-            if not db_user:
-                logger.warning(f"Authentication failed: username={username}, reason=user_not_found")
-                return None
-                
-            # Check password
-            if not verify_password(password, db_user.password_hash):
-                logger.warning(f"Authentication failed: username={username}, reason=invalid_password")
-                return None
-                
-            # Check if user is active
-            if not db_user.is_active:
-                logger.warning(f"Authentication failed: username={username}, reason=user_inactive")
-                return None
-                
-            # Update last login timestamp
-            from netraven.web.crud import update_user_last_login
-            update_user_last_login(db, db_user.id)
-            
-            # Get user permissions (could be based on roles or other factors)
-            permissions = []
-            if db_user.is_admin:
-                permissions = ["admin:*", "read:*", "write:*"]
-            else:
-                # Basic permissions for regular users
-                permissions = ["read:devices", "write:devices"]
-                
-            # Return user model
-            return User(
-                username=db_user.username,
-                email=db_user.email,
-                permissions=permissions,
-                is_active=db_user.is_active
-            )
-        finally:
-            db.close()
+        # Use async crud functions
+        from netraven.web.crud.user import get_user_by_username, update_user_last_login
+
+        # Find user in database
+        db_user = await get_user_by_username(db, username)
+
+        if not db_user:
+            logger.warning(f"Authentication failed: username={username}, reason=user_not_found")
+            return None
+
+        # Check password (verify_password is sync, CPU-bound, okay to call directly)
+        if not verify_password(password, db_user.password_hash):
+            logger.warning(f"Authentication failed: username={username}, reason=invalid_password")
+            return None
+
+        # Check if user is active
+        if not db_user.is_active:
+            logger.warning(f"Authentication failed: username={username}, reason=user_inactive")
+            return None
+
+        # Update last login timestamp asynchronously
+        await update_user_last_login(db, db_user.id)
+
+        # Get user permissions (could be based on roles or other factors)
+        permissions = []
+        if db_user.is_admin:
+            permissions = ["admin:*", "read:*", "write:*"] # Consider making scopes more granular
+        else:
+            # Basic permissions for regular users
+            permissions = settings.DEFAULT_USER_SCOPES # Use configured default scopes
+
+        # Return a dictionary representing the user, suitable for creating UserPrincipal
+        # This avoids returning a full SQLAlchemy model detached from session
+        return {
+            "id": db_user.id,
+            "username": db_user.username,
+            "email": db_user.email,
+            "scopes": permissions,
+            "is_admin": db_user.is_admin,
+            "is_active": db_user.is_active
+            # Add other relevant fields if needed by UserPrincipal
+        }
+
     except Exception as e:
         logger.exception(f"Error during authentication: {str(e)}")
         

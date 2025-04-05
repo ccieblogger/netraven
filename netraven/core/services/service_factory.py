@@ -178,7 +178,9 @@ class ServiceFactory:
         if self._auth_service is None:
             self._auth_service = AsyncAuthService(
                 db_session=self._db_session,
-                audit_service=self.audit_service # Pass placeholder audit service
+                audit_service=self.audit_service,
+                rate_limiter=self.rate_limiter, # Pass rate limiter
+                token_store=self.token_store # Pass token store
             )
         return self._auth_service
 
