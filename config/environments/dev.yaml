@@ -1,0 +1,4 @@
+database:
+  url: postgresql+psycopg2://netraven:netraven@localhost:5432/netraven
+logging:
+  level: DEBUG 
