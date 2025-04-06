@@ -477,3 +477,30 @@
 - Implemented `create_test_device` and `create_test_job` fixture factories that leverage `db_session` for creating test data within the transaction.
 
 **Next Steps:** Commit the pytest fixtures.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Live Testing - Phase 3: Refactor Integration Tests (Live DB Focus)
+
+**Goal:** Refactor integration tests to use live DB sessions and assert against DB state, while keeping external I/O mocked.
+
+**Plan:**
+- Modify `tests/worker/test_runner_integration.py`.
+- Use `db_session` fixture from `conftest.py`.
+- Use `create_test_device`/`create_test_job` fixtures to set up data in the DB transaction.
+- Remove mocks for `load_device_for_job`, `update_job_status`, `save_connection_log`, `save_job_log`.
+- Add assertions querying the DB via `db_session` to verify `jobs`, `job_logs`, `connection_logs` tables are correctly updated.
+- Keep mocks for `run_command`, `commit_configuration_to_git`, `time.sleep`, `load_config`.
+- Commit refactored tests.
+
+**Progress:**
+- Refactored tests in `test_runner_integration.py`.
+- Removed DB-related mocks from the `mock_external_dependencies` fixture.
+- Updated tests to use `db_session`, `create_test_job` fixtures.
+- Added helper functions (`get_job`, `get_job_logs`, `get_connection_logs`) to query DB within tests.
+- Modified assertions to query the database using the `db_session` and verify the state of Job status, JobLog entries, and ConnectionLog entries.
+- Fixed linter errors related to `patch` nesting.
+
+**Next Steps:** Commit the refactored integration tests.
