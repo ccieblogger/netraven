@@ -1,0 +1,9 @@
+sqlalchemy[asyncio]
+asyncpg
+alembic
+PyYAML
+psycopg2-binary # For Alembic autogenerate with asyncpg
+
+# Testing
+pytest
+pytest-asyncio 

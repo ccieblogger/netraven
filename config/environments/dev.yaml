@@ -1,0 +1,4 @@
+database:
+  url: postgresql+asyncpg://netraven:netraven@localhost:5432/netraven
+logging:
+  level: DEBUG 
