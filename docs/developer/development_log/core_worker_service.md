@@ -410,3 +410,45 @@
     - Ensured `db.close()` is called in `finally` block.
 
 **Next Steps:** Commit the refactored worker code.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** DB Integration - Phase 4: Apply Schema Changes & Basic Test
+
+**Goal:** Apply the updated schema to the database and conceptually outline a basic test.
+
+**Plan:**
+- Run `alembic upgrade head` to apply the schema changes.
+- Verify successful execution.
+- Outline steps for a basic manual test (create Job/Device, run worker, check DB/logs).
+- Commit any necessary changes (likely none in this phase).
+
+**Progress:**
+- Successfully executed `alembic upgrade head`. The command completed without errors, indicating the schema should be up-to-date.
+- Outlined the steps for a manual smoke test.
+
+**Next Steps:** Conclude DB integration phase.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Live Testing - Phase 1: Implement/Verify Configuration Loader & dev.yaml
+
+**Goal:** Ensure a working config loader exists and the `dev.yaml` file contains necessary worker configurations.
+
+**Plan:**
+- Verify/create `netraven/config/loader.py` with `load_config()`.
+- Verify `config/environments/dev.yaml` contains `database` and `worker` sections with required keys.
+- Update `dev.yaml` if keys are missing.
+- Add basic tests for `load_config()` verifying loading from `dev.yaml` and environment variable overrides.
+- Commit loader, updated `dev.yaml`, and tests.
+
+**Progress:**
+- Created `netraven/config/loader.py` with a basic `load_config` function using `PyYAML` and handling `DATABASE_URL` override.
+- Updated `config/environments/dev.yaml` to include the `worker` section with keys: `thread_pool_size`, `connection_timeout`, `retry_attempts`, `retry_backoff`, `git_repo_path`, `redaction.patterns`.
+- Created `tests/config/test_loader.py` with tests for default loading, nonexistent environment, and `DATABASE_URL` override.
+
+**Next Steps:** Commit the config loader implementation, `dev.yaml` updates, and tests.
