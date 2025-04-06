@@ -12,8 +12,8 @@ This diagram illustrates the interaction between NetRaven’s core components.
                         ┌────────┴───────────┐
                         │     API Service     │
                         │     (FastAPI)       │
-                        └────────▲───────────┘
-                                 │
+                        └───────▲───────────┘
+                                │
              ┌──────────────────┼────────────────────┐
              │                  │                    │
       Device │          Job CRUD│           User/Auth│
@@ -38,17 +38,17 @@ This diagram illustrates the interaction between NetRaven’s core components.
    │     Device Communication        │
    │        (device_comm)          ─ │
    └────────────┬────────────────────┘
+                │                 ▲
+                ▼                 │
+       ┌───────────────────┐      │
+       │  Netmiko (SSH/API)│      │ 
+       └────────┬──────────┘      │
                 │                 │
                 ▼                 │
-       ┌───────────────────┐
-       │  Netmiko (SSH/API)│
-       └────────┬──────────┘
-                │
-                ▼
-        ┌─────────────┐
-        │ Network Gear│
-        └─────────────┘
-
+        ┌─────────────┐           │
+        │ Network Gear│           │
+        └─────────────┘           │
+                                  ▼
         ┌──────────────────────────────────┐
         │ Git Repo (configs & versioning)  │
         └──────────────────────────────────┘

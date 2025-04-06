@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 # Import worker components
 from netraven.worker.backends import netmiko_driver
@@ -10,21 +10,26 @@ from netraven.worker import git_writer
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
 from git import GitCommandError
 
-# Placeholder for configuration - should be loaded properly later
+# Default path if not found in config
 DEFAULT_GIT_REPO_PATH = "/data/git-repo/" # As per SOT example
 
-def handle_device(device: Any, job_id: int, repo_path: str = DEFAULT_GIT_REPO_PATH) -> Dict[str, Any]:
+def handle_device(
+    device: Any,
+    job_id: int,
+    config: Optional[Dict[str, Any]] = None # Accept loaded config
+) -> Dict[str, Any]:
     """Handles the entire process for a single device.
 
     Connects to the device, executes 'show running-config', redacts sensitive
-    information, logs the redacted output, commits the raw configuration to Git,
-    and logs the final job status for the device.
+    information (using config), logs the redacted output, commits the raw
+    configuration to Git (using repo_path from config), and logs the final
+    job status for the device.
 
     Args:
         device: A device object with attributes like id, device_type,
                 ip_address, username, password.
         job_id: The ID of the parent job.
-        repo_path: The file system path to the Git repository for configs.
+        config: The loaded application configuration dictionary.
 
     Returns:
         A dictionary containing:
@@ -36,6 +41,15 @@ def handle_device(device: Any, job_id: int, repo_path: str = DEFAULT_GIT_REPO_PA
     device_identifier = getattr(device, 'ip_address', getattr(device, 'hostname', f'Device_{getattr(device, "id", "Unknown")}'))
     device_id = getattr(device, 'id', 0) # Use 0 if no id? Needs refinement.
 
+    # Get repo path from config, fallback to default
+    repo_path = DEFAULT_GIT_REPO_PATH
+    if config and isinstance(config.get("worker", {}).get("git_repo_path"), str):
+         repo_path = config["worker"]["git_repo_path"]
+         print(f"[Job: {job_id}, Device: {device_identifier}] Using Git repo path from config: {repo_path}")
+    else:
+         print(f"[Job: {job_id}, Device: {device_identifier}] Using default Git repo path: {repo_path}")
+
+
     result: Dict[str, Any] = {"success": False, "result": None, "error": None}
     raw_output: str | None = None
     commit_hash: str | None = None
@@ -45,12 +59,13 @@ def handle_device(device: Any, job_id: int, repo_path: str = DEFAULT_GIT_REPO_PA
 
         # 1. Connect and get config
         print(f"[Job: {job_id}, Device: {device_identifier}] Connecting and running command...")
+        # TODO: Add connection timeout from config to netmiko_driver call if needed
         raw_output = netmiko_driver.run_command(device)
         print(f"[Job: {job_id}, Device: {device_identifier}] Successfully retrieved config.")
 
         # 2. Redact output
         print(f"[Job: {job_id}, Device: {device_identifier}] Redacting output...")
-        redacted_output = redactor.redact(raw_output)
+        redacted_output = redactor.redact(raw_output, config=config) # Pass config
 
         # 3. Log redacted output to connection log
         print(f"[Job: {job_id}, Device: {device_identifier}] Saving connection log...")
@@ -62,7 +77,7 @@ def handle_device(device: Any, job_id: int, repo_path: str = DEFAULT_GIT_REPO_PA
             device_id=device_id,
             config_data=raw_output, # Commit the original, unredacted data
             job_id=job_id,
-            repo_path=repo_path
+            repo_path=repo_path # Use path determined from config or default
         )
 
         if commit_hash:
@@ -102,7 +117,7 @@ def handle_device(device: Any, job_id: int, repo_path: str = DEFAULT_GIT_REPO_PA
         if raw_output is not None and result["success"] is False: # Check if output was fetched before error
             try:
                 print(f"[Job: {job_id}, Device: {device_identifier}] Logging potentially partial redacted output due to error...")
-                partial_redacted = redactor.redact(raw_output)
+                partial_redacted = redactor.redact(raw_output, config=config) # Pass config here too
                 log_utils.save_connection_log(device_id, job_id, f"PARTIAL LOG DUE TO ERROR:\n{partial_redacted}")
             except Exception as log_e:
                 print(f"[Job: {job_id}, Device: {device_identifier}] Error saving partial connection log: {log_e}")

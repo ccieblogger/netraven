@@ -1,9 +1,10 @@
-from typing import List, Any
+from typing import List, Any, Dict
 import time # For simulating work/delays
 
 from netraven.worker import dispatcher
 from netraven.db.session import get_db # Assuming this exists
 # from netraven.db.models import Job, Device # Assuming these exist
+from netraven.config.loader import load_config # Assume this exists and works
 
 # --- Placeholder Data / Mocks --- 
 # Replace with actual DB interaction later
@@ -43,8 +44,8 @@ def update_job_status(job_id: int, status: str, start_time: float = None, end_ti
 def run_job(job_id: int) -> None:
     """Main entry point to run a specific job by its ID.
 
-    Loads job details and devices, dispatches tasks using the dispatcher,
-    and handles overall job status updates.
+    Loads job details and devices, loads configuration, dispatches tasks
+    using the dispatcher (passing config), and handles overall job status updates.
 
     Args:
         job_id: The ID of the job to execute.
@@ -54,6 +55,14 @@ def run_job(job_id: int) -> None:
     update_job_status(job_id, "RUNNING", start_time=start_time)
 
     try:
+        # 0. Load Configuration
+        # Assume load_config determines the environment (e.g., from env var)
+        config = load_config()
+        print(f"[Job: {job_id}] Configuration loaded.")
+        # Example: Accessing a config value
+        # repo_path_test = config.get("worker", {}).get("git_repo_path", "DEFAULT_PATH")
+        # print(f"[Job: {job_id}] Test read Git repo path from config: {repo_path_test}")
+
         # 1. Load devices associated with the job
         # Replace this with actual DB call using job_id
         devices_to_process = load_devices_for_job(job_id)
@@ -64,11 +73,9 @@ def run_job(job_id: int) -> None:
             return
 
         # 2. Dispatch tasks using the dispatcher
-        # Configuration for max_workers and repo_path should ideally be loaded here
-        # or passed down from the scheduler/API call trigger point.
-        # Using defaults from dispatcher for now.
+        # Pass the loaded config down
         print(f"[Job: {job_id}] Handing off {len(devices_to_process)} devices to dispatcher...")
-        results = dispatcher.dispatch_tasks(devices_to_process, job_id)
+        results = dispatcher.dispatch_tasks(devices_to_process, job_id, config=config)
 
         # 3. Process results and determine final job status
         successful_tasks = sum(1 for r in results if r.get("success"))

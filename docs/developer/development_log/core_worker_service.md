@@ -263,3 +263,30 @@
 - Added top-level exception handling.
 
 **Next Steps:** Commit the changes.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Configuration Integration (Phase 10 Start)
+
+**Goal:** Refactor worker components to load configurable values (thread pool size, Git path, redaction keywords) from a central configuration mechanism instead of using hardcoded defaults.
+
+**Plan:**
+- Assume existence of `netraven.config.loader.load_config()`.
+- Modify `redactor.redact` to accept an optional `config` dictionary and load `worker.redaction.patterns` from it, falling back to defaults.
+- Modify `executor.handle_device` to accept an optional `config` dictionary, load `worker.git_repo_path` from it, and pass the `config` dict down to `redactor.redact`.
+- Modify `dispatcher.dispatch_tasks` to accept an optional `config` dictionary, load `worker.thread_pool_size` from it, and pass the `config` dict down to `executor.handle_device`.
+- Modify `runner.run_job` to call `load_config()` at the beginning and pass the resulting `config` dictionary down to `dispatcher.dispatch_tasks`.
+- Update function signatures and docstrings.
+- Keep fallback defaults in case config values are missing or invalid.
+- Commit changes.
+
+**Progress:**
+- Modified `redactor.py` to load keywords from config.
+- Modified `executor.py` to load git repo path from config and pass config to `redact`.
+- Modified `dispatcher.py` to load thread pool size from config and pass config to `handle_device`.
+- Modified `runner.py` to load the config using assumed `load_config()` and pass it to the dispatcher.
+- Updated signatures and added basic checks/fallbacks for config values.
+
+**Next Steps:** Commit the changes.

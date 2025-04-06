@@ -1,5 +1,5 @@
 import concurrent.futures
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
 
 from netraven.worker import executor
 
@@ -7,29 +7,42 @@ from netraven.worker import executor
 DEFAULT_THREAD_POOL_SIZE = 5
 DEFAULT_GIT_REPO_PATH = "/data/git-repo/" # Should match executor or be loaded centrally
 
-def dispatch_tasks(devices: List[Any], job_id: int, max_workers: int = DEFAULT_THREAD_POOL_SIZE, repo_path: str = DEFAULT_GIT_REPO_PATH) -> List[Dict[str, Any]]:
+def dispatch_tasks(
+    devices: List[Any],
+    job_id: int,
+    config: Optional[Dict[str, Any]] = None # Accept loaded config
+) -> List[Dict[str, Any]]:
     """Dispatches tasks to handle multiple devices concurrently using a thread pool.
 
     Args:
         devices: A list of device objects to process.
         job_id: The ID of the parent job.
-        max_workers: The maximum number of threads to use.
-        repo_path: The path to the Git repository for storing configs.
+        config: The loaded application configuration dictionary.
 
     Returns:
         A list of result dictionaries, one for each device processed by handle_device.
     """
     results = []
+
+    # Get max_workers from config, fallback to default
+    max_workers = DEFAULT_THREAD_POOL_SIZE
+    if config and isinstance(config.get("worker", {}).get("thread_pool_size"), int):
+        loaded_max_workers = config["worker"]["thread_pool_size"]
+        if loaded_max_workers > 0:
+            max_workers = loaded_max_workers
+            print(f"[Job: {job_id}] Using thread pool size from config: {max_workers}")
+        else:
+            print(f"[Job: {job_id}] Config provided invalid thread pool size ({loaded_max_workers}), using default: {max_workers}")
+    else:
+        print(f"[Job: {job_id}] Using default thread pool size: {max_workers}")
+
     print(f"[Job: {job_id}] Dispatching tasks for {len(devices)} devices using up to {max_workers} workers...")
 
     # Using ThreadPoolExecutor to run handle_device concurrently
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        # Create a future for each device
-        # We use submit to pass different arguments to each call if needed,
-        # but map might be simpler if only device changes.
-        # Using submit allows passing job_id and repo_path easily.
+        # Submit tasks, passing the config down to the executor
         future_to_device = {
-            pool.submit(executor.handle_device, device, job_id, repo_path): device
+            pool.submit(executor.handle_device, device, job_id, config): device
             for device in devices
         }
 
