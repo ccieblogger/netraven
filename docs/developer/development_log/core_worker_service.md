@@ -290,3 +290,43 @@
 - Updated signatures and added basic checks/fallbacks for config values.
 
 **Next Steps:** Commit the changes.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Integration Testing & Refinement (Phase 11 Start)
+
+**Goal:** Add integration tests, implement connection retry logic, and perform final code cleanup.
+
+**Plan:**
+- **Retry Logic:**
+    - Modify `executor.handle_device` to include a retry loop around the `netmiko_driver.run_command` call.
+    - Load `worker.retry_attempts` and `worker.retry_backoff` from config, with defaults.
+    - Retry only on specific connection exceptions (e.g., `NetmikoTimeoutException`).
+    - Do not retry on authentication errors (`NetmikoAuthenticationException`).
+    - Use `time.sleep()` for backoff.
+- **Integration Tests:**
+    - Create `tests/worker/test_runner_integration.py`.
+    - Use `unittest.mock.patch` to mock external dependencies (`load_config`, DB interactions, `netmiko_driver.run_command`, `log_utils.*`, `git_writer.*`, `time.sleep`).
+    - Create test cases for `runner.run_job` covering:
+        - All devices successful.
+        - Mix of success, timeout (with successful retry), auth failure, Git failure.
+        - No devices found for job.
+        - Exception during device loading.
+    - Assert calls to mocked functions (status updates, logging, Netmiko, Git) and final job status.
+- **Refinement:**
+    - Remove placeholder `MockDevice` class and `load_devices_for_job`/`update_job_status` functions from `runner.py`, replacing with calls assuming real DB models/session.
+    - Switch `runner.py` to use standard `logging` instead of `print`.
+    - Remove excessive informational `print` statements from `executor.py`, keeping essential error/retry messages.
+- **Commit:** Commit tests and refinements.
+
+**Progress:**
+- Added retry logic to `executor.handle_device` based on config values.
+- Created `tests/worker/test_runner_integration.py` with mocked integration tests for `run_job`, covering various success/failure scenarios including retries.
+- Fixed linter errors in test file by nesting `patch` context managers.
+- Removed placeholder functions/class from `runner.py` and replaced with assumed DB model/session usage.
+- Switched `runner.py` to use Python's standard `logging` module.
+- Removed most informational `print` statements from `executor.py`.
+
+**Next Steps:** Commit the final changes for the worker service implementation.

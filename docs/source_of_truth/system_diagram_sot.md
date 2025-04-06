@@ -4,15 +4,15 @@ This diagram illustrates the interaction between NetRaven’s core components.
 
 ```
                         ┌────────────────────┐
-                        │     Frontend UI     │
-                        │   (React / REST)    │
+                        │     Frontend UI    │
+                        │   (React / REST)   │
                         └────────▲───────────┘
                                  │ REST API
                                  │
                         ┌────────┴───────────┐
-                        │     API Service     │
-                        │     (FastAPI)       │
-                        └───────▲───────────┘
+                        │     API Service    │
+                        │     (FastAPI)      │
+                        └───────▲────────────┘
                                 │
              ┌──────────────────┼────────────────────┐
              │                  │                    │
