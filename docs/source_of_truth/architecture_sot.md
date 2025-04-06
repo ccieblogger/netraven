@@ -7,6 +7,7 @@ This document outlines the complete architecture for NetRaven, a network device 
 ### System Overview
 
 NetRaven supports:
+
 1. Retrieval of running configuration and identifying information from network devices (primarily via SSH).
 2. Storing configuration snapshots in a Git repository for version control.
 3. Job scheduling for one-time or recurring configuration backups.
@@ -16,6 +17,7 @@ NetRaven supports:
 The system is installed locally using Python-based services with PostgreSQL and Redis. The directory structure and service boundaries support future containerization but do not require it.
 
 ### Core Architectural Principles
+
 - **Synchronous-First Design**: Synchronous services simplify development and debugging.
 - **Targeted Concurrency**: Uses threads only where concurrency offers clear benefits (e.g., connecting to multiple devices).
 - **Modular Design**: Isolated services for API, job scheduling, communication, and logging.
@@ -25,6 +27,7 @@ The system is installed locally using Python-based services with PostgreSQL and 
 ### Core Services
 
 #### 1. API Service (FastAPI - Sync Mode)
+
 - Exposes REST API endpoints for all system functions.
 - JWT-based authentication with role enforcement (admin/user).
 - CRUD for:
@@ -35,6 +38,7 @@ The system is installed locally using Python-based services with PostgreSQL and 
 - Status endpoints for job monitoring.
 
 #### 2. Device Communication Worker
+
 - Executes device jobs triggered by scheduler or on demand.
 - Connects to network devices using **Netmiko**.
 - Retrieves `show running-config` and basic facts (hostname, serial number).
@@ -42,6 +46,7 @@ The system is installed locally using Python-based services with PostgreSQL and 
 - Reports logs and results to database.
 
 #### 3. Job Scheduler
+
 - Based on **RQ + RQ Scheduler**.
 - Queues and schedules jobs:
   - One-time
@@ -50,6 +55,7 @@ The system is installed locally using Python-based services with PostgreSQL and 
 - Triggers device communication jobs in the background.
 
 #### 4. PostgreSQL Database
+
 - Stores all persistent data:
   - Devices, jobs, logs
   - Credentials (encrypted)
@@ -58,6 +64,7 @@ The system is installed locally using Python-based services with PostgreSQL and 
 - Managed with **SQLAlchemy (sync)** + **Alembic**.
 
 #### 5. Frontend UI (React)
+
 - Built with React for responsive user experience.
 - Integrates via REST API.
 - Supports:
@@ -67,6 +74,7 @@ The system is installed locally using Python-based services with PostgreSQL and 
   - Log inspection
 
 ### Device Communication
+
 - Primary protocol: **SSH via Netmiko**
 - Vendor extensibility via Netmiko platform mapping
 - Device grouping (tags) determines credential selection
@@ -77,11 +85,13 @@ The system is installed locally using Python-based services with PostgreSQL and 
   - Output with sensitive line redaction
 
 ### Authentication & Authorization
+
 - JWT-based access for both API and UI users
 - Admin and user roles
 - Users can be assigned visibility to specific device groups
 
 ### Configuration Management
+
 - Hierarchical loading:
   1. Environment variables
   2. Admin-set values from DB
@@ -89,37 +99,59 @@ The system is installed locally using Python-based services with PostgreSQL and 
 - All components read configuration via a common loader
 
 ### Git Integration
-- Config files committed to local Git repo per job
-- Commit messages include timestamp, job ID, device
-- Diffs and history available via Git
+
+NetRaven uses a local Git repository as the versioned storage backend for device configuration files. This approach offers simplicity, traceability, and built-in change tracking with minimal infrastructure overhead.
+
+- Each configuration snapshot is saved as a text file and committed to a local Git repository.
+- Commit messages include structured metadata such as job ID, device hostname, and timestamp.
+- Git provides built-in versioning, rollback, and readable diffs to show changes between snapshots.
+- The Git repository is stored in a dedicated project folder (e.g., `/data/git-repo/`) and initialized on first use.
+- GitPython is used to interface with the repository programmatically.
+
+This design avoids the need for an external version control system while ensuring historical tracking and auditability of all config changes. It also complements the relational database, which stores job metadata and connection logs.
 
 ### Deployment
-NetRaven is intended to be installed and run locally using Python and system packages. Each component can be launched individually via CLI or system service manager.
 
-- PostgreSQL and Redis are assumed to be locally installed (can later be containerized)
-- System services can be managed via `systemd`, `supervisord`, or developer CLI runners
-- Frontend runs with standard Node.js tooling
+NetRaven uses a monorepo structure and is designed for local installation using Python with [Poetry](https://python-poetry.org/) for dependency management. All services share a unified environment and can be run individually using developer scripts.
+
+- PostgreSQL 14 and Redis 7 are installed locally using scripts provided in the `/setup/` directory. Containerization is not required and not used by default
+- Developer runner scripts for DB schema creation, job execution, and job debugging live in `/setup/`
+- Each service lives under the `netraven/` namespace and is importable as `netraven.api`, `netraven.worker`, etc.
+- The root `pyproject.toml` file governs dependencies across the system
+
+```
+/netraven/
+├── api/          # FastAPI service
+├── worker/       # Device command execution logic
+├── scheduler/    # RQ-based job scheduler
+├── db/           # SQLAlchemy models and session mgmt
+├── config/       # YAML and env-based config
+├── git/          # Git commit logic
+├── frontend/     # React app (built separately)
+├── setup/        # Developer runners and bootstrap scripts
+├── tests/        # Tests organized by feature
+├── pyproject.toml
+└── poetry.lock
+```
+
+### Development Environment
+
+It is strongly encouraged to use a python virtual environment to install and run this application.
+
+```
+python3 -m venv venv
+
+```
+
 
 ### Testing Strategy
+
 - **Unit Tests**: Business logic, validation, utilities
 - **Integration Tests**: DB transactions, API/worker behavior
 - **E2E Tests**: Simulate full workflows from API → device → Git → UI
 - Test database with Alembic-migrated schemas
 - Threaded jobs tested for isolation, timing, logging
 
-### Directory Structure
-```
-/netraven/
-├── api/                  # FastAPI routes and schemas
-├── worker/               # Device job execution logic
-├── scheduler/            # RQ + scheduling logic
-├── db/                   # SQLAlchemy models and session mgmt
-├── config/               # YAML and loader logic
-├── frontend/             # React app (separate build pipeline)
-├── git/                  # Git repository interface
-├── tests/                # Unit, integration, and E2E tests
-└── utils/                # Shared helpers
-```
+
 
 ---
-
