@@ -330,3 +330,26 @@
 - Removed most informational `print` statements from `executor.py`.
 
 **Next Steps:** Commit the final changes for the worker service implementation.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** DB Integration - Phase 1: Define/Verify Core SQLAlchemy Models
+
+**Goal:** Ensure SQLAlchemy models required by the worker service exist and match the SOT.
+
+**Plan:**
+- Check existence and content of `job.py`, `device.py`, `job_log.py`, `connection_log.py`, `__init__.py`, `base.py`, `session.py`.
+- Verify model definitions against `postgresql_sot.md`.
+- Add/modify models as needed.
+- Commit changes.
+
+**Progress:**
+- Verified existing model files and DB setup files (`session.py`, `base.py`).
+- `Job`, `Device`, `ConnectionLog` models generally match SOT.
+- Identified missing `device_id` in `JobLog` model.
+- Added `device_id` column (ForeignKey to `devices.id`) and `device` relationship to `JobLog` model in `netraven/db/models/job_log.py`.
+- Noted potential discrepancy: SOT `Job` model has `device_id` (one device per job), while worker integration tests used multiple devices per job. Proceeding with current model structure for now.
+
+**Next Steps:** Commit model update.
