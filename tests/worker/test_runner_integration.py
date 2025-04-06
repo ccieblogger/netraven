@@ -63,7 +63,7 @@ def test_run_job_success_live_config_db(
     mock_external_io["commit_git"].return_value = MOCK_COMMIT_HASH
 
     # --- Run --- 
-    runner.run_job(test_job.id)
+    runner.run_job(test_job.id, db=db_session)
 
     # --- Assertions --- 
     db_session.flush() 
@@ -110,7 +110,7 @@ def test_run_job_auth_fail_live_config_db(
     mock_external_io["run_command"].side_effect = NetmikoAuthenticationException(error_msg)
 
     # --- Run --- 
-    runner.run_job(test_job.id)
+    runner.run_job(test_job.id, db=db_session)
 
     # --- Assertions --- 
     db_session.flush()
@@ -120,7 +120,10 @@ def test_run_job_auth_fail_live_config_db(
     job_logs = get_job_logs(db_session, test_job.id)
     assert len(job_logs) == 1
     assert job_logs[0].level == LogLevel.ERROR
-    assert "Authentication error" in job_logs[0].message
+    # Check for the actual prefix logged by log_utils
+    assert "Connection/Auth error:" in job_logs[0].message
+    # Ensure the original Netmiko message is included
+    assert error_msg in job_logs[0].message
 
     # Mock Verification
     mock_external_io["run_command"].assert_called_once_with(test_device)
@@ -148,7 +151,7 @@ def test_run_job_timeout_retry_live_config_db(
     mock_external_io["commit_git"].return_value = MOCK_COMMIT_HASH
 
     # --- Run --- 
-    runner.run_job(test_job.id)
+    runner.run_job(test_job.id, db=db_session)
 
     # --- Assertions --- 
     db_session.flush()
@@ -195,7 +198,7 @@ def test_run_job_timeout_max_retry_fail_live_db(
     mock_external_io["run_command"].side_effect = side_effects
 
     # --- Run --- 
-    runner.run_job(test_job.id)
+    runner.run_job(test_job.id, db=db_session)
 
     # --- Assertions --- 
     db_session.flush()
@@ -217,26 +220,28 @@ def test_run_job_timeout_max_retry_fail_live_db(
     if expected_retries > 0:
         mock_external_io["sleep"].assert_called_with(expected_backoff)
 
-# test_run_job_no_device_found can remain as is, doesn't rely on removed mocks
-def test_run_job_no_device_found(db_session: Session, mock_external_io):
-    """Test run_job when the job exists but has no associated device."""
+def test_run_job_no_device_found(db_session: Session, create_test_job, mock_external_io):
+    """Test run_job when the job's device lookup fails."""
     # --- Setup --- 
-    test_job = Job(status='pending', device_id=None) 
-    db_session.add(test_job)
-    db_session.commit()
-    db_session.refresh(test_job)
-
-    # --- Run --- 
-    runner.run_job(test_job.id)
+    # Create a valid job with a device first
+    test_job = create_test_job() 
+    
+    # Now, mock the load_device_for_job function specifically for this test
+    # to simulate the device not being found *after* the job is created.
+    with patch('netraven.worker.runner.load_device_for_job', return_value=None) as mock_load:
+        # --- Run --- 
+        runner.run_job(test_job.id, db=db_session)
 
     # --- Assertions --- 
     db_session.flush()
     updated_job = get_job(db_session, test_job.id)
+    # The status should be FAILED_NO_DEVICE as set by the runner
     assert updated_job.status == "FAILED_NO_DEVICE"
 
     job_logs = get_job_logs(db_session, test_job.id)
-    assert len(job_logs) == 0 
+    assert len(job_logs) == 0 # No job logs expected for device processing failure
 
     # Mock Verification
+    mock_load.assert_called_once_with(test_job.id, ANY) # Check loader was called
     mock_external_io["run_command"].assert_not_called()
     mock_external_io["commit_git"].assert_not_called()

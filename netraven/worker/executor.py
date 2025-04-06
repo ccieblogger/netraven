@@ -1,5 +1,6 @@
 import time # Import time for sleep
 from typing import Any, Dict, Optional
+from sqlalchemy.orm import Session # Add Session
 
 # Import worker components
 from netraven.worker.backends import netmiko_driver
@@ -19,19 +20,21 @@ DEFAULT_RETRY_BACKOFF = 2 # seconds
 def handle_device(
     device: Any,
     job_id: int,
-    config: Optional[Dict[str, Any]] = None # Accept loaded config
+    config: Optional[Dict[str, Any]] = None,
+    db: Optional[Session] = None # Accept optional db session
 ) -> Dict[str, Any]:
     """Handles the entire process for a single device, including retries.
 
     Connects to the device (with retries), executes 'show running-config',
     redacts sensitive information, logs output, commits config, logs status.
-    Retries connection on specific connection errors (e.g., timeout).
+    Uses the provided DB session for logging.
 
     Args:
         device: A device object with attributes like id, device_type,
                 ip_address, username, password.
         job_id: The ID of the parent job.
         config: The loaded application configuration dictionary.
+        db: The SQLAlchemy session to use for database operations.
 
     Returns:
         A dictionary containing:
@@ -110,7 +113,7 @@ def handle_device(
         redacted_output = redactor.redact(raw_output, config=config) # Pass config
 
         # 3. Log redacted output to connection log
-        log_utils.save_connection_log(device_id, job_id, redacted_output)
+        log_utils.save_connection_log(device_id, job_id, redacted_output, db=db)
 
         # 4. Commit raw config to Git
         commit_hash = git_writer.commit_configuration_to_git(
@@ -124,34 +127,34 @@ def handle_device(
             result["success"] = True
             result["result"] = commit_hash
             log_message = f"Success. Commit: {commit_hash}"
-            log_utils.save_job_log(device_id, job_id, log_message, success=True)
+            log_utils.save_job_log(device_id, job_id, log_message, success=True, db=db)
         else:
             result["error"] = "Failed to commit configuration to Git repository."
-            log_utils.save_job_log(device_id, job_id, result["error"], success=False)
+            log_utils.save_job_log(device_id, job_id, result["error"], success=False, db=db)
 
     # --- Exception Handling --- 
     except (NetmikoTimeoutException, NetmikoAuthenticationException) as e:
         error_message = f"Connection/Auth error: {e}"
         result["error"] = error_message
-        log_utils.save_job_log(device_id, job_id, error_message, success=False)
+        log_utils.save_job_log(device_id, job_id, error_message, success=False, db=db)
 
     except GitCommandError as e:
         error_message = f"Git command error: {e}"
         print(f"[Job: {job_id}, Device: {device_identifier}] {error_message}") # Keep specific error prints
         result["error"] = error_message
-        log_utils.save_job_log(device_id, job_id, error_message, success=False)
+        log_utils.save_job_log(device_id, job_id, error_message, success=False, db=db)
 
     except Exception as e:
         # Includes connection errors not caught above, or errors during redaction/logging etc.
         error_message = f"Unexpected error: {e}"
         print(f"[Job: {job_id}, Device: {device_identifier}] {error_message}") # Keep specific error prints
         result["error"] = error_message
-        log_utils.save_job_log(device_id, job_id, error_message, success=False)
+        log_utils.save_job_log(device_id, job_id, error_message, success=False, db=db)
         # Log partial output if possible
         if raw_output is not None and result["success"] is False:
             try:
                 partial_redacted = redactor.redact(raw_output, config=config)
-                log_utils.save_connection_log(device_id, job_id, f"PARTIAL LOG DUE TO ERROR:\n{partial_redacted}")
+                log_utils.save_connection_log(device_id, job_id, f"PARTIAL LOG DUE TO ERROR:\n{partial_redacted}", db=db)
             except Exception as log_e:
                 print(f"[Job: {job_id}, Device: {device_identifier}] Error saving partial connection log: {log_e}") # Keep log error prints
 

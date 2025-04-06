@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text # Import text for raw SQL if needed in fixtures
 
 from netraven.db.session import get_db, engine, SessionLocal
-from netraven.db.models import Base, Device, Job # Import necessary models
+from netraven.db import Base
+from netraven.db.models import Device, Job # Import necessary models
 
 # --- Alembic Schema Management Fixture --- 
 

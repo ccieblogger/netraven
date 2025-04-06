@@ -1,5 +1,6 @@
 import concurrent.futures
 from typing import List, Any, Dict, Optional
+from sqlalchemy.orm import Session
 
 from netraven.worker import executor
 
@@ -10,14 +11,18 @@ DEFAULT_GIT_REPO_PATH = "/data/git-repo/" # Should match executor or be loaded c
 def dispatch_tasks(
     devices: List[Any],
     job_id: int,
-    config: Optional[Dict[str, Any]] = None # Accept loaded config
+    config: Optional[Dict[str, Any]] = None,
+    db: Optional[Session] = None # Accept optional db session
 ) -> List[Dict[str, Any]]:
     """Dispatches tasks to handle multiple devices concurrently using a thread pool.
+
+    Passes the DB session down to the executor tasks.
 
     Args:
         devices: A list of device objects to process.
         job_id: The ID of the parent job.
         config: The loaded application configuration dictionary.
+        db: The SQLAlchemy session to use for database operations within tasks.
 
     Returns:
         A list of result dictionaries, one for each device processed by handle_device.
@@ -40,9 +45,9 @@ def dispatch_tasks(
 
     # Using ThreadPoolExecutor to run handle_device concurrently
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        # Submit tasks, passing the config down to the executor
+        # Submit tasks, passing the config AND db session down to the executor
         future_to_device = {
-            pool.submit(executor.handle_device, device, job_id, config): device
+            pool.submit(executor.handle_device, device, job_id, config, db): device
             for device in devices
         }
 
