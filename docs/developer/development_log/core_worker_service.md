@@ -504,3 +504,31 @@
 - Fixed linter errors related to `patch` nesting.
 
 **Next Steps:** Commit the refactored integration tests.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Live Testing - Phase 4: Refactor Integration Tests (Config Loader Focus)
+
+**Goal:** Refactor integration tests to use the live configuration loader and verify behavior based on `dev.yaml` values.
+
+**Plan:**
+- Modify `tests/worker/test_runner_integration.py`.
+- Remove the mock for `netraven.worker.runner.load_config`.
+- Ensure tests run in an environment where `load_config()` reads `dev.yaml`.
+- Adapt tests and assertions to verify behavior driven by `dev.yaml` settings:
+    - Retry attempts/backoff.
+    - Redaction patterns used.
+    - Git repository path used.
+- Keep mocks for external IO (Netmiko, Git, time.sleep).
+- Commit refactored tests.
+
+**Progress:**
+- Refactored tests in `test_runner_integration.py`.
+- Removed the mock for `load_config()` from the `mock_external_io` fixture.
+- Added tests (`test_run_job_timeout_retry_live_config_db`, `test_run_job_timeout_max_retry_fail_live_db`) specifically verifying retry counts and backoff based on values loaded from `dev.yaml` via `load_config()`.
+- Modified success test (`test_run_job_success_live_config_db`) to assert the correct `repo_path` from config is passed to the Git mock and that redaction uses patterns from config.
+- Fixed linter errors from previous steps.
+
+**Next Steps:** Commit the refactored integration tests.
