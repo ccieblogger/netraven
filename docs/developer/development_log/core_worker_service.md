@@ -76,3 +76,27 @@
 - Included commented-out example usage block for potential local testing.
 
 **Next Steps:** Commit the changes.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Redaction Utility Implementation & Testing (Phase 4 Start)
+
+**Goal:** Implement and test the utility for redacting sensitive information from device output.
+
+**Plan:**
+- Implement the `redact` function in `netraven/worker/redactor.py`.
+- Use a predefined list of keywords (e.g., "password", "secret", case-insensitive).
+- Replace lines containing keywords with `[REDACTED LINE]`.
+- Create unit tests in `tests/worker/test_redactor.py`.
+- Use `pytest` for testing.
+- Cover various scenarios (keywords present, absent, case variations, empty input).
+- Commit implementation and tests.
+
+**Progress:**
+- Implemented the `redact` function as specified.
+- Created the `tests/worker/` directory and `test_redactor.py` file.
+- Added comprehensive unit tests using `pytest.mark.parametrize` to cover multiple input cases.
+
+**Next Steps:** Commit the changes.
