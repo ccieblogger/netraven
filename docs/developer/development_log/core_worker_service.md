@@ -100,3 +100,30 @@
 - Added comprehensive unit tests using `pytest.mark.parametrize` to cover multiple input cases.
 
 **Next Steps:** Commit the changes.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Logging Utilities Implementation (Phase 5 Start)
+
+**Goal:** Implement functions to save connection and job logs to the database.
+
+**Plan:**
+- Implement `save_connection_log` and `save_job_log` in `netraven/worker/log_utils.py`.
+- Use the `get_db` session manager pattern from `postgresql_sot.md`.
+- Assume existence of `ConnectionLog` and `JobLog` database models (from `netraven.db.models`).
+- Add placeholder imports/checks for models/session as they might not be implemented yet.
+- Instantiate model objects with provided data.
+- Add, commit, and close the database session.
+- Include basic try/except/finally blocks with rollback for error handling.
+- Add temporary print statements for logging activity.
+- Commit changes.
+
+**Progress:**
+- Implemented `save_connection_log` and `save_job_log` functions.
+- Added necessary imports (placeholder for models, actual for `get_db`).
+- Included logic for session management, model instantiation, commit, rollback, and closing.
+- Added placeholder checks and print statements.
+
+**Next Steps:** Commit the changes.
