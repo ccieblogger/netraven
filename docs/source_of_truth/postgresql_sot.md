@@ -99,12 +99,16 @@ models:
 │   ├── env.py
 │   └── versions/
 ├── alembic.ini
+├── setup/
+│   ├── dev_runner.py
+│   └── setup_postgres.sh
 ├── config/
 │   └── environments/
 │       └── dev.yaml
 ├── tests/
 │   └── test_db_connection.py
-└── dev_runner.py
+├── setup/
+│   └── dev_runner.py
 ```
 
 ### Alembic Setup Workflow
@@ -178,17 +182,138 @@ class ConnectionLog(Base):
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 ```
 
-### Developer Runner Script: `dev_runner.py`
+### Developer Runner Script: `setup/dev_runner.py`
 ```python
-from netraven.db.session import engine
+import argparse
+import os
+from netraven.config.loader import load_config
+from netraven.db.session import create_engine, SessionLocal
+from netraven.db.base import Base
+
+config = load_config(env="dev")
+db_url = os.getenv("DATABASE_URL", config["database"]["url"])
+engine = create_engine(db_url, echo=True)
+
+def run_db_check():
+    print(f"Checking DB connection at {db_url}...")
+    try:
+        with engine.connect() as conn:
+            conn.execute("SELECT 1")
+        print("✅ Database connection successful")
+    except Exception as e:
+        print(f"❌ Database connection failed: {e}")
+
+def run_create_schema():
+    print("Creating database schema (for dev use only)...")
+    try:
+        Base.metadata.create_all(engine)
+        print("✅ Schema created successfully.")
+    except Exception as e:
+        print(f"❌ Failed to create schema: {e}")
+
+def run_drop_schema():
+    print("WARNING: This will drop all tables in the database!")
+    confirm = input("Are you sure you want to continue? Type 'yes' to proceed: ")
+    if confirm.lower() == 'yes':
+        try:
+            Base.metadata.drop_all(engine)
+            print("✅ All tables dropped successfully.")
+        except Exception as e:
+            print(f"❌ Failed to drop schema: {e}")
+    else:
+        print("Schema drop cancelled.")
 
 if __name__ == "__main__":
-    with engine.connect() as conn:
-        conn.execute("SELECT 1")
-        print("✅ Database connection successful")
+    parser = argparse.ArgumentParser(description="NetRaven Dev Runner - Manage DB for development.")
+    parser.add_argument("--db-check", action="store_true", help="Check database connection")
+    parser.add_argument("--create-schema", action="store_true", help="Create DB schema from models")
+    parser.add_argument("--drop-schema", action="store_true", help="Drop all DB tables (DANGEROUS)")
+
+    args = parser.parse_args()
+
+    if args.db_check:
+        run_db_check()
+    elif args.create_schema:
+        run_create_schema()
+    elif args.drop_schema:
+        run_drop_schema()
+    else:
+        print("No task specified. Use -h or --help for options.")
 ```
 
 ---
 
-> ✅ This document serves as a source of truth for setting up and maintaining the NetRaven PostgreSQL database layer, with a sync-first design and full developer tooling support.
+### Appendix: PostgreSQL 14 Installation and Management Script
 
+To simplify the developer experience, use the following script to install PostgreSQL 14 and bootstrap the NetRaven database.
+
+#### `setup/setup_postgres.sh`
+```bash
+#!/bin/bash
+
+set -e
+
+COMMAND=${1:-install}
+
+DB_USER=${DB_USER:-netraven}
+DB_PASSWORD=${DB_PASSWORD:-netraven}
+DB_NAME=${DB_NAME:-netraven}
+
+# Install PostgreSQL 14
+sudo apt update
+sudo apt install -y wget gnupg lsb-release
+
+# Add PostgreSQL's official GPG key
+wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+
+# Add PostgreSQL repo
+echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+
+sudo apt update
+sudo apt install -y postgresql-14 postgresql-client-14
+
+# Enable and start service
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+
+# Create user and database
+sudo -u postgres psql <<EOF
+DO \$\$
+BEGIN
+   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$DB_USER') THEN
+      CREATE ROLE $DB_USER LOGIN PASSWORD '$DB_PASSWORD';
+   END IF;
+END
+\$\$;
+
+CREATE DATABASE $DB_NAME OWNER $DB_USER;
+EOF
+
+echo "✅ PostgreSQL 14 installed and NetRaven database initialized."
+
+elif [[ $COMMAND == "drop" ]]; then
+  echo "⚠ Dropping all tables from database '$DB_NAME'..."
+  sudo -u postgres psql -d $DB_NAME -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+  echo "✅ Schema reset."
+
+elif [[ $COMMAND == "check" ]]; then
+  echo "🔍 Testing database connection..."
+  PGPASSWORD=$DB_PASSWORD psql -h localhost -U $DB_USER -d $DB_NAME -c "SELECT 1" || echo "❌ Failed to connect to database"
+
+elif [[ $COMMAND == "refresh" ]]; then
+  echo "♻ Removing PostgreSQL and reinstalling..."
+  sudo systemctl stop postgresql || true
+  sudo apt remove --purge -y postgresql* postgresql-client*
+  sudo rm -rf /var/lib/postgresql /etc/postgresql
+  sudo apt autoremove -y
+  echo "🧹 PostgreSQL removed. Reinstalling..."
+  exec "$0" install
+
+else
+  echo "Usage: $0 [install|drop|check|refresh]"
+  exit 1
+```
+
+> 📝 The `DB_USER`, `DB_PASSWORD`, and `DB_NAME` values are automatically pulled from the configuration system (`config/environments/dev.yaml`) but can also be overridden using environment variables.
+
+---
