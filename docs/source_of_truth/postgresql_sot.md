@@ -32,7 +32,7 @@ models:
     device_id: foreign_key => Device
     config_data: text
     retrieved_at: datetime
-    metadata: jsonb
+    config_metadata: jsonb
 
   Credential:
     id: integer, primary_key
