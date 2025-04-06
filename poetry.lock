@@ -15,12 +15,56 @@ typing-extensions = ">=4.12"
 tz = ["tzdata"]
 
 [[package]]
+name = "bcrypt"
+version = "4.3.0"
+description = "Modern password hashing for your software and your servers"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.extras]
+tests = ["pytest (>=3.2.1,!=3.3.0)"]
+typecheck = ["mypy"]
+
+[[package]]
+name = "cffi"
+version = "1.17.1"
+description = "Foreign Function Interface for Python calling C code."
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.dependencies]
+pycparser = "*"
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
 category = "main"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
+
+[[package]]
+name = "cryptography"
+version = "44.0.2"
+description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
+category = "main"
+optional = false
+python-versions = "!=3.9.0,!=3.9.1,>=3.7"
+
+[package.dependencies]
+cffi = {version = ">=1.12", markers = "platform_python_implementation != \"PyPy\""}
+
+[package.extras]
+ssh = ["bcrypt (>=3.1.5)"]
+nox = ["nox (>=2024.4.15)", "nox[uv] (>=2024.3.2)"]
+test = ["cryptography-vectors (==44.0.2)", "pytest (>=7.4.0)", "pytest-benchmark (>=4.0)", "pytest-cov (>=2.10.1)", "pytest-xdist (>=3.5.0)", "pretend (>=0.7)", "certifi (>=2024)"]
+test-randomorder = ["pytest-randomly"]
+docs = ["sphinx (>=5.3.0)", "sphinx-rtd-theme (>=3.0.0)"]
+docstest = ["pyenchant (>=3)", "readme-renderer (>=30.0)", "sphinxcontrib-spelling (>=7.3.1)"]
+sdist = ["build (>=1.0.0)"]
+pep8test = ["ruff (>=0.3.6)", "mypy (>=1.4)", "check-sdist", "click (>=8.0.1)"]
 
 [[package]]
 name = "exceptiongroup"
@@ -32,6 +76,40 @@ python-versions = ">=3.7"
 
 [package.extras]
 test = ["pytest (>=6)"]
+
+[[package]]
+name = "future"
+version = "1.0.0"
+description = "Clean single-source support for Python 3 and 2"
+category = "main"
+optional = false
+python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
+
+[[package]]
+name = "gitdb"
+version = "4.0.12"
+description = "Git Object Database"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+smmap = ">=3.0.1,<6"
+
+[[package]]
+name = "gitpython"
+version = "3.1.44"
+description = "GitPython is a Python library used to interact with Git repositories"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+gitdb = ">=4.0.1,<5"
+
+[package.extras]
+test = ["coverage", "ddt (>=1.1.1,!=1.4.3)", "mock", "mypy", "pre-commit", "pytest (>=7.3.1)", "pytest-cov", "pytest-instafail", "pytest-mock", "pytest-sugar", "typing-extensions"]
+doc = ["sphinx (>=7.1.2,<7.2)", "sphinx-rtd-theme", "sphinx-autodoc-typehints"]
 
 [[package]]
 name = "greenlet"
@@ -70,12 +148,41 @@ babel = ["babel"]
 lingua = ["lingua"]
 
 [[package]]
+name = "markdown-it-py"
+version = "3.0.0"
+description = "Python port of markdown-it. Markdown parsing, done right!"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.dependencies]
+mdurl = ">=0.1,<1.0"
+
+[package.extras]
+benchmarking = ["psutil", "pytest", "pytest-benchmark"]
+code_style = ["pre-commit (>=3.0,<4.0)"]
+compare = ["commonmark (>=0.9,<1.0)", "markdown (>=3.4,<4.0)", "mistletoe (>=1.0,<2.0)", "mistune (>=2.0,<3.0)", "panflute (>=2.3,<3.0)"]
+linkify = ["linkify-it-py (>=1,<3)"]
+plugins = ["mdit-py-plugins"]
+profiling = ["gprof2dot"]
+rtd = ["mdit-py-plugins", "myst-parser", "pyyaml", "sphinx", "sphinx-copybutton", "sphinx-design", "sphinx-book-theme", "jupyter-sphinx"]
+testing = ["coverage", "pytest", "pytest-cov", "pytest-regressions"]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.2"
 description = "Safely add untrusted strings to HTML/XML markup."
 category = "main"
 optional = false
 python-versions = ">=3.9"
+
+[[package]]
+name = "mdurl"
+version = "0.1.2"
+description = "Markdown URL utilities"
+category = "main"
+optional = false
+python-versions = ">=3.7"
 
 [[package]]
 name = "mypy"
@@ -106,12 +213,59 @@ optional = false
 python-versions = ">=3.5"
 
 [[package]]
+name = "netmiko"
+version = "4.5.0"
+description = "Multi-vendor library to simplify legacy CLI connections to network devices"
+category = "main"
+optional = false
+python-versions = "<4.0,>=3.9"
+
+[package.dependencies]
+ntc-templates = ">=3.1.0"
+paramiko = ">=2.9.5"
+pyserial = ">=3.3"
+pyyaml = ">=6.0.2"
+rich = ">=13.8"
+"ruamel.yaml" = ">=0.17"
+scp = ">=0.13.6"
+textfsm = ">=1.1.3"
+
+[[package]]
+name = "ntc-templates"
+version = "7.8.0"
+description = "TextFSM Templates for Network Devices, and Python wrapper for TextFSM's CliTable."
+category = "main"
+optional = false
+python-versions = "<4.0,>=3.8"
+
+[package.dependencies]
+textfsm = ">=1.1.0,<2.0.0"
+
+[[package]]
 name = "packaging"
 version = "24.2"
 description = "Core utilities for Python packages"
 category = "main"
 optional = false
 python-versions = ">=3.8"
+
+[[package]]
+name = "paramiko"
+version = "3.5.1"
+description = "SSH2 protocol library"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+bcrypt = ">=3.2"
+cryptography = ">=3.3"
+pynacl = ">=1.5"
+
+[package.extras]
+gssapi = ["pyasn1 (>=0.1.7)", "gssapi (>=1.4.1)", "pywin32 (>=2.1.8)"]
+invoke = ["invoke (>=2.0)"]
+all = ["pyasn1 (>=0.1.7)", "gssapi (>=1.4.1)", "pywin32 (>=2.1.8)", "invoke (>=2.0)"]
 
 [[package]]
 name = "pluggy"
@@ -134,6 +288,51 @@ optional = false
 python-versions = ">=3.8"
 
 [[package]]
+name = "pycparser"
+version = "2.22"
+description = "C parser in Python"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[[package]]
+name = "pygments"
+version = "2.19.1"
+description = "Pygments is a syntax highlighting package written in Python."
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[package.extras]
+windows-terminal = ["colorama (>=0.4.6)"]
+
+[[package]]
+name = "pynacl"
+version = "1.5.0"
+description = "Python binding to the Networking and Cryptography (NaCl) library"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+cffi = ">=1.4.1"
+
+[package.extras]
+docs = ["sphinx (>=1.6.5)", "sphinx-rtd-theme"]
+tests = ["pytest (>=3.2.1,!=3.3.0)", "hypothesis (>=3.27.0)"]
+
+[[package]]
+name = "pyserial"
+version = "3.5"
+description = "Python Serial Port Extension"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.extras]
+cp2110 = ["hidapi"]
+
+[[package]]
 name = "pytest"
 version = "8.3.5"
 description = "pytest: simple powerful testing with Python"
@@ -151,6 +350,80 @@ tomli = {version = ">=1", markers = "python_version < \"3.11\""}
 
 [package.extras]
 dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
+
+[[package]]
+name = "pyyaml"
+version = "6.0.2"
+description = "YAML parser and emitter for Python"
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
+[[package]]
+name = "rich"
+version = "14.0.0"
+description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
+category = "main"
+optional = false
+python-versions = ">=3.8.0"
+
+[package.dependencies]
+markdown-it-py = ">=2.2.0"
+pygments = ">=2.13.0,<3.0.0"
+typing-extensions = {version = ">=4.0.0,<5.0", markers = "python_version < \"3.11\""}
+
+[package.extras]
+jupyter = ["ipywidgets (>=7.5.1,<9)"]
+
+[[package]]
+name = "ruamel.yaml"
+version = "0.18.10"
+description = "ruamel.yaml is a YAML parser/emitter that supports roundtrip preservation of comments, seq/map flow style, and map key order"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+"ruamel.yaml.clib" = {version = ">=0.2.7", markers = "platform_python_implementation == \"CPython\" and python_version < \"3.13\""}
+
+[package.extras]
+docs = ["ryd", "mercurial (>5.7)"]
+jinja2 = ["ruamel.yaml.jinja2 (>=0.2)"]
+
+[[package]]
+name = "ruamel.yaml.clib"
+version = "0.2.12"
+description = "C version of reader, parser and emitter for ruamel.yaml derived from libyaml"
+category = "main"
+optional = false
+python-versions = ">=3.9"
+
+[[package]]
+name = "scp"
+version = "0.15.0"
+description = "scp module for paramiko"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+paramiko = "*"
+
+[[package]]
+name = "six"
+version = "1.17.0"
+description = "Python 2 and 3 compatibility utilities"
+category = "main"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
+
+[[package]]
+name = "smmap"
+version = "5.0.2"
+description = "A pure Python implementation of a sliding window memory map manager"
+category = "main"
+optional = false
+python-versions = ">=3.7"
 
 [[package]]
 name = "sqlalchemy"
@@ -191,6 +464,18 @@ aiosqlite = ["greenlet (>=1)", "aiosqlite", "typing_extensions (!=3.10.0.1)"]
 sqlcipher = ["sqlcipher3-binary"]
 
 [[package]]
+name = "textfsm"
+version = "1.1.3"
+description = "Python module for parsing semi-structured text into python tables."
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+future = "*"
+six = "*"
+
+[[package]]
 name = "tomli"
 version = "2.2.1"
 description = "A lil' TOML parser"
@@ -209,22 +494,45 @@ python-versions = ">=3.8"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "ddc7fcc452acbb51d6f1f788d023a9c18c92951eb64c03a993227e260bdb10e2"
+content-hash = "3a9707a88ef07dbc33760ff7cf4e67c3bb258b894f705ab6e0d0068172a50a2b"
 
 [metadata.files]
 alembic = []
+bcrypt = []
+cffi = []
 colorama = []
+cryptography = []
 exceptiongroup = []
+future = []
+gitdb = []
+gitpython = []
 greenlet = []
 iniconfig = []
 mako = []
+markdown-it-py = []
 markupsafe = []
+mdurl = []
 mypy = []
 mypy-extensions = []
+netmiko = []
+ntc-templates = []
 packaging = []
+paramiko = []
 pluggy = []
 psycopg2-binary = []
+pycparser = []
+pygments = []
+pynacl = []
+pyserial = []
 pytest = []
+pyyaml = []
+rich = []
+"ruamel.yaml" = []
+"ruamel.yaml.clib" = []
+scp = []
+six = []
+smmap = []
 sqlalchemy = []
+textfsm = []
 tomli = []
 typing-extensions = []
