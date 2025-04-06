@@ -127,3 +127,36 @@
 - Added placeholder checks and print statements.
 
 **Next Steps:** Commit the changes.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Git Writer Implementation & Testing (Phase 6 Start)
+
+**Goal:** Implement and test the utility for writing device configurations to a local Git repository.
+
+**Plan:**
+- Implement `commit_configuration_to_git` in `netraven/worker/git_writer.py`.
+- Use `GitPython` library (`git.Repo`).
+- Handle repository initialization if path doesn't exist or isn't a valid repo.
+- Write config data to a file named `{device_id}_config.txt`.
+- Stage the file using `repo.index.add()`.
+- Commit the file using `repo.index.commit()` with a structured message.
+- Handle `GitCommandError` and other potential exceptions.
+- Return the commit hash on success, `None` on failure.
+- Create unit tests in `tests/worker/test_git_writer.py`.
+- Use `unittest.mock` to patch `git.Repo`, `os` functions, and `open` to avoid actual filesystem/Git operations during tests.
+- Test scenarios: new repo creation, existing repo, commit errors.
+- Note `GitPython` dependency requirement.
+- Commit implementation and tests.
+
+**Progress:**
+- Implemented the `commit_configuration_to_git` function using `GitPython`.
+- Added logic for repo initialization, file writing, staging, and committing.
+- Included error handling for `GitCommandError` and general exceptions.
+- Created `tests/worker/test_git_writer.py`.
+- Added unit tests using `unittest.mock` to simulate Git operations and file I/O.
+- Tests cover initializing a new repo, using an existing repo, and handling commit errors.
+
+**Next Steps:** Commit the changes.
