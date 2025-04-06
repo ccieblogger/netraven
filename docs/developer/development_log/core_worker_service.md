@@ -160,3 +160,40 @@
 - Tests cover initializing a new repo, using an existing repo, and handling commit errors.
 
 **Next Steps:** Commit the changes.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Executor Logic Implementation (Phase 7 Start)
+
+**Goal:** Implement the main orchestrator function (`handle_device`) that ties together the different worker components for processing a single device.
+
+**Plan:**
+- Implement `handle_device` in `netraven/worker/executor.py`.
+- Add imports for other worker components (`netmiko_driver`, `redactor`, `log_utils`, `git_writer`) and relevant exceptions (`Netmiko*Exception`, `GitCommandError`).
+- Define the sequence of operations:
+    1. Call `netmiko_driver.run_command`.
+    2. Call `redactor.redact` on the result.
+    3. Call `log_utils.save_connection_log` with the *redacted* output.
+    4. Call `git_writer.commit_configuration_to_git` with the *raw* output and repo path.
+    5. Call `log_utils.save_job_log` based on success/failure of the previous steps (including commit hash if successful).
+- Wrap the sequence in a `try...except` block to catch specific and general exceptions.
+- Log appropriate errors using `save_job_log` in `except` blocks.
+- Consider logging partial connection logs on error if data was retrieved before failure.
+- Return a dictionary `{success: bool, result: commit_hash | None, error: str | None}`.
+- Add placeholder for loading `repo_path` from config.
+- Add placeholder logic for getting `device_id` and a `device_identifier` string.
+- Commit changes.
+
+**Progress:**
+- Implemented the `handle_device` function in `executor.py`.
+- Integrated calls to `netmiko_driver`, `redactor`, `log_utils`, and `git_writer`.
+- Added comprehensive `try...except` block catching Netmiko, Git, and general exceptions.
+- Implemented logging of job status and connection logs (including partial on error).
+- Structured the return value as specified.
+- Added temporary print statements for debugging flow.
+- Used placeholder `DEFAULT_GIT_REPO_PATH`.
+- Added placeholder device attribute access (`id`, `ip_address`, `hostname`).
+
+**Next Steps:** Commit the changes.
