@@ -377,3 +377,36 @@
 - Edited the `downgrade()` function to add `op.drop_index(op.f('ix_job_logs_device_id'), table_name='job_logs')`.
 
 **Next Steps:** Commit the Alembic revision file update.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** DB Integration - Phase 3: Refactor Worker Code
+
+**Goal:** Update worker code to use actual DB models and session management instead of placeholders.
+
+**Plan:**
+- Update `log_utils.py`:
+    - Remove placeholder imports/checks.
+    - Use actual `JobLog`, `ConnectionLog` model imports.
+    - Ensure model instantiation matches definitions.
+    - Switch print statements to logging.
+- Update `runner.py`:
+    - Remove placeholder imports.
+    - Use actual `Job`, `Device` model imports.
+    - Modify `load_devices_for_job` to `load_device_for_job`, query the single related `Device` via `Job.device` relationship (using `joinedload` for efficiency).
+    - Modify `update_job_status` to ensure compatibility with `Job` model attributes.
+    - Adjust main `run_job` logic to handle a single device being loaded and processed.
+    - Add helper `log_runner_error` to log critical errors to `JobLog`.
+- Commit refactored code.
+
+**Progress:**
+- Refactored `log_utils.py` to use actual models, session, and logging.
+- Refactored `runner.py`:
+    - Renamed `load_devices_for_job` to `load_device_for_job` and updated query logic for the one-to-one Job-Device relationship.
+    - Adjusted `run_job` logic to expect a single device and process the single result from the dispatcher.
+    - Added `log_runner_error` helper.
+    - Ensured `db.close()` is called in `finally` block.
+
+**Next Steps:** Commit the refactored worker code.

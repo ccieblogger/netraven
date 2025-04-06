@@ -25,12 +25,12 @@ This diagram illustrates the interaction between NetRaven’s core components.
              │                  ▼                   │
              │        ┌───────────────┐             │
              │        │   Scheduler   │◄─────┐      │
-             │        │   (RQ + Redis)│      │      │
+             │        │   (RQ Only)│      │      │
              │        └──────┬────────┘      │      │
              │               │               │      │
              ▼               ▼               ▼      ▼
       ┌────────────┐  ┌──────────────┐  ┌──────────────┐
-      │ PostgreSQL │  │  Redis Queue │  │ JWT Security │
+      │ PostgreSQL │  │ RQ + RQ Scheduler │  │ JWT Security │
       └────┬───────┘  └──────┬───────┘  └──────────────┘
            │                 │
            ▼                 ▼
