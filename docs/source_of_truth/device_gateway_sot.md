@@ -125,10 +125,9 @@ class CommandResponse(BaseModel):
 
 ---
 
-### Monitoring & Metrics
+### Monitoring
 - `/health` → returns service status
-- `/metrics` → Prometheus-compatible output
-- `/status` → active connections, pool stats, retry stats
+- `/status` → returns internal summary (connection/session stats)
 
 ---
 
@@ -143,6 +142,119 @@ class CommandResponse(BaseModel):
 - structlog or JSON logging
 - Prometheus client
 - pytest + unittest.mock
+```
+
+---
+
+### Database Integration
+
+The `device_comm` service communicates with the PostgreSQL database to:
+- Log job events and command results
+- Update device metadata
+- Store retrieved configuration data
+- Save raw session logs from Netmiko into a structured table
+
+#### Add: db.py
+```python
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+import os
+
+DB_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://netraven:netraven@localhost:5432/netraven")
+
+engine = create_async_engine(DB_URL, echo=True)
+AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+Base = declarative_base()
+
+async def get_session():
+    async with AsyncSessionLocal() as session:
+        yield session
+```
+
+#### Add: connection_logs table definition (models.py)
+```python
+from sqlalchemy import Column, Integer, Text, DateTime, func
+from device_comm.db import Base
+
+class ConnectionLog(Base):
+    __tablename__ = 'connection_logs'
+
+    id = Column(Integer, primary_key=True)
+    job_id = Column(Integer)
+    device_id = Column(Integer)
+    log = Column(Text)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+```
+
+#### Update: log_utils.py
+```python
+from device_comm.db import get_session
+from device_comm.models import ConnectionLog
+
+async def save_connection_log(job_id, device_id, raw_log: str):
+    redacted = redact_secrets(raw_log)
+    async for session in get_session():
+        entry = ConnectionLog(job_id=job_id, device_id=device_id, log=redacted)
+        session.add(entry)
+        await session.commit()
+
+# Basic redaction
+def redact_secrets(log: str):
+    redacted_lines = []
+    for line in log.splitlines():
+        if any(secret in line.lower() for secret in ["password", "secret"]):
+            redacted_lines.append("[REDACTED LINE]")
+        else:
+            redacted_lines.append(line)
+    return "
+".join(redacted_lines)
+```
+
+#### Update: service.py (example DB insert + session log save)
+```python
+from device_comm.db import get_session
+from sqlalchemy import text
+from device_comm.log_utils import save_connection_log
+
+async def run_command_on_device(request):
+    command_output = f"Simulated output of '{request.command}' on {request.ip}"
+    netmiko_log = f"Login to {request.ip} successful
+> {request.command}
+{command_output}"
+
+    # Save output to connection log table
+    await save_connection_log(job_id=1, device_id=request.device_id, raw_log=netmiko_log)
+
+    # Also log summary to job_logs
+    async for session in get_session():
+        await session.execute(
+            text("INSERT INTO job_logs (job_id, device_id, message, success) VALUES (:job, :device, :msg, :ok)"),
+            {
+                "job": 1,
+                "device": request.device_id,
+                "msg": f"Command executed: {request.command}",
+                "ok": True
+            }
+        )
+        await session.commit()
+
+    return {
+        "result": command_output,
+        "success": True,
+        "error": None
+    }
+```
+
+---
+
+#### Add: security.py
+```python
+from fastapi import Header, HTTPException, Depends
+from device_comm.config import settings
+
+async def verify_api_key(x_api_key: str = Header(...)):
+    if x_api_key != settings.api_key:
+        raise HTTPException(status_code=403, detail="Invalid or missing API Key")
 ```
 
 ---
@@ -212,6 +324,29 @@ app.include_router(router)
 
 #### controller.py
 ```python
+from fastapi import APIRouter, Depends
+from device_comm.models import CommandRequest, CommandResponse
+from device_comm.service import run_command_on_device
+from device_comm.security import verify_api_key
+
+router = APIRouter()
+
+@router.get("/health")
+def health():
+    return {"status": "ok"}
+
+@router.post("/execute-command", response_model=CommandResponse, dependencies=[Depends(verify_api_key)])
+async def execute_command(req: CommandRequest):
+    return await run_command_on_device(req)
+
+@router.get("/status")
+def status():
+    # Simplified static return for now
+    return {
+        "active_connections": 0,
+        "successful_commands": 0,
+        "queued_jobs": 0
+    }
 from fastapi import APIRouter
 from device_comm.models import CommandRequest, CommandResponse
 from device_comm.service import run_command_on_device
@@ -227,6 +362,29 @@ async def execute_command(req: CommandRequest):
     return await run_command_on_device(req)
 ```
 
+### 🌐 REST API Endpoint for Accessing Connection Logs
+
+```python
+@router.get("/connection-log/{job_id}")
+async def get_connection_log(job_id: int, db=Depends(get_session), api=Depends(verify_api_key)):
+    result = await db.execute(
+        select(ConnectionLog)
+        .where(ConnectionLog.job_id == job_id)
+        .order_by(ConnectionLog.timestamp.desc())
+        .limit(1)
+    )
+    log = result.scalar_one_or_none()
+    if not log:
+        raise HTTPException(status_code=404, detail="Log not found")
+    return {
+        "device_id": log.device_id,
+        "job_id": log.job_id,
+        "timestamp": log.timestamp,
+        "log": log.log
+    }
+```
+
+
 #### service.py
 ```python
 async def run_device_collection():
@@ -240,7 +398,6 @@ async def run_command_on_device(request):
         "success": True,
         "error": None
     }
-```
 
 #### models.py
 ```python
@@ -331,5 +488,17 @@ def test_execute_command_success(dummy_credential):
     assert "result" in body
     assert body["error"] is None
 ```
+
+### 🧪 Test Case (Optional for `test_db_connection.py`)
+```python
+from netraven.db.models.connection_log import ConnectionLog
+
+@pytest.mark.asyncio
+async def test_connection_log_insert():
+    async with SessionLocal() as session:
+        log = ConnectionLog(job_id=1, device_id=101, log="Sample connection log")
+        session.add(log)
+        await session.commit()
+
 
 ---

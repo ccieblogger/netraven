@@ -72,6 +72,13 @@ models:
     key: string
     value: json
     description: string
+
+  ConnectionLog:
+    id: integer, primary_key
+    job_id: foreign_key => Job
+    device_id: foreign_key => Device
+    log: text
+    timestamp: datetime
 ```
 
 ### Alembic Setup
@@ -107,7 +114,8 @@ alembic upgrade head
 │   │       ├── credential.py
 │   │       ├── tag.py
 │   │       ├── joblog.py
-│   │       └── system_setting.py
+│   │       |── system_setting.py
+|   |       └── connection_log.py
 ├── alembic/
 │   ├── env.py
 │   ├── script.py.mako
@@ -184,7 +192,49 @@ if __name__ == "__main__":
         asyncio.run(run_db_check())
 ```
 
+### 📂 New Model File
+In the `netraven_db/db/models/` directory, create:
+
+`connection_log.py`
+```python
+from sqlalchemy import Column, Integer, Text, DateTime, ForeignKey, func
+from netraven.db.base import Base
+
+class ConnectionLog(Base):
+    __tablename__ = 'connection_logs'
+
+    id = Column(Integer, primary_key=True)
+    job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"))
+    device_id = Column(Integer, ForeignKey("devices.id", ondelete="CASCADE"))
+    log = Column(Text, nullable=False)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+```
+
+Also update `models/__init__.py` to include:
+```python
+from .connection_log import ConnectionLog
+```
+
+### 🔎 Access Example (Optional for LLM)
+```sql
+SELECT log, timestamp
+FROM connection_logs
+WHERE device_id = 123
+ORDER BY timestamp DESC
+LIMIT 1;
+```
+
+### 🧪 Test Case (Optional for `test_db_connection.py`)
+```python
+from netraven.db.models.connection_log import ConnectionLog
+
+@pytest.mark.asyncio
+async def test_connection_log_insert():
+    async with SessionLocal() as session:
+        log = ConnectionLog(job_id=1, device_id=101, log="Sample connection log")
+        session.add(log)
+        await session.commit()
+
 ---
 
-This appendix provides a precise schema, setup steps, file layout, dev script, and testing scaffold that an LLM can reliably use to generate, initialize, and verify a working NetRaven database backend.
 
