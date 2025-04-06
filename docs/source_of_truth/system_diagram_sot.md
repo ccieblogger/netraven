@@ -18,17 +18,17 @@ This diagram illustrates the interaction between NetRaven’s core components.
              │                  │                    │
       Device │          Job CRUD│           User/Auth│
      Records │                  ▼                    ▼
-         ┌───┴─────┐     ┌──────────────┐      ┌───────────────┐
-         │ Devices │     │  Jobs Table  │      │  Users/Roles  │
+         ┌───┴─────┐     ┌──────────────┐      ┌──────────────┐
+         │ Devices │     │  Jobs Table  │      │  Users/Roles │
          └───┬─────┘     └──────┬───────┘      └────┬─────────┘
              │                  │                   │
              │                  ▼                   │
-             │        ┌──────────────┐              │
-             │        │   Scheduler  │◄─────┐       │
-             │        │   (RQ + Redis)│     │       │
-             │        └──────┬───────┘      │       │
-             │               │              │       │
-             ▼               ▼              ▼       ▼
+             │        ┌───────────────┐             │
+             │        │   Scheduler   │◄─────┐      │
+             │        │   (RQ + Redis)│      │      │
+             │        └──────┬────────┘      │      │
+             │               │               │      │
+             ▼               ▼               ▼      ▼
       ┌────────────┐  ┌──────────────┐  ┌──────────────┐
       │ PostgreSQL │  │  Redis Queue │  │ JWT Security │
       └────┬───────┘  └──────┬───────┘  └──────────────┘
@@ -36,10 +36,10 @@ This diagram illustrates the interaction between NetRaven’s core components.
            ▼                 ▼
    ┌─────────────────────────────────┐
    │     Device Communication        │
-   │        (device_comm)           │
-   └────────────┬───────────────────┘
-                │
-                ▼
+   │        (device_comm)          ─ │
+   └────────────┬────────────────────┘
+                │                 │
+                ▼                 │
        ┌───────────────────┐
        │  Netmiko (SSH/API)│
        └────────┬──────────┘
@@ -50,7 +50,7 @@ This diagram illustrates the interaction between NetRaven’s core components.
         └─────────────┘
 
         ┌──────────────────────────────────┐
-        │ Git Repo (configs & versioning) │
+        │ Git Repo (configs & versioning)  │
         └──────────────────────────────────┘
 ```
 

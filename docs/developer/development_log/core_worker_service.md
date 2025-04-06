@@ -228,3 +228,38 @@
 - Included temporary print statements for progress indication.
 
 **Next Steps:** Commit the changes.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Runner Logic Implementation (Phase 9 Start)
+
+**Goal:** Implement the main job runner entry point (`run_job`) that orchestrates the overall job execution.
+
+**Plan:**
+- Implement `run_job` in `netraven/worker/runner.py`.
+- Accept `job_id` as input.
+- Add placeholder function `load_devices_for_job` to simulate fetching devices from DB (returns mock devices).
+- Add placeholder function `update_job_status` to simulate updating the job status in DB.
+- In `run_job`:
+    - Record start time.
+    - Call `update_job_status` to set status to `RUNNING`.
+    - Call `load_devices_for_job`.
+    - If devices are found, call `dispatcher.dispatch_tasks`.
+    - Process the list of result dictionaries from the dispatcher to determine overall success/failure (e.g., count successes).
+    - Call `update_job_status` with the final status (`COMPLETED_SUCCESS`, `COMPLETED_FAILURE`, `COMPLETED_PARTIAL_FAILURE`, `COMPLETED_NO_DEVICES`).
+    - Include a `try...except` block for unexpected errors during the run.
+    - Record end time and log duration via `update_job_status`.
+- Commit changes.
+
+**Progress:**
+- Implemented the `run_job` function in `runner.py`.
+- Added placeholder `MockDevice` class and `load_devices_for_job` function to simulate DB interaction.
+- Added placeholder `update_job_status` function.
+- Implemented the core logic in `run_job` to load devices, call the dispatcher, and process results.
+- Determined final job status based on task outcomes.
+- Included basic timing and status updates using placeholder functions.
+- Added top-level exception handling.
+
+**Next Steps:** Commit the changes.
