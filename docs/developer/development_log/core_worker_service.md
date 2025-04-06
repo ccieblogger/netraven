@@ -353,3 +353,27 @@
 - Noted potential discrepancy: SOT `Job` model has `device_id` (one device per job), while worker integration tests used multiple devices per job. Proceeding with current model structure for now.
 
 **Next Steps:** Commit model update.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** DB Integration - Phase 2: Update Initial Alembic Revision
+
+**Goal:** Ensure the initial Alembic revision file accurately reflects the required schema for the worker service.
+
+**Plan:**
+- Identify the initial revision file in `alembic/versions/`.
+- Read the file to check existing table definitions.
+- Modify the `upgrade()` function to add/correct table definitions for `jobs`, `job_logs`, `connection_logs` as needed, based on SOT and model changes.
+- Specifically, add the `device_id` column, FK constraint, and index to the `job_logs` table definition.
+- Modify the `downgrade()` function to correctly drop added indexes/tables.
+- Commit the updated revision file.
+
+**Progress:**
+- Identified initial revision: `a3992da91329_initial_schema_definition.py`.
+- Verified it already contained definitions for `jobs`, `job_logs`, `connection_logs`.
+- Edited the `upgrade()` function in the revision file to add `sa.Column('device_id', sa.Integer(), nullable=True)`, `sa.ForeignKeyConstraint(['device_id'], ['devices.id'], ondelete='CASCADE')`, and `op.create_index(op.f('ix_job_logs_device_id'), 'job_logs', ['device_id'], unique=False)` to the `job_logs` table creation.
+- Edited the `downgrade()` function to add `op.drop_index(op.f('ix_job_logs_device_id'), table_name='job_logs')`.
+
+**Next Steps:** Commit the Alembic revision file update.

@@ -5,7 +5,7 @@ This diagram illustrates the interaction between NetRaven’s core components.
 ```
                         ┌────────────────────┐
                         │     Frontend UI    │
-                        │   (React / REST)   │
+                        │   (Vue / REST)   │
                         └────────▲───────────┘
                                  │ REST API
                                  │
