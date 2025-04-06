@@ -452,3 +452,28 @@
 - Created `tests/config/test_loader.py` with tests for default loading, nonexistent environment, and `DATABASE_URL` override.
 
 **Next Steps:** Commit the config loader implementation, `dev.yaml` updates, and tests.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Live Testing - Phase 2: Test Database Setup & Fixtures
+
+**Goal:** Set up pytest fixtures for managing the test database schema and providing isolated, transactional sessions with test data.
+
+**Plan:**
+- Verify test DB connection defined in `dev.yaml` is accessible.
+- Verify Alembic targets the correct DB.
+- Create `tests/conftest.py`.
+- Implement `apply_migrations` session-scoped fixture to run `alembic upgrade head`.
+- Implement `db_session` function-scoped fixture using transactions and rollback for isolation.
+- Implement `create_test_device` and `create_test_job` function-scoped fixtures using `db_session` to insert/yield test data within transactions.
+- Commit `conftest.py`.
+
+**Progress:**
+- Created `tests/conftest.py`.
+- Implemented `apply_migrations` fixture using `subprocess` to run `alembic upgrade head` once per session.
+- Implemented `db_session` fixture to provide a transactional session, rolling back after each test.
+- Implemented `create_test_device` and `create_test_job` fixture factories that leverage `db_session` for creating test data within the transaction.
+
+**Next Steps:** Commit the pytest fixtures.
