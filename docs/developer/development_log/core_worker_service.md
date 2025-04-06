@@ -48,3 +48,31 @@
 - Used `typing.Any` as a placeholder for the `Device` object where needed.
 
 **Next Steps:** Commit the changes.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Netmiko Driver Implementation (Phase 3 Start)
+
+**Goal:** Implement the core device connection and command execution logic using Netmiko.
+
+**Plan:**
+- Implement `run_command` in `netraven/worker/backends/netmiko_driver.py`.
+- Use `netmiko.ConnectHandler` to establish SSH connection.
+- Execute `show running-config` command.
+- Handle potential `NetmikoTimeoutException`, `NetmikoAuthenticationException`, and general `Exception`.
+- Ensure device disconnection in a `finally` block.
+- Assume device object provides `device_type`, `ip_address`, `username`, `password` attributes.
+- Add necessary imports.
+- Note `netmiko` dependency requirement.
+- Commit changes.
+
+**Progress:**
+- Implemented `run_command` function with Netmiko logic.
+- Added imports for `ConnectHandler` and specific exceptions.
+- Included basic error handling and logging (print statements for now).
+- Added placeholder `device` attribute access.
+- Included commented-out example usage block for potential local testing.
+
+**Next Steps:** Commit the changes.
