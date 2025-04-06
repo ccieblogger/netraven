@@ -6,6 +6,8 @@ from sqlalchemy import pool
 from alembic import context
 
 from netraven.db.base import Base
+# Import all models here so Base.metadata is populated
+import netraven.db.models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

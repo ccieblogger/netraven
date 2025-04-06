@@ -4,6 +4,10 @@ from sqlalchemy.orm import relationship
 from netraven.db.base import Base
 
 class Job(Base):
+    """Represents a task to be performed, usually involving a device.
+
+    Jobs are typically created and managed by the scheduler or API calls.
+    """
     __tablename__ = "jobs"
 
     id = Column(Integer, primary_key=True)

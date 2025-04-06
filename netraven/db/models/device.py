@@ -5,6 +5,7 @@ from netraven.db.base import Base
 from .tag import device_tag_association
 
 class Device(Base):
+    """Represents a network device managed by NetRaven."""
     __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True)

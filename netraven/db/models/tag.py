@@ -20,6 +20,10 @@ credential_tag_association = Table(
 )
 
 class Tag(Base):
+    """Represents a tag that can be associated with Devices or Credentials.
+
+    Tags provide a flexible way to group and categorize items.
+    """
     __tablename__ = "tags"
 
     id = Column(Integer, primary_key=True)

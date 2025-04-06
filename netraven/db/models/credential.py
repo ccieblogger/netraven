@@ -9,6 +9,10 @@ from .tag import credential_tag_association
 #       a custom SQLAlchemy TypeDecorator or Hybrid Property.
 
 class Credential(Base):
+    """Stores credential information used to access devices.
+
+    Passwords should be stored encrypted.
+    """
     __tablename__ = "credentials"
 
     id = Column(Integer, primary_key=True)

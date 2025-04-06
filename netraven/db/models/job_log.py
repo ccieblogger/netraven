@@ -12,6 +12,7 @@ class LogLevel(enum.Enum):
     CRITICAL = "critical"
 
 class JobLog(Base):
+    """Records a log message associated with a specific Job."""
     __tablename__ = "job_logs"
 
     id = Column(Integer, primary_key=True)

@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from netraven.db.base import Base
 
 class ConnectionLog(Base):
+    """Logs details about a specific connection attempt during a Job."""
     __tablename__ = 'connection_logs'
 
     id = Column(Integer, primary_key=True)

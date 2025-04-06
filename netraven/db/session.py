@@ -15,7 +15,11 @@ engine = create_engine(db_url, echo=True) # echo=True for dev visibility
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 def get_db():
-    """Dependency injector for database sessions."""
+    """SQLAlchemy dependency injector for database sessions.
+
+    Yields a session that is automatically closed.
+    To be used with FastAPI's Depends().
+    """
     db = SessionLocal()
     try:
         yield db
