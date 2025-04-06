@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import create_async_engine # Import async engine
 from logging.config import fileConfig
 
 # Use regular engine for autogenerate connection, but async for actual migration runs if needed later
-from sqlalchemy import engine_from_config
+# Import create_engine for sync support
+from sqlalchemy import engine_from_config, create_engine
 from sqlalchemy import pool
 
 from alembic import context
@@ -39,13 +40,15 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
-# Get the database URL from alembic.ini
-DB_URL = config.get_main_option("sqlalchemy.url")
+# Get the database URL from alembic.ini - REMOVED, will get from config contextually
+# DB_URL = config.get_main_option("sqlalchemy.url")
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
+    # Get URL directly from config
+    db_url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=DB_URL, # Use the URL from config
+        url=db_url, # Use the URL from config
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -55,16 +58,23 @@ def run_migrations_offline() -> None:
 
 def do_run_migrations(connection):
     """Helper function to run migrations within a context."""
+    # print("DEBUG: Entering do_run_migrations...") # Removed debug print
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
+        # print("DEBUG: About to call context.run_migrations()...") # Removed debug print
         context.run_migrations()
+        # print("DEBUG: Finished context.run_migrations().") # Removed debug print
+    # print("DEBUG: Exiting do_run_migrations.") # Removed debug print
 
-async def run_migrations_online() -> None:
+# Renamed original function
+async def run_migrations_online_async() -> None:
     """Run migrations in 'online' mode using async engine."""
+    # Get URL directly from config
+    db_url = config.get_main_option("sqlalchemy.url")
 
     # Create an async engine
     connectable = create_async_engine(
-        DB_URL,
+        db_url, # Use the URL from config
         poolclass=pool.NullPool,
     )
 
@@ -72,6 +82,21 @@ async def run_migrations_online() -> None:
         await connection.run_sync(do_run_migrations)
 
     await connectable.dispose()
+
+# New function for synchronous online migrations
+def run_migrations_online_sync() -> None:
+    """Run migrations in 'online' mode using sync engine."""
+    # Get URL directly from config
+    db_url = config.get_main_option("sqlalchemy.url") # Restored original line
+    # --- TEMPORARY HARDCODED URL FOR DEBUGGING --- 
+    # db_url = "postgresql://netraven:netraven@localhost:5432/netraven" # Removed hardcoding
+    # print(f"DEBUG: Hardcoded sync URL being used: {db_url}") # Removed debug print
+    # --------------------------------------------- 
+    # Ensure NullPool is used here too, matching the async path and test script behavior
+    connectable = create_engine(db_url, poolclass=pool.NullPool) # Use the URL from config
+    with connectable.connect() as connection:
+        # do_run_migrations handles the transaction logic via context
+        do_run_migrations(connection)
 
 # Determine whether to run async or sync based on the driver
 # For autogenerate, Alembic inherently uses a sync connection process internally,
@@ -92,5 +117,26 @@ async def run_migrations_online() -> None:
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    # Run the async migration function
-    asyncio.run(run_migrations_online())
+    # Check the DB_URL from the config to decide execution path
+    # Get URL directly from config for check
+    current_db_url = config.get_main_option("sqlalchemy.url")
+    is_async = "+asyncpg" in current_db_url
+
+    if is_async:
+        # Handle async online migration
+        try:
+            # Attempt to get the current running event loop
+            loop = asyncio.get_running_loop()
+            # If successful, assume we are being called programmatically within a loop
+            print("Detected running loop (async URL), skipping asyncio.run in env.py")
+            # Depending on how alembic is invoked programmatically, might need
+            # loop.create_task(run_migrations_online_async()) or similar.
+            # For CLI or simple scripts, asyncio.run below handles it.
+        except RuntimeError: # No running loop
+            # If no loop is running, we're likely being called from the Alembic CLI
+            print("No running loop detected (async URL), calling asyncio.run in env.py")
+            asyncio.run(run_migrations_online_async())
+    else:
+        # Handle sync online migration (used by pytest setup)
+        print("Detected sync URL, running migrations synchronously.")
+        run_migrations_online_sync()

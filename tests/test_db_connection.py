@@ -7,32 +7,28 @@ from netraven_db.db.session import SessionLocal, engine, check_db_connection # U
 from netraven_db.db.base import Base # Updated import
 
 @pytest.mark.asyncio
-async def test_database_connection_via_session():
+async def test_database_connection_via_session(db_session: AsyncSession):
     """Tests basic connectivity by acquiring a session and executing a simple query."""
-    session: AsyncSession | None = None
     try:
-        async with SessionLocal() as session:
-            # Execute a simple query that doesn't rely on specific tables
-            # Wrap the raw SQL string in text()
-            await session.execute(text("SELECT 1"))
-            # If the above executes without error, the connection is likely working
-            assert True
+        # Use the injected session
+        await db_session.execute(text("SELECT 1"))
+        # If the above executes without error, the connection is likely working
+        assert True
     except (OperationalError, DBAPIError) as e:
         # Catch specific SQLAlchemy connection-related errors
         pytest.fail(f"Database connection via SessionLocal failed: {e}")
     except Exception as e:
         # Catch any other unexpected errors during session handling
         pytest.fail(f"An unexpected error occurred during session test: {e}")
-    finally:
-        # Ensure session is closed, although async context manager should handle this
-        if session:
-            await session.close()
 
 @pytest.mark.asyncio
 async def test_database_connection_via_check_function():
-    """Tests the check_db_connection utility function."""
-    connected = await check_db_connection()
-    assert connected is True, "check_db_connection utility returned False"
+    """Tests connectivity using the check_db_connection utility function."""
+    try:
+        connected = await check_db_connection()
+        assert connected is True, "check_db_connection should return True on success"
+    except Exception as e:
+        pytest.fail(f"check_db_connection failed with an unexpected error: {e}")
 
 # Optional: Fixture to manage test database state (if tests modify data)
 # @pytest.fixture(scope="function", autouse=True)

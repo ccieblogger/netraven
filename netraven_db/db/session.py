@@ -14,9 +14,9 @@ db_url = config.get("database", {}).get("url")
 
 if not db_url:
     # Fallback or raise error if DB URL is crucial and not found
-    # Using the default from postgresql_sot.md as a fallback here
-    print(f"Warning: Database URL not found in config for env '{APP_ENV}'. Using default (postgres user).")
-    db_url = "postgresql+asyncpg://postgres:netraven@localhost:5432/netraven"
+    # Using the correct credentials (netraven:netraven) as the fallback.
+    print(f"Warning: Database URL not found in config for env '{APP_ENV}'. Using default (netraven user).")
+    db_url = "postgresql+asyncpg://netraven:netraven@localhost:5432/netraven"
 
 # Set echo=True for debugging SQL statements, can be False or driven by config in production
 engine = create_async_engine(db_url, echo=True)
