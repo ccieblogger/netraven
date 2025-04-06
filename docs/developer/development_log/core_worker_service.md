@@ -197,3 +197,34 @@
 - Added placeholder device attribute access (`id`, `ip_address`, `hostname`).
 
 **Next Steps:** Commit the changes.
+
+---
+
+**Date:** $(date '+%Y-%m-%d %H:%M:%S')
+
+**Phase:** Dispatcher Logic Implementation (Phase 8 Start)
+
+**Goal:** Implement the logic to run device handling tasks concurrently using a thread pool.
+
+**Plan:**
+- Implement `dispatch_tasks` in `netraven/worker/dispatcher.py`.
+- Import `concurrent.futures` and `netraven.worker.executor`.
+- Use `concurrent.futures.ThreadPoolExecutor`.
+- Accept a list of `devices`, `job_id`, `max_workers`, and `repo_path`.
+- Use placeholder default values for `max_workers` and `repo_path` (to be replaced by config loading).
+- Use `executor.submit()` to schedule `executor.handle_device` for each device, passing necessary arguments (`device`, `job_id`, `repo_path`).
+- Iterate through completed futures using `concurrent.futures.as_completed()`.
+- Collect the result dictionaries returned by `handle_device`.
+- Include basic error handling for exceptions raised by futures.
+- Return the list of result dictionaries.
+- Commit changes.
+
+**Progress:**
+- Implemented the `dispatch_tasks` function in `dispatcher.py`.
+- Used `ThreadPoolExecutor` to submit `handle_device` tasks.
+- Passed `job_id` and `repo_path` to `handle_device` calls.
+- Collected results from completed futures.
+- Added placeholder default values for thread pool size and repo path.
+- Included temporary print statements for progress indication.
+
+**Next Steps:** Commit the changes.
