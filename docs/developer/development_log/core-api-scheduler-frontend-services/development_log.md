@@ -22,3 +22,22 @@
 
 **Next Steps:**
 *   Proceed to Phase 2: Scheduler Service Scaffolding.
+
+## Phase 2: Scheduler Service Scaffolding (Complete)
+
+**Date:** April 7, 2024
+
+**Changes:**
+*   Created scheduler directory structure: `netraven/scheduler/`.
+*   Created initial files: `__init__.py`, `scheduler_runner.py`, `job_definitions.py`, `job_registration.py`, `utils.py`.
+*   Added basic scheduler runner structure (`scheduler_runner.py`) with imports (structlog, Redis, rq-scheduler), config loading placeholder, Redis connection logic, and main polling loop.
+*   Added placeholder job definition function (`job_definitions.py`: `run_device_job`) that imports and calls the worker's `run_job` function.
+*   Added placeholder job registration logic (`job_registration.py`: `sync_jobs_from_db`) with structure for DB query, checking existing scheduled jobs, and calling `scheduler.schedule` (includes examples for interval, one-time, cron).
+
+**Rationale:**
+*   Established the foundational file and code structure for the scheduler service based on `scheduler_sot.md`.
+*   Implemented the basic runner loop, connection to Redis, and placeholder logic for dynamically loading and scheduling jobs based on DB entries.
+*   Linked the scheduled task (`run_device_job`) to the existing worker service entry point (`netraven.worker.runner.run_job`).
+
+**Next Steps:**
+*   Proceed to Phase 3: Frontend UI Scaffolding.
