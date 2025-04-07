@@ -41,3 +41,30 @@
 
 **Next Steps:**
 *   Proceed to Phase 3: Frontend UI Scaffolding.
+
+## Phase 3: Frontend UI Scaffolding (Complete)
+
+**Date:** April 7, 2024
+
+**Changes:**
+*   Resolved issues with frontend directory structure (removed nested `frontend/frontend`).
+*   Created correct `frontend/src` subdirectories: `components`, `layouts`, `pages`, `router`, `store`, `services`, `utils`.
+*   Manually initialized Tailwind CSS (`tailwind.config.js`, `postcss.config.js`) due to npx issues.
+*   Added Tailwind directives to `frontend/src/assets/main.css` and ensured it's imported in `frontend/src/main.js`.
+*   Created `frontend/src/router/index.js` and configured Vue Router with placeholder routes (Dashboard, Devices, Jobs, Logs, Users, Login, Unauthorized) and a basic navigation guard structure based on `frontend_sot.md`.
+*   Integrated Pinia and Vue Router into the main Vue app instance (`frontend/src/main.js`).
+*   Created Pinia store modules (`auth.js`, `job.js`, `notifications.js`) in `frontend/src/store/` with state and placeholder actions based on `frontend_sot.md`.
+*   Created `frontend/src/services/api.js` and configured an Axios instance with a base URL and interceptors for adding JWT tokens and basic error handling (e.g., 401).
+*   Created placeholder Vue components for the main pages (`Dashboard.vue`, `Devices.vue`, `Jobs.vue`, `Logs.vue`, `Users.vue`, `Login.vue`, `Unauthorized.vue`) in `frontend/src/pages/`.
+
+**Rationale:**
+*   Established the foundational file structure, tooling (Vite, Tailwind), routing (Vue Router), state management (Pinia), and API communication layer (Axios) for the frontend application based on `frontend_sot.md`.
+*   Placeholder components and routes allow the application structure to be visualized and tested during development.
+*   The navigation guard and Axios interceptors provide the basic framework for authentication and authorization.
+
+**Issues Encountered:**
+*   Significant issues running `npm create vue`, `npm install`, and `npx` commands via the tool, likely due to WSL/UNC path conflicts or permissions. Required manual execution by the user for these steps.
+*   Shell context persistence within the tool was inconsistent, leading to incorrect relative paths. Required using absolute paths or workspace-relative paths and manual correction of directory structures.
+
+**Next Steps:**
+*   Proceed to Phase 4: Review and Align Minor Gaps (Config loading, Setup scripts, Tests).
