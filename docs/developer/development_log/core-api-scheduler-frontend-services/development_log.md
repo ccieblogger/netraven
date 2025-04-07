@@ -68,3 +68,30 @@
 
 **Next Steps:**
 *   Proceed to Phase 4: Review and Align Minor Gaps (Config loading, Setup scripts, Tests).
+
+## Phase 4: Review and Align Minor Gaps (Complete)
+
+**Date:** April 7, 2024
+
+**Changes:**
+*   Implemented central configuration loader (`netraven/config/loader.py`) supporting `default.yaml`, `{env}.yaml`, and `NETRAVEN_` prefixed environment variables.
+*   Added `PyYAML` dependency (already present).
+*   Created `netraven/config/environments/dev.yaml` with initial config keys for database, scheduler, worker, logging, api, and git.
+*   Updated `netraven/db/session.py` to use `load_config()`.
+*   Updated `netraven/scheduler/scheduler_runner.py` to use `load_config()`.
+*   Removed the redundant root-level `/config` directory (manually by user).
+*   Verified `setup/dev_runner.py` and `setup/setup_postgres.sh` against SOTs.
+*   Created `setup/setup_redis.sh` based on SOT and made it executable.
+*   Verified `tests/test_db_connection.py` against SOT.
+*   Reviewed `tests/worker/` directory (contains tests for git_writer, redactor, runner).
+*   Rewritten `tests/config/test_loader.py` to accurately test the new `netraven.config.loader`.
+
+**Rationale:**
+*   Standardized configuration loading across services, adhering to the defined hierarchy (YAML + Env Vars).
+*   Ensured necessary setup scripts are present and aligned with documentation.
+*   Confirmed baseline test coverage for existing DB and Worker components.
+*   Updated configuration tests to match the implemented loader.
+*   Cleaned up project structure by removing the redundant root config directory.
+
+**Next Steps:**
+*   Proceed to Phase 5: Documentation & Final Review.

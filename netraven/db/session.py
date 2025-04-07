@@ -1,17 +1,22 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-# Assuming netraven.config.loader exists or will be created
-# from netraven.config.loader import load_config
-import os
+from netraven.config.loader import load_config
+import structlog
+# import os # No longer needed directly for db_url
 
-# Placeholder config loading - replace with actual loader later
-# config = load_config(env="dev")
-# db_url = config["database"]["url"]
+log = structlog.get_logger()
 
-# Using environment variable or a default for now
-db_url = os.getenv("DATABASE_URL", "postgresql+psycopg2://netraven:netraven@localhost:5432/netraven")
+# Load configuration using the central loader
+config = load_config() # Determines env via NETRAVEN_ENV or defaults to 'dev'
 
-engine = create_engine(db_url, echo=True) # echo=True for dev visibility
+# Get database URL from the loaded config, with a fallback default
+db_config = config.get('database', {})
+db_url = db_config.get('url', "postgresql+psycopg2://netraven:netraven@localhost:5432/netraven")
+
+log.info("Database session configured", db_url=db_url) # Log the URL being used (be careful in prod)
+
+# echo=True is useful for dev to see SQL statements
+engine = create_engine(db_url, echo=config.get('logging', {}).get('level') == 'DEBUG') 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 def get_db():

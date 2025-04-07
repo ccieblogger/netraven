@@ -1,0 +1,52 @@
+# Development Environment Configuration for NetRaven
+
+database:
+  # Standard PostgreSQL connection URL
+  # Format: postgresql+<driver>://<user>:<password>@<host>:<port>/<database>
+  url: "postgresql+psycopg2://netraven:netraven@localhost:5432/netraven"
+
+scheduler:
+  # URL for the Redis instance used by RQ and RQ Scheduler
+  redis_url: "redis://localhost:6379/0"
+  # How often the scheduler checks for new jobs to sync from the DB (seconds)
+  polling_interval_seconds: 10
+  # Maximum number of retries for a failed job
+  max_retries: 3
+  # Base delay between retries (seconds) - RQ uses exponential backoff
+  retry_backoff_seconds: 5
+
+worker:
+  # Number of concurrent device connections allowed per job run
+  thread_pool_size: 5
+  # Timeout for establishing a connection to a device (seconds)
+  connection_timeout: 15
+  # Number of attempts to connect/run commands if the first fails
+  retry_attempts: 2
+  # Delay between retry attempts (seconds)
+  retry_backoff: 2
+  # List of patterns/keywords to redact from device output logs
+  redaction:
+    patterns:
+      - "password"
+      - "secret"
+      - "community"
+      # Add more sensitive patterns as needed
+
+logging:
+  # Default logging level for the application
+  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: DEBUG
+
+# API Service specific settings (placeholders)
+api:
+  # Secret key for signing JWT tokens. IMPORTANT: CHANGE THIS and load from env var in production!
+  jwt_secret: "a_very_secret_key_that_should_be_in_config_or_env"
+  # Algorithm used for JWT signing
+  jwt_algorithm: "HS256"
+  # Token expiry time in minutes
+  access_token_expire_minutes: 30
+
+# Git Repository settings
+git:
+  # Path to the local directory where device configurations will be stored as a Git repo
+  repo_path: "/data/git-config-repo" # Ensure this path exists and is writable
