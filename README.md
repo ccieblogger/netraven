@@ -57,8 +57,8 @@ The system is installed locally using Python-based services with PostgreSQL and 
   - System configuration
 - Managed with **SQLAlchemy (sync)** + **Alembic**.
 
-#### 5. Frontend UI (React)
-- Built with React for responsive user experience.
+#### 5. Frontend UI (Vue 3)
+- Built with **Vue 3 (using Vite)** for responsive user experience.
 - Integrates via REST API.
 - Supports:
   - Device inventory views
@@ -98,7 +98,7 @@ NetRaven is intended to be installed and run locally using Python and system pac
 
 - PostgreSQL and Redis are assumed to be locally installed (can later be containerized)
 - System services can be managed via `systemd`, `supervisord`, or developer CLI runners
-- Frontend runs with standard Node.js tooling
+- Frontend runs with standard **Vite/Node.js** tooling
 
 ### Testing Strategy
 - **Unit Tests**: Business logic, validation, utilities
@@ -115,7 +115,7 @@ NetRaven is intended to be installed and run locally using Python and system pac
 ├── scheduler/            # RQ + scheduling logic
 ├── db/                   # SQLAlchemy models and session mgmt
 ├── config/               # YAML and loader logic
-├── frontend/             # React app (separate build pipeline)
+├── frontend/             # **Vue 3** app (separate build pipeline)
 ├── git/                  # Git repository interface
 ├── tests/                # Unit, integration, and E2E tests
 └── utils/                # Shared helpers
