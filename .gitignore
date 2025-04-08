@@ -104,3 +104,6 @@ alembic/versions/__pycache__/
 # Environment Variables
 .env
 .env.*
+
+# tailwindcss
+frontend/tailwindcss
