@@ -1,63 +1,70 @@
 <template>
-  <div class="p-4 flex flex-col items-center justify-center min-h-screen">
-    <h1 class="text-2xl font-semibold">Login</h1>
-    <p class="mt-2">Please log in to continue. (Placeholder)</p>
-    <!-- Add login form here -->
-    <form @submit.prevent="handleLogin" class="mt-4 space-y-4 w-full max-w-xs">
-      <div>
-        <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-        <input type="text" id="username" v.model="username" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-      </div>
-      <div>
-        <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-        <input type="password" id="password" v.model="password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-      </div>
-      <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-        Log In
-      </button>
-      <p v-if="errorMsg" class="text-sm text-red-600">{{ errorMsg }}</p>
-    </form>
+  <div class="min-h-screen flex items-center justify-center bg-gray-100">
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+      <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">NetRaven Login</h2>
+      
+      <!-- Login Form -->
+      <form @submit.prevent="handleLogin">
+        <div class="mb-4">
+          <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+          <input 
+            type="text" 
+            id="username" 
+            v-model="username" 
+            required
+            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Enter your username"
+          >
+        </div>
+        <div class="mb-6">
+          <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            v-model="password" 
+            required
+            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="Enter your password"
+          >
+        </div>
+
+        <!-- Error Message -->
+        <div v-if="authStore.loginError" class="mb-4 text-red-600 text-sm text-center">
+          {{ authStore.loginError }}
+        </div>
+
+        <!-- Submit Button -->
+        <button 
+          type="submit" 
+          :disabled="authStore.isLoading" 
+          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50"
+        >
+          <span v-if="authStore.isLoading">Logging in...</span>
+          <span v-else>Login</span>
+        </button>
+      </form>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-// import { useRouter } from 'vue-router';
-// import { useAuthStore } from '../store/auth';
-// import api from '../services/api';
+import { ref } from 'vue'
+import { useAuthStore } from '../store/auth'
 
-const username = ref('');
-const password = ref('');
-const errorMsg = ref(null);
-// const router = useRouter();
-// const authStore = useAuthStore();
+const authStore = useAuthStore()
+const username = ref('')
+const password = ref('')
 
-const handleLogin = async () => {
-  errorMsg.value = null;
-  console.log('Login attempt (placeholder)', username.value);
-  // Placeholder: Implement actual login logic using authStore and API client
-  // try {
-  //   // Use OAuth2PasswordRequestForm format expected by backend
-  //   const formData = new URLSearchParams();
-  //   formData.append('username', username.value);
-  //   formData.append('password', password.value);
-  // 
-  //   const response = await api.post('/auth/token', formData, {
-  //      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-  //   });
-  // 
-  //   const token = response.data.access_token;
-  //   // Fetch user details (or decode token if it contains user info)
-  //   // const userResponse = await api.get('/users/me'); // Assuming a /users/me endpoint
-  //   // const user = userResponse.data;
-  //   const user = { username: username.value, role: 'user' }; // Placeholder user
-  // 
-  //   authStore.setAuth(token, user);
-  //   router.push({ name: 'Dashboard' }); // Redirect to dashboard on success
-  // } catch (error) {
-  //   console.error('Login failed:', error.response?.data?.detail || error.message);
-  //   errorMsg.value = error.response?.data?.detail || 'Login failed. Please check credentials.';
-  //   authStore.logout(); // Ensure any partial auth state is cleared
-  // }
-};
+async function handleLogin() {
+  if (!username.value || !password.value) {
+    // Basic validation (can be enhanced)
+    authStore.loginError = 'Username and password are required.'; 
+    return;
+  }
+  await authStore.login({ username: username.value, password: password.value })
+}
 </script>
+
+<style scoped>
+/* Add custom styles if needed */
+</style>

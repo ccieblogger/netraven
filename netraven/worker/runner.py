@@ -1,12 +1,12 @@
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Dict, Optional, Set
 import time
 import logging # Use standard logging
 
 from netraven.worker import dispatcher
 # Assume these imports will work once the db module is built
 from netraven.db.session import get_db
-from netraven.db.models import Job, Device, JobLog
-from sqlalchemy.orm import Session, joinedload
+from netraven.db.models import Job, Device, JobLog, Tag
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from netraven.config.loader import load_config
 
@@ -18,21 +18,42 @@ log = logging.getLogger(__name__)
 # --- Database Interaction Functions --- 
 # These replace the placeholders
 
-def load_device_for_job(job_id: int, db: Session) -> Optional[Device]:
-    """Loads the single Device object associated with a specific job ID."""
-    log.info(f"[Job: {job_id}] Loading device from database...")
-    # Query Job and eagerly load the associated Device
-    job = db.query(Job).options(joinedload(Job.device)).filter(Job.id == job_id).first()
+def load_devices_for_job(job_id: int, db: Session) -> List[Device]:
+    """Loads all unique Device objects associated with a specific job ID via Tags."""
+    log.info(f"[Job: {job_id}] Loading devices from database via tags...")
+    job = (
+        db.query(Job)
+        .options(
+            selectinload(Job.tags) # Load tags efficiently
+            .selectinload(Tag.devices) # Then load devices for those tags
+        )
+        .filter(Job.id == job_id)
+        .first()
+    )
+
     if not job:
         log.warning(f"[Job: {job_id}] Job not found in database.")
-        return None
-    
-    if not job.device:
-         log.warning(f"[Job: {job_id}] No device associated with this job.")
-         return None
+        return []
 
-    log.info(f"[Job: {job_id}] Loaded device: {job.device.hostname} (ID: {job.device.id})")
-    return job.device
+    if not job.tags:
+        log.warning(f"[Job: {job_id}] Job found, but has no associated tags.")
+        return []
+
+    # Collect unique devices from all associated tags
+    unique_devices: Set[Device] = set()
+    for tag in job.tags:
+        if tag.devices:
+             for device in tag.devices:
+                 unique_devices.add(device)
+    
+    loaded_devices = list(unique_devices)
+    if not loaded_devices:
+        log.warning(f"[Job: {job_id}] Job tags found, but no devices associated with those tags.")
+        return []
+
+    device_names = [d.hostname for d in loaded_devices]
+    log.info(f"[Job: {job_id}] Loaded {len(loaded_devices)} devices: {device_names}")
+    return loaded_devices
 
 def update_job_status(job_id: int, status: str, db: Session, start_time: float = None, end_time: float = None):
     """Updates the status and timestamps of a job in the database."""
@@ -62,11 +83,10 @@ def update_job_status(job_id: int, status: str, db: Session, start_time: float =
 def log_runner_error(job_id: int, message: str, db: Session):
     """Logs a critical runner error using the provided session."""
     try:
-        # Move import to top level if not already there
         from netraven.db.models.job_log import LogLevel, JobLog 
         entry = JobLog(
             job_id=job_id,
-            # device_id=None, # REMOVED - device_id is not in JobLog model
+            device_id=None, # Explicitly set device_id to None for job-level errors
             message=message,
             level=LogLevel.CRITICAL
         )
@@ -80,8 +100,8 @@ def log_runner_error(job_id: int, message: str, db: Session):
 def run_job(job_id: int, db: Optional[Session] = None) -> None:
     """Main entry point to run a specific job by its ID.
 
-    Loads job details and the associated device from DB, loads configuration,
-    dispatches the task for the single device, and updates job status in DB.
+    Loads job details and associated devices (via Tags) from DB, loads configuration,
+    dispatches tasks for all devices, processes results, and updates job status in DB.
     If a db session is provided, it uses it; otherwise, it creates its own.
 
     Args:
@@ -103,7 +123,7 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         log.debug(f"[Job: {job_id}] Using provided DB session.")
         db_to_use = db
 
-    job_failed = False # Flag to track overall failure
+    job_failed = False # Flag to track if *any* device task failed
     final_status = "UNKNOWN"
 
     try:
@@ -116,32 +136,40 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         config = load_config()
         log.info(f"[Job: {job_id}] Configuration loaded.")
 
-        # 1. Load the single device associated with the job from DB
-        device_to_process = load_device_for_job(job_id, db_to_use)
+        # 1. Load associated devices from DB via tags
+        devices_to_process = load_devices_for_job(job_id, db_to_use)
 
-        if not device_to_process:
-            final_status = "FAILED_NO_DEVICE"
-            job_failed = True
-            log.warning(f"[Job: {job_id}] No device found for this job. Final Status: {final_status}")
+        if not devices_to_process:
+            final_status = "COMPLETED_NO_DEVICES" # Changed status
+            # Not necessarily a failure, just nothing to do
+            log.warning(f"[Job: {job_id}] No devices found for this job. Final Status: {final_status}")
         else:
-            # 2. Dispatch task, passing the SAME session (db_to_use)
-            log.info(f"[Job: {job_id}] Handing off device {device_to_process.hostname} to dispatcher...")
-            # Pass device as a list and the current db session
-            results = dispatcher.dispatch_tasks([device_to_process], job_id, config=config, db=db_to_use)
+            # 2. Dispatch tasks for all devices
+            device_count = len(devices_to_process)
+            log.info(f"[Job: {job_id}] Handing off {device_count} device(s) to dispatcher...")
+            # Pass device list and the current db session
+            results: List[Dict] = dispatcher.dispatch_tasks(devices_to_process, job_id, config=config, db=db_to_use)
 
-            # 3. Process result
-            if not results:
+            # 3. Process results
+            if not results or len(results) != device_count:
                  final_status = "FAILED_DISPATCHER_ERROR"
                  job_failed = True
-                 log.error(f"[Job: {job_id}] Dispatcher returned no results. Final Status: {final_status}")
+                 log.error(f"[Job: {job_id}] Dispatcher returned incorrect number of results ({len(results)} vs {device_count}). Final Status: {final_status}")
             else:
-                task_result = results[0]
-                if task_result.get("success"): 
+                success_count = sum(1 for r in results if r.get("success"))
+                failure_count = device_count - success_count
+                log.info(f"[Job: {job_id}] Dispatcher finished. Success: {success_count}, Failure: {failure_count}")
+
+                if failure_count == 0:
                     final_status = "COMPLETED_SUCCESS"
-                else:
+                elif success_count > 0:
+                    final_status = "COMPLETED_PARTIAL_FAILURE"
+                    job_failed = True # Mark job as failed overall if any device failed
+                else: # All failed
                     final_status = "COMPLETED_FAILURE"
-                    job_failed = True # Mark job as failed overall
-            log.info(f"[Job: {job_id}] Task finished. Final Status: {final_status}")
+                    job_failed = True
+                
+            log.info(f"[Job: {job_id}] Tasks finished. Final Status: {final_status}")
 
         # 4. Update final status
         end_time = time.time()

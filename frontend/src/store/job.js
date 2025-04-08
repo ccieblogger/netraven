@@ -1,60 +1,112 @@
 import { defineStore } from 'pinia';
+import { ref } from 'vue';
+import api from '../services/api';
+// import { useNotificationStore } from './notifications'; // Optional for user feedback
 
-export const useJobStore = defineStore('job', {
-  state: () => ({
-    selectedJobId: null, // ID of the job being viewed/monitored
-    selectedJobDetails: null, // Full details of the selected job
-    jobRunResults: [], // Results of devices for a specific job run
-    recentJobs: [], // List of recent job runs for dashboard
-  }),
-  actions: {
-    // Action to fetch and set details for a specific job
-    async fetchJobDetails(jobId) {
-      // Placeholder: Replace with API call using Axios
-      // try {
-      //   const response = await api.get(`/jobs/${jobId}`);
-      //   this.selectedJobDetails = response.data;
-      //   this.selectedJobId = jobId;
-      // } catch (error) {
-      //   console.error('Failed to fetch job details:', error);
-      //   // Handle error (e.g., show notification)
-      // }
-      this.selectedJobId = jobId; // Temporary placeholder
-      this.selectedJobDetails = { id: jobId, name: `Placeholder Job ${jobId}`, status: 'completed' }; // Placeholder
-    },
-    // Action to fetch results for a specific job run
-    async fetchJobRunResults(jobId) {
-      // Placeholder: Replace with API call
-      // try {
-      //   const response = await api.get(`/logs?job_id=${jobId}`); // Or a dedicated results endpoint
-      //   this.jobRunResults = response.data;
-      // } catch (error) {
-      //   console.error('Failed to fetch job results:', error);
-      // }
-      this.jobRunResults = [ // Placeholder
-          { device: 'core1', status: 'success', log_id: 88 },
-          { device: 'edge2', status: 'fail', error: 'timeout', log_id: 89 }
-      ];
-    },
-    // Action to fetch recent jobs for the dashboard
-    async fetchRecentJobs() {
-      // Placeholder: Replace with API call
-      // try {
-      //   const response = await api.get('/jobs?limit=10&sort=desc'); 
-      //   this.recentJobs = response.data;
-      // } catch (error) {
-      //   console.error('Failed to fetch recent jobs:', error);
-      // }
-      this.recentJobs = [
-          { id: 120, devices: 12, status: 'Success', runTime: '1:05' },
-          { id: 121, devices: 8, status: 'Failed', runTime: '0:50' }
-      ]; // Placeholder
-    },
-    // Action to clear selected job data when navigating away
-    clearSelectedJob() {
-      this.selectedJobId = null;
-      this.selectedJobDetails = null;
-      this.jobRunResults = [];
+export const useJobStore = defineStore('jobs', () => {
+  // const notifications = useNotificationStore();
+  const jobs = ref([]);
+  const isLoading = ref(false);
+  const error = ref(null);
+  const runStatus = ref(null); // To store status of manual run trigger
+
+  async function fetchJobs() {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await api.get('/jobs');
+      jobs.value = response.data;
+    } catch (err) {
+      error.value = err.response?.data?.detail || 'Failed to fetch jobs';
+      console.error("Fetch Jobs Error:", err);
+    } finally {
+      isLoading.value = false;
     }
   }
+
+  async function createJob(jobData) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await api.post('/jobs', jobData);
+      jobs.value.push(response.data);
+      // notifications.addMessage({ type: 'success', text: 'Job created successfully' });
+      return true;
+    } catch (err) {
+      error.value = err.response?.data?.detail || 'Failed to create job';
+      console.error("Create Job Error:", err);
+      // notifications.addMessage({ type: 'error', text: error.value });
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function updateJob(jobId, jobData) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await api.put(`/jobs/${jobId}`, jobData);
+      const index = jobs.value.findIndex(j => j.id === jobId);
+      if (index !== -1) {
+        jobs.value[index] = response.data;
+      }
+      // notifications.addMessage({ type: 'success', text: 'Job updated successfully' });
+      return true;
+    } catch (err) {
+      error.value = err.response?.data?.detail || 'Failed to update job';
+      console.error("Update Job Error:", err);
+      // notifications.addMessage({ type: 'error', text: error.value });
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function deleteJob(jobId) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      await api.delete(`/jobs/${jobId}`);
+      jobs.value = jobs.value.filter(j => j.id !== jobId);
+      // notifications.addMessage({ type: 'success', text: 'Job deleted successfully' });
+      return true;
+    } catch (err) {
+      error.value = err.response?.data?.detail || 'Failed to delete job';
+      console.error("Delete Job Error:", err);
+      // notifications.addMessage({ type: 'error', text: error.value });
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function runJobNow(jobId) {
+    runStatus.value = { jobId: jobId, status: 'running', error: null }; // Reset status
+    try {
+      const response = await api.post(`/jobs/run/${jobId}`);
+      runStatus.value = { jobId: jobId, status: 'queued', data: response.data, error: null };
+      // notifications.addMessage({ type: 'info', text: `Job ${jobId} queued successfully.` });
+      return true;
+    } catch (err) {
+      const errorDetail = err.response?.data?.detail || 'Failed to trigger job run';
+      runStatus.value = { jobId: jobId, status: 'failed', error: errorDetail };
+      console.error(`Run Job ${jobId} Error:`, err);
+      // notifications.addMessage({ type: 'error', text: errorDetail });
+      return false;
+    }
+  }
+
+  function $reset() {
+    jobs.value = [];
+    isLoading.value = false;
+    error.value = null;
+    runStatus.value = null;
+  }
+
+  return {
+    jobs, isLoading, error, runStatus,
+    fetchJobs, createJob, updateJob, deleteJob, runJobNow,
+    $reset
+  };
 });

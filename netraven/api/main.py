@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 # Import routers
-from .routers import devices, jobs, users, logs, auth_router
+from .routers import devices, jobs, users, logs, auth_router, tags, credentials
 
 app = FastAPI(
     title="NetRaven API",
@@ -19,7 +19,9 @@ def health_check():
 
 # Include routers
 app.include_router(auth_router.router)
+app.include_router(users.router)
+app.include_router(tags.router)
+app.include_router(credentials.router)
 app.include_router(devices.router)
 app.include_router(jobs.router)
-app.include_router(users.router)
 app.include_router(logs.router)

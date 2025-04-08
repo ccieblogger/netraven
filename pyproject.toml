@@ -13,6 +13,15 @@ pytest = "^8.3.5"
 netmiko = "^4.3.0"
 GitPython = "^3.1.43"
 PyYAML = "^6.0.1"
+structlog = "^25.2.0"
+fastapi = "^0.115.12"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+python-jose = {extras = ["cryptography"], version = "^3.4.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-multipart = "^0.0.20"
+redis = "^5.2.1"
+rq = "^2.3.1"
+rq-scheduler = "^0.14.0"
 
 [tool.poetry.dev-dependencies]
 

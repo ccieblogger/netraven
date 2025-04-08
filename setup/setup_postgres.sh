@@ -99,3 +99,4 @@ else
   echo "  check   : Tests the connection to the database."
   echo "  refresh : Purges PostgreSQL and runs install again (DANGEROUS)."
   exit 1
+fi

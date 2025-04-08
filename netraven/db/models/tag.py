@@ -19,6 +19,13 @@ credential_tag_association = Table(
     Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
 )
 
+# Association table for Job <-> Tag
+job_tags_association = Table(
+    'job_tags', Base.metadata,
+    Column('job_id', Integer, ForeignKey('jobs.id', ondelete="CASCADE"), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tags.id', ondelete="CASCADE"), primary_key=True)
+)
+
 class Tag(Base):
     """Represents a tag that can be associated with Devices or Credentials.
 
@@ -30,14 +37,18 @@ class Tag(Base):
     name = Column(String, nullable=False, unique=True, index=True)
     type = Column(String)  # E.g., 'location', 'role', 'custom'
 
-    # Relationships defined in Device and Credential models using back_populates
-    # devices = relationship(
-    #     "Device",
-    #     secondary=device_tag_association,
-    #     back_populates="tags"
-    # )
-    # credentials = relationship(
-    #     "Credential",
-    #     secondary=credential_tag_association,
-    #     back_populates="tags"
-    # ) 
+    devices = relationship(
+        "Device",
+        secondary=device_tag_association,
+        back_populates="tags"
+    )
+    credentials = relationship(
+        "Credential",
+        secondary=credential_tag_association,
+        back_populates="tags"
+    )
+    jobs = relationship(
+        "Job",
+        secondary=job_tags_association,
+        back_populates="tags"
+    ) 

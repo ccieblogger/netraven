@@ -1,7 +1,16 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
 class BaseSchema(BaseModel):
-    pass
+    # Pydantic V2 uses model_config
+    model_config = ConfigDict(
+        from_attributes=True, # Replaces orm_mode
+        extra='ignore' # Ignore extra fields during parsing
+    )
+
+# Maybe useful later for responses needing ID
+class BaseSchemaWithId(BaseSchema):
+    id: int
 
 # Example of common fields or config
 # class BaseSchemaWithConfig(BaseModel):

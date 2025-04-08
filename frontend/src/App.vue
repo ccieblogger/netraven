@@ -1,12 +1,14 @@
 <script setup>
-// No HelloWorld/TheWelcome needed now
+import DefaultLayout from './layouts/DefaultLayout.vue'
+// Import other layouts if needed
 </script>
 
 <template>
-  <router-view />
+  <DefaultLayout>
+    <router-view />
+  </DefaultLayout>
 </template>
 
 <style>
-/* Remove scoped styles or add global styles if needed */
-/* Ensure Tailwind base styles are applied via main.css */
+/* Global styles */
 </style>

@@ -70,21 +70,20 @@ const router = createRouter({
 });
 
 // Navigation Guard (as per frontend_sot.md)
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => { // Make async
   const requiresAuth = to.meta.requiresAuth;
   const requiredRoles = to.meta.roles;
   const auth = useAuthStore(); // Get auth store instance
   
-  // Use actual store state
+  // Attempt to load user profile if token exists but user data is missing
+  // This handles page refreshes where the store state is lost but token persists
+  if (auth.token && !auth.user) {
+     await auth.fetchUserProfile(); 
+  }
+
+  // Use computed properties from the store
   const isAuthenticated = auth.isAuthenticated; 
   const userRole = auth.userRole; 
-
-  // Attempt to load token if not authenticated (e.g., on page refresh)
-  // This should ideally happen once on app startup, not every navigation
-  // if (!isAuthenticated && localStorage.getItem('authToken')) { 
-  //    auth.loadToken(); // Assuming loadToken updates isAuthenticated if valid
-  //    isAuthenticated = auth.isAuthenticated; // Re-check after loading
-  // }
 
   if (requiresAuth && !isAuthenticated) {
     // If route requires auth and user is not logged in, redirect to login
