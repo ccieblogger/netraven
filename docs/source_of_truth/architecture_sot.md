@@ -67,7 +67,6 @@ The system is installed locally using Python-based services with PostgreSQL and 
 ### Core Architectural Principles
 
 - **Local Redis Required**: Redis is a core local dependency for job queuing and scheduling. All job execution flows rely on it via RQ and RQ Scheduler.
-
 - **Synchronous-First Design**: Synchronous services simplify development and debugging.
 - **Targeted Concurrency**: Uses threads only where concurrency offers clear benefits (e.g., connecting to multiple devices).
 - **Modular Design**: Isolated services for API, job scheduling, communication, and logging.

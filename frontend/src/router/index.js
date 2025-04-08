@@ -1,17 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router';
-// import { useAuthStore } from '../store/auth'; // Import Pinia store for auth checks
+import { useAuthStore } from '../store/auth'; // Import Pinia store for auth checks
 
-// Placeholder Page Imports (create these components later)
-// import Login from '../pages/Login.vue';
-// import Dashboard from '../pages/Dashboard.vue';
-// import Devices from '../pages/Devices.vue';
-// import Jobs from '../pages/Jobs.vue';
-// import Logs from '../pages/Logs.vue';
-// import Users from '../pages/Users.vue';
-// import Unauthorized from '../pages/Unauthorized.vue';
+// Import Page Components
+import Login from '../pages/Login.vue';
+import Dashboard from '../pages/Dashboard.vue';
+import Devices from '../pages/Devices.vue';
+import Jobs from '../pages/Jobs.vue';
+import Logs from '../pages/Logs.vue';
+import Users from '../pages/Users.vue';
+import Unauthorized from '../pages/Unauthorized.vue';
 
 // Placeholder components for routes to work initially
-const PlaceholderComponent = { template: '<div>Placeholder Page</div>' };
+// const PlaceholderComponent = { template: '<div>Placeholder Page</div>' }; // No longer needed
 
 const routes = [
   { 
@@ -21,43 +21,43 @@ const routes = [
   {
     path: '/login',
     name: 'Login',
-    component: PlaceholderComponent, // Replace with actual Login component
+    component: Login, // Use actual Login component
     meta: { requiresAuth: false }
   },
   {
     path: '/dashboard',
     name: 'Dashboard',
-    component: PlaceholderComponent, // Replace with actual Dashboard component
+    component: Dashboard, // Use actual Dashboard component
     meta: { requiresAuth: true, roles: ['admin', 'user'] } 
   },
   {
     path: '/devices',
     name: 'Devices',
-    component: PlaceholderComponent, // Replace with actual Devices component
+    component: Devices, // Use actual Devices component
     meta: { requiresAuth: true, roles: ['admin', 'user'] } 
   },
   {
     path: '/jobs',
     name: 'Jobs',
-    component: PlaceholderComponent, // Replace with actual Jobs component
+    component: Jobs, // Use actual Jobs component
     meta: { requiresAuth: true, roles: ['admin', 'user'] } 
   },
   {
     path: '/logs',
     name: 'Logs',
-    component: PlaceholderComponent, // Replace with actual Logs component
+    component: Logs, // Use actual Logs component
     meta: { requiresAuth: true, roles: ['admin', 'user'] } 
   },
   {
     path: '/users',
     name: 'Users',
-    component: PlaceholderComponent, // Replace with actual Users component
+    component: Users, // Use actual Users component
     meta: { requiresAuth: true, roles: ['admin'] } // Example: Admin only
   },
   {
     path: '/unauthorized',
     name: 'Unauthorized',
-    component: PlaceholderComponent, // Replace with actual Unauthorized component
+    component: Unauthorized, // Use actual Unauthorized component
     meta: { requiresAuth: false }
   },
   // Catch-all route (optional)
@@ -73,19 +73,26 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const requiresAuth = to.meta.requiresAuth;
   const requiredRoles = to.meta.roles;
-  // const auth = useAuthStore(); // Get auth store instance
+  const auth = useAuthStore(); // Get auth store instance
   
-  // Placeholder auth state (replace with Pinia store access)
-  const isAuthenticated = false; // Example: Check auth.token
-  const userRole = null; // Example: Get auth.role
+  // Use actual store state
+  const isAuthenticated = auth.isAuthenticated; 
+  const userRole = auth.userRole; 
+
+  // Attempt to load token if not authenticated (e.g., on page refresh)
+  // This should ideally happen once on app startup, not every navigation
+  // if (!isAuthenticated && localStorage.getItem('authToken')) { 
+  //    auth.loadToken(); // Assuming loadToken updates isAuthenticated if valid
+  //    isAuthenticated = auth.isAuthenticated; // Re-check after loading
+  // }
 
   if (requiresAuth && !isAuthenticated) {
     // If route requires auth and user is not logged in, redirect to login
-    console.log('Redirecting to login, requires auth.');
-    next({ name: 'Login' });
+    console.log('Guard: Redirecting to login, requires auth.');
+    next({ name: 'Login', query: { redirect: to.fullPath } }); // Pass redirect query
   } else if (requiresAuth && requiredRoles && !requiredRoles.includes(userRole)) {
     // If route requires specific role and user doesn't have it, redirect to unauthorized
-    console.log(`Redirecting to unauthorized, requires role: ${requiredRoles}, user has: ${userRole}`);
+    console.log(`Guard: Redirecting to unauthorized, requires role: ${requiredRoles}, user has: ${userRole}`);
     next({ name: 'Unauthorized' });
   } else {
     // Otherwise, allow navigation
