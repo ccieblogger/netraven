@@ -76,7 +76,7 @@ def handle_device(
         for attempt in range(retry_attempts + 1):
             try:
                 # TODO: Add connection timeout from config to netmiko_driver call if needed
-                raw_output = netmiko_driver.run_command(device)
+                raw_output = netmiko_driver.run_command(device, job_id)
                 # print(f"[Job: {job_id}, Device: {device_identifier}] Connection successful on attempt {attempt + 1}.") # Removed
                 last_connection_error = None # Clear last error on success
                 break # Exit retry loop on success
@@ -126,8 +126,20 @@ def handle_device(
         if commit_hash:
             result["success"] = True
             result["result"] = commit_hash
-            log_message = f"Success. Commit: {commit_hash}"
-            log_utils.save_job_log(device_id, job_id, log_message, success=True, db=db)
+            # If commit_hash is a tuple (commit_hash, log_dict), extract just the hash
+            if isinstance(commit_hash, tuple):
+                log_dict = commit_hash[1]
+                commit_hash = commit_hash[0]
+                # If we got a log dictionary, log it directly
+                if isinstance(log_dict, dict) and "message" in log_dict:
+                    log_utils.save_job_log(device_id, job_id, log_dict["message"], success=True, db=db)
+                else:
+                    log_message = f"Success. Commit: {commit_hash}"
+                    log_utils.save_job_log(device_id, job_id, log_message, success=True, db=db)
+            else:
+                # Handle string return value case
+                log_message = f"Success. Commit: {commit_hash}"
+                log_utils.save_job_log(device_id, job_id, log_message, success=True, db=db)
         else:
             result["error"] = "Failed to commit configuration to Git repository."
             log_utils.save_job_log(device_id, job_id, result["error"], success=False, db=db)

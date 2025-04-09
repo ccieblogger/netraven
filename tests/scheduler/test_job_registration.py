@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch, call, ANY
 from datetime import datetime, timedelta, timezone
 
 from netraven.scheduler.job_registration import sync_jobs_from_db, generate_rq_job_id
@@ -69,7 +69,7 @@ def test_sync_jobs_schedules_correct_types(mock_get_db, mock_db_session, mock_sc
     # Check onetime job was scheduled
     mock_scheduler.enqueue_at.assert_called_once_with(
         sample_jobs[2].scheduled_for,
-        func=ANY,
+        ANY,  # Function should be ANY, not specifically named
         args=[sample_jobs[2].id],
         job_id=generate_rq_job_id(sample_jobs[2].id),
         description=ANY,

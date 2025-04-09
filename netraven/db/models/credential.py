@@ -25,5 +25,5 @@ class Credential(Base):
     tags = relationship(
         "Tag",
         secondary=credential_tag_association,
-        backref="credentials" # Simple backref
+        back_populates="credentials" # Changed from backref to back_populates
     ) 

@@ -5,7 +5,7 @@ from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationExc
 # Define standard command to run
 COMMAND_SHOW_RUN = "show running-config"
 
-def run_command(device: Any) -> str:
+def run_command(device: Any, job_id: int = None) -> str:
     """
     Connects to a device using Netmiko, runs 'show running-config',
     and returns the output.
@@ -14,6 +14,7 @@ def run_command(device: Any) -> str:
         device: A device object containing connection details (e.g.,
                 device_type, ip_address, username, password).
                 Expected attributes: device_type, ip_address, username, password.
+        job_id: Optional job ID for logging purposes.
 
     Returns:
         The output of the 'show running-config' command as a string.

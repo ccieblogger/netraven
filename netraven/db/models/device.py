@@ -19,9 +19,8 @@ class Device(Base):
     tags = relationship(
         "Tag",
         secondary=device_tag_association,
-        backref="devices" # Simple backref for now, adjust if complex queries needed
+        back_populates="devices"
     )
 
     configurations = relationship("DeviceConfiguration", back_populates="device", cascade="all, delete-orphan")
-    connection_logs = relationship("ConnectionLog", back_populates="device", cascade="all, delete-orphan")
-    jobs = relationship("Job", back_populates="device", cascade="all, delete-orphan") 
+    connection_logs = relationship("ConnectionLog", back_populates="device", cascade="all, delete-orphan") 

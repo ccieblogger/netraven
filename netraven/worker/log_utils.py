@@ -25,7 +25,14 @@ def save_connection_log(device_id: int, job_id: int, log_data: str, db: Optional
             # timestamp is handled by server_default in the model (as per SOT)
         )
         db.add(entry)
-        db.commit()
+        
+        # Only commit if we created this session and we're not in a transaction
+        if session_managed and not db.in_transaction():
+            try:
+                db.commit()
+            except Exception as commit_error:
+                log.error(f"Error committing connection log: {commit_error}")
+                db.rollback()
         # log.debug(f"Connection log saved for job {job_id}, device {device_id}") # Maybe too verbose
     except Exception as e:
         log.error(f"Error saving connection log for job {job_id}, device {device_id}: {e}")
@@ -61,12 +68,20 @@ def save_job_log(device_id: Optional[int], job_id: int, message: str, success: b
 
         entry = JobLog(
             job_id=job_id,
+            device_id=device_id,
             level=level_enum,
             message=message
             # timestamp is handled by server_default in the model (as per SOT)
         )
         db.add(entry)
-        # No commit here, handled by the calling function's session management
+        
+        # Only commit if we created this session and we're not in a transaction
+        if session_managed and not db.in_transaction():
+            try:
+                db.commit()
+            except Exception as commit_error:
+                log.error(f"Error committing job log: {commit_error}")
+                db.rollback()
     except Exception as e:
         log.error(f"Error saving job log for job {job_id}, device {device_id}: {e}")
         if session_managed:

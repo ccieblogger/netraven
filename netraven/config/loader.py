@@ -35,6 +35,10 @@ def get_env_overrides(prefix: str = "NETRAVEN_") -> Dict[str, Any]:
     prefix_len = len(prefix)
     for key, value in os.environ.items():
         if key.startswith(prefix):
+            # Skip the NETRAVEN_ENV variable itself, it's only for selecting the env context
+            if key == "NETRAVEN_ENV":
+                continue
+            
             # Remove prefix and split by double underscore for nesting
             parts = key[prefix_len:].lower().split('__')
             d = overrides

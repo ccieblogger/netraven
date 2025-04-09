@@ -58,6 +58,11 @@ def sync_jobs_from_db(scheduler: Scheduler):
 
             # --- Schedule based on type --- 
             try:
+                if not db_job.is_enabled:
+                    log.debug("Job is disabled, skipping.", **job_log_details)
+                    skipped_count += 1
+                    continue
+                
                 if db_job.schedule_type == 'interval' and db_job.interval_seconds and db_job.interval_seconds > 0:
                     scheduler.schedule(
                         scheduled_time=datetime.now(timezone.utc), # Start ASAP, interval defines repeats
