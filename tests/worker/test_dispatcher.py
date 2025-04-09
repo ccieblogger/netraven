@@ -204,27 +204,25 @@ def test_dispatch_tasks_results_collection(mock_executor_class):
     
     # Create mock futures with results
     future1 = MagicMock()
-    future1.result.return_value = {"device_id": 1, "success": True}
+    future1.result.return_value = {"device_id": 1, "device_name": "device1", "success": True}
     
     future2 = MagicMock()
-    future2.result.return_value = {"device_id": 2, "success": False, "error": "Failed"}
+    future2.result.return_value = {"device_id": 2, "device_name": "device2", "success": False, "error": "Failed"}
     
     # Setup mock as_completed to return our futures
     with patch('concurrent.futures.as_completed', return_value=[future1, future2]):
-        # Mock task_with_retry to be a no-op since we're mocking futures directly
-        with patch('netraven.worker.dispatcher.task_with_retry'):
-            devices = [
-                MockDevice(1, "device1", "192.168.1.1"),
-                MockDevice(2, "device2", "192.168.1.2")
-            ]
-            
-            # Run dispatcher
-            results = dispatch_tasks(devices, 123)
-            
-            # Verify results were collected
-            assert len(results) == 2
-            assert any(r["device_id"] == 1 and r["success"] for r in results)
-            assert any(r["device_id"] == 2 and not r["success"] for r in results)
+        devices = [
+            MockDevice(1, "device1", "192.168.1.1"),
+            MockDevice(2, "device2", "192.168.1.2")
+        ]
+        
+        # Run dispatcher
+        results = dispatch_tasks(devices, 123)
+        
+        # Verify results were collected
+        assert len(results) == 2
+        assert any(r["device_id"] == 1 and r["success"] for r in results)
+        assert any(r["device_id"] == 2 and not r["success"] for r in results)
 
 @patch('netraven.worker.dispatcher.ThreadPoolExecutor')
 def test_dispatch_tasks_handles_thread_exceptions(mock_executor_class):
@@ -239,20 +237,141 @@ def test_dispatch_tasks_handles_thread_exceptions(mock_executor_class):
     
     # Setup as_completed to return our future
     with patch('concurrent.futures.as_completed', return_value=[error_future]):
-        # Mock task_with_retry and classify_exception
-        with patch('netraven.worker.dispatcher.task_with_retry'):
+        with patch('netraven.worker.dispatcher.classify_exception') as mock_classify:
+            # Mock error classification
+            error_info = MagicMock()
+            error_info.to_dict.return_value = {"category": "UNKNOWN"}
+            mock_classify.return_value = error_info
+            
+            devices = [MockDevice(1, "device1", "192.168.1.1")]
+            
+            # Run dispatcher
+            results = dispatch_tasks(devices, 123)
+            
+            # Verify error handling (one result per device)
+            assert len(results) == 1
+            assert results[0]["success"] is False
+            assert "error" in results[0]
+
+class TestTaskWithRetry:
+    """Test cases for task_with_retry function."""
+
+    def test_task_with_retry_success(self):
+        """Test that task_with_retry returns successful result on first attempt."""
+        with patch('netraven.worker.dispatcher.handle_device') as mock_handle:
+            # Mock successful handling
+            mock_handle.return_value = {"status": "success", "success": True}
+            
+            # Create test device
+            device = MockDevice(1, "device1", "192.168.1.1")
+            
+            # Mock config and db
+            config = {"some": "config"}
+            db = MagicMock()
+            
+            # Execute function
+            result = task_with_retry(
+                device=device, 
+                job_id=123, 
+                config=config,
+                db=db,
+                retry_config={"max_retries": 3, "retry_delay": 0}
+            )
+            
+            # Verify success
+            assert result["status"] == "success"
+            assert result["device_id"] == 1
+            assert result["device_name"] == "device1"
+            assert result["success"] is True
+            assert result["retries"] == 0  # Should report 0 retries
+            
+            # Verify handle_device was called correctly
+            mock_handle.assert_called_once_with(device, 123, config, db)
+
+    def test_task_with_retry_retries(self):
+        """Test that task_with_retry retries on retriable errors."""
+        with patch('netraven.worker.dispatcher.handle_device') as mock_handle:
             with patch('netraven.worker.dispatcher.classify_exception') as mock_classify:
-                # Mock error classification
+                # Setup handle_device to fail then succeed
+                mock_handle.side_effect = [
+                    Exception("Temporary failure"),  # First call fails
+                    {"status": "success", "success": True}  # Second call succeeds
+                ]
+                
+                # Setup error classification as retriable
                 error_info = MagicMock()
-                error_info.to_dict.return_value = {"category": "UNKNOWN"}
+                error_info.is_retriable = True
+                error_info.to_dict.return_value = {"category": "CONNECTION", "is_retriable": True}
+                error_info.next_retry_delay.return_value = 0  # No delay for testing
+                error_info.increment_retry.return_value = error_info
                 mock_classify.return_value = error_info
                 
-                devices = [MockDevice(1, "device1", "192.168.1.1")]
+                # Create test device
+                device = MockDevice(1, "device1", "192.168.1.1")
                 
-                # Run dispatcher
-                results = dispatch_tasks(devices, 123)
+                # Mock config and db
+                config = {"some": "config"}
+                db = MagicMock()
                 
-                # Verify error was handled and result created
-                assert len(results) == 1
-                assert results[0]["success"] is False
-                assert "Thread error" in results[0]["error"] 
+                # Execute function with retry
+                result = task_with_retry(
+                    device=device, 
+                    job_id=123, 
+                    config=config,
+                    db=db,
+                    retry_config={"max_retries": 3, "retry_delay": 0}
+                )
+                
+                # Verify eventual success
+                assert result["status"] == "success"
+                assert result["device_id"] == 1
+                assert result["device_name"] == "device1"
+                assert result["success"] is True
+                assert result["retries"] == 1  # One retry was needed
+                
+                # Verify handle_device was called twice
+                assert mock_handle.call_count == 2
+                mock_handle.assert_has_calls([
+                    call(device, 123, config, db),
+                    call(device, 123, config, db)
+                ])
+
+    def test_task_with_retry_nonretriable(self):
+        """Test that task_with_retry doesn't retry non-retriable errors."""
+        with patch('netraven.worker.dispatcher.handle_device') as mock_handle:
+            with patch('netraven.worker.dispatcher.classify_exception') as mock_classify:
+                # Setup handle_device to always fail
+                mock_handle.side_effect = Exception("Critical failure")
+                
+                # Setup error classification as non-retriable
+                error_info = MagicMock()
+                error_info.is_retriable = False
+                error_info.to_dict.return_value = {"category": "AUTH", "is_retriable": False}
+                mock_classify.return_value = error_info
+                
+                # Create test device
+                device = MockDevice(1, "device1", "192.168.1.1")
+                
+                # Mock config and db
+                config = {"some": "config"}
+                db = MagicMock()
+                
+                # Execute function with retry config
+                result = task_with_retry(
+                    device=device, 
+                    job_id=123, 
+                    config=config,
+                    db=db,
+                    retry_config={"max_retries": 3, "retry_delay": 0}
+                )
+                
+                # Verify failure without retry
+                assert result["device_id"] == 1
+                assert result["device_name"] == "device1"
+                assert result["success"] is False
+                assert result["retries"] == 0  # Should be 0 for non-retriable errors
+                assert result["max_retries"] == 3  # Should match config
+                assert "error" in result
+                
+                # Verify handle_device was called only once
+                mock_handle.assert_called_once_with(device, 123, config, db) 

@@ -115,6 +115,10 @@ class ErrorInfo:
         logger_to_use = logger_instance or logger
         
         log_data = self.to_dict()
+        # Remove 'message' key to avoid conflict with LogRecord
+        if 'message' in log_data:
+            log_data['error_message'] = log_data.pop('message')
+            
         msg = f"{log_data['category']}: {self.message}"
         
         if self.is_retriable:
