@@ -1,74 +1,107 @@
 <template>
   <BaseModal :is-open="isOpen" :title="modalTitle" @close="closeModal">
     <template #content>
-      <form @submit.prevent="submitForm">
-        <div class="space-y-4">
-          <!-- Job Name -->
-          <div>
-            <label for="jobName" class="block text-sm font-medium text-gray-700">Job Name</label>
-            <input type="text" id="jobName" v-model="form.name" required
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-          </div>
+      <form @submit.prevent="submitForm" class="space-y-4">
+        <!-- Job Name -->
+        <FormField
+          id="jobName"
+          v-model="form.name"
+          label="Job Name"
+          type="text"
+          required
+          :error="validationErrors.name"
+          placeholder="e.g., Daily Backup"
+        />
 
-          <!-- Description -->
-          <div>
-            <label for="jobDescription" class="block text-sm font-medium text-gray-700">Description</label>
-            <textarea id="jobDescription" v-model="form.description" rows="3"
-                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-          </div>
+        <!-- Description -->
+        <FormField
+          id="jobDescription"
+          v-model="form.description"
+          label="Description"
+          type="textarea"
+          :error="validationErrors.description"
+          placeholder="Enter job description..."
+          help-text="Describe the purpose of this job"
+        />
 
-           <!-- Tags (Multi-select) -->
-          <div>
-            <label for="jobTags" class="block text-sm font-medium text-gray-700">Target Tags</label>
-            <select id="jobTags" v-model="form.tag_ids" multiple required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-24">
-              <option v-if="tagStore.isLoading">Loading tags...</option>
-              <option v-for="tag in tagStore.tags" :key="tag.id" :value="tag.id">
-                {{ tag.name }}
-              </option>
-            </select>
-             <p v-if="tagStore.error" class="text-xs text-red-600 mt-1">{{ tagStore.error }}</p>
-          </div>
+        <!-- Tags (Multi-select) -->
+        <TagSelector
+          id="jobTags"
+          v-model="form.tag_ids"
+          label="Target Tags"
+          required
+          :error="validationErrors.tag_ids"
+          help-text="Select tags to determine which devices this job will run against"
+        />
 
-          <!-- Is Enabled -->
-          <div class="flex items-center">
-            <input id="is_enabled" type="checkbox" v-model="form.is_enabled"
-                   class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-            <label for="is_enabled" class="ml-2 block text-sm text-gray-900">Enabled</label>
-          </div>
-
-          <!-- Schedule Type -->
-          <div>
-            <label for="scheduleType" class="block text-sm font-medium text-gray-700">Schedule Type</label>
-            <select id="scheduleType" v-model="form.schedule_type" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-              <option value="interval">Interval</option>
-              <option value="cron">Cron</option>
-              <!-- <option value="onetime">One Time</option> -->
-              <!-- Add other types if supported -->
-            </select>
-          </div>
-
-          <!-- Interval Seconds (Conditional) -->
-          <div v-if="form.schedule_type === 'interval'">
-            <label for="intervalSeconds" class="block text-sm font-medium text-gray-700">Interval (seconds)</label>
-            <input type="number" id="intervalSeconds" v-model.number="form.interval_seconds" min="1" required
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-          </div>
-
-          <!-- Cron String (Conditional) -->
-          <div v-if="form.schedule_type === 'cron'">
-            <label for="cronString" class="block text-sm font-medium text-gray-700">Cron String</label>
-            <input type="text" id="cronString" v-model="form.cron_string" placeholder="e.g., 0 2 * * *" required
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-             <p class="text-xs text-gray-500 mt-1">Standard cron format (min hour day month weekday)</p>
-          </div>
-
+        <!-- Is Enabled -->
+        <div class="flex items-center">
+          <input 
+            id="is_enabled" 
+            type="checkbox" 
+            v-model="form.is_enabled"
+            class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          >
+          <label for="is_enabled" class="ml-2 block text-sm text-gray-900">
+            Enable this job
+          </label>
         </div>
+
+        <!-- Schedule Type -->
+        <FormField
+          id="scheduleType"
+          v-model="form.schedule_type"
+          label="Schedule Type"
+          type="select"
+          required
+          :error="validationErrors.schedule_type"
+        >
+          <option value="interval">Interval</option>
+          <option value="cron">Cron</option>
+          <option value="onetime">One Time</option>
+        </FormField>
+
+        <!-- Interval Seconds (Conditional) -->
+        <FormField
+          v-if="form.schedule_type === 'interval'"
+          id="intervalSeconds"
+          v-model.number="form.interval_seconds"
+          label="Interval (seconds)"
+          type="number"
+          required
+          :min="60"
+          :error="validationErrors.interval_seconds"
+          help-text="Minimum interval is 60 seconds (1 minute)"
+        />
+
+        <!-- Cron String (Conditional) -->
+        <FormField
+          v-if="form.schedule_type === 'cron'"
+          id="cronString"
+          v-model="form.cron_string"
+          label="Cron Expression"
+          type="text"
+          required
+          :error="validationErrors.cron_string"
+          placeholder="e.g., 0 2 * * *"
+          help-text="Standard cron format (min hour day month weekday)"
+        />
+
+        <!-- One Time Date (Conditional) -->
+        <FormField
+          v-if="form.schedule_type === 'onetime'"
+          id="runAt"
+          v-model="form.run_at"
+          label="Run At"
+          type="datetime-local"
+          required
+          :error="validationErrors.run_at"
+          help-text="Select date and time to run this job"
+        />
       </form>
     </template>
     <template #actions>
-       <button
+      <button
         type="button"
         :disabled="isSaving"
         class="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -90,7 +123,10 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue';
 import BaseModal from './BaseModal.vue';
+import FormField from './FormField.vue';
+import TagSelector from './TagSelector.vue';
 import { useTagStore } from '../store/tag';
+import { useNotificationStore } from '../store/notifications';
 
 const props = defineProps({
   isOpen: {
@@ -106,7 +142,9 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save']);
 
 const tagStore = useTagStore();
+const notificationStore = useNotificationStore();
 const isSaving = ref(false);
+const validationErrors = ref({});
 
 // Initialize form reactive object
 const form = ref({
@@ -116,19 +154,30 @@ const form = ref({
     tag_ids: [], // Array of selected tag IDs
     is_enabled: true,
     schedule_type: 'interval', // Default schedule type
-    interval_seconds: 3600, // Default interval
-    cron_string: ''
+    interval_seconds: 3600, // Default interval: 1 hour
+    cron_string: '',
+    run_at: formatDateForInput(new Date(Date.now() + 3600000)) // Default: 1 hour from now
 });
 
 const modalTitle = computed(() => props.jobToEdit ? 'Edit Job' : 'Create New Job');
+
+// Helper function to format date for datetime-local input
+function formatDateForInput(date) {
+  if (!date) return '';
+  
+  // Convert to ISO string and remove seconds and timezone
+  return new Date(date).toISOString().slice(0, 16);
+}
 
 // Watch for the modal opening or jobToEdit changing
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     resetForm();
+    clearValidationErrors();
+    
     // Fetch tags if they haven't been loaded
-    if (tagStore.tags.length === 0) {
-        tagStore.fetchTags();
+    if (tagStore.tags.length === 0 && !tagStore.isLoading) {
+      tagStore.fetchTags();
     }
   }
 });
@@ -143,8 +192,15 @@ function resetForm() {
         form.value.tag_ids = props.jobToEdit.tags ? props.jobToEdit.tags.map(tag => tag.id) : [];
         form.value.is_enabled = props.jobToEdit.is_enabled;
         form.value.schedule_type = props.jobToEdit.schedule_type || 'interval';
-        form.value.interval_seconds = props.jobToEdit.interval_seconds || null;
+        form.value.interval_seconds = props.jobToEdit.interval_seconds || 3600;
         form.value.cron_string = props.jobToEdit.cron_string || '';
+        
+        // Handle run_at for onetime jobs
+        if (props.jobToEdit.run_at) {
+          form.value.run_at = formatDateForInput(new Date(props.jobToEdit.run_at));
+        } else {
+          form.value.run_at = formatDateForInput(new Date(Date.now() + 3600000));
+        }
     } else {
         // Create mode: Reset to defaults
         form.value.id = null;
@@ -155,27 +211,66 @@ function resetForm() {
         form.value.schedule_type = 'interval';
         form.value.interval_seconds = 3600;
         form.value.cron_string = '';
+        form.value.run_at = formatDateForInput(new Date(Date.now() + 3600000));
     }
-     isSaving.value = false; // Reset saving state
+    isSaving.value = false; // Reset saving state
 }
 
+function clearValidationErrors() {
+  validationErrors.value = {};
+}
+
+function validateForm() {
+  const errors = {};
+  
+  // Name validation
+  if (!form.value.name) {
+    errors.name = 'Job name is required';
+  } else if (form.value.name.length < 3) {
+    errors.name = 'Job name must be at least 3 characters';
+  }
+  
+  // Tag validation
+  if (!form.value.tag_ids || form.value.tag_ids.length === 0) {
+    errors.tag_ids = 'Please select at least one target tag';
+  }
+  
+  // Schedule type specific validation
+  if (form.value.schedule_type === 'interval') {
+    if (!form.value.interval_seconds) {
+      errors.interval_seconds = 'Interval is required';
+    } else if (form.value.interval_seconds < 60) {
+      errors.interval_seconds = 'Interval must be at least 60 seconds';
+    }
+  } else if (form.value.schedule_type === 'cron') {
+    if (!form.value.cron_string) {
+      errors.cron_string = 'Cron expression is required';
+    } else if (!/^(\S+\s+){4}\S+$/.test(form.value.cron_string)) {
+      errors.cron_string = 'Invalid cron expression format';
+    }
+  } else if (form.value.schedule_type === 'onetime') {
+    if (!form.value.run_at) {
+      errors.run_at = 'Run date/time is required';
+    } else {
+      const runAtDate = new Date(form.value.run_at);
+      if (isNaN(runAtDate) || runAtDate <= new Date()) {
+        errors.run_at = 'Run date/time must be in the future';
+      }
+    }
+  }
+  
+  validationErrors.value = errors;
+  return Object.keys(errors).length === 0;
+}
 
 function closeModal() {
   emit('close');
 }
 
 async function submitForm() {
-  // Basic validation
-  if (!form.value.name || form.value.tag_ids.length === 0) {
-    alert('Please provide a Job Name and select at least one Target Tag.');
-    return;
-  }
-  if (form.value.schedule_type === 'interval' && (!form.value.interval_seconds || form.value.interval_seconds < 1)) {
-    alert('Please provide a valid Interval (positive number of seconds).');
-    return;
-  }
-   if (form.value.schedule_type === 'cron' && !form.value.cron_string) {
-    alert('Please provide a valid Cron String.');
+  // Validate form
+  if (!validateForm()) {
+    notificationStore.error('Please correct the validation errors before saving.');
     return;
   }
 
@@ -183,20 +278,28 @@ async function submitForm() {
   try {
     // Prepare payload, ensuring nulls for non-applicable schedule fields
     const payload = {
-        ...form.value,
-        interval_seconds: form.value.schedule_type === 'interval' ? form.value.interval_seconds : null,
-        cron_string: form.value.schedule_type === 'cron' ? form.value.cron_string : null,
+      ...form.value,
+      // Set irrelevant schedule fields to null based on schedule_type
+      interval_seconds: form.value.schedule_type === 'interval' ? form.value.interval_seconds : null,
+      cron_string: form.value.schedule_type === 'cron' ? form.value.cron_string : null,
+      run_at: form.value.schedule_type === 'onetime' ? new Date(form.value.run_at).toISOString() : null,
     };
+    
     // Remove id if it's null (for create operation)
     if (payload.id === null) {
-        delete payload.id;
+      delete payload.id;
     }
 
     await emit('save', payload);
+    notificationStore.success(`Job ${props.jobToEdit ? 'updated' : 'created'} successfully!`);
     // Parent should handle closing on success
   } catch (error) {
     console.error("Error saving job:", error);
-    alert('Failed to save job. Check console for details.'); // User feedback
+    notificationStore.error({
+      title: 'Save Failed',
+      message: error.message || 'Failed to save job. Please try again.',
+      duration: 0 // Make error persistent
+    });
   } finally {
     isSaving.value = false;
   }
@@ -204,9 +307,8 @@ async function submitForm() {
 
 // Fetch initial tags if needed
 onMounted(() => {
-    if (tagStore.tags.length === 0) {
-        // tagStore.fetchTags(); // Optional pre-fetch
-    }
-})
-
+  if (props.isOpen && tagStore.tags.length === 0 && !tagStore.isLoading) {
+    tagStore.fetchTags();
+  }
+});
 </script> 

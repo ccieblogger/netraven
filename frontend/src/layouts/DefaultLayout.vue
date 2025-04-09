@@ -37,13 +37,15 @@
     </main>
 
      <!-- Global Notification Area -->
-     <!-- TODO: Implement Notification Component -->
+     <NotificationToast />
 
   </div>
 </template>
 
 <script setup>
 import { useAuthStore } from '../store/auth'; // Import auth store
+import NotificationToast from '../components/NotificationToast.vue';
+
 const authStore = useAuthStore(); // Initialize
 
 // Add sidebar logic if needed (e.g., user role checks for links)

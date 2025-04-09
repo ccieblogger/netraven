@@ -1,67 +1,73 @@
 <template>
   <BaseModal :is-open="isOpen" :title="modalTitle" @close="closeModal">
     <template #content>
-      <form @submit.prevent="submitForm">
-        <div class="space-y-4">
-          <!-- Hostname -->
-          <div>
-            <label for="hostname" class="block text-sm font-medium text-gray-700">Hostname</label>
-            <input type="text" id="hostname" v-model="form.hostname" required
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-            <!-- Add validation error display if needed -->
-          </div>
+      <form @submit.prevent="submitForm" class="space-y-4">
+        <!-- Hostname -->
+        <FormField
+          id="hostname"
+          v-model="form.hostname"
+          label="Hostname"
+          type="text"
+          required
+          :error="validationErrors.hostname"
+          placeholder="e.g., core-switch-01"
+        />
 
-          <!-- IP Address -->
-          <div>
-            <label for="ip_address" class="block text-sm font-medium text-gray-700">IP Address</label>
-            <input type="text" id="ip_address" v-model="form.ip_address" required
-                   pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
-                   title="Enter a valid IPv4 address"
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-          </div>
+        <!-- IP Address -->
+        <FormField
+          id="ip_address"
+          v-model="form.ip_address"
+          label="IP Address"
+          type="text"
+          required
+          :error="validationErrors.ip_address"
+          placeholder="e.g., 192.168.1.1"
+          pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+          help-text="IPv4 address of the device"
+        />
 
-          <!-- Device Type (Example - adapt based on actual types) -->
-           <div>
-            <label for="device_type" class="block text-sm font-medium text-gray-700">Device Type</label>
-            <input type="text" id="device_type" v-model="form.device_type" required placeholder="e.g., cisco_ios, junos"
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-          </div>
+        <!-- Device Type -->
+        <FormField
+          id="device_type"
+          v-model="form.device_type"
+          label="Device Type"
+          type="text"
+          required
+          :error="validationErrors.device_type"
+          placeholder="e.g., cisco_ios, junos"
+          help-text="Netmiko device type"
+        />
 
-          <!-- Port -->
-          <div>
-            <label for="port" class="block text-sm font-medium text-gray-700">Port</label>
-            <input type="number" id="port" v-model.number="form.port" min="1" max="65535"
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-          </div>
+        <!-- Port -->
+        <FormField
+          id="port"
+          v-model.number="form.port"
+          label="Port"
+          type="number"
+          :min="1"
+          :max="65535"
+          :error="validationErrors.port"
+          help-text="SSH port (default: 22)"
+        />
 
-          <!-- Tags (Multi-select example using basic select) -->
-          <div>
-            <label for="tags" class="block text-sm font-medium text-gray-700">Tags</label>
-            <select id="tags" v-model="form.tag_ids" multiple
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-24">
-              <option v-if="tagStore.isLoading">Loading tags...</option>
-              <option v-for="tag in tagStore.tags" :key="tag.id" :value="tag.id">
-                {{ tag.name }}
-              </option>
-            </select>
-             <p v-if="tagStore.error" class="text-xs text-red-600 mt-1">{{ tagStore.error }}</p>
-          </div>
+        <!-- Tags (multi-select) -->
+        <TagSelector
+          id="tags"
+          v-model="form.tag_ids"
+          label="Tags"
+          :error="validationErrors.tag_ids"
+          help-text="Associate tags with this device"
+        />
 
-          <!-- Credentials (Dropdown) -->
-          <div>
-            <label for="credential" class="block text-sm font-medium text-gray-700">Credentials</label>
-            <select id="credential" v-model="form.credential_id" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-              <option v-if="credentialStore.isLoading">Loading credentials...</option>
-              <option :value="null">-- Select Credentials --</option> <!-- Allow unsetting -->
-              <option v-for="cred in credentialStore.credentials" :key="cred.id" :value="cred.id">
-                {{ cred.name }} ({{ cred.username }})
-              </option>
-            </select>
-            <p v-if="credentialStore.error" class="text-xs text-red-600 mt-1">{{ credentialStore.error }}</p>
-          </div>
-
-        </div>
+        <!-- Credentials -->
+        <CredentialSelector
+          id="credential"
+          v-model="form.credential_id"
+          label="Credential"
+          required
+          :error="validationErrors.credential_id"
+          help-text="Credentials used to access this device"
+        />
       </form>
     </template>
     <template #actions>
@@ -87,8 +93,12 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue';
 import BaseModal from './BaseModal.vue';
+import FormField from './FormField.vue';
+import TagSelector from './TagSelector.vue';
+import CredentialSelector from './CredentialSelector.vue';
 import { useTagStore } from '../store/tag';
 import { useCredentialStore } from '../store/credential';
+import { useNotificationStore } from '../store/notifications';
 
 const props = defineProps({
   isOpen: {
@@ -105,8 +115,10 @@ const emit = defineEmits(['close', 'save']);
 
 const tagStore = useTagStore();
 const credentialStore = useCredentialStore();
+const notificationStore = useNotificationStore();
 
 const isSaving = ref(false);
+const validationErrors = ref({});
 
 // Initialize form reactive object
 const form = ref({
@@ -125,12 +137,14 @@ const modalTitle = computed(() => props.deviceToEdit ? 'Edit Device' : 'Create N
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     resetForm();
+    clearValidationErrors();
+    
     // Fetch tags and credentials if they haven't been loaded
-    if (tagStore.tags.length === 0) {
+    if (tagStore.tags.length === 0 && !tagStore.isLoading) {
         tagStore.fetchTags();
     }
-    if (credentialStore.credentials.length === 0) {
-         credentialStore.fetchCredentials();
+    if (credentialStore.credentials.length === 0 && !credentialStore.isLoading) {
+        credentialStore.fetchCredentials();
     }
   }
 });
@@ -160,50 +174,94 @@ function resetForm() {
     isSaving.value = false; // Reset saving state
 }
 
+function clearValidationErrors() {
+  validationErrors.value = {};
+}
+
+function validateForm() {
+  const errors = {};
+  
+  // Hostname validation
+  if (!form.value.hostname) {
+    errors.hostname = 'Hostname is required';
+  } else if (form.value.hostname.length < 2) {
+    errors.hostname = 'Hostname must be at least 2 characters';
+  }
+  
+  // IP Address validation
+  if (!form.value.ip_address) {
+    errors.ip_address = 'IP address is required';
+  } else if (!/^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(form.value.ip_address)) {
+    errors.ip_address = 'Please enter a valid IPv4 address';
+  }
+  
+  // Device type validation
+  if (!form.value.device_type) {
+    errors.device_type = 'Device type is required';
+  }
+  
+  // Port validation (optional)
+  if (form.value.port !== null && (form.value.port < 1 || form.value.port > 65535)) {
+    errors.port = 'Port must be between 1 and 65535';
+  }
+  
+  // Credential validation
+  if (!form.value.credential_id) {
+    errors.credential_id = 'Please select credentials for this device';
+  }
+  
+  validationErrors.value = errors;
+  return Object.keys(errors).length === 0;
+}
 
 function closeModal() {
   emit('close');
 }
 
 async function submitForm() {
-  // Basic validation example (can be expanded)
-  if (!form.value.hostname || !form.value.ip_address || !form.value.device_type || !form.value.credential_id) {
-    alert('Please fill in all required fields.'); // Replace with better validation feedback
+  // Validate form
+  if (!validateForm()) {
+    notificationStore.error('Please correct the validation errors before saving.');
     return;
   }
 
   isSaving.value = true;
   try {
-    // Prepare payload - ensure credential_id is null if not selected, not undefined
+    // Prepare payload
     const payload = {
         ...form.value,
         credential_id: form.value.credential_id || null
     };
+    
     // Remove id if it's null (for create operation)
     if (payload.id === null) {
         delete payload.id;
     }
 
     await emit('save', payload);
+    notificationStore.success(`Device ${props.deviceToEdit ? 'updated' : 'created'} successfully!`);
     // Parent component should close modal on successful save
-    // closeModal();
   } catch (error) {
     console.error("Error saving device:", error);
-    alert('Failed to save device. Check console for details.'); // User feedback
+    notificationStore.error({
+      title: 'Save Failed',
+      message: error.message || 'Failed to save device. Please try again.',
+      duration: 0 // Make error persistent
+    });
   } finally {
     isSaving.value = false;
   }
 }
 
-// Fetch initial data if stores are empty (e.g., on component mount if modal could be initially open)
-// Although fetching in the watch(isOpen) is generally preferred for modals
+// Fetch initial data if needed (e.g., when modal is initially open)
 onMounted(() => {
-    if (tagStore.tags.length === 0) {
-        // tagStore.fetchTags(); // Can optionally pre-fetch
+  if (props.isOpen) {
+    if (tagStore.tags.length === 0 && !tagStore.isLoading) {
+      tagStore.fetchTags();
     }
-     if (credentialStore.credentials.length === 0) {
-        // credentialStore.fetchCredentials(); // Can optionally pre-fetch
+    if (credentialStore.credentials.length === 0 && !credentialStore.isLoading) {
+      credentialStore.fetchCredentials();
     }
-})
-
+  }
+});
 </script> 
