@@ -89,11 +89,51 @@
 
 ---
 
-## Phase 1.4: Implement Log Pagination (Backend & Frontend)
+## Phase 1.4: Implement Log Pagination (Backend & Frontend) (Complete)
 
 **Date:** $(date +'%Y-%m-%d %H:%M:%S')
 
 **Goal:** Add pagination to the Logs API endpoint and integrate pagination controls into the Logs page.
+
+**Changes:**
+*   **Backend (`netraven/api/routers/logs.py`):**
+    *   Modified `/logs` endpoint to accept `page` (default 1) and `size` (default 20, max 100) query parameters.
+    *   Added a generic `PaginatedResponse` Pydantic model.
+    *   Updated endpoint logic to calculate offset, perform filtering, combine results (in memory), count total items, calculate total pages, and return data in the `PaginatedResponse` structure.
+*   **Frontend (`frontend/src/store/log.js`):**
+    *   Updated `pagination` state to use `currentPage`, `itemsPerPage`, `totalItems`, `totalPages`.
+    *   Modified `fetchLogs` action:
+        *   Accepts `page` and optional `newFilters`.
+        *   Resets `currentPage` to 1 when `newFilters` are provided.
+        *   Sends `page` and `size` parameters to the API.
+        *   Updates `logs` list and pagination state from the `PaginatedResponse` received from the API.
+    *   Added `totalPages` computed property.
+*   **Frontend (`frontend/src/components/PaginationControls.vue`):**
+    *   Created a new component to display page info (X of Y) and Previous/Next buttons.
+    *   Takes `currentPage` and `totalPages` as props.
+    *   Emits `changePage` event with the new page number.
+*   **Frontend (`frontend/src/pages/Logs.vue`):**
+    *   Imported and integrated `PaginationControls` component below the logs table.
+    *   Bound controls to `logStore.pagination.currentPage` and `totalPages`.
+    *   Implemented `handlePageChange` method to call `logStore.fetchLogs(newPage)`.
+    *   Modified `applyFilters` and `resetFilters` to call `logStore.fetchLogs(1, filters)` to ensure pagination resets.
+    *   Added logic (`updateRouteQuery`) to synchronize filters and current page with URL query parameters for better navigation and sharing.
+    *   Updated initial `onMounted` fetch to use page/filters from route query.
+
+**Rationale:**
+*   Enables efficient loading and display of large log datasets by breaking them into pages.
+*   Provides UI controls for navigating between log pages.
+*   Synchronizes filters and page state with the URL for better user experience.
+
+**Next Steps:** Proceed to Phase 1.5: Refinement and Testing.
+
+---
+
+## Phase 1.5: Refinement and Testing
+
+**Date:** $(date +'%Y-%m-%d %H:%M:%S')
+
+**Goal:** Manually test all implemented features and refine UI/UX.
 
 **Changes:**
 *(pending)*
@@ -101,4 +141,4 @@
 **Rationale:**
 *(pending)*
 
-**Next Steps:** Modify API `/logs` endpoint. Update `useLogStore` and `Logs.vue` page. 
+**Next Steps:** Conduct thorough manual testing of Device/Job CRUD and Log pagination. 
