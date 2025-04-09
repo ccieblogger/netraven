@@ -9,6 +9,7 @@ from netraven.worker import redactor
 from netraven.worker import log_utils
 from netraven.worker import git_writer
 from netraven.worker.error_handler import ErrorCategory, ErrorInfo, classify_exception, format_error_for_db
+from netraven.worker.circuit_breaker import get_circuit_breaker, CircuitState
 
 # Import specific exceptions for error handling
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
@@ -48,6 +49,40 @@ def handle_device(
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
 
+    # --- Check Circuit Breaker ---
+    circuit_breaker = get_circuit_breaker()
+    if not circuit_breaker.can_connect(device_id):
+        # Circuit is open, don't attempt connection
+        circuit_state = circuit_breaker.get_state(device_id)
+        failure_count = circuit_breaker.get_failure_count(device_id)
+        
+        error_message = (
+            f"Connection blocked by circuit breaker. "
+            f"Circuit is {circuit_state.value} after {failure_count} failures. "
+            f"Try again later."
+        )
+        
+        log.warning(f"[Job: {job_id}] {error_message} for device: {device_name}")
+        
+        error_info = ErrorInfo(
+            category=ErrorCategory.DEVICE_BUSY,
+            message=error_message,
+            is_retriable=False,  # Don't retry in this job run
+            log_level=logging.WARNING,
+            context={"job_id": job_id, "device_id": device_id, "circuit_state": circuit_state.value}
+        )
+        
+        log_utils.save_job_log(device_id, job_id, error_message, success=False, db=db)
+        
+        return {
+            "success": False,
+            "result": None,
+            "error": error_message,
+            "error_info": error_info.to_dict(),
+            "device_id": device_id,
+            "circuit_blocked": True
+        }
+
     # --- Load Configurable Values --- 
     repo_path = DEFAULT_GIT_REPO_PATH
     
@@ -70,6 +105,9 @@ def handle_device(
             raise ValueError("Device returned empty configuration")
             
         log.info(f"[Job: {job_id}] Successfully retrieved configuration from device: {device_name}")
+        
+        # Record success in circuit breaker
+        circuit_breaker.record_success(device_id)
 
         # 2. Redact output
         redacted_output = redactor.redact(raw_output, config=config)
@@ -105,8 +143,14 @@ def handle_device(
             result["error_info"] = error_info.to_dict()
             log_utils.save_job_log(device_id, job_id, error_info.message, success=False, db=db)
             log.error(f"[Job: {job_id}] Failed to commit configuration for device: {device_name}")
+            
+            # Record failure in circuit breaker only for connection/retrieval failures
+            circuit_breaker.record_failure(device_id)
 
     except Exception as e:
+        # Record failure in circuit breaker 
+        circuit_breaker.record_failure(device_id)
+        
         # Classify the exception
         error_info = classify_exception(e, job_id=job_id, device_id=device_id)
         
@@ -116,6 +160,10 @@ def handle_device(
         # Add error details to result
         result["error"] = error_info.message
         result["error_info"] = error_info.to_dict()
+        
+        # Add circuit breaker state to result
+        result["circuit_state"] = circuit_breaker.get_state(device_id).value
+        result["failure_count"] = circuit_breaker.get_failure_count(device_id)
         
         # Save error to job log
         log_utils.save_job_log(device_id, job_id, error_info.message, success=False, db=db)
