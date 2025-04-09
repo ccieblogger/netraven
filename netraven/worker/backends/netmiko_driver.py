@@ -17,10 +17,11 @@ DEFAULT_COMMAND_TIMEOUT = 120  # seconds
 def run_command(
     device: Any, 
     job_id: Optional[int] = None,
+    command: Optional[str] = None,
     config: Optional[Dict] = None
 ) -> str:
     """
-    Connects to a device using Netmiko, runs 'show running-config',
+    Connects to a device using Netmiko, runs the specified command (or 'show running-config' by default),
     and returns the output.
 
     Args:
@@ -28,10 +29,11 @@ def run_command(
                 device_type, ip_address, username, password).
                 Expected attributes: device_type, ip_address, username, password.
         job_id: Optional job ID for logging purposes.
+        command: The command to execute. Defaults to 'show running-config' if not specified.
         config: Optional configuration dictionary with timeout settings.
 
     Returns:
-        The output of the 'show running-config' command as a string.
+        The output of the command as a string.
 
     Raises:
         NetmikoTimeoutException: If the connection times out.
@@ -41,6 +43,10 @@ def run_command(
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
     device_ip = getattr(device, 'ip_address', 'Unknown')
+    
+    # Set default command if none provided
+    if command is None:
+        command = COMMAND_SHOW_RUN
     
     # Get timeout values from config or use defaults
     conn_timeout = DEFAULT_CONN_TIMEOUT
@@ -74,19 +80,19 @@ def run_command(
         connection = ConnectHandler(**connection_details)
         
         # Execute command with timeout
-        log.debug(f"[Job: {job_id}] Executing '{COMMAND_SHOW_RUN}' on {device_name}")
+        log.debug(f"[Job: {job_id}] Executing '{command}' on {device_name}")
         output = connection.send_command(
-            COMMAND_SHOW_RUN, 
+            command, 
             read_timeout=command_timeout
         )
         
         # Validate output
         if output is None:
-            raise ValueError(f"Received no output for command '{COMMAND_SHOW_RUN}' from {device_ip}")
+            raise ValueError(f"Received no output for command '{command}' from {device_ip}")
         
         # Log success
         elapsed = time.time() - start_time
-        log.info(f"[Job: {job_id}] Successfully retrieved configuration from {device_name} in {elapsed:.2f}s")
+        log.info(f"[Job: {job_id}] Successfully executed command on {device_name} in {elapsed:.2f}s")
         
         return output
         
@@ -99,7 +105,7 @@ def run_command(
     except Exception as e:
         # Catch broader exceptions during connection or command execution
         elapsed = time.time() - start_time
-        log.error(f"[Job: {job_id}] Error connecting to {device_name} or running command after {elapsed:.2f}s: {e}")
+        log.error(f"[Job: {job_id}] Error connecting to {device_name} or running command '{command}' after {elapsed:.2f}s: {e}")
         raise
         
     finally:
@@ -127,5 +133,10 @@ def run_command(
 #         config = run_command(mock_dev)
 #         print("Successfully retrieved config:")
 #         print(config[:200] + "...") # Print first 200 chars
+#
+#         # Example with custom command
+#         version = run_command(mock_dev, command="show version")
+#         print("Version information:")
+#         print(version[:200] + "...") # Print first 200 chars
 #     except Exception as e:
 #         print(f"Failed to run command: {e}")
