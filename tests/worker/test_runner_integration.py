@@ -1,6 +1,9 @@
 import pytest
-from unittest.mock import patch, ANY, call
+from unittest.mock import patch, ANY, call, MagicMock
 import os # Import os to potentially check env vars if needed
+from typing import List # Add this import
+from datetime import datetime
+import logging
 
 # Import the main runner function
 from netraven.worker import runner
