@@ -63,11 +63,37 @@
 
 ---
 
-## Phase 1.3: Implement Job CRUD Modals & Integration
+## Phase 1.3: Implement Job CRUD Modals & Integration (Complete)
 
 **Date:** $(date +'%Y-%m-%d %H:%M:%S')
 
 **Goal:** Create and integrate modals for creating, editing, and deleting jobs.
+
+**Changes:**
+*   Created `frontend/src/components/JobFormModal.vue` with fields for job properties (name, desc, tags, enabled, schedule type, interval/cron), tag selection using `useTagStore`, conditional rendering for schedule fields, and save logic.
+*   Modified `frontend/src/pages/Jobs.vue`:
+    *   Imported `JobFormModal`, `DeleteConfirmationModal`, and icon components.
+    *   Added state refs (`isFormModalOpen`, `selectedJob`, `isDeleteModalOpen`, `jobToDelete`) to manage modal visibility and data.
+    *   Implemented handler functions (`openCreateJobModal`, `openEditJobModal`, `handleSaveJob`, `openDeleteJobModal`, `handleDeleteJobConfirm`, `runJobNow`) to control modals and call `useJobStore` actions.
+    *   Replaced placeholder buttons/logic with actual modal triggers.
+    *   Used icons for action buttons.
+    *   Removed placeholder `statusClass` function (last run status needs backend support).
+    *   Improved loading/error display logic.
+
+**Rationale:**
+*   Provides interactive UI for full CRUD management and manual triggering of Jobs.
+*   Reuses modal components for consistency.
+*   Connects frontend actions to backend API calls via Pinia stores.
+
+**Next Steps:** Proceed to Phase 1.4: Implement Log Pagination (Backend & Frontend).
+
+---
+
+## Phase 1.4: Implement Log Pagination (Backend & Frontend)
+
+**Date:** $(date +'%Y-%m-%d %H:%M:%S')
+
+**Goal:** Add pagination to the Logs API endpoint and integrate pagination controls into the Logs page.
 
 **Changes:**
 *(pending)*
@@ -75,4 +101,4 @@
 **Rationale:**
 *(pending)*
 
-**Next Steps:** Implement `JobFormModal.vue` and integrate into `Jobs.vue` using the existing delete modal. 
+**Next Steps:** Modify API `/logs` endpoint. Update `useLogStore` and `Logs.vue` page. 

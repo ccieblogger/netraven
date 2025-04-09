@@ -4,25 +4,25 @@
 
     <!-- Add Job Button -->
     <div class="mb-4 text-right">
-      <button @click="openCreateModal" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+      <button @click="openCreateJobModal" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
         + Add Job
       </button>
     </div>
 
     <!-- Loading/Error Indicators -->
-    <div v-if="jobStore.isLoading" class="text-center py-4">Loading Jobs...</div>
+    <div v-if="jobStore.isLoading && jobs.length === 0" class="text-center py-4">Loading Jobs...</div>
     <div v-if="jobStore.error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
        Error loading jobs: {{ jobStore.error }}
     </div>
     <!-- Job Run Status Indicator -->
-     <div v-if="jobStore.runStatus" :class="runStatusClass" class="px-4 py-3 rounded relative mb-4" role="alert">
+     <div v-if="jobStore.runStatus" :class="runStatusClass" class="px-4 py-3 rounded relative mb-4 transition-opacity duration-300" role="alert">
        <span v-if="jobStore.runStatus.status === 'running'">Triggering job {{ jobStore.runStatus.jobId }}...</span>
        <span v-if="jobStore.runStatus.status === 'queued'">Job {{ jobStore.runStatus.jobId }} queued successfully (RQ ID: {{ jobStore.runStatus.data?.queue_job_id }}).</span>
        <span v-if="jobStore.runStatus.status === 'failed'">Failed to trigger job {{ jobStore.runStatus.jobId }}: {{ jobStore.runStatus.error }}</span>
     </div>
 
     <!-- Jobs Table -->
-    <div v-if="!jobStore.isLoading && jobs.length > 0" class="bg-white shadow-md rounded my-6">
+     <div v-if="jobs.length > 0" class="bg-white shadow-md rounded my-6" :class="{ 'opacity-50': jobStore.isLoading }">
       <table class="min-w-max w-full table-auto">
         <thead>
           <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
@@ -59,15 +59,21 @@
                <span v-if="!job.tags || job.tags.length === 0">-</span>
             </td>
              <td class="py-3 px-6 text-left">
-                <span :class="statusClass(job.status)" class="py-1 px-3 rounded-full text-xs">
-                    {{ job.status }}
+                <span class="py-1 px-3 rounded-full text-xs bg-gray-200 text-gray-600">
+                   N/A
                 </span>
             </td>
             <td class="py-3 px-6 text-center">
               <div class="flex item-center justify-center">
-                 <button @click="triggerRun(job)" title="Run Job Now" class="w-4 mr-2 transform hover:text-green-500 hover:scale-110">▶️</button>
-                 <button @click="openEditModal(job)" title="Edit Job" class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">✏️</button>
-                 <button @click="confirmDelete(job)" title="Delete Job" class="w-4 mr-2 transform hover:text-red-500 hover:scale-110">🗑️</button>
+                 <button @click="runJobNow(job)" title="Run Job Now" class="w-4 mr-2 transform hover:text-green-500 hover:scale-110">
+                    <PlayIcon class="h-4 w-4" />
+                 </button>
+                 <button @click="openEditJobModal(job)" title="Edit Job" class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
+                    <PencilIcon class="h-4 w-4" />
+                 </button>
+                 <button @click="openDeleteJobModal(job)" title="Delete Job" class="w-4 mr-2 transform hover:text-red-500 hover:scale-110">
+                    <TrashIcon class="h-4 w-4" />
+                 </button>
               </div>
             </td>
           </tr>
@@ -80,7 +86,22 @@
       No jobs found. Add one!
     </div>
 
-    <!-- TODO: Add Create/Edit Modal Component (requires tag selection, schedule inputs) -->
+    <!-- Create/Edit Job Modal -->
+     <JobFormModal
+        :is-open="isFormModalOpen"
+        :job-to-edit="selectedJob"
+        @close="closeFormModal"
+        @save="handleSaveJob"
+      />
+
+     <!-- Delete Confirmation Modal -->
+      <DeleteConfirmationModal
+        :is-open="isDeleteModalOpen"
+        item-type="job"
+        :item-name="jobToDelete?.name"
+        @close="closeDeleteModal"
+        @confirm="handleDeleteJobConfirm"
+      />
 
   </div>
 </template>
@@ -88,17 +109,24 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useJobStore } from '../store/job'
+import JobFormModal from '../components/JobFormModal.vue'
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue'
+import { PencilIcon, TrashIcon, PlayIcon } from '@heroicons/vue/24/outline'
 
 const jobStore = useJobStore()
 const jobs = computed(() => jobStore.jobs)
 
-// Modal state placeholders
-const showModal = ref(false)
-const selectedJob = ref(null)
-const isEditMode = ref(false)
+// Modal States
+const isFormModalOpen = ref(false)
+const selectedJob = ref(null) // null for create, job object for edit
+const isDeleteModalOpen = ref(false)
+const jobToDelete = ref(null)
 
 onMounted(() => {
-  jobStore.fetchJobs()
+    // Fetch jobs only if the list is empty initially
+    if (jobs.value.length === 0) {
+         jobStore.fetchJobs()
+    }
 })
 
 // --- Helper Functions ---
@@ -112,15 +140,7 @@ function formatDateTime(dateTimeString) {
   }
 }
 
-function statusClass(status) {
-  if (!status) return 'bg-gray-200 text-gray-600';
-  status = status.toLowerCase();
-  if (status.includes('success')) return 'bg-green-200 text-green-600';
-  if (status.includes('fail') || status.includes('error')) return 'bg-red-200 text-red-600';
-  if (status.includes('running') || status.includes('pending') || status.includes('queued')) return 'bg-yellow-200 text-yellow-600';
-  return 'bg-gray-200 text-gray-600'; // Default
-}
-
+// Status class based on job run status (API response)
 const runStatusClass = computed(() => {
   if (!jobStore.runStatus) return '';
   switch (jobStore.runStatus.status) {
@@ -132,27 +152,70 @@ const runStatusClass = computed(() => {
 });
 
 // --- Action Handlers ---
-function openCreateModal() {
-  alert('Placeholder: Open Create Job Modal');
+
+// Form Modal
+function openCreateJobModal() {
+  selectedJob.value = null
+  isFormModalOpen.value = true
 }
-function openEditModal(job) {
-   alert(`Placeholder: Open Edit Job Modal for ${job.name}`);
+
+function openEditJobModal(job) {
+  selectedJob.value = { ...job } // Pass copy
+  isFormModalOpen.value = true
 }
-function confirmDelete(job) {
-  if (confirm(`Are you sure you want to delete the job "${job.name}"? This cannot be undone.`)) {
-     alert(`Placeholder: Delete job ${job.id}`);
-     // jobStore.deleteJob(job.id);
+
+function closeFormModal() {
+  isFormModalOpen.value = false
+  selectedJob.value = null
+}
+
+async function handleSaveJob(jobData) {
+  console.log("Saving job:", jobData);
+  try {
+      if (jobData.id) {
+          await jobStore.updateJob(jobData.id, jobData);
+      } else {
+          await jobStore.createJob(jobData);
+      }
+      closeFormModal();
+      // jobStore.fetchJobs(); // Refresh if not reactive
+  } catch (error) {
+      console.error("Failed to save job:", error);
+      alert(`Error saving job: ${jobStore.error || 'Unknown error'}`);
   }
 }
 
-function triggerRun(job) {
-   if (confirm(`Trigger job "${job.name}" to run now?`)) {
+// Delete Modal
+function openDeleteJobModal(job) {
+  jobToDelete.value = job
+  isDeleteModalOpen.value = true
+}
+
+function closeDeleteModal() {
+  isDeleteModalOpen.value = false
+  jobToDelete.value = null
+}
+
+async function handleDeleteJobConfirm() {
+  if (!jobToDelete.value) return;
+  console.log("Deleting job:", jobToDelete.value.id);
+  try {
+      await jobStore.deleteJob(jobToDelete.value.id);
+      closeDeleteModal();
+      // jobStore.fetchJobs(); // Refresh if not reactive
+  } catch (error) {
+      console.error("Failed to delete job:", error);
+      alert(`Error deleting job: ${jobStore.error || 'Unknown error'}`);
+      closeDeleteModal();
+  }
+}
+
+// Run Job
+function runJobNow(job) {
+   if (confirm(`Trigger job "${job.name}" (ID: ${job.id}) to run now?`)) {
      jobStore.runJobNow(job.id);
    }
 }
-
-function closeModal() { /* ... */ }
-async function handleSave(data) { /* ... */ }
 
 </script>
 
