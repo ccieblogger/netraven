@@ -3,30 +3,13 @@
     <h1 class="text-2xl font-semibold mb-4">System Logs</h1>
 
     <!-- Filters -->
-    <div class="bg-white p-4 rounded shadow mb-6 flex space-x-4 items-end">
-      <div>
-        <label for="jobIdFilter" class="block text-sm font-medium text-gray-700">Job ID</label>
-        <input type="number" id="jobIdFilter" v-model.number="currentFilters.job_id" placeholder="Filter by Job ID" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-      </div>
-      <div>
-        <label for="deviceIdFilter" class="block text-sm font-medium text-gray-700">Device ID</label>
-        <input type="number" id="deviceIdFilter" v-model.number="currentFilters.device_id" placeholder="Filter by Device ID" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-      </div>
-      <div>
-        <label for="logTypeFilter" class="block text-sm font-medium text-gray-700">Log Type</label>
-        <select id="logTypeFilter" v-model="currentFilters.log_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-          <option :value="null">All</option>
-          <option value="job">Job Logs</option>
-          <option value="connection">Connection Logs</option>
-        </select>
-      </div>
-      <button @click="applyFilters" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-        Apply Filters
-      </button>
-      <button @click="resetFilters" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-        Reset
-      </button>
-    </div>
+    <ResourceFilter
+      title="Log Filters"
+      :filter-fields="filterFields"
+      :initial-filters="currentFilters"
+      @apply-filters="applyFilters"
+      @reset-filters="resetFilters"
+    />
 
     <!-- Loading/Error Indicators -->
     <div v-if="logStore.isLoading && logs.length === 0" class="text-center py-4">Loading Logs...</div>
@@ -92,12 +75,40 @@ import { ref, onMounted, computed, reactive, watch } from 'vue'
 import { useLogStore } from '../store/log'
 import { useRoute, useRouter } from 'vue-router' // To potentially pre-fill filters from query params
 import PaginationControls from '../components/PaginationControls.vue'
+import ResourceFilter from '../components/ResourceFilter.vue'
 
 const logStore = useLogStore()
 const logs = computed(() => logStore.logs)
 const totalPages = computed(() => logStore.totalPages) // Use computed from store
 const route = useRoute()
 const router = useRouter()
+
+// Filter fields configuration
+const filterFields = [
+  {
+    id: 'job_id',
+    label: 'Job ID',
+    type: 'number',
+    placeholder: 'Filter by Job ID'
+  },
+  {
+    id: 'device_id',
+    label: 'Device ID',
+    type: 'number',
+    placeholder: 'Filter by Device ID'
+  },
+  {
+    id: 'log_type',
+    label: 'Log Type',
+    type: 'select',
+    placeholder: 'Select log type',
+    options: [
+      { value: null, label: 'All' },
+      { value: 'job_log', label: 'Job Logs' },
+      { value: 'connection_log', label: 'Connection Logs' }
+    ]
+  }
+]
 
 // Local reactive state for filter inputs, initialized from route query
 const currentFilters = reactive({
@@ -137,16 +148,21 @@ onMounted(() => {
     logStore.fetchLogs(initialPage, currentFilters)
 })
 
-function applyFilters() {
+function applyFilters(filters) {
+  // Update currentFilters with the values received from ResourceFilter
+  Object.assign(currentFilters, filters);
+  
   // fetchLogs in store now resets page to 1 when newFilters are passed
   logStore.fetchLogs(1, currentFilters);
   updateRouteQuery(); // Update URL after applying filters
 }
 
 function resetFilters() {
-  currentFilters.job_id = null
-  currentFilters.device_id = null
-  currentFilters.log_type = null
+  // Reset all filters to null
+  Object.keys(currentFilters).forEach(key => {
+    currentFilters[key] = null;
+  });
+  
   // fetchLogs resets page to 1
   logStore.fetchLogs(1, currentFilters);
   updateRouteQuery(); // Update URL after resetting filters
