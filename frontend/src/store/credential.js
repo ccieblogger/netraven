@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '../services/api'
 
-export const useCredentialStore = defineStore('credentials', () => {
+export const useCredentialStore = defineStore('credential', () => {
   const credentials = ref([])
   const isLoading = ref(false)
   const error = ref(null)
@@ -12,10 +12,11 @@ export const useCredentialStore = defineStore('credentials', () => {
     error.value = null
     try {
       const response = await api.get('/credentials')
-      credentials.value = response.data
+      credentials.value = Array.isArray(response.data) ? response.data : []
     } catch (err) {
+      console.error("Error fetching credentials:", err)
       error.value = err.response?.data?.detail || 'Failed to fetch credentials'
-      console.error("Fetch Credentials Error:", err)
+      credentials.value = []
     } finally {
       isLoading.value = false
     }
@@ -77,5 +78,17 @@ export const useCredentialStore = defineStore('credentials', () => {
     isLoading.value = false
     error.value = null
   }
+
+  return {
+    credentials,
+    isLoading,
+    error,
+    fetchCredentials,
+    createCredential,
+    updateCredential,
+    deleteCredential,
+    $reset
+  }
+})
 
  

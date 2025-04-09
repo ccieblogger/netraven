@@ -10,13 +10,14 @@
     </div>
 
     <!-- Loading/Error Indicators -->
-    <div v-if="deviceStore.isLoading" class="text-center py-4">Loading...</div>
+    <div v-if="deviceStore.isLoading && devices.length === 0" class="text-center py-4">Loading devices...</div>
     <div v-if="deviceStore.error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-       Error: {{ deviceStore.error }}
+       Error fetching devices: {{ deviceStore.error }}
     </div>
 
     <!-- Devices Table -->
-    <div v-if="!deviceStore.isLoading && devices.length > 0" class="bg-white shadow-md rounded my-6">
+    <!-- Show skeleton or previous data while loading updates -->
+    <div v-if="devices.length > 0" class="bg-white shadow-md rounded my-6" :class="{ 'opacity-50': deviceStore.isLoading }">
       <table class="min-w-max w-full table-auto">
         <thead>
           <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
@@ -26,6 +27,7 @@
             <th class="py-3 px-6 text-left">Type</th>
             <th class="py-3 px-6 text-left">Port</th>
             <th class="py-3 px-6 text-left">Tags</th>
+            <th class="py-3 px-6 text-left">Credential</th>
             <th class="py-3 px-6 text-center">Actions</th>
           </tr>
         </thead>
@@ -42,10 +44,18 @@
               </span>
               <span v-if="!device.tags || device.tags.length === 0">-</span>
             </td>
+             <td class="py-3 px-6 text-left">
+                <span v-if="device.credential">{{ device.credential.name }}</span>
+                <span v-else class="text-gray-400">-</span>
+            </td>
             <td class="py-3 px-6 text-center">
               <div class="flex item-center justify-center">
-                 <button @click="openEditModal(device)" class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">✏️</button>
-                 <button @click="confirmDelete(device)" class="w-4 mr-2 transform hover:text-red-500 hover:scale-110">🗑️</button>
+                 <button @click="openEditModal(device)" class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
+                    <PencilIcon class="h-4 w-4" />
+                 </button>
+                 <button @click="openDeleteModal(device)" class="w-4 mr-2 transform hover:text-red-500 hover:scale-110">
+                    <TrashIcon class="h-4 w-4" />
+                 </button>
               </div>
             </td>
           </tr>
@@ -58,7 +68,22 @@
       No devices found. Add one!
     </div>
 
-    <!-- TODO: Add Create/Edit Modal Component (requires tag selection) -->
+    <!-- Create/Edit Modal -->
+     <DeviceFormModal
+        :is-open="isFormModalOpen"
+        :device-to-edit="selectedDevice"
+        @close="closeFormModal"
+        @save="handleSaveDevice"
+      />
+
+     <!-- Delete Confirmation Modal -->
+      <DeleteConfirmationModal
+        :is-open="isDeleteModalOpen"
+        item-type="device"
+        :item-name="deviceToDelete?.hostname"
+        @close="closeDeleteModal"
+        @confirm="handleDeleteConfirm"
+      />
 
   </div>
 </template>
@@ -66,34 +91,96 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useDeviceStore } from '../store/device'
+import DeviceFormModal from '../components/DeviceFormModal.vue'
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue'
+import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline' // Using outline icons
 
 const deviceStore = useDeviceStore()
 const devices = computed(() => deviceStore.devices)
 
-// Modal state placeholders
-const showModal = ref(false)
-const selectedDevice = ref(null)
-const isEditMode = ref(false)
+// Modal States
+const isFormModalOpen = ref(false)
+const selectedDevice = ref(null) // null for create, device object for edit
+const isDeleteModalOpen = ref(false)
+const deviceToDelete = ref(null)
 
 onMounted(() => {
-  deviceStore.fetchDevices()
+    // Fetch devices only if the list is empty initially
+    if (devices.value.length === 0) {
+         deviceStore.fetchDevices()
+    }
 })
 
-// Placeholder actions
+// Form Modal Handlers
 function openCreateModal() {
-  alert('Placeholder: Open Create Device Modal');
+  selectedDevice.value = null // Ensure create mode
+  isFormModalOpen.value = true
 }
+
 function openEditModal(device) {
-   alert(`Placeholder: Open Edit Device Modal for ${device.hostname}`);
+  selectedDevice.value = { ...device } // Pass a copy to avoid reactivity issues
+  isFormModalOpen.value = true
 }
-function confirmDelete(device) {
-  if (confirm(`Are you sure you want to delete the device "${device.hostname}"?`)) {
-     alert(`Placeholder: Delete device ${device.id}`);
-     // deviceStore.deleteDevice(device.id);
+
+function closeFormModal() {
+  isFormModalOpen.value = false
+  selectedDevice.value = null
+}
+
+async function handleSaveDevice(deviceData) {
+  console.log("Saving device:", deviceData)
+  let success = false; // Flag to track success
+  try {
+      if (deviceData.id) {
+        await deviceStore.updateDevice(deviceData.id, deviceData);
+      } else {
+        await deviceStore.createDevice(deviceData);
+      }
+      success = true; // Mark as successful
+      closeFormModal();
+      // Refresh list might still be needed if store isn't fully reactive
+      // await deviceStore.fetchDevices();
+  } catch (error) {
+       console.error("Failed to save device:", error);
+       // Show error from the store action directly
+       alert(`Error saving device: ${deviceStore.error || 'An unknown error occurred.'}`);
+       // Do NOT close the modal on error
+  } finally {
+      // Optional: Add logic here if needed regardless of success/fail
+      // For example, re-enable save button is handled in the modal itself
   }
 }
-function closeModal() { /* ... */ }
-async function handleSave(data) { /* ... */ }
+
+
+// Delete Modal Handlers
+function openDeleteModal(device) {
+  deviceToDelete.value = device
+  isDeleteModalOpen.value = true
+}
+
+function closeDeleteModal() {
+  isDeleteModalOpen.value = false
+  deviceToDelete.value = null
+}
+
+async function handleDeleteConfirm() {
+  if (!deviceToDelete.value) return;
+
+  console.log("Deleting device:", deviceToDelete.value.id)
+   let success = false;
+  try {
+      await deviceStore.deleteDevice(deviceToDelete.value.id);
+      success = true;
+      closeDeleteModal();
+      // Refresh list might still be needed
+      // await deviceStore.fetchDevices();
+  } catch (error) {
+      console.error("Failed to delete device:", error);
+      alert(`Error deleting device: ${deviceStore.error || 'An unknown error occurred.'}`);
+      // Close modal even on error to avoid being stuck
+      closeDeleteModal();
+  }
+}
 
 </script>
 
