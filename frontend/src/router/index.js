@@ -9,6 +9,8 @@ import Jobs from '../pages/Jobs.vue';
 import Logs from '../pages/Logs.vue';
 import Users from '../pages/Users.vue';
 import Unauthorized from '../pages/Unauthorized.vue';
+import ConfigDiff from '../pages/ConfigDiff.vue'; // Import the ConfigDiff component
+import JobMonitor from '../pages/JobMonitor.vue'; // Import the JobMonitor component
 
 // Placeholder components for routes to work initially
 // const PlaceholderComponent = { template: '<div>Placeholder Page</div>' }; // No longer needed
@@ -43,6 +45,12 @@ const routes = [
     meta: { requiresAuth: true, roles: ['admin', 'user'] } 
   },
   {
+    path: '/jobs/:id',
+    name: 'JobMonitor',
+    component: JobMonitor, // Use JobMonitor component
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
+  },
+  {
     path: '/logs',
     name: 'Logs',
     component: Logs, // Use actual Logs component
@@ -53,6 +61,12 @@ const routes = [
     name: 'Users',
     component: Users, // Use actual Users component
     meta: { requiresAuth: true, roles: ['admin'] } // Example: Admin only
+  },
+  {
+    path: '/config-diff',
+    name: 'ConfigDiff',
+    component: ConfigDiff, // Use the ConfigDiff component
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
   },
   {
     path: '/unauthorized',

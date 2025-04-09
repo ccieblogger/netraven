@@ -248,98 +248,125 @@ I'll approach each phase methodically:
    - Supported custom cell rendering through scoped slots
 
 3. **Pagination Controls:**
-   - Created a standalone pagination component with page size selection
-   - Implemented page navigation buttons with appropriate disabling
-   - Added current page indicator and total items display
-   - Made the component fully responsive for all screen sizes
+   - Implemented a reusable pagination component
+   - Supported customizable page sizes and navigation
+   - Added visual indicators for current page and total count
+   - Synchronized with URL query parameters for bookmarkable pagination state
 
 4. **Form Components:**
-   - Implemented FormField component with validation display
-   - Created SelectField component for dropdown selections
-   - Added TagSelector component for multi-select tag input
-   - Implemented DateTimePicker for scheduling inputs
-   - Built SearchInput component with debounced input for filtering
+   - Created `FormField` component for consistent form styling and validation
+   - Implemented `TagSelector` for multi-select tag functionality
+   - Added `CredentialSelector` for credential selection
 
-5. **Notification Component:**
-   - Implemented a toast notification system integrated with the notifications store
-   - Added support for success, error, warning, and info message types
-   - Created an auto-dismiss feature with configurable timeout
-   - Implemented stacking for multiple notifications
+### Phase 3.1: DiffViewer Component Implementation (2025-04-11)
 
-Each component was designed with reusability in mind, utilizing props for configuration and emitting events for interaction with parent components. All components support both light and dark mode themes through TailwindCSS classes.
+**Review:**
 
-### Phase 2.2: Form Component Implementation (2025-04-10)
+After reviewing the codebase, I've found that several frontend components have been implemented, including:
+- Base components: BaseModal, BaseTable, FormField
+- Selection components: TagSelector, CredentialSelector
+- CRUD form components: DeviceFormModal, JobFormModal
+- Pagination and filtering components
 
-**Implemented and enhanced form components for the frontend:**
+However, the DiffViewer component for configuration visualization is missing, and there's no implementation for real-time job status updates.
 
-1. **FormField Component:**
-   - Created a reusable form field component that supports various input types:
-     - Text, number, email, password, date, time, datetime-local
-     - Textarea for multi-line text
-     - Select dropdown for options
-   - Added comprehensive validation support:
-     - Error message display with icon
-     - Visual indication of error state
-     - Support for required fields
-     - Min/max validation for numeric inputs
-     - Pattern validation for text inputs
-   - Implemented accessibility features:
-     - Proper labeling
-     - Required field indicators
-     - Helpful error messages
-   - Added styling with TailwindCSS:
-     - Consistent form styling
-     - Different states (normal, focused, error, disabled)
-     - Help text display
+**Plan for today:**
 
-2. **TagSelector Component:**
-   - Built a custom tag selector component for multi-select experience:
-     - Searchable dropdown interface
-     - Selected tags displayed as pills
-     - Tag removal from selection
-     - Loading state handling
-   - Connected to the tag store for data retrieval
-   - Added keyboard navigation support
-   - Implemented responsive design for various screen sizes
+1. Create the DiffViewer component to display configuration differences between job runs
+2. Implement real-time job status update functionality
+3. Add any missing CRUD functionality in device and job forms
 
-3. **CredentialSelector Component:**
-   - Created a specialized credential selector:
-     - Displays credential name and username
-     - Shows associated tags for each credential
-     - Supports clear selection option
-     - Visual indication of selected credential
-   - Connected to the credential store for data retrieval
-   - Implemented dropdown with detailed credential information
-   - Added loading and empty states
+**Implementation Details:**
 
-4. **NotificationToast Component:**
-   - Implemented a toast notification system:
-     - Different styles for success, error, warning, and info
-     - Auto-dismiss with progress bar
-     - Manual dismiss option
-     - Stacking for multiple notifications
-     - Animation for appear/disappear
-   - Updated notification store to manage notifications:
-     - Added functions for different notification types
-     - Implemented progress tracking
-     - Support for titles and messages
-     - Configurable duration
+The DiffViewer component will:
+- Use Diff2Html library as specified in the frontend SOT
+- Display configuration differences in a Git-style format
+- Support side-by-side and unified diff views
+- Include header information showing the compared versions
+- Allow navigation between different configurations
 
-5. **Form Integration:**
-   - Updated DeviceFormModal and JobFormModal to use the new form components:
-     - Replaced basic inputs with FormField components
-     - Integrated TagSelector for tag selection
-     - Added CredentialSelector for device credential selection
-     - Implemented validation with clear error messages
-     - Added notification feedback on save/error
-   - Added proper form validation:
-     - Field-level validation
-     - Form-level validation before submission
-     - Clear error messaging
+The real-time job status functionality will:
+- Implement polling or WebSocket connection to check job status
+- Display progress indicators for running jobs
+- Update UI components when job status changes
+- Show detailed device-level status during job execution
 
-These enhancements significantly improve the user experience, making forms more intuitive, responsive, and error-resistant. The components are designed to be reusable across the application, ensuring consistency and reducing code duplication.
+### Phase 3.2: DiffViewer Implementation (2025-04-12)
 
-Next, I'll focus on implementing pagination controls for resource listings and adding filtering functionality in the frontend.
+**Implemented the configuration diff viewer:**
+
+1. **DiffViewer Component:**
+   - Created a reusable `DiffViewer.vue` component using the diff2html library
+   - Implemented side-by-side and unified diff views with toggle functionality
+   - Added a header with metadata about compared configurations (timestamps, job IDs)
+   - Implemented styling overrides to integrate with our UI design
+   - Added copy-to-clipboard functionality for configuration content
+   - Handled loading and error states appropriately
+
+2. **ConfigDiff Page:**
+   - Created a dedicated page for configuration comparison
+   - Implemented device selection dropdown
+   - Added configuration version selection for both old and new versions
+   - Added job filtering to help users find relevant configurations
+   - Implemented automatic selection of newest configurations
+   - Added navigation between different configurations
+
+3. **Router Integration:**
+   - Added the ConfigDiff route to the Vue Router
+   - Updated the navigation sidebar to include a link to the ConfigDiff page
+   - Implemented proper authorization checks for the new route
+
+### Phase 3.3: Job Monitor Implementation (2025-04-12)
+
+**Implemented real-time job status monitoring:**
+
+1. **JobMonitor Component:**
+   - Created a reusable `JobMonitor.vue` component for displaying job status
+   - Implemented auto-refresh functionality using polling interval
+   - Added progress bar for overall job completion
+   - Created device-level status table with completion indicators
+   - Added detailed metadata display (scheduled time, start time, end time)
+   - Implemented device log viewing via modal
+   - Added "Retry Failed Devices" functionality for error recovery
+   - Added direct link to configuration diff viewer for completed jobs
+
+2. **JobMonitor Page:**
+   - Created a dedicated page for job monitoring
+   - Added route parameter support for navigating directly to a specific job
+   - Implemented navigation back to the jobs list
+   - Added proper error handling and loading states
+
+3. **Jobs Page Enhancements:**
+   - Added a "Monitor" button to each job in the jobs table
+   - Updated the "Run Job" functionality to automatically navigate to the job monitor
+   - Improved job status display
+
+4. **Router Integration:**
+   - Added the JobMonitor route to the Vue Router with proper parameters
+   - Implemented authorization checks for the new route
+
+These implementations significantly enhance the user experience by providing real-time visibility into job execution and making it easy to compare configuration changes between different versions. The DiffViewer component helps users identify configuration differences quickly, while the JobMonitor component provides detailed status information during job execution.
 
 **Next Steps:**
-- Add comprehensive API test coverage 
+1. Implement enhanced error handling and retry mechanisms for the worker service
+2. Add comprehensive tests for the new frontend components
+3. Improve job result tracking and reporting in the scheduler service
+
+### Bugfix: Standardize Log Type Values (2025-04-11)
+
+**Standardized log type values between frontend and backend:**
+
+1. **Issue Identified:**
+   - Log filtering wasn't working correctly due to a mismatch in log type values
+   - Frontend was using `'job'` and `'connection'` while backend expected `'job_log'` and `'connection_log'`
+
+2. **Fix Implemented:**
+   - Updated the frontend log type filter options in `Logs.vue` to use consistent values:
+     - Changed `'job'` to `'job_log'`
+     - Changed `'connection'` to `'connection_log'`
+   - This ensures the backend correctly applies the log type filter
+
+3. **Benefits:**
+   - Consistent naming convention across the application
+   - Fixed log filtering functionality
+   - Improved maintainability by following API naming standards 

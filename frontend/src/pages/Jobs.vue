@@ -68,6 +68,15 @@
                  <button @click="runJobNow(job)" title="Run Job Now" class="w-4 mr-2 transform hover:text-green-500 hover:scale-110">
                     <PlayIcon class="h-4 w-4" />
                  </button>
+                 <router-link 
+                   :to="`/jobs/${job.id}`" 
+                   title="Monitor Job"
+                   class="w-4 mr-2 transform hover:text-blue-500 hover:scale-110"
+                 >
+                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                   </svg>
+                 </router-link>
                  <button @click="openEditJobModal(job)" title="Edit Job" class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">
                     <PencilIcon class="h-4 w-4" />
                  </button>
@@ -109,11 +118,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useJobStore } from '../store/job'
+import { useRouter } from 'vue-router'
 import JobFormModal from '../components/JobFormModal.vue'
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue'
 import { PencilIcon, TrashIcon, PlayIcon } from '@heroicons/vue/24/outline'
 
 const jobStore = useJobStore()
+const router = useRouter()
 const jobs = computed(() => jobStore.jobs)
 
 // Modal States
@@ -218,9 +229,17 @@ async function handleDeleteJobConfirm() {
 }
 
 // Run Job
-function runJobNow(job) {
+async function runJobNow(job) {
    if (confirm(`Trigger job "${job.name}" (ID: ${job.id}) to run now?`)) {
-     jobStore.runJobNow(job.id);
+     try {
+       await jobStore.runJobNow(job.id);
+       // Navigate to the job monitor page if successfully queued
+       if (jobStore.runStatus && jobStore.runStatus.status === 'queued') {
+         router.push(`/jobs/${job.id}`);
+       }
+     } catch (error) {
+       console.error("Failed to run job:", error);
+     }
    }
 }
 

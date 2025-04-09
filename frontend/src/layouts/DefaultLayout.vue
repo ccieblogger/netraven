@@ -10,6 +10,7 @@
         <router-link to=\"/credentials\" class=\"block px-4 py-2 rounded hover:bg-gray-700\">Credentials</router-link>
         <router-link to=\"/jobs\" class=\"block px-4 py-2 rounded hover:bg-gray-700\">Jobs</router-link>
         <router-link to=\"/logs\" class=\"block px-4 py-2 rounded hover:bg-gray-700\">Logs</router-link>
+        <router-link to=\"/config-diff\" class=\"block px-4 py-2 rounded hover:bg-gray-700\">Config Diff</router-link>
         <router-link to=\"/users\" class=\"block px-4 py-2 rounded hover:bg-gray-700\">Users</router-link>
         <!-- Add other links as needed -->
       </nav>
