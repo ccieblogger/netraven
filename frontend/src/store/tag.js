@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import api from '../services/api' // Import the configured Axios instance
 // import { useNotificationStore } from './notifications' // Optional for user feedback
 
-export const useTagStore = defineStore('tags', () => {
+export const useTagStore = defineStore('tag', () => {
   // const notifications = useNotificationStore()
   const tags = ref([])
   const isLoading = ref(false)
@@ -14,11 +14,13 @@ export const useTagStore = defineStore('tags', () => {
     error.value = null
     try {
       const response = await api.get('/tags')
-      tags.value = response.data
+      // Assuming the API returns an array of tag objects
+      // Check if the response data is an array, default to empty array if not
+      tags.value = Array.isArray(response.data) ? response.data : []
     } catch (err) {
+      console.error("Error fetching tags:", err)
       error.value = err.response?.data?.detail || 'Failed to fetch tags'
-      console.error("Fetch Tags Error:", err)
-      // notifications.addMessage({ type: 'error', text: error.value })
+      tags.value = [] // Clear tags on error
     } finally {
       isLoading.value = false
     }
