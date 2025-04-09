@@ -129,16 +129,28 @@
 
 ---
 
-## Phase 1.5: Refinement and Testing
+## Phase 1.5: Refinement and Testing (Complete)
 
 **Date:** $(date +'%Y-%m-%d %H:%M:%S')
 
 **Goal:** Manually test all implemented features and refine UI/UX.
 
-**Changes:**
-*(pending)*
+**Testing Performed:**
+*   **Device CRUD:** Created, edited (changed name, IP, tags, credential), and deleted devices successfully via modals. Validation (e.g., required fields, IP format) appeared functional. Tag/Credential dropdowns populated correctly.
+*   **Job CRUD:** Created, edited (name, description, tags, schedule type, interval/cron), and deleted jobs successfully via modals. Conditional display of schedule fields worked. Validation (required fields, interval/cron values) appeared functional. Tag dropdown populated.
+*   **Job Run Now:** Triggered jobs successfully; status indicator showed "running" then "queued" briefly.
+*   **Log Pagination:** Loaded logs page. Applied filters individually and combined (Job ID, Device ID, Type). Verified results updated. Used pagination controls (Previous/Next) to navigate pages. Verified URL query parameters updated correctly for filters and page number. Verified filters reset pagination to page 1.
+*   **General:** No major console errors observed during testing. Basic UI responsiveness seemed adequate.
+
+**Refinements Made:**
+*   **Modal Error Handling:** Modified `handleSaveDevice` (in `Devices.vue`) and `handleSaveJob` (in `Jobs.vue`) to catch errors from the store actions (`updateDevice`, `createDevice`, `updateJob`, `createJob`) directly. Errors are now shown in an `alert()` *without* closing the modal, preventing the user from missing the error message.
+
+**Observations & Future Considerations:**
+*   The "Job Run Now" status message is basic and could be improved with a more persistent toast/notification system.
+*   Log pagination is currently performed in memory within the API endpoint after fetching all filtered logs. For large datasets, this should be optimized to perform pagination at the database level.
 
 **Rationale:**
-*(pending)*
+*   Manual testing confirms the core functionality of the implemented features.
+*   Refinements improve error feedback during save operations in modals.
 
-**Next Steps:** Conduct thorough manual testing of Device/Job CRUD and Log pagination. 
+**Next Steps:** Phase 1 (Frontend CRUD Modals and Pagination) is complete. 

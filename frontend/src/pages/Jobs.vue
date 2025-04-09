@@ -171,17 +171,21 @@ function closeFormModal() {
 
 async function handleSaveJob(jobData) {
   console.log("Saving job:", jobData);
+  let success = false;
   try {
       if (jobData.id) {
           await jobStore.updateJob(jobData.id, jobData);
       } else {
           await jobStore.createJob(jobData);
       }
+      success = true;
       closeFormModal();
       // jobStore.fetchJobs(); // Refresh if not reactive
   } catch (error) {
       console.error("Failed to save job:", error);
-      alert(`Error saving job: ${jobStore.error || 'Unknown error'}`);
+      // Show error from store action directly
+      alert(`Error saving job: ${jobStore.error || 'An unknown error occurred.'}`);
+      // Do NOT close modal on error
   }
 }
 
@@ -199,13 +203,16 @@ function closeDeleteModal() {
 async function handleDeleteJobConfirm() {
   if (!jobToDelete.value) return;
   console.log("Deleting job:", jobToDelete.value.id);
+  let success = false;
   try {
       await jobStore.deleteJob(jobToDelete.value.id);
+      success = true;
       closeDeleteModal();
       // jobStore.fetchJobs(); // Refresh if not reactive
   } catch (error) {
       console.error("Failed to delete job:", error);
-      alert(`Error deleting job: ${jobStore.error || 'Unknown error'}`);
+      alert(`Error deleting job: ${jobStore.error || 'An unknown error occurred.'}`);
+      // Close modal even on error
       closeDeleteModal();
   }
 }

@@ -129,23 +129,25 @@ function closeFormModal() {
 
 async function handleSaveDevice(deviceData) {
   console.log("Saving device:", deviceData)
+  let success = false; // Flag to track success
   try {
       if (deviceData.id) {
-        // Update existing device
         await deviceStore.updateDevice(deviceData.id, deviceData);
       } else {
-        // Create new device
         await deviceStore.createDevice(deviceData);
       }
-       // Optionally show success notification
+      success = true; // Mark as successful
       closeFormModal();
-      // Refresh list after save (store action should ideally update the list reactively)
-      // If not reactive, uncomment the line below:
+      // Refresh list might still be needed if store isn't fully reactive
       // await deviceStore.fetchDevices();
   } catch (error) {
        console.error("Failed to save device:", error);
-       // Show error notification to the user in the modal or globally
-       alert(`Error saving device: ${deviceStore.error || 'Unknown error'}`); // Simple alert, replace with better UI
+       // Show error from the store action directly
+       alert(`Error saving device: ${deviceStore.error || 'An unknown error occurred.'}`);
+       // Do NOT close the modal on error
+  } finally {
+      // Optional: Add logic here if needed regardless of success/fail
+      // For example, re-enable save button is handled in the modal itself
   }
 }
 
@@ -165,18 +167,18 @@ async function handleDeleteConfirm() {
   if (!deviceToDelete.value) return;
 
   console.log("Deleting device:", deviceToDelete.value.id)
+   let success = false;
   try {
       await deviceStore.deleteDevice(deviceToDelete.value.id);
-      // Optionally show success notification
+      success = true;
       closeDeleteModal();
-       // Refresh list after delete (store action should ideally update the list reactively)
-      // If not reactive, uncomment the line below:
+      // Refresh list might still be needed
       // await deviceStore.fetchDevices();
   } catch (error) {
       console.error("Failed to delete device:", error);
-      // Show error notification
-      alert(`Error deleting device: ${deviceStore.error || 'Unknown error'}`); // Simple alert
-      closeDeleteModal(); // Close modal even on error
+      alert(`Error deleting device: ${deviceStore.error || 'An unknown error occurred.'}`);
+      // Close modal even on error to avoid being stuck
+      closeDeleteModal();
   }
 }
 
