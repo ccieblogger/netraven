@@ -136,9 +136,9 @@ COMMAND_TIMING = {
 # Improved regex patterns for parsing device capabilities from version output
 CAPABILITY_PATTERNS = {
     "cisco_ios": {
-        "model": r"(?:^|\n)cisco\s+(\S+).+?(?:processor|chassis)",
+        "model": r"cisco\s+(\S+(?:-\S+)?)\s+(?:\(|processor)",
         "version": r"(?:IOS|Software) .*?Version\s+([^\s,]+)",
-        "serial": r"Processor board ID\s+(\S+)",
+        "serial": r"[Pp]rocessor board ID\s+(\S+)",
         "ios_type": r"(IOS-XE|IOS)",  # Detect IOS vs IOS-XE
     },
     "cisco_xr": {
@@ -159,7 +159,7 @@ CAPABILITY_PATTERNS = {
     },
     "juniper_junos": {
         "model": r"Model:\s+(\S+)",
-        "version": r"JUNOS\s+([^\s,]+)",
+        "version": r"JUNOS.*?\[([^\[\]]+)\]",
         "serial": r"Chassis\s+(\S+)",
         "hardware": r"Hardware model:\s+(\S+)",
     },
@@ -300,7 +300,14 @@ def get_command(device_type: str, command_type: str) -> str:
         The device-specific command string
     """
     commands = get_device_commands(device_type)
-    return commands.get(command_type, COMMAND_VARIATIONS["default"][command_type])
+    # First check if command exists in device-specific commands
+    if command_type in commands:
+        return commands[command_type]
+    # Then check if it exists in default commands
+    elif command_type in COMMAND_VARIATIONS["default"]:
+        return COMMAND_VARIATIONS["default"][command_type]
+    # Return None if command doesn't exist anywhere
+    return None
 
 def get_command_timeout(device_type: str, command_type: str) -> int:
     """
@@ -342,6 +349,41 @@ def parse_device_capabilities(device_type: str, version_output: str) -> Dict[str
         match = re.search(pattern, version_output, re.IGNORECASE | re.MULTILINE)
         if match:
             capabilities[capability] = match.group(1)
+    
+    # Special case for Cisco IOS to handle various model formats
+    if device_type == "cisco_ios" and capabilities["model"] == "Unknown":
+        # Try more patterns for different Cisco model formats
+        model_patterns = [
+            r"cisco\s+(WS-C\S+)\s+",                # Catalyst switches
+            r"cisco\s+(CISCO\d+/K9)\s+",            # ISR routers with K9
+            r"cisco\s+(CISCO\d+)\s+",               # ISR routers
+            r"cisco\s+(ASR\S+)\s+",                 # ASR routers
+            r"cisco\s+(C\d+\S*)\s+",                # Generic Cisco model
+            r"[Mm]odel number\s*:\s*(\S+)",         # Model number format
+            r"[Pp]latform\s*:\s*(\S+)",             # Platform format
+        ]
+        
+        for pattern in model_patterns:
+            model_match = re.search(pattern, version_output, re.IGNORECASE | re.MULTILINE)
+            if model_match:
+                capabilities["model"] = model_match.group(1)
+                break
+    
+    # Special case for Juniper to handle various version formats
+    if device_type == "juniper_junos" and capabilities["version"] == "Unknown":
+        # Try more patterns for different Juniper version formats
+        version_patterns = [
+            r"JUNOS\s+(\d+\.\d+R\d+\.\d+)",             # Standard format
+            r"JUNOS.*?[Vv]ersion\s+(\d+\.\d+R\d+\.\d+)", # Version in text
+            r"JUNOS.*?\[(\d+\.\d+R\d+\.\d+)\]",          # Version in brackets
+            r"JUNOS Base OS boot\s+\[?(\d+\.\d+R\d+\.\d+)", # Base OS format
+        ]
+        
+        for pattern in version_patterns:
+            version_match = re.search(pattern, version_output, re.IGNORECASE | re.MULTILINE)
+            if version_match:
+                capabilities["version"] = version_match.group(1)
+                break
     
     # Special case for Cisco IOS vs IOS-XE detection
     if device_type == "cisco_ios" and "ios_type" in capabilities:
@@ -395,20 +437,24 @@ def get_command_sequence(device_type: str) -> List[Tuple[str, str]]:
     # Add paging control
     if device_caps.get("supports_paging_control", True):
         paging_cmd = get_command(device_type, "enable_paging")
-        command_sequence.append(("enable_paging", paging_cmd))
+        if paging_cmd:
+            command_sequence.append(("enable_paging", paging_cmd))
     
     # Add version check
     version_cmd = get_command(device_type, "show_version")
-    command_sequence.append(("show_version", version_cmd))
+    if version_cmd:
+        command_sequence.append(("show_version", version_cmd))
     
     # Add inventory check if supported
     if device_caps.get("supports_inventory", False):
         inventory_cmd = get_command(device_type, "show_inventory")
-        command_sequence.append(("show_inventory", inventory_cmd))
+        if inventory_cmd:
+            command_sequence.append(("show_inventory", inventory_cmd))
     
     # Add running config retrieval
     running_cmd = get_command(device_type, "show_running")
-    command_sequence.append(("show_running", running_cmd))
+    if running_cmd:
+        command_sequence.append(("show_running", running_cmd))
     
     return command_sequence
 

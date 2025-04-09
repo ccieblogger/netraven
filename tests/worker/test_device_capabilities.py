@@ -53,9 +53,9 @@ class TestDeviceCommands:
         assert get_command('juniper_junos', 'show_running') == 'show configuration | display set'
         assert get_command('paloalto_panos', 'show_version') == 'show system info'
         
-        # Test nonexistent command returns default
-        assert get_command('cisco_ios', 'nonexistent_command') == \
-               get_command('default', 'nonexistent_command')
+        # Test nonexistent command returns None
+        assert get_command('cisco_ios', 'nonexistent_command') is None
+        assert get_command('default', 'nonexistent_command') is None
     
     def test_get_command_timeout(self):
         """Test that get_command_timeout returns the correct timeout for a command."""
