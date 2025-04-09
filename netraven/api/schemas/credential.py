@@ -1,4 +1,4 @@
-from .base import BaseSchema, BaseSchemaWithId
+from .base import BaseSchema, BaseSchemaWithId, create_paginated_response
 from typing import Optional, List
 from .tag import Tag # Import Tag schema for relationships
 
@@ -24,3 +24,6 @@ class CredentialUpdate(BaseSchema):
 # Response model, excludes password
 class Credential(CredentialBase, BaseSchemaWithId):
     tags: List[Tag] = [] 
+
+# Paginated response model
+PaginatedCredentialResponse = create_paginated_response(Credential) 

@@ -1,6 +1,7 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import and_
 
 from netraven.api import schemas
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role
@@ -53,21 +54,59 @@ def create_credential(
     db.query(models.Credential).options(selectinload(models.Credential.tags)).filter(models.Credential.id == db_credential.id).first()
     return db_credential
 
-@router.get("/", response_model=List[schemas.credential.Credential])
+@router.get("/", response_model=schemas.credential.PaginatedCredentialResponse)
 def list_credentials(
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Items per page"),
+    username: Optional[str] = None,
+    priority: Optional[int] = None,
+    tag_id: Optional[List[int]] = Query(None, description="Filter by tag IDs"),
     db: Session = Depends(get_db_session)
 ):
-    """Retrieve a list of credentials (passwords are not returned)."""
-    credentials = (
-        db.query(models.Credential)
-        .options(selectinload(models.Credential.tags))
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-    return credentials
+    """
+    Retrieve a list of credentials with pagination and filtering (passwords are not returned).
+    
+    - **page**: Page number (starts at 1)
+    - **size**: Number of items per page
+    - **username**: Filter by username (partial match)
+    - **priority**: Filter by exact priority value
+    - **tag_id**: Filter by tag IDs (multiple allowed)
+    """
+    query = db.query(models.Credential).options(selectinload(models.Credential.tags))
+    
+    # Apply filters
+    filters = []
+    if username:
+        filters.append(models.Credential.username.ilike(f"%{username}%"))
+    if priority is not None:
+        filters.append(models.Credential.priority == priority)
+    
+    # Apply all filters
+    if filters:
+        query = query.filter(and_(*filters))
+    
+    # Apply tag filter if specified
+    if tag_id:
+        query = query.join(models.Credential.tags).filter(models.Tag.id.in_(tag_id)).group_by(models.Credential.id)
+    
+    # Get total count for pagination
+    total = query.count()
+    
+    # Calculate pagination values
+    pages = (total + size - 1) // size
+    offset = (page - 1) * size
+    
+    # Get paginated credentials
+    credentials = query.offset(offset).limit(size).all()
+    
+    # Return paginated response
+    return {
+        "items": credentials,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": pages
+    }
 
 @router.get("/{credential_id}", response_model=schemas.credential.Credential)
 def get_credential(

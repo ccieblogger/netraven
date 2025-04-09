@@ -1,6 +1,7 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import or_, and_, func
 
 from netraven.api import schemas # Import schemas module
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role # Import dependencies
@@ -48,21 +49,63 @@ def create_device(
     db.refresh(db_device)
     return db_device
 
-@router.get("/", response_model=List[schemas.device.Device])
+@router.get("/", response_model=schemas.device.PaginatedDeviceResponse)
 def list_devices(
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Items per page"),
+    hostname: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    device_type: Optional[str] = None,
+    tag_id: Optional[List[int]] = Query(None, description="Filter by tag IDs"),
     db: Session = Depends(get_db_session)
 ):
-    """Retrieve a list of network devices."""
-    devices = (
-        db.query(models.Device)
-        .options(selectinload(models.Device.tags)) # Eager load tags
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-    return devices
+    """
+    Retrieve a list of network devices with pagination and filtering.
+    
+    - **page**: Page number (starts at 1)
+    - **size**: Number of items per page
+    - **hostname**: Filter by hostname (partial match)
+    - **ip_address**: Filter by IP address (partial match)
+    - **device_type**: Filter by device type
+    - **tag_id**: Filter by tag IDs (multiple allowed)
+    """
+    query = db.query(models.Device).options(selectinload(models.Device.tags))
+    
+    # Apply filters
+    filters = []
+    if hostname:
+        filters.append(models.Device.hostname.ilike(f"%{hostname}%"))
+    if ip_address:
+        filters.append(models.Device.ip_address.ilike(f"%{ip_address}%"))
+    if device_type:
+        filters.append(models.Device.device_type == device_type)
+    
+    # Apply all filters
+    if filters:
+        query = query.filter(and_(*filters))
+    
+    # Apply tag filter if specified
+    if tag_id:
+        query = query.join(models.Device.tags).filter(models.Tag.id.in_(tag_id)).group_by(models.Device.id)
+    
+    # Get total count for pagination
+    total = query.count()
+    
+    # Calculate pagination values
+    pages = (total + size - 1) // size
+    offset = (page - 1) * size
+    
+    # Get paginated devices
+    devices = query.offset(offset).limit(size).all()
+    
+    # Return paginated response
+    return {
+        "items": devices,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": pages
+    }
 
 @router.get("/{device_id}", response_model=schemas.device.Device)
 def get_device(

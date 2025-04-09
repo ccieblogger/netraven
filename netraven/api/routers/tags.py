@@ -1,6 +1,7 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import and_
 
 from netraven.api import schemas
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role
@@ -28,15 +29,53 @@ def create_tag(
     db.refresh(db_tag)
     return db_tag
 
-@router.get("/", response_model=List[schemas.tag.Tag])
+@router.get("/", response_model=schemas.tag.PaginatedTagResponse)
 def list_tags(
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Items per page"),
+    name: Optional[str] = None,
+    tag_type: Optional[str] = Query(None, alias="type", description="Filter by tag type"),
     db: Session = Depends(get_db_session)
 ):
-    """Retrieve a list of tags."""
-    tags = db.query(models.Tag).offset(skip).limit(limit).all()
-    return tags
+    """
+    Retrieve a list of tags with pagination and filtering.
+    
+    - **page**: Page number (starts at 1)
+    - **size**: Number of items per page
+    - **name**: Filter by tag name (partial match)
+    - **type**: Filter by tag type
+    """
+    query = db.query(models.Tag)
+    
+    # Apply filters
+    filters = []
+    if name:
+        filters.append(models.Tag.name.ilike(f"%{name}%"))
+    if tag_type:
+        filters.append(models.Tag.type == tag_type)
+    
+    # Apply all filters
+    if filters:
+        query = query.filter(and_(*filters))
+    
+    # Get total count for pagination
+    total = query.count()
+    
+    # Calculate pagination values
+    pages = (total + size - 1) // size
+    offset = (page - 1) * size
+    
+    # Get paginated tags
+    tags = query.offset(offset).limit(size).all()
+    
+    # Return paginated response
+    return {
+        "items": tags,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": pages
+    }
 
 @router.get("/{tag_id}", response_model=schemas.tag.Tag)
 def get_tag(

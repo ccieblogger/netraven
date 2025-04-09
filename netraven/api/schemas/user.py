@@ -1,4 +1,4 @@
-from .base import BaseSchema, BaseSchemaWithId
+from .base import BaseSchema, BaseSchemaWithId, create_paginated_response
 from typing import Optional
 
 # --- User Schemas ---
@@ -27,3 +27,7 @@ class UserPublic(BaseSchemaWithId):
     username: str
     role: Optional[str] = None
     is_active: bool
+
+# Paginated response models
+PaginatedUserResponse = create_paginated_response(User)
+PaginatedUserPublicResponse = create_paginated_response(UserPublic)

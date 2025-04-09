@@ -1,6 +1,8 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import and_
+from datetime import datetime
 
 from netraven.api import schemas
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role
@@ -43,20 +45,67 @@ def create_job(
     db.query(models.Job).options(selectinload(models.Job.tags)).filter(models.Job.id == db_job.id).first()
     return db_job
 
-@router.get("/", response_model=List[schemas.job.Job])
+@router.get("/", response_model=schemas.job.PaginatedJobResponse)
 def list_jobs(
-    skip: int = 0,
-    limit: int = 100,
-    enabled_only: bool = False, # Optional filter
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Items per page"),
+    name: Optional[str] = None,
+    status: Optional[str] = None,
+    is_enabled: Optional[bool] = None, 
+    schedule_type: Optional[str] = None,
+    tag_id: Optional[List[int]] = Query(None, description="Filter by tag IDs"),
     db: Session = Depends(get_db_session)
 ):
-    """Retrieve a list of job definitions."""
-    query = db.query(models.Job).options(selectinload(models.Job.tags))
-    if enabled_only:
-        query = query.filter(models.Job.is_enabled == True)
+    """
+    Retrieve a list of job definitions with pagination and filtering.
     
-    jobs = query.offset(skip).limit(limit).all()
-    return jobs
+    - **page**: Page number (starts at 1)
+    - **size**: Number of items per page
+    - **name**: Filter by job name (partial match)
+    - **status**: Filter by job status
+    - **is_enabled**: Filter by enabled/disabled status
+    - **schedule_type**: Filter by schedule type (interval, cron, onetime)
+    - **tag_id**: Filter by tag IDs (multiple allowed)
+    """
+    query = db.query(models.Job).options(selectinload(models.Job.tags))
+    
+    # Apply filters
+    filters = []
+    if name:
+        filters.append(models.Job.name.ilike(f"%{name}%"))
+    if status:
+        filters.append(models.Job.status == status)
+    if is_enabled is not None:
+        filters.append(models.Job.is_enabled == is_enabled)
+    if schedule_type:
+        filters.append(models.Job.schedule_type == schedule_type)
+    
+    # Apply all filters
+    if filters:
+        query = query.filter(and_(*filters))
+    
+    # Apply tag filter if specified
+    if tag_id:
+        query = query.join(models.Job.tags).filter(models.Tag.id.in_(tag_id)).group_by(models.Job.id)
+    
+    # Get total count for pagination
+    total = query.count()
+    
+    # Calculate pagination values
+    pages = (total + size - 1) // size
+    offset = (page - 1) * size
+    
+    # Get paginated jobs
+    jobs = query.offset(offset).limit(size).all()
+    
+    # Return paginated response
+    return {
+        "items": jobs,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": pages
+    }
 
 @router.get("/{job_id}", response_model=schemas.job.Job)
 def get_job(

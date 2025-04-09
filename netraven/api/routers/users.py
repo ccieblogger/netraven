@@ -1,6 +1,7 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
 from netraven.api import schemas
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role
@@ -38,15 +39,57 @@ async def read_users_me(current_user: models.User = Depends(get_current_active_u
     return current_user
 
 # Admin routes
-@router.get("/", response_model=List[schemas.user.UserPublic])
+@router.get("/", response_model=schemas.user.PaginatedUserPublicResponse)
 def list_users(
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Items per page"),
+    username: Optional[str] = None,
+    role: Optional[str] = None,
+    is_active: Optional[bool] = None,
     db: Session = Depends(get_db_session)
 ):
-    """Retrieve a list of users (requires admin privileges)."""
-    users = db.query(models.User).offset(skip).limit(limit).all()
-    return users
+    """
+    Retrieve a list of users with pagination and filtering (requires admin privileges).
+    
+    - **page**: Page number (starts at 1)
+    - **size**: Number of items per page
+    - **username**: Filter by username (partial match)
+    - **role**: Filter by role (admin, user)
+    - **is_active**: Filter by active status
+    """
+    query = db.query(models.User)
+    
+    # Apply filters
+    filters = []
+    if username:
+        filters.append(models.User.username.ilike(f"%{username}%"))
+    if role:
+        filters.append(models.User.role == role)
+    if is_active is not None:
+        filters.append(models.User.is_active == is_active)
+    
+    # Apply all filters
+    if filters:
+        query = query.filter(and_(*filters))
+    
+    # Get total count for pagination
+    total = query.count()
+    
+    # Calculate pagination values
+    pages = (total + size - 1) // size if total > 0 else 1
+    offset = (page - 1) * size
+    
+    # Get paginated users
+    users = query.offset(offset).limit(size).all()
+    
+    # Return paginated response
+    return {
+        "items": users,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": pages
+    }
 
 @router.get("/{user_id}", response_model=schemas.user.User)
 def get_user(

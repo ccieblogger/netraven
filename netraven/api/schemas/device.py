@@ -2,7 +2,7 @@ from pydantic import Field, IPvAnyAddress
 from datetime import datetime
 from typing import Optional, List
 
-from .base import BaseSchema, BaseSchemaWithId
+from .base import BaseSchema, BaseSchemaWithId, create_paginated_response
 from .tag import Tag # Import Tag schema for relationships
 
 # --- Device Schemas ---
@@ -30,3 +30,6 @@ class Device(DeviceBase, BaseSchemaWithId):
     last_seen: Optional[datetime] = None
     tags: List[Tag] = []
     # configurations: List[...] # TBD: Add DeviceConfiguration schema later if needed
+
+# Paginated response model
+PaginatedDeviceResponse = create_paginated_response(Device)

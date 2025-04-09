@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import Field
 
-from .base import BaseSchema, BaseSchemaWithId
+from .base import BaseSchema, BaseSchemaWithId, create_paginated_response
 from .tag import Tag # Import Tag schema for relationships
 
 # --- Job Schemas ---
@@ -36,3 +36,6 @@ class Job(JobBase, BaseSchemaWithId):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     tags: List[Tag] = []
+
+# Paginated response model
+PaginatedJobResponse = create_paginated_response(Job)

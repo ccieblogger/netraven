@@ -107,4 +107,40 @@ I'll approach each phase methodically:
 2. Write tests for each new component
 3. Commit frequently with meaningful messages
 4. Update this development log regularly
-5. Keep track of deviations from the plan 
+5. Keep track of deviations from the plan
+
+## Progress
+
+### Phase 1.1: Pagination and Filtering for API Endpoints (2025-04-09)
+
+**Implemented pagination and filtering for all resource listing endpoints:**
+
+1. **Schema Changes:**
+   - Created a `PaginationParams` base schema with `page` and `size` fields
+   - Implemented a generic `PaginatedResponse` schema using Pydantic generics
+   - Added a utility function `create_paginated_response` to generate paginated response models for each resource type
+   - Created paginated response models for all resources: `Device`, `Job`, `Tag`, `Credential`, `User`, and combined `JobLog` and `ConnectionLog`
+
+2. **API Endpoint Changes:**
+   - Updated all listing endpoints (`GET /devices/`, `/jobs/`, `/tags/`, `/credentials/`, `/users/`, `/logs/`) to:
+     - Accept pagination parameters (`page`, `size`)
+     - Return paginated responses with metadata (`total`, `pages`, etc.)
+     - Support filtering on common attributes specific to each resource type
+     - Use improved SQL queries to optimize database performance
+
+3. **Resource-Specific Filters:**
+   - **Devices**: Added filtering by hostname, IP address, device type, and tag IDs
+   - **Jobs**: Added filtering by name, status, is_enabled, schedule_type, and tag IDs
+   - **Tags**: Added filtering by name and type
+   - **Credentials**: Added filtering by username, priority, and tag IDs
+   - **Users**: Added filtering by username, role, and is_active
+   - **Logs**: Added filtering by job_id, device_id, log_type, and level
+
+4. **Query Optimizations:**
+   - Used SQLAlchemy efficiently for complex filtering with multiple conditions
+   - Implemented tag-based filtering via joins
+   - Used proper SQL operations for searches with case-insensitive matches
+
+**Next Steps:**
+- Complete API endpoint validation enhancements
+- Add comprehensive API test coverage 

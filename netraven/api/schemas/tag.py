@@ -1,4 +1,4 @@
-from .base import BaseSchema, BaseSchemaWithId
+from .base import BaseSchema, BaseSchemaWithId, create_paginated_response
 from typing import Optional
 
 # --- Tag Schemas ---
@@ -16,3 +16,6 @@ class TagUpdate(BaseSchema):
 
 class Tag(TagBase, BaseSchemaWithId): # Inherit ID
     pass 
+
+# Paginated response model
+PaginatedTagResponse = create_paginated_response(Tag) 
