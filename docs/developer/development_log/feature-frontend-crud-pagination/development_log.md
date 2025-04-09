@@ -37,11 +37,37 @@
 
 ---
 
-## Phase 1.2: Implement Device CRUD Modals & Integration
+## Phase 1.2: Implement Device CRUD Modals & Integration (Complete)
 
 **Date:** $(date +'%Y-%m-%d %H:%M:%S')
 
 **Goal:** Create and integrate modals for creating, editing, and deleting devices.
+
+**Changes:**
+*   Created reusable `frontend/src/components/DeleteConfirmationModal.vue` using `BaseModal`.
+*   Created `frontend/src/components/DeviceFormModal.vue` with fields for device properties, tag/credential selection (using `useTagStore`, `useCredentialStore`), and save logic.
+*   Modified `frontend/src/pages/Devices.vue`:
+    *   Imported `DeviceFormModal`, `DeleteConfirmationModal`, and icon components.
+    *   Added state refs (`isFormModalOpen`, `selectedDevice`, `isDeleteModalOpen`, `deviceToDelete`) to manage modal visibility and data.
+    *   Implemented handler functions (`openCreateModal`, `openEditModal`, `handleSaveDevice`, `openDeleteModal`, `handleDeleteConfirm`) to control modals and call `useDeviceStore` actions.
+    *   Replaced placeholder buttons/logic with actual modal triggers.
+    *   Added Credential column to the table.
+    *   Improved loading/error display logic.
+
+**Rationale:**
+*   Provides interactive UI for full CRUD management of Devices.
+*   Reuses modal components for consistency.
+*   Connects frontend actions to backend API calls via Pinia stores.
+
+**Next Steps:** Proceed to Phase 1.3: Implement Job CRUD Modals & Integration.
+
+---
+
+## Phase 1.3: Implement Job CRUD Modals & Integration
+
+**Date:** $(date +'%Y-%m-%d %H:%M:%S')
+
+**Goal:** Create and integrate modals for creating, editing, and deleting jobs.
 
 **Changes:**
 *(pending)*
@@ -49,4 +75,4 @@
 **Rationale:**
 *(pending)*
 
-**Next Steps:** Implement `DeviceFormModal.vue`, `DeleteConfirmationModal.vue`, and integrate into `Devices.vue`. 
+**Next Steps:** Implement `JobFormModal.vue` and integrate into `Jobs.vue` using the existing delete modal. 
