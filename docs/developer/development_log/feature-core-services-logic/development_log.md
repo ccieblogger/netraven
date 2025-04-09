@@ -242,4 +242,28 @@
 *   The `/api/v1/logs` endpoint needs to be updated to accept `page` and `size` query parameters and return pagination metadata (total items, total pages, current page) alongside the log data.
 *   The `/api/v1/devices`, `/api/v1/jobs`, `/api/v1/tags`, `/api/v1/credentials` list endpoints might also benefit from pagination if lists become long.
 
+---
+
+## Debugging: Worker Integration Tests (`tests/worker/test_runner_integration.py`)
+
+**Date:** 2025-04-09
+
+**Goal:** Resolve multiple failures in the worker integration tests that emerged after refactoring the Job-Device relationship and initial API/Scheduler implementations.
+
+**Debugging Process & Fixes:**
+
+1.  **Initial Failures:** Tests failed primarily due to `DetachedInstanceError` (SQLAlchemy session issues) and mock signature/return value mismatches (`ValueError`, `ProgrammingError`).
+2.  **`get_db` Mocking:** Initially removed `db=db_session` from `runner.run_job` calls and patched `get_db`. This led to session errors. **Fix:** Reverted the removal of `db=db_session` in test calls to `runner.run_job`. The runner now manages the session context correctly internally, but the tests still need to provide the initial session for setup and assertions. Removed the `get_db` patching as it became unnecessary.
+3.  **`commit_git` Mock Return:** Identified `ValueError` due to incorrect return tuple size from the mocked `commit_configuration_to_git`. **Fix:** Updated mock `side_effect`/`return_value` to provide a 2-tuple `(Optional[str], Optional[dict])` as per `git_writer.py`.
+4.  **`run_command` Mock Return:** Identified errors related to the return type of the mocked `netmiko_driver.run_command`. **Fix:** Updated mock `side_effect` lambdas/lists to return a 3-tuple `(bool, Optional[str], Optional[dict])` matching the actual function signature and `RunResult` type.
+5.  **Log Dictionary `type` Key:** Assertion errors occurred because mock log dictionaries were missing the `"type"` key. **Fix:** Added `"type": "connection"` or `"type": "job"` to the relevant mock log dictionaries returned by `run_command` and `commit_git` side effects.
+6.  **SQLAlchemy `ANY` Placeholder Error:** Encountered `ProgrammingError` when using `unittest.mock.ANY` for timestamps in log dictionaries being inserted into the DB. **Fix:** Replaced `timestamp: ANY` with `timestamp: datetime.utcnow()` in mock log dictionaries.
+7.  **`run_command` Mock Call Assertion:** Test failed asserting `run_command` was called with `call(device)` instead of the actual `call(device, job_id)`. **Fix:** Updated `assert_has_calls` for `run_command` to include `test_job.id`.
+8.  **`ConnectionLog` Count Assertions:** Partial and total failure tests incorrectly asserted the number of connection logs (expecting 1 or 0 instead of 2, as logs are created for both success and failure attempts). **Fix:** Updated assertions in `test_run_job_partial_failure_multiple_devices` and `test_run_job_total_failure_multiple_devices` to expect `len(conn_logs) == 2`.
+9.  **`commit_git` Mock `repo_path` Assertion:** Mock assertions failed because the `repo_path` argument expected (`None`, loaded dynamically in the test) differed from the actual path used (`/data/git-repo/`, loaded within the `git_writer`). **Fix:** Hardcoded the expected `repo_path` in assertions to `/data/git-repo/`.
+10. **`commit_git` Mock Argument Swapping (Concurrency):** In the multi-device success test, the assertion failed because arguments (like `config_data` and `device_hostname`) were swapped between the two calls to `commit_git` due to non-deterministic thread execution order. **Fix:** Refactored `run_command` and `commit_git` mock `side_effect`s to use device-specific lambdas (helper functions) to return the correct data based on the device hostname or ID, regardless of call order. Used a set-based comparison for `commit_git` call arguments to handle the order-independent nature.
+11. **`JobLog` Assertion Order (Concurrency):** The final failure occurred because assertions assumed `job_logs[0]` would always correspond to `device1`. Due to concurrency, `device2`'s log might be created first. **Fix:** Made `JobLog` assertions order-independent by checking for the presence of both `device1.id` and `device2.id` in the set of `device_id`s, and checking for the presence of both expected commit messages in the list of log messages.
+
+**Outcome:** All 4 tests in `tests/worker/test_runner_integration.py` now pass successfully.
+
 --- 
