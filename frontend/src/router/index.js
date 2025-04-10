@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/auth'; // Import Pinia store for auth che
 
 // Import Page Components
 import Login from '../pages/Login.vue';
-import Dashboard from '../pages/Dashboard.vue';
+import Dashboard from '../pages/Dashboard.vue'; // Use the consolidated dashboard component
 import Devices from '../pages/Devices.vue';
 import Jobs from '../pages/Jobs.vue';
 import Logs from '../pages/Logs.vue';

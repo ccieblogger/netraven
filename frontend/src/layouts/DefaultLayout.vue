@@ -1,140 +1,212 @@
 <template>
-  <div class="flex h-screen text-white" style="background-color: #0D1321;">
+  <div class="flex h-screen bg-[#0D1321]">
     <!-- Sidebar -->
-    <aside class="w-64 flex flex-col border-r border-opacity-20 border-white" style="background-color: #0D1321;">
-      <!-- Logo -->
-      <div class="px-6 py-4 border-b border-opacity-20 border-white">
-        <h1 class="text-xl font-bold">
-          <span class="text-green-500">Net</span><span class="text-white">Raven</span>
-        </h1>
+    <aside :class="[
+      'h-screen flex-shrink-0 flex flex-col transition-all duration-300 bg-[#0D1321] border-r border-gray-700',
+      isSidebarOpen ? 'w-64' : 'w-16'
+    ]">
+      <!-- Sidebar header with logo -->
+      <div class="flex items-center justify-between px-4 py-4">
+        <router-link to="/" class="flex items-center space-x-2">
+          <span v-if="isSidebarOpen" class="text-lg font-semibold">
+            <span class="text-green-500">Net</span><span class="text-white">Raven</span>
+          </span>
+          <span v-else class="text-lg font-semibold">
+            <span class="text-green-500">N</span>
+          </span>
+        </router-link>
+        <button @click="toggleSidebar" class="text-gray-400 hover:text-white focus:outline-none">
+          <svg v-if="isSidebarOpen" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 19l-7-7 7-7" />
+          </svg>
+          <svg v-else class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
-      
-      <!-- Navigation Links -->
-      <nav class="flex-1 overflow-y-auto py-4">
-        <div class="px-4 space-y-1">
-          <router-link to="/dashboard" class="flex items-center px-4 py-2 hover:bg-blue-800 group">
-            <!-- Dashboard icon (grid) -->
-            <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
-            </svg>
-            Dashboard
-          </router-link>
-          
-          <router-link to="/devices" class="flex items-center px-4 py-2 hover:bg-blue-800 group">
-            <!-- Computer/devices icon -->
-            <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-              <line x1="8" y1="21" x2="16" y2="21" />
-              <line x1="12" y1="17" x2="12" y2="21" />
-            </svg>
-            Devices
-          </router-link>
-          
-          <router-link to="/tags" class="flex items-center px-4 py-2 hover:bg-blue-800 group">
-            <!-- Tags icon -->
-            <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-              <line x1="7" y1="7" x2="7.01" y2="7" />
-            </svg>
-            Tags
-          </router-link>
-          
-          <router-link to="/credentials" class="flex items-center px-4 py-2 hover:bg-blue-800 group">
-            <!-- Lock/credentials icon -->
-            <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            Credentials
-          </router-link>
-          
-          <router-link to="/jobs" class="flex items-center px-4 py-2 hover:bg-blue-800 group">
-            <!-- Activity/jobs icon (heartbeat) -->
-            <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-            Jobs
-          </router-link>
-          
-          <router-link to="/logs" class="flex items-center px-4 py-2 hover:bg-blue-800 group">
-            <!-- Document/logs icon -->
-            <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
-            Logs
-          </router-link>
-          
-          <router-link to="/config-diff" class="flex items-center px-4 py-2 hover:bg-blue-800 group">
-            <!-- Config diff/compare icon -->
-            <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <line x1="18" y1="2" x2="22" y2="6" />
-              <path d="M7.5 20.5L19 9l-4-4L3.5 16.5 2 22l5.5-1.5z" />
-            </svg>
-            Config Diff
-          </router-link>
-          
-          <router-link to="/users" class="flex items-center px-4 py-2 hover:bg-blue-800 group">
-            <!-- Users icon -->
-            <svg class="w-5 h-5 mr-3 text-gray-400 group-hover:text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            Users
-          </router-link>
-        </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-2 py-4 space-y-2">
+        <router-link 
+          v-for="item in navigation" 
+          :key="item.name"
+          :to="item.path" 
+          class="group flex items-center gap-4 px-2 py-2 text-sm font-medium transition-colors duration-150 ease-in-out"
+          :class="[
+            $route.path.startsWith(item.path) 
+              ? 'text-white bg-[#19253D] border-l-4 border-blue-500 pl-1' 
+              : 'text-gray-400 hover:text-white hover:bg-[#19253D] border-l-4 border-transparent'
+          ]"
+        >
+          <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0" 
+               :class="{ 
+                 'text-gray-400': !$route.path.startsWith(item.path),
+                 'text-green-500': $route.path.startsWith(item.path)
+               }"></div>
+          <span v-if="isSidebarOpen" class="truncate">{{ item.name }}</span>
+        </router-link>
       </nav>
-      
-      <!-- User Account Section -->
-      <div class="px-4 py-4 border-t border-opacity-20 border-white mt-auto">
-        <div v-if="authStore.isAuthenticated" class="flex items-center">
+
+      <!-- User account -->
+      <div class="p-4 mt-auto border-t border-gray-700">
+        <div class="flex items-center gap-4" :class="{ 'justify-center': !isSidebarOpen }">
           <div class="flex-shrink-0">
-            <div class="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
-              <span class="font-bold text-blue-900">{{ authStore.username?.charAt(0).toUpperCase() || 'A' }}</span>
+            <div class="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center text-white font-medium text-xl">
+              A
             </div>
           </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium">{{ authStore.username }}</p>
-            <button @click="authStore.logout" class="text-xs text-gray-400 hover:text-white mt-1">
-              Logout
-            </button>
+          <div v-if="isSidebarOpen">
+            <p class="text-base font-medium text-white">admin</p>
           </div>
         </div>
-        <router-link v-else to="/login" class="flex items-center px-4 py-2 hover:bg-blue-800">
-          Login
-        </router-link>
+        
+        <div v-if="isSidebarOpen" class="mt-5">
+          <button 
+            @click="authStore.logout" 
+            class="w-full flex items-center gap-4 px-3 py-2 text-sm font-medium text-gray-300 hover:text-white group"
+          >
+            <svg class="h-5 w-5 text-gray-400 group-hover:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Logout
+          </button>
+        </div>
+        <div v-else class="mt-3 flex justify-center">
+          <button 
+            @click="authStore.logout" 
+            class="p-2 text-gray-400 rounded-md hover:bg-[#19253D] hover:text-white"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </div>
       </div>
     </aside>
 
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto" style="background-color: #0D1321;">
-      <slot></slot>
-    </main>
+    <!-- Main content -->
+    <div class="flex flex-col flex-1 overflow-hidden">
+      <!-- Main content header -->
+      <header class="sticky top-0 z-10 flex items-center justify-between h-16 bg-[#101B2D] border-b border-gray-700 px-4">
+        <div class="flex flex-col">
+          <h1 class="text-xl font-semibold">
+            <span class="text-green-500">Welcome to</span> <span class="text-white">NetRaven</span>
+          </h1>
+          <p class="text-sm text-gray-400">Network Configuration Management System</p>
+        </div>
+        <div class="flex items-center space-x-4">
+          <button class="p-1 text-gray-400 rounded-full hover:text-white focus:outline-none">
+            <BellIcon class="w-6 h-6" />
+          </button>
+          <!-- Mobile menu button (only visible on small screens) -->
+          <button class="p-1 text-gray-400 rounded-full lg:hidden hover:text-white focus:outline-none">
+            <Bars3Icon class="w-6 h-6" />
+          </button>
+        </div>
+      </header>
 
-    <!-- Global Notification Area -->
-    <NotificationToast />
+      <!-- Page content -->
+      <main class="flex-1 overflow-y-auto bg-[#141E32] p-6">
+        <slot></slot>
+      </main>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { useAuthStore } from '../store/auth';
 import NotificationToast from '../components/NotificationToast.vue';
+import { ref } from 'vue';
+import { Disclosure, DisclosureButton, DisclosurePanel } from '@headlessui/vue';
+import { ChevronDownIcon, BellIcon, Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline';
 
 const authStore = useAuthStore();
+
+const navigation = [
+  { 
+    name: 'Dashboard', 
+    path: '/dashboard', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="14" y="14" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
+      </svg>`
+    }
+  },
+  { 
+    name: 'Devices', 
+    path: '/devices', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+      </svg>`
+    } 
+  },
+  { 
+    name: 'Jobs', 
+    path: '/jobs', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>`
+    } 
+  },
+  { 
+    name: 'Credentials', 
+    path: '/credentials', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+      </svg>`
+    } 
+  },
+  { 
+    name: 'Tags', 
+    path: '/tags', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M7 7h.01M7 3h5a1.99 1.99 0 0 1 1.414.586l7 7a2 2 0 0 1 0 2.828l-7 7a2 2 0 0 1-2.828 0l-7-7A1.99 1.99 0 0 1 3 12V7a4 4 0 0 1 4-4z" />
+      </svg>`
+    } 
+  },
+  { 
+    name: 'Users', 
+    path: '/users', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>`
+    } 
+  },
+  { 
+    name: 'Settings', 
+    path: '/settings', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>`
+    } 
+  }
+];
+
+const isSidebarOpen = ref(true);
+const toggleSidebar = () => {
+  isSidebarOpen.value = !isSidebarOpen.value;
+};
 </script>
 
-<style scoped>
-.router-link-active {
-  background-color: rgba(30, 58, 138, 0.5); /* bg-blue-900 with opacity */
-}
-
-.router-link-active svg {
-  color: #10b981; /* text-green-500 */
-}
+<style>
+/* Removing global styles in favor of inline Tailwind classes */
 </style> 

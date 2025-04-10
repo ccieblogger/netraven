@@ -1,26 +1,19 @@
 <template>
   <div class="p-6">
-    <!-- Header Section -->
-    <div class="mb-6">
-      <h1 class="text-3xl font-bold text-white">Welcome to NetRaven</h1>
-      <p class="text-gray-400 mt-1">Network Configuration Management System</p>
-    </div>
-
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <!-- Devices Card -->
-      <div class="netraven-card bg-blue-600">
+      <div class="bg-blue-600 rounded overflow-hidden shadow-lg">
         <div class="p-5 flex justify-between items-start">
           <div>
             <h2 class="text-lg uppercase font-semibold text-gray-300">DEVICES</h2>
             <div class="mt-2 flex items-baseline">
-              <p class="stat-counter">0</p>
+              <p class="text-4xl font-bold text-white">0</p>
               <p class="ml-2 text-sm text-gray-300">Total Managed Devices</p>
             </div>
           </div>
-          <div class="icon-container bg-blue-700">
-            <!-- Computer monitor icon - exactly like reference -->
-            <svg class="w-6 h-6 text-blue-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div class="flex items-center justify-center h-10 w-10 rounded-md bg-blue-700">
+            <svg class="w-6 h-6 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
               <line x1="8" y1="21" x2="16" y2="21" />
               <line x1="12" y1="17" x2="12" y2="21" />
@@ -28,9 +21,9 @@
           </div>
         </div>
         <div class="bg-blue-700 px-5 py-3">
-          <router-link to="/devices" class="view-details text-blue-200 hover:text-white">
+          <router-link to="/devices" class="flex items-center text-sm font-medium text-blue-300 hover:text-white">
             View Details
-            <svg class="ml-1 w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="ml-1 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </router-link>
@@ -38,26 +31,25 @@
       </div>
 
       <!-- Jobs Card -->
-      <div class="netraven-card bg-green-600">
+      <div class="bg-green-600 rounded overflow-hidden shadow-lg">
         <div class="p-5 flex justify-between items-start">
           <div>
             <h2 class="text-lg uppercase font-semibold text-gray-300">JOBS</h2>
             <div class="mt-2 flex items-baseline">
-              <p class="stat-counter">0</p>
+              <p class="text-4xl font-bold text-white">0</p>
               <p class="ml-2 text-sm text-gray-300">Active Jobs</p>
             </div>
           </div>
-          <div class="icon-container bg-green-700">
-            <!-- Activity/heartbeat icon - exactly like reference -->
-            <svg class="w-6 h-6 text-green-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div class="flex items-center justify-center h-10 w-10 rounded-md bg-green-700">
+            <svg class="w-6 h-6 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
           </div>
         </div>
         <div class="bg-green-700 px-5 py-3">
-          <router-link to="/jobs" class="view-details text-green-200 hover:text-white">
+          <router-link to="/jobs" class="flex items-center text-sm font-medium text-green-300 hover:text-white">
             View Details
-            <svg class="ml-1 w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="ml-1 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </router-link>
@@ -65,27 +57,25 @@
       </div>
 
       <!-- Credentials Card -->
-      <div class="netraven-card bg-purple-600">
+      <div class="bg-purple-600 rounded overflow-hidden shadow-lg">
         <div class="p-5 flex justify-between items-start">
           <div>
             <h2 class="text-lg uppercase font-semibold text-gray-300">CREDENTIALS</h2>
             <div class="mt-2 flex items-baseline">
-              <p class="stat-counter">0</p>
+              <p class="text-4xl font-bold text-white">0</p>
               <p class="ml-2 text-sm text-gray-300">Stored Credentials</p>
             </div>
           </div>
-          <div class="icon-container bg-purple-700">
-            <!-- Lock icon - exactly like reference -->
-            <svg class="w-6 h-6 text-purple-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          <div class="flex items-center justify-center h-10 w-10 rounded-md bg-purple-700">
+            <svg class="w-6 h-6 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
             </svg>
           </div>
         </div>
         <div class="bg-purple-700 px-5 py-3">
-          <router-link to="/credentials" class="view-details text-purple-200 hover:text-white">
+          <router-link to="/credentials" class="flex items-center text-sm font-medium text-purple-300 hover:text-white">
             View Details
-            <svg class="ml-1 w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="ml-1 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </router-link>
@@ -94,20 +84,23 @@
     </div>
 
     <!-- Recent Activity Section -->
-    <div class="netraven-card bg-gray-900 border border-gray-800">
-      <div class="px-5 py-4 border-b border-gray-800 flex justify-between items-center">
-        <h2 class="text-xl font-bold text-white">Recent Activity</h2>
-        <router-link to="/logs" class="view-details text-gray-300 hover:text-white">
+    <div class="bg-[#101B2D] border border-gray-700 rounded-md overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-700 flex justify-between items-center">
+        <div>
+          <h2 class="text-lg font-semibold text-white">Recent Activity</h2>
+          <p class="text-xs text-gray-400">Latest system events and logs</p>
+        </div>
+        <router-link to="/logs" class="flex items-center text-sm font-medium text-blue-400 hover:text-white">
           View All Logs
-          <svg class="ml-1 w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="ml-1 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
           </svg>
         </router-link>
       </div>
       <div class="p-5">
-        <div class="flex justify-center items-center py-8">
+        <div class="flex justify-center items-center py-6">
           <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <span class="ml-3 text-gray-300">Loading recent activity...</span>
+          <span class="ml-3 text-gray-400">Loading recent activity...</span>
         </div>
       </div>
     </div>
