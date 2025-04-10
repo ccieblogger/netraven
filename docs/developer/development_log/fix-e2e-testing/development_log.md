@@ -79,6 +79,10 @@ Encountered several issues when running the startup script. Fixed these issues t
    - Problem: Encountered `AttributeError: module 'netraven.api.schemas' has no attribute 'device'`.
    - Solution: Updated `/netraven/api/schemas/__init__.py` to import all the schema modules.
 
+3. **Incorrect Model Import in Auth Router:**
+   - Problem: `auth_router.py` had incorrect import: `from netraven.api import models`.
+   - Solution: Changed the import to `from netraven.db.models import User` and updated related code.
+
 By addressing these issues, we've improved the robustness of the startup process and fixed missing elements in the codebase.
 
 Next steps:

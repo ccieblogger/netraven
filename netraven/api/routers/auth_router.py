@@ -3,7 +3,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from sqlalchemy.orm import Session
 
-from netraven.api import auth, schemas, models # Import models too
+from netraven.api import auth, schemas
+from netraven.db.models import User  # Import User model from the correct location
 from netraven.api.dependencies import get_db_session # Import DB dependency
 
 router = APIRouter(
@@ -12,8 +13,8 @@ router = APIRouter(
 )
 
 # Helper function (could be moved to auth.py or a crud layer)
-def authenticate_user(db: Session, username: str, password: str) -> models.User | None:
-    user = db.query(models.User).filter(models.User.username == username).first()
+def authenticate_user(db: Session, username: str, password: str) -> User | None:
+    user = db.query(User).filter(User.username == username).first()
     if not user:
         return None
     if not auth.verify_password(password, user.hashed_password):
