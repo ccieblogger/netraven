@@ -11,6 +11,8 @@ import Users from '../pages/Users.vue';
 import Unauthorized from '../pages/Unauthorized.vue';
 import ConfigDiff from '../pages/ConfigDiff.vue'; // Import the ConfigDiff component
 import JobMonitor from '../pages/JobMonitor.vue'; // Import the JobMonitor component
+import Tags from '../pages/Tags.vue'; // Import the Tags component
+import Credentials from '../pages/Credentials.vue'; // Import the Credentials component
 
 // Placeholder components for routes to work initially
 // const PlaceholderComponent = { template: '<div>Placeholder Page</div>' }; // No longer needed
@@ -37,6 +39,18 @@ const routes = [
     name: 'Devices',
     component: Devices, // Use actual Devices component
     meta: { requiresAuth: true, roles: ['admin', 'user'] } 
+  },
+  {
+    path: '/tags',
+    name: 'Tags',
+    component: Tags, // Use the Tags component
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
+  },
+  {
+    path: '/credentials',
+    name: 'Credentials',
+    component: Credentials, // Use the Credentials component
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
   },
   {
     path: '/jobs',

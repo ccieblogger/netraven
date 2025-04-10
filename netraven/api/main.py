@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers
 from .routers import devices, jobs, users, logs, auth_router, tags, credentials
@@ -10,6 +11,15 @@ app = FastAPI(
     openapi_url="/api/v1/openapi.json",  # Customize OpenAPI path if needed
     docs_url="/api/docs",              # Customize Swagger UI path
     redoc_url="/api/redoc"             # Customize ReDoc path
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/health", tags=["Health"])
