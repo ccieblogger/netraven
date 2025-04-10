@@ -45,8 +45,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 3rem;
-  height: 3rem;
+  width: 2.5rem;
+  height: 2.5rem;
 }
 
 /* Stat counter styling */
@@ -66,5 +66,10 @@ html, body {
 }
 .view-details:hover {
   text-decoration: underline;
+}
+
+/* Force an update by adding a small tweak */
+.router-link-active svg {
+  stroke-width: 2px;
 }
 </style>
