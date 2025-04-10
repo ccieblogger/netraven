@@ -49,21 +49,41 @@
 
       <!-- User account -->
       <div class="p-4 border-t border-gray-700">
-        <div class="flex items-center space-x-3" :class="{ 'justify-center': !isSidebarOpen }">
-          <img
-            class="h-9 w-9 rounded-full"
-            src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-            alt="User avatar"
-          />
-          <div v-if="isSidebarOpen">
-            <p class="text-sm font-medium text-white">Admin User</p>
-            <button 
-              @click="authStore.logout" 
-              class="text-xs text-gray-400 hover:text-white"
-            >
-              Sign out
-            </button>
+        <div class="flex items-center" :class="{ 'justify-center': !isSidebarOpen }">
+          <div class="flex-shrink-0">
+            <div class="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center text-white font-medium text-lg">
+              A
+            </div>
           </div>
+          <div v-if="isSidebarOpen" class="ml-3">
+            <p class="text-base font-medium text-white">admin</p>
+          </div>
+        </div>
+        
+        <div v-if="isSidebarOpen" class="mt-3">
+          <button 
+            @click="authStore.logout" 
+            class="w-full flex items-center px-2 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-[#19253D] hover:text-white group"
+          >
+            <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Logout
+          </button>
+        </div>
+        <div v-else class="mt-3 flex justify-center">
+          <button 
+            @click="authStore.logout" 
+            class="p-2 text-gray-400 rounded-md hover:bg-[#19253D] hover:text-white"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
         </div>
       </div>
     </aside>
