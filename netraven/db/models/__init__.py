@@ -6,6 +6,7 @@ from .job import Job
 from .job_log import JobLog, LogLevel
 from .system_setting import SystemSetting
 from .connection_log import ConnectionLog
+from .user import User
 
 __all__ = [
     "Tag",
@@ -19,4 +20,5 @@ __all__ = [
     "LogLevel",
     "SystemSetting",
     "ConnectionLog",
+    "User",
 ] 

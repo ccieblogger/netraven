@@ -63,6 +63,24 @@ Created a comprehensive service startup script to easily start and stop all NetR
 
 This script will significantly simplify testing by ensuring a consistent environment and making it easy to start and stop services.
 
+### Fixes for Initial Setup Issues (In Progress)
+
+**Date:** 2025-04-10
+
+Encountered several issues when running the startup script. Fixed these issues to ensure smooth startup:
+
+1. **User Model Missing:**
+   - Problem: The `User` model was missing from the database models.
+   - Solution: Created `/netraven/db/models/user.py` with the proper User class definition.
+   - Added the User model to the imports in `/netraven/db/models/__init__.py`.
+   - Generated and applied an Alembic migration to add the User table to the database.
+
+2. **Schema Imports Issue:**
+   - Problem: Encountered `AttributeError: module 'netraven.api.schemas' has no attribute 'device'`.
+   - Solution: Updated `/netraven/api/schemas/__init__.py` to import all the schema modules.
+
+By addressing these issues, we've improved the robustness of the startup process and fixed missing elements in the codebase.
+
 Next steps:
-- Test the startup script to verify it works correctly
+- Continue testing the startup script with our fixes
 - Begin component-level testing of the API endpoints 
