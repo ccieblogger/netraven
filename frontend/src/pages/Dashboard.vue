@@ -19,6 +19,7 @@
             </div>
           </div>
           <div class="icon-container bg-blue-800">
+            <!-- Computer monitor icon -->
             <svg class="w-8 h-8 text-blue-200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
               <line x1="8" y1="21" x2="16" y2="21"></line>
@@ -47,6 +48,7 @@
             </div>
           </div>
           <div class="icon-container bg-green-800">
+            <!-- Activity/heartbeat icon -->
             <svg class="w-8 h-8 text-green-200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
             </svg>
@@ -73,6 +75,7 @@
             </div>
           </div>
           <div class="icon-container bg-purple-800">
+            <!-- Lock icon -->
             <svg class="w-8 h-8 text-purple-200" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>

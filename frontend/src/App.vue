@@ -32,10 +32,10 @@ html, body {
 
 /* Card styling using direct CSS instead of @apply */
 .netraven-card {
-  border-radius: 0.5rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Icon containers */
@@ -45,6 +45,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 3rem;
+  height: 3rem;
 }
 
 /* Stat counter styling */
@@ -52,6 +54,7 @@ html, body {
   font-size: 3rem;
   font-weight: 700;
   color: white;
+  line-height: 1;
 }
 
 /* View details links */
