@@ -107,3 +107,6 @@ alembic/versions/__pycache__/
 
 # tailwindcss
 frontend/tailwindcss
+
+# Startup 
+.pids/
