@@ -4,54 +4,61 @@ export default {
     "./index.html",
     "./src/**/*.{vue,js,ts,jsx,tsx}",
   ],
-  purge: [
-    './src/**/*.html', './src/**/*.vue', './src/**/*.jsx'
-  ],
-  safelist: [
-    'bg-gray-900',
-    'text-gray-900'
-  ],
   theme: {
     extend: {
       colors: {
-        // Standard gray scale that works in v4
+        // Standard gray scale
         gray: {
-          100: '#f3f4f6',
-          200: '#e5e7eb',
-          300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280',
-          600: '#4b5563',
-          700: '#374151',
-          800: '#1f2937',
-          900: '#111827',
+          100: 'oklch(0.961 0.02 91)',
+          200: 'oklch(0.921 0.02 91)',
+          300: 'oklch(0.866 0.02 91)',
+          400: 'oklch(0.71 0.02 91)',
+          500: 'oklch(0.51 0.02 91)',
+          600: 'oklch(0.41 0.02 91)',
+          700: 'oklch(0.31 0.02 91)',
+          800: 'oklch(0.21 0.02 91)',
+          900: 'oklch(0.12 0.02 91)',
         },
         // Blue colors updated to match UI screenshot - more subdued navy tones
         blue: {
-          500: '#3b82f6', // Medium blue for backgrounds
-          600: '#2563eb', // Device card background
-          700: '#1d4ed8', // Darker blue elements
-          800: '#1e3a8a', // Sidebar background (navy blue)
-          900: '#0D1321', // Main content background (Rich Black)
+          300: 'oklch(0.8 0.15 250)',
+          400: 'oklch(0.7 0.15 250)',
+          500: 'oklch(0.6 0.15 250)', // Medium blue for backgrounds
+          600: 'oklch(0.5 0.15 250)', // Device card background
+          700: 'oklch(0.4 0.15 250)', // Darker blue elements
+          800: 'oklch(0.3 0.15 250)', // Sidebar background (navy blue)
+          900: 'oklch(0.15 0.08 265)', // Main content background (Rich Black)
         },
         // Greens for Jobs card and accents
         green: {
-          500: '#10b981', // Main green for accents
-          600: '#059669',
-          700: '#047857',
-          800: '#065f46',
+          300: 'oklch(0.8 0.15 150)',
+          400: 'oklch(0.7 0.15 150)',
+          500: 'oklch(0.6 0.15 150)', // Main green for accents
+          600: 'oklch(0.5 0.15 150)',
+          700: 'oklch(0.4 0.15 150)',
+          800: 'oklch(0.3 0.15 150)',
         },
         // Purples for Credentials card
         purple: {
-          600: '#9333ea', // Main purple for credentials card
-          700: '#7e22ce',
-          800: '#6b21a8',
-          900: '#581c87',
+          300: 'oklch(0.8 0.15 310)',
+          400: 'oklch(0.7 0.15 310)',
+          500: 'oklch(0.6 0.15 310)',
+          600: 'oklch(0.5 0.15 310)', // Main purple for credentials card
+          700: 'oklch(0.4 0.15 310)',
+          800: 'oklch(0.3 0.15 310)',
+          900: 'oklch(0.2 0.15 310)',
         },
+      },
+      backgroundColor: {
+        'sidebar': 'oklch(0.16 0.06 265)', // Exact sidebar and header color
+      },
+      borderColor: {
+        'divider': 'oklch(0.23 0.04 265)', // Exact border color
       },
     },
   },
   plugins: [
-    require('@tailwindcss/forms'),
+    // Using modern syntax for Tailwind CSS v4
+    ['@tailwindcss/forms', {}],
   ],
 }

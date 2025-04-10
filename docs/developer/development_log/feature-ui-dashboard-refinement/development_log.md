@@ -170,7 +170,7 @@ Based on the provided screenshot, I'll implement the following changes to refact
 
 ### 5.2 Layout Component Revisions
 1. Updated `frontend/src/layouts/DefaultLayout.vue`:
-   - Rewrote all SVG icons with cleaner syntax
+   - Rewritten all SVG icons with cleaner syntax
    - Removed unnecessary attributes (stroke-width, stroke-linecap, etc.)
    - Improved readability with consistent attribute ordering
    - Used self-closing syntax for all SVG path elements
@@ -195,4 +195,65 @@ Based on the provided screenshot, I'll implement the following changes to refact
 **Results:**
 - The UI now precisely matches the reference image
 - Card colors, icons, and layout perfectly align with the intended design
-- SVG code is cleaner, more consistent, and renders correctly across browsers 
+- SVG code is cleaner, more consistent, and renders correctly across browsers
+
+## Phase 6: Technology Upgrade and UI Modernization
+
+**Date:** 2025-06-10
+
+**Developer:** Eamon
+
+**Changes:**
+
+### 6.1 Technology Stack Upgrades
+1. Updated dependencies in `frontend/package.json`:
+   - Upgraded Vue to version 3.5.13
+   - Upgraded Tailwind CSS to version 4.0.17
+   - Added the official Tailwind CSS Vite plugin
+   - Removed @tailwindcss/postcss in favor of the new plugin
+
+### 6.2 Tailwind CSS v4 Configuration
+1. Updated `frontend/tailwind.config.js`:
+   - Rewrote color definitions using the modern oklch color format
+   - Simplified plugin configuration using the new array syntax
+   - Removed purge configuration (automatic in v4)
+   - Expanded color palette with more gradations
+
+### 6.3 CSS Modernization
+1. Updated `frontend/src/assets/main.css`:
+   - Added @theme directive with CSS variables for consistent theming
+   - Replaced hex colors with CSS variables
+   - Utilized the new color-mix() function for transparency effects
+   - Simplified imports with the new Tailwind CSS v4 syntax
+
+### 6.4 Build System Update
+1. Updated `frontend/vite.config.js`:
+   - Added the Tailwind CSS Vite plugin
+   - Simplified PostCSS configuration
+
+### 6.5 Component Modernization
+1. Updated `frontend/src/pages/Dashboard.vue`:
+   - Utilized Vue 3.5 improved reactivity system
+   - Added proper loading state management
+   - Improved SVG icon semantics with modern formatting
+   - Fixed border radius for a more consistent appearance
+
+2. Updated `frontend/src/layouts/DefaultLayout.vue`:
+   - Removed the sidebar toggle functionality (as per screenshot)
+   - Updated icon and navigation styles to match the reference exactly
+   - Improved navigation space usage and readability
+   - Replaced Mobile menu button with a cleaner header
+
+**Rationale:**
+- The Vue 3.5 upgrade provides improved reactivity and performance
+- Tailwind CSS v4 offers better color handling, smaller bundle sizes, and improved developer experience
+- Modern CSS features like color-mix() and CSS variables improve maintainability
+- The updated component structure better follows Vue 3.5 best practices
+- The simpler layout better matches the reference screenshot exactly
+
+**Results:**
+- The UI now precisely matches the reference image
+- The application benefits from the latest Vue and Tailwind CSS features
+- The codebase is more maintainable with better theming support
+- Performance is improved with the optimized build system
+- The development experience is enhanced with better tooling 
