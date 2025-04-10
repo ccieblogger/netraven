@@ -90,6 +90,19 @@ Successfully started all NetRaven services:
 
 The setup phase is now complete. All services are running properly and can be accessed for testing.
 
+### Frontend Fixes
+
+**Date:** 2025-04-10
+
+While navigating to the frontend, encountered errors loading the pages due to missing dependencies:
+
+1. **Missing Heroicons Package:**
+   - Problem: Frontend Vue components were trying to import icons from '@heroicons/vue/24/outline' but the package wasn't installed.
+   - Error: `Failed to resolve import "@heroicons/vue/24/outline" from "src/pages/Jobs.vue"`
+   - Solution: Installed the missing package with `npm install @heroicons/vue`
+
+This fix allows the frontend pages to load correctly without 500 errors.
+
 ### Component Testing: API Endpoints (Starting)
 
 **Date:** 2025-04-10
