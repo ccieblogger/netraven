@@ -108,8 +108,16 @@ Based on the provided screenshot, I'll implement the following changes to refact
    - Added CSS for proper active link indicator (green icon highlight)
    - Updated border opacity for a more subtle appearance
 
+### 3.4 Tailwind Configuration Update
+1. Updated `frontend/tailwind.config.js` to define the custom color palette:
+   - Added specific blue colors (including #0D1321 for main background)
+   - Enhanced green colors for Jobs card and accents
+   - Updated purple colors for Credentials card
+   - Added descriptive comments for each color's purpose
+
 **Rationale:**
 - These changes bring the UI in line with the design in the screenshot
 - Using utility classes improves consistency across components
 - The color scheme now follows the intended design with rich blues, greens, and purples
-- The layout now properly emphasizes the dashboard cards and navigation 
+- The layout now properly emphasizes the dashboard cards and navigation
+- The Tailwind configuration ensures consistent color usage throughout the application 
