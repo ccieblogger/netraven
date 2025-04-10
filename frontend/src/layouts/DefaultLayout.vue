@@ -1,12 +1,12 @@
 <template>
-  <div class="flex h-screen bg-blue-900">
+  <div class="flex h-screen overflow-hidden">
     <!-- Sidebar -->
-    <aside class="h-screen flex-shrink-0 flex flex-col w-64 bg-sidebar border-r border-divider">
+    <aside class="h-screen w-sidebar flex-shrink-0 flex flex-col bg-sidebar border-r border-divider">
       <!-- Sidebar header with logo -->
       <div class="flex items-center px-4 py-4">
         <router-link to="/" class="flex items-center space-x-2">
           <span class="text-xl font-semibold">
-            <span class="text-green-500">Net</span><span class="text-white">Raven</span>
+            <span class="text-primary">Net</span><span class="text-text-primary">Raven</span>
           </span>
         </router-link>
       </div>
@@ -20,14 +20,14 @@
           class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out"
           :class="[
             $route.path.startsWith(item.path) 
-              ? 'text-white bg-[#19253D] border-l-4 border-green-500 pl-2' 
-              : 'text-gray-400 hover:text-white hover:bg-[#19253D] border-l-4 border-transparent'
+              ? 'text-text-primary bg-card border-l-4 border-primary pl-2' 
+              : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
           ]"
         >
           <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0 mr-3" 
                :class="{ 
-                 'text-gray-400': !$route.path.startsWith(item.path),
-                 'text-green-500': $route.path.startsWith(item.path)
+                 'text-text-secondary': !$route.path.startsWith(item.path),
+                 'text-primary': $route.path.startsWith(item.path)
                }"></div>
           <span class="truncate">{{ item.name }}</span>
         </router-link>
@@ -37,21 +37,26 @@
       <div class="p-4 mt-auto border-t border-divider">
         <div class="flex items-center gap-3">
           <div class="flex-shrink-0">
-            <div class="h-9 w-9 rounded-full bg-green-500 flex items-center justify-center text-white font-medium text-lg">
+            <div class="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg">
               A
             </div>
           </div>
           <div>
-            <p class="text-sm font-medium text-white">admin</p>
+            <p class="text-sm font-medium text-text-primary">{{ authStore.user?.username || 'admin' }}</p>
           </div>
         </div>
         
-        <div class="mt-4">
+        <!-- Theme Switcher -->
+        <div class="mt-3 pb-3">
+          <ThemeSwitcher />
+        </div>
+        
+        <div class="mt-2">
           <button 
             @click="authStore.logout" 
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-400 hover:text-white rounded-md hover:bg-[#19253D] group"
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-text-primary rounded-md hover:bg-card group"
           >
-            <svg class="h-5 w-5 text-gray-400 group-hover:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="h-5 w-5 text-text-secondary group-hover:text-text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
               <polyline points="16 17 21 12 16 7"></polyline>
               <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -68,19 +73,19 @@
       <header class="sticky top-0 z-10 flex items-center justify-between h-16 bg-sidebar border-b border-divider px-4">
         <div class="flex flex-col">
           <h1 class="text-xl font-semibold">
-            <span class="text-green-500">Welcome to</span> <span class="text-white">NetRaven</span>
+            <span class="text-primary">Welcome to</span> <span class="text-text-primary">NetRaven</span>
           </h1>
-          <p class="text-sm text-gray-400">Network Configuration Management System</p>
+          <p class="text-sm text-text-secondary">Network Configuration Management System</p>
         </div>
         <div class="flex items-center space-x-4">
-          <button class="p-1 text-gray-400 rounded-full hover:text-white focus:outline-none">
+          <button class="p-1 text-text-secondary rounded-full hover:text-text-primary focus:outline-none">
             <BellIcon class="w-6 h-6" />
           </button>
         </div>
       </header>
 
       <!-- Page content -->
-      <main class="flex-1 overflow-y-auto bg-blue-900 p-6">
+      <main class="flex-1 overflow-y-auto bg-content p-6">
         <slot></slot>
       </main>
     </div>
@@ -89,8 +94,8 @@
 
 <script setup>
 import { useAuthStore } from '../store/auth';
-import { ref } from 'vue';
 import { BellIcon } from '@heroicons/vue/24/outline';
+import ThemeSwitcher from '../components/ui/ThemeSwitcher.vue';
 
 const authStore = useAuthStore();
 

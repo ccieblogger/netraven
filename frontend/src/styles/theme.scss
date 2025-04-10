@@ -1,0 +1,47 @@
+:root {
+  /* Brand colors */
+  --nr-primary: #10B981;
+  --nr-primary-light: #34D399;
+  --nr-primary-dark: #059669;
+  
+  /* Background colors */
+  --nr-bg-sidebar: #0D1321;
+  --nr-bg-content: #121F3D;
+  --nr-bg-card: #19253D;
+  
+  /* Text colors */
+  --nr-text-primary: #FFFFFF;
+  --nr-text-secondary: #94A3B8;
+  
+  /* Border colors */
+  --nr-border: rgba(255, 255, 255, 0.1);
+  
+  /* Component-specific variables */
+  --nr-card-radius: 0.375rem;
+  --nr-sidebar-width: 16rem;
+}
+
+/* Dark theme (default) */
+.theme-dark {
+  /* Same as root for default */
+}
+
+/* Light theme */
+.theme-light {
+  --nr-bg-sidebar: #F8FAFC;
+  --nr-bg-content: #F1F5F9;
+  --nr-bg-card: #FFFFFF;
+  --nr-text-primary: #0F172A;
+  --nr-text-secondary: #475569;
+  --nr-border: rgba(0, 0, 0, 0.1);
+}
+
+/* Blue theme */
+.theme-blue {
+  --nr-bg-sidebar: #172554;
+  --nr-bg-content: #1E3A8A;
+  --nr-bg-card: #1E40AF;
+  --nr-text-primary: #FFFFFF;
+  --nr-text-secondary: #93C5FD;
+  --nr-border: rgba(147, 197, 253, 0.3);
+} 
