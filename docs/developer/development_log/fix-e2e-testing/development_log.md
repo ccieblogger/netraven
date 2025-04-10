@@ -101,7 +101,12 @@ While navigating to the frontend, encountered errors loading the pages due to mi
    - Error: `Failed to resolve import "@heroicons/vue/24/outline" from "src/pages/Jobs.vue"`
    - Solution: Installed the missing package with `npm install @heroicons/vue`
 
-This fix allows the frontend pages to load correctly without 500 errors.
+2. **Template Syntax Errors in DefaultLayout.vue:**
+   - Problem: The Vue template had escaped quotes (`\"`) causing a syntax error: `Unquoted attribute value cannot contain U+0022 ("), U+0027 ('), U+003C (<), U+003D (=), and U+0060 (`)`.
+   - Error: `GET http://localhost:5173/src/layouts/DefaultLayout.vue net::ERR_ABORTED 500 (Internal Server Error)`
+   - Solution: Replaced all escaped quotes (`\"`) with regular quotes (`"`) in the template attributes.
+
+These fixes allow the frontend to load properly, resolving the 500 errors during page navigation.
 
 ### Component Testing: API Endpoints (Starting)
 
