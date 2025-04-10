@@ -31,7 +31,7 @@
           v-for="item in navigation" 
           :key="item.name"
           :to="item.path" 
-          class="group flex items-center gap-6 px-2 py-2 text-sm font-medium transition-colors duration-150 ease-in-out"
+          class="group flex items-center gap-4 px-2 py-2 text-sm font-medium transition-colors duration-150 ease-in-out"
           :class="[
             $route.path.startsWith(item.path) 
               ? 'text-white bg-[#19253D] border-l-4 border-blue-500 pl-1' 
@@ -49,13 +49,13 @@
 
       <!-- User account -->
       <div class="p-4 mt-auto border-t border-gray-700">
-        <div class="flex items-center" :class="{ 'justify-center': !isSidebarOpen }">
+        <div class="flex items-center gap-4" :class="{ 'justify-center': !isSidebarOpen }">
           <div class="flex-shrink-0">
             <div class="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center text-white font-medium text-xl">
               A
             </div>
           </div>
-          <div v-if="isSidebarOpen" class="ml-3">
+          <div v-if="isSidebarOpen">
             <p class="text-base font-medium text-white">admin</p>
           </div>
         </div>
