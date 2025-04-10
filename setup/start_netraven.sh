@@ -154,10 +154,14 @@ if [ -d "$ROOT_DIR/frontend" ]; then
     echo -e "\n${YELLOW}Starting Frontend development server...${NC}"
     cd "$ROOT_DIR/frontend"
     
-    # Check if node_modules exists, if not, install dependencies
-    if [ ! -d "node_modules" ]; then
-        echo -e "${YELLOW}Installing frontend dependencies...${NC}"
-        npm install
+    # Make sure all dependencies are installed
+    echo -e "${YELLOW}Checking frontend dependencies...${NC}"
+    npm install
+
+    # Ensure specific required packages are installed
+    if ! npm list @heroicons/vue &> /dev/null; then
+        echo -e "${YELLOW}Installing @heroicons/vue package...${NC}"
+        npm install @heroicons/vue
     fi
     
     start_service "Frontend Development Server" "npm run dev -- --host 0.0.0.0" "$FRONTEND_LOG" "$FRONTEND_PID"
