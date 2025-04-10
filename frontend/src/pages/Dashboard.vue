@@ -91,7 +91,7 @@
     </div>
 
     <!-- Recent Activity Section -->
-    <div class="netraven-card bg-blue-800">
+    <div class="netraven-card" style="background-color: #0D1321; border: 1px solid rgba(255, 255, 255, 0.2);">
       <div class="px-5 py-4 border-b border-opacity-20 border-white flex justify-between items-center">
         <h2 class="text-xl font-bold text-white">Recent Activity</h2>
         <router-link to="/logs" class="view-details text-gray-300 hover:text-white">
