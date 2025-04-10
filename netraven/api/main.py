@@ -1,8 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 # Import routers
 from .routers import devices, jobs, users, logs, auth_router, tags, credentials
+
+# Check if we're in development mode (you can set this in your environment)
+# Default to development mode if not specified
+is_development = os.getenv("ENVIRONMENT", "development").lower() == "development"
 
 app = FastAPI(
     title="NetRaven API",
@@ -13,10 +18,15 @@ app = FastAPI(
     redoc_url="/api/redoc"             # Customize ReDoc path
 )
 
-# Configure CORS
+# Configure CORS - more flexible approach
+origins = ["*"] if is_development else [
+    "http://localhost:5173",  # Production/fixed origins would go here
+    "https://netraven.example.com"  # Example production domain
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
