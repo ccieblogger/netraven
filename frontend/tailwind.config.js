@@ -26,22 +26,27 @@ export default {
           800: '#1f2937',
           900: '#111827',
         },
-        // Dark blue backgrounds
+        // Blue colors updated to match UI screenshot - more subdued navy tones
         blue: {
-          800: '#1a365d',
-          900: '#1e3a8a',
+          500: '#3b82f6', // Medium blue for backgrounds
+          600: '#2563eb', // Device card background
+          700: '#1d4ed8', // Darker blue elements
+          800: '#1e3a8a', // Sidebar background (navy blue)
+          900: '#0D1321', // Main content background (Rich Black)
         },
-        // Greens for buttons and accents
+        // Greens for Jobs card and accents
         green: {
-          500: '#10b981',
+          500: '#10b981', // Main green for accents
           600: '#059669',
           700: '#047857',
           800: '#065f46',
         },
-        // Purples for cards
+        // Purples for Credentials card
         purple: {
-          800: '#5b21b6',
-          900: '#4c1d95',
+          600: '#9333ea', // Main purple for credentials card
+          700: '#7e22ce',
+          800: '#6b21a8',
+          900: '#581c87',
         },
       },
     },
