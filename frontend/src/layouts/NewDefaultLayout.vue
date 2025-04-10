@@ -26,21 +26,21 @@
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 px-2 py-4 space-y-1">
+      <nav class="flex-1 px-2 py-4 space-y-2">
         <router-link 
           v-for="item in navigation" 
           :key="item.name"
           :to="item.path" 
-          class="group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out"
+          class="group flex items-center gap-6 px-2 py-2 text-sm font-medium transition-colors duration-150 ease-in-out"
           :class="[
             $route.path.startsWith(item.path) 
-              ? 'text-white bg-[#19253D] border-l-4 border-blue-500' 
-              : 'text-gray-400 hover:text-white hover:bg-[#19253D]'
+              ? 'text-white bg-[#19253D] border-l-4 border-blue-500 pl-1' 
+              : 'text-gray-400 hover:text-white hover:bg-[#19253D] border-l-4 border-transparent'
           ]"
         >
-          <div v-html="item.icon.template" class="mr-3" 
+          <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0" 
                :class="{ 
-                 'ml-1': !$route.path.startsWith(item.path),
+                 'text-gray-400': !$route.path.startsWith(item.path),
                  'text-green-500': $route.path.startsWith(item.path)
                }"></div>
           <span v-if="isSidebarOpen" class="truncate">{{ item.name }}</span>
@@ -48,10 +48,10 @@
       </nav>
 
       <!-- User account -->
-      <div class="p-4 border-t border-gray-700">
+      <div class="p-4 mt-auto border-t border-gray-700">
         <div class="flex items-center" :class="{ 'justify-center': !isSidebarOpen }">
           <div class="flex-shrink-0">
-            <div class="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center text-white font-medium text-lg">
+            <div class="h-12 w-12 rounded-full bg-green-500 flex items-center justify-center text-white font-medium text-xl">
               A
             </div>
           </div>
@@ -60,12 +60,12 @@
           </div>
         </div>
         
-        <div v-if="isSidebarOpen" class="mt-3">
+        <div v-if="isSidebarOpen" class="mt-5">
           <button 
             @click="authStore.logout" 
-            class="w-full flex items-center px-2 py-2 text-sm font-medium text-gray-300 rounded-md hover:bg-[#19253D] hover:text-white group"
+            class="w-full flex items-center gap-4 px-3 py-2 text-sm font-medium text-gray-300 hover:text-white group"
           >
-            <svg class="mr-3 h-5 w-5 text-gray-400 group-hover:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="h-5 w-5 text-gray-400 group-hover:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
               <polyline points="16 17 21 12 16 7"></polyline>
               <line x1="21" y1="12" x2="9" y2="12"></line>
