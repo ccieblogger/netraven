@@ -142,6 +142,27 @@ const navigation = [
     } 
   },
   { 
+    name: 'Tags', 
+    path: '/tags', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M7 7h.01M7 3h5a1.99 1.99 0 0 1 1.414.586l7 7a2 2 0 0 1 0 2.828l-7 7a2 2 0 0 1-2.828 0l-7-7A1.99 1.99 0 0 1 3 12V7a4 4 0 0 1 4-4z" />
+      </svg>`
+    } 
+  },
+  { 
+    name: 'Users', 
+    path: '/users', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>`
+    } 
+  },
+  { 
     name: 'Settings', 
     path: '/settings', 
     icon: {
