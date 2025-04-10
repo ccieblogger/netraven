@@ -1,7 +1,7 @@
 <template>
-  <div class="p-6">
+  <div class="p-3">
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
       <!-- Devices Card -->
       <div class="bg-blue-600 rounded overflow-hidden shadow-lg">
         <div class="p-5 flex justify-between items-start">
@@ -84,7 +84,7 @@
     </div>
 
     <!-- Recent Activity Section -->
-    <div class="bg-[#101B2D] border border-gray-700 rounded-md overflow-hidden">
+    <div class="bg-[#101B2D] border border-gray-700 rounded-md overflow-hidden mt-3">
       <div class="px-5 py-3 border-b border-gray-700 flex justify-between items-center">
         <div>
           <h2 class="text-lg font-semibold text-white">Recent Activity</h2>
