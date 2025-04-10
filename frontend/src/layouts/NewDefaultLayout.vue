@@ -8,8 +8,12 @@
       <!-- Sidebar header with logo -->
       <div class="flex items-center justify-between px-4 py-4">
         <router-link to="/" class="flex items-center space-x-2">
-          <img src="../assets/logo.png" alt="Logo" class="h-8 w-auto" />
-          <span v-if="isSidebarOpen" class="text-lg font-semibold text-white">NetRaven</span>
+          <span v-if="isSidebarOpen" class="text-lg font-semibold">
+            <span class="text-green-500">Net</span><span class="text-white">Raven</span>
+          </span>
+          <span v-else class="text-lg font-semibold">
+            <span class="text-green-500">N</span>
+          </span>
         </router-link>
         <button @click="toggleSidebar" class="text-gray-400 hover:text-white focus:outline-none">
           <svg v-if="isSidebarOpen" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -68,8 +72,11 @@
     <div class="flex flex-col flex-1 overflow-hidden">
       <!-- Main content header -->
       <header class="sticky top-0 z-10 flex items-center justify-between h-16 bg-[#101B2D] border-b border-gray-700 px-4">
-        <div class="flex items-center">
-          <h1 class="text-xl font-semibold text-white">Dashboard</h1>
+        <div class="flex flex-col">
+          <h1 class="text-xl font-semibold">
+            <span class="text-green-500">Welcome to</span> <span class="text-white">NetRaven</span>
+          </h1>
+          <p class="text-sm text-gray-400">Network Configuration Management System</p>
         </div>
         <div class="flex items-center space-x-4">
           <button class="p-1 text-gray-400 rounded-full hover:text-white focus:outline-none">
