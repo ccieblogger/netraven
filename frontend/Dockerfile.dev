@@ -1,0 +1,20 @@
+# Use a specific Node.js version with full image instead of alpine
+FROM node:20
+
+WORKDIR /app
+
+# Verify Node.js and npm installation
+RUN node --version && npm --version
+
+# Install dependencies first (leveraging Docker cache)
+COPY package*.json ./
+RUN npm install
+
+# Copy the rest of the application
+COPY . .
+
+# Expose the dev server port
+EXPOSE 5173
+
+# Start the development server with host 0.0.0.0 to allow external connections
+CMD ["npm", "run", "dev"]

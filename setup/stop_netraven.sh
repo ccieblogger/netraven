@@ -32,8 +32,11 @@ stop_service() {
     fi
 }
 
-stop_service "frontend"
+# Only stop backend services
 stop_service "scheduler"
 stop_service "api"
 
-echo "All NetRaven services stopped."
+echo "All NetRaven backend services stopped."
+echo "To stop the frontend containers:"
+echo "- Development environment: docker-compose down"
+echo "- Production environment: docker-compose -f docker-compose.prod.yml down"

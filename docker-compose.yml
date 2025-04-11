@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: netraven-frontend-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source code for live updates
+      - ./frontend:/app
+      # Use a named volume for node_modules to avoid overwriting with host directory
+      - frontend-node-modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000
+    # Simplify command since we've verified Node.js works in the Dockerfile
+    command: npm run dev
+    # Add healthcheck to verify the service is working
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5173 || exit 1
+      interval: 30s  # Increased from 10s to 30s
+      timeout: 10s   # Increased from 5s to 10s
+      retries: 5
+      start_period: 30s  # Give it 30s before starting health checks
+    # Ensure container restarts if it fails
+    restart: unless-stopped
+
+volumes:
+  frontend-node-modules:

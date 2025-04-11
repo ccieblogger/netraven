@@ -147,33 +147,22 @@ SCHEDULER_LOG="$LOG_DIR/scheduler.log"
 SCHEDULER_PID="$PID_DIR/scheduler.pid"
 start_service "Scheduler Service" "poetry run python -m netraven.scheduler.scheduler_runner" "$SCHEDULER_LOG" "$SCHEDULER_PID"
 
-# Start Frontend (if needed for development)
-FRONTEND_LOG="$LOG_DIR/frontend.log"
-FRONTEND_PID="$PID_DIR/frontend.pid"
-if [ -d "$ROOT_DIR/frontend" ]; then
-    echo -e "\n${YELLOW}Starting Frontend development server...${NC}"
-    cd "$ROOT_DIR/frontend"
-    
-    # Make sure all dependencies are installed
-    echo -e "${YELLOW}Checking frontend dependencies...${NC}"
-    npm install
-
-    # Ensure specific required packages are installed
-    if ! npm list @heroicons/vue &> /dev/null; then
-        echo -e "${YELLOW}Installing @heroicons/vue package...${NC}"
-        npm install @heroicons/vue
-    fi
-    
-    start_service "Frontend Development Server" "npm run dev -- --host 0.0.0.0" "$FRONTEND_LOG" "$FRONTEND_PID"
-    cd "$ROOT_DIR"
-fi
+# Frontend information (now containerized)
+echo -e "\n${YELLOW}Frontend information:${NC}"
+echo -e "The frontend is now containerized and can be started separately using Docker."
+echo -e "${GREEN}To start the frontend development environment:${NC}"
+echo -e "cd $ROOT_DIR && docker-compose up -d"
+echo -e "${GREEN}To start the frontend production environment:${NC}"
+echo -e "cd $ROOT_DIR && docker-compose -f docker-compose.prod.yml up -d"
 
 # Print summary
 echo -e "\n${GREEN}==========================================${NC}"
 echo -e "${GREEN}     NetRaven Services Started             ${NC}"
 echo -e "${GREEN}==========================================${NC}"
 echo -e "API running at: http://localhost:8000/api/docs"
-echo -e "Frontend running at: http://localhost:5173"
+echo -e "Frontend (when started with Docker):"
+echo -e " - Development: http://localhost:5173"
+echo -e " - Production: http://localhost:80"
 echo -e "\nLogin with: username='admin', password='admin123'"
 echo -e "\nTo stop the services, run: $ROOT_DIR/setup/stop_netraven.sh"
 echo -e "${GREEN}==========================================${NC}"
@@ -214,13 +203,16 @@ stop_service() {
     fi
 }
 
-stop_service "frontend"
+# Only stop backend services
 stop_service "scheduler"
 stop_service "api"
 
-echo "All NetRaven services stopped."
+echo "All NetRaven backend services stopped."
+echo "To stop the frontend containers:"
+echo "- Development environment: docker-compose down"
+echo "- Production environment: docker-compose -f docker-compose.prod.yml down"
 EOF
 
 chmod +x "$ROOT_DIR/setup/stop_netraven.sh"
 
-exit 0 
+exit 0
