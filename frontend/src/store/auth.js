@@ -8,11 +8,12 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem('authUser') || 'null')); // Load user info
   const loginError = ref(null);
   const isLoading = ref(false);
+  const username = ref(''); // Added reactive username
+  const password = ref(''); // Added reactive password
 
   // Computed properties for easy access
   const isAuthenticated = computed(() => !!token.value);
   const userRole = computed(() => user.value?.role || null);
-  const username = computed(() => user.value?.username || null);
 
   // Function to set auth data in state and localStorage
   function setAuthData(newToken, userData) {
@@ -56,18 +57,20 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Login action
   async function login(credentials) {
-    isLoading.value = true;
     loginError.value = null;
-    try {
-      // Use URLSearchParams for form data expected by OAuth2PasswordRequestForm
-      const formData = new URLSearchParams();
-      formData.append('username', credentials.username);
-      formData.append('password', credentials.password);
 
-      const response = await api.post('/auth/token', formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    try {
+      // Use URLSearchParams to format the payload as x-www-form-urlencoded
+      const payload = new URLSearchParams();
+      payload.append('username', credentials.username);
+      payload.append('password', credentials.password);
+
+      const response = await api.post('/auth/token', payload, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       });
-      
+
       const newToken = response.data.access_token;
       // After getting token, fetch user details
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
@@ -76,13 +79,14 @@ export const useAuthStore = defineStore('auth', () => {
       setAuthData(newToken, userResponse.data);
       
       // Redirect to dashboard or intended route
-      const redirectPath = router.currentRoute.value.query.redirect || '/';
+      const redirectPath = router.currentRoute.value.query.redirect || '/dashboard';
       router.push(redirectPath); 
 
     } catch (err) {
       loginError.value = err.response?.data?.detail || 'Login failed. Please check credentials.';
       console.error("Login Error:", err);
       clearAuthData(); // Clear any potentially partially set data
+      throw err; // Re-throw error for handling in Login.vue
     } finally {
       isLoading.value = false;
     }
@@ -95,7 +99,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return { 
-    token, user, loginError, isLoading, isAuthenticated, userRole, username,
+    token, user, loginError, isLoading, isAuthenticated, userRole, username, password,
     login, logout, fetchUserProfile, clearAuthData 
   };
 });

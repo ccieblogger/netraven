@@ -25,7 +25,7 @@
                 type="text"
                 autocomplete="username"
                 required
-                v-model="username"
+                v-model="authStore.username"
                 class="appearance-none block w-full px-3 py-2 border border-divider rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
               />
             </div>
@@ -42,7 +42,7 @@
                 type="password"
                 autocomplete="current-password"
                 required
-                v-model="password"
+                v-model="authStore.password"
                 class="appearance-none block w-full px-3 py-2 border border-divider rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
               />
             </div>
@@ -61,7 +61,7 @@
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               </template>
-              {{ isLoading ? 'Signing in...' : 'Sign in' }}
+              {{ isLoading ? 'Logging in...' : 'Login' }}
             </NrButton>
           </div>
           
@@ -74,38 +74,46 @@
   </div>
 </template>
 
-<script setup>
-import { ref } from 'vue';
+<script>
 import { useAuthStore } from '../store/auth';
 import { useRouter } from 'vue-router';
+import { ref } from 'vue';
 
-const authStore = useAuthStore();
-const router = useRouter();
+export default {
+  setup() {
+    const authStore = useAuthStore();
+    const router = useRouter();
+    const error = ref(null);
+    const isLoading = ref(false);
 
-const username = ref('');
-const password = ref('');
-const error = ref(null);
-const isLoading = ref(false);
+    const handleLogin = async () => {
+      isLoading.value = true;
+      error.value = null;
 
-const handleLogin = async () => {
-  isLoading.value = true;
-  error.value = null;
+      try {
+        // Call the login method from auth store with user credentials
+        await authStore.login({
+          username: authStore.username, // Ensure username is bound to input
+          password: authStore.password, // Ensure password is bound to input
+        });
 
-  try {
-    // Call the login method from auth store
-    await authStore.login({
-      username: username.value,
-      password: password.value,
-    });
+        // Navigate to dashboard after successful login
+        router.push('/dashboard');
+      } catch (err) {
+        // Handle login error
+        error.value = err.response?.data?.detail || 'Login failed. Please check your credentials.';
+      } finally {
+        isLoading.value = false;
+      }
+    };
 
-    // Navigate to dashboard after successful login
-    router.push('/dashboard');
-  } catch (err) {
-    // Handle login error
-    error.value = err.response?.data?.detail || 'Login failed. Please check your credentials.';
-  } finally {
-    isLoading.value = false;
-  }
+    return {
+      handleLogin,
+      error,
+      isLoading,
+      authStore,
+    };
+  },
 };
 </script>
 
