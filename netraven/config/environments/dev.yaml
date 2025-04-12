@@ -7,7 +7,7 @@ database:
 
 scheduler:
   # URL for the Redis instance used by RQ and RQ Scheduler
-  redis_url: "redis://localhost:6379/0"
+  redis_url: "redis://netraven-redis:6379/0"
   # How often the scheduler checks for new jobs to sync from the DB (seconds)
   polling_interval_seconds: 10
   # Maximum number of retries for a failed job

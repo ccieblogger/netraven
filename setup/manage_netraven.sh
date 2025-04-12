@@ -69,22 +69,29 @@ mkdir -p "$LOG_DIR" "$PID_DIR"
 install_deps() {
     echo -e "${YELLOW}Installing dependencies...${NC}"
 
+    # Install Poetry
+    if ! command -v poetry &> /dev/null; then
+        echo -e "${YELLOW}Installing Poetry...${NC}"
+        curl -sSL https://install.python-poetry.org | python3 -
+        export PATH="$HOME/.local/bin:$PATH" # Ensure Poetry is in PATH
+    fi
+
     # Install Python dependencies
     echo -e "${YELLOW}Installing Python dependencies...${NC}"
     poetry install
+
+    # Install Node.js (if not installed)
+    if ! command -v node &> /dev/null; then
+        echo -e "${YELLOW}Installing Node.js...${NC}"
+        curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+    fi
 
     # Install Node.js dependencies
     echo -e "${YELLOW}Installing Node.js dependencies...${NC}"
     cd "$FRONTEND_DIR"
     npm install
     cd "$ROOT_DIR"
-
-    # Install Redis
-    echo -e "${YELLOW}Installing Redis...${NC}"
-    sudo apt-get update
-    sudo apt-get install -y redis-server
-    sudo systemctl enable redis-server
-    sudo systemctl start redis-server
 
     echo -e "${GREEN}Dependencies installed successfully.${NC}"
 }
@@ -109,6 +116,9 @@ reset_db() {
 start_services() {
     echo -e "${YELLOW}Starting NetRaven services...${NC}"
 
+    # Start Docker Compose services (including Redis)
+    docker-compose up -d
+
     # Start API service
     "$ROOT_DIR/setup/start_netraven.sh"
 
@@ -129,11 +139,9 @@ stop_services() {
     # Stop backend services
     "$ROOT_DIR/setup/stop_netraven.sh"
 
-    # Stop Frontend
-    if [ -f "$PID_DIR/frontend.pid" ]; then
-        kill "$(cat "$PID_DIR/frontend.pid")" || true
-        rm "$PID_DIR/frontend.pid"
-    fi
+    # Stop Docker Compose services (including frontend and Redis)
+    echo -e "${YELLOW}Stopping Docker Compose services...${NC}"
+    docker-compose down
 
     echo -e "${GREEN}NetRaven services stopped.${NC}"
 }
