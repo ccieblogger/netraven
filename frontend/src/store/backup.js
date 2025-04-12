@@ -1,9 +1,10 @@
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
 import axios from 'axios';
 
-const backupStore = reactive({
-  backups: 0,
-
+export const useBackupStore = defineStore('backup', {
+  state: () => ({
+    backups: 0, // Initialize backups count as 0
+  }),
   actions: {
     async fetchBackups() {
       try {
@@ -15,5 +16,3 @@ const backupStore = reactive({
     },
   },
 });
-
-export default backupStore;

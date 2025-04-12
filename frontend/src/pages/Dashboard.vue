@@ -56,25 +56,25 @@
         </div>
       </NrCard>
 
-      <!-- Credentials Card -->
-      <NrCard className="border-l-4 border-l-purple-600">
+      <!-- Backups Card -->
+      <NrCard className="border-l-4 border-l-green-600">
         <div class="p-4 flex justify-between items-start">
           <div>
-            <h2 class="text-lg uppercase font-semibold text-text-secondary">CREDENTIALS</h2>
+            <h2 class="text-lg uppercase font-semibold text-text-secondary">BACKUPS</h2>
             <div class="mt-2 flex items-baseline">
-              <p class="text-4xl font-bold text-text-primary">{{ credentialStore.credentials?.length ?? 0 }}</p>
-              <p class="ml-2 text-sm text-text-secondary">Stored Credentials</p>
+              <p class="text-4xl font-bold text-text-primary">{{ backupStore.backups ?? 0 }}</p>
+              <p class="ml-2 text-sm text-text-secondary">Stored Backup Files</p>
             </div>
           </div>
-          <div class="flex items-center justify-center h-10 w-10 rounded-md bg-purple-700">
-            <svg class="w-6 h-6 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path d="M15 7a2 2 0 0 1 2 2m4 0a6 6 0 0 1-7.743 5.743L11 17H9v2H7v2H4a1 1 0 0 1-1-1v-2.586a1 1 0 0 1 .293-.707l5.964-5.964A6 6 0 0 1 21 9z" />
+          <div class="flex items-center justify-center h-10 w-10 rounded-md bg-green-700">
+            <svg class="w-6 h-6 text-green-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path d="M12 4v16m8-8H4" />
             </svg>
           </div>
         </div>
         <div class="border-t border-divider px-4 py-3">
-          <router-link to="/credentials" class="flex items-center text-sm font-medium text-purple-400 hover:text-purple-300">
-            View Credentials
+          <router-link to="/backups" class="flex items-center text-sm font-medium text-green-400 hover:text-green-300">
+            View Backups
             <svg class="ml-1 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
@@ -89,17 +89,17 @@
 import { onMounted } from 'vue';
 import { useDeviceStore } from '../store/device';
 import { useJobStore } from '../store/job';
-import { useCredentialStore } from '../store/credential';
+import { useBackupStore } from '../store/backup'; // Import the backup store
 
 // Initialize stores
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
-const credentialStore = useCredentialStore();
+const backupStore = useBackupStore(); // Initialize the backup store
 
 // Fetch data on component mount
 onMounted(() => {
   deviceStore.fetchDevices();
   jobStore.fetchJobs();
-  credentialStore.fetchCredentials();
+  backupStore.fetchBackups(); // Fetch backup data
 });
 </script>
