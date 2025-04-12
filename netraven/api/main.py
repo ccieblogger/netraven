@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers
-from .routers import devices, jobs, users, logs, auth_router, tags, credentials
+from .routers import devices, jobs, users, logs, auth_router, tags, credentials, backups  # Import the new backups router
 
 app = FastAPI(
     title="NetRaven API",
@@ -35,3 +35,4 @@ app.include_router(credentials.router)
 app.include_router(devices.router)
 app.include_router(jobs.router)
 app.include_router(logs.router)
+app.include_router(backups.router)  # Include the backups router
