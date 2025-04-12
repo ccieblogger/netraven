@@ -22,7 +22,7 @@ NC='\033[0m' # No Color
 
 # Print usage
 usage() {
-    echo "Usage: $0 [start|stop|reset-db|install-deps|switch-env] [dev|release]"
+    echo "Usage: $0 [start|stop|reset-db|install-deps|switch-env|restart] [dev|release|service]"
     echo ""
     echo "Commands:"
     echo "  start         Start all NetRaven services"
@@ -30,6 +30,7 @@ usage() {
     echo "  reset-db      Reset the database (drop and recreate tables)"
     echo "  install-deps  Install all dependencies (Python, Node.js, Redis)"
     echo "  switch-env    Switch between dev and release environments"
+    echo "  restart       Restart individual services (frontend, backend, redis)"
     echo ""
     echo "Environment:"
     echo "  dev           Development environment"
@@ -43,23 +44,29 @@ if [ "$#" -lt 1 ]; then
 fi
 
 COMMAND=$1
-ENVIRONMENT=${2:-dev}
 
-# Validate environment
-if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "release" ]]; then
-    echo -e "${RED}Invalid environment: $ENVIRONMENT. Use 'dev' or 'release'.${NC}"
-    usage
+# For commands other than 'restart', treat the second argument as the environment
+if [ "$COMMAND" != "restart" ]; then
+    ENVIRONMENT=${2:-dev}
+
+    # Validate environment
+    if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "release" ]]; then
+        echo -e "${RED}Invalid environment: $ENVIRONMENT. Use 'dev' or 'release'.${NC}"
+        usage
+    fi
 fi
 
 # Set environment-specific variables
-if [ "$ENVIRONMENT" == "dev" ]; then
-    export APP_ENV="dev"
-    export DATABASE_URL="postgresql+psycopg2://netraven:netraven@localhost:5432/netraven_dev"
-    export VITE_API_URL="http://localhost:8000"
-else
-    export APP_ENV="release"
-    export DATABASE_URL="postgresql+psycopg2://netraven:netraven@localhost:5432/netraven"
-    export VITE_API_URL="https://api.netraven.com"
+if [ "$COMMAND" != "restart" ]; then
+    if [ "$ENVIRONMENT" == "dev" ]; then
+        export APP_ENV="dev"
+        export DATABASE_URL="postgresql+psycopg2://netraven:netraven@localhost:5432/netraven_dev"
+        export VITE_API_URL="http://localhost:8000"
+    else
+        export APP_ENV="release"
+        export DATABASE_URL="postgresql+psycopg2://netraven:netraven@localhost:5432/netraven"
+        export VITE_API_URL="https://api.netraven.com"
+    fi
 fi
 
 # Create necessary directories
@@ -146,6 +153,34 @@ stop_services() {
     echo -e "${GREEN}NetRaven services stopped.${NC}"
 }
 
+# Restart individual services
+restart_service() {
+    local service=$1
+
+    case "$service" in
+        frontend)
+            echo -e "${YELLOW}Restarting frontend container...${NC}"
+            docker-compose restart frontend
+            echo -e "${GREEN}Frontend container restarted.${NC}"
+            ;;
+        backend)
+            echo -e "${YELLOW}Restarting backend service...${NC}"
+            "$ROOT_DIR/setup/stop_netraven.sh"
+            "$ROOT_DIR/setup/start_netraven.sh"
+            echo -e "${GREEN}Backend service restarted.${NC}"
+            ;;
+        redis)
+            echo -e "${YELLOW}Restarting Redis container...${NC}"
+            docker-compose restart redis
+            echo -e "${GREEN}Redis container restarted.${NC}"
+            ;;
+        *)
+            echo -e "${RED}Invalid service: $service. Use 'frontend', 'backend', or 'redis'.${NC}"
+            exit 1
+            ;;
+    esac
+}
+
 # Switch environment
 switch_env() {
     echo -e "${YELLOW}Switching to $ENVIRONMENT environment...${NC}"
@@ -166,6 +201,13 @@ case "$COMMAND" in
         ;;
     stop)
         stop_services
+        ;;
+    restart)
+        if [ "$#" -lt 2 ]; then
+            echo -e "${RED}Please specify a service to restart (frontend, backend, redis).${NC}"
+            usage
+        fi
+        restart_service "$2"
         ;;
     switch-env)
         switch_env

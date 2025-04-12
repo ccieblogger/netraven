@@ -20,11 +20,11 @@ export default defineConfig({
     devSourcemap: true,
   },
   server: {
-    host: '0.0.0.0',
+    host: 'localhost', // Change from '0.0.0.0' to 'localhost'
     port: 5173,
     strictPort: true, // Fail if port is already in use
     hmr: {
-      host: '0.0.0.0',
+      host: 'localhost', // Ensure HMR uses 'localhost'
       port: 5173,
       protocol: 'ws',
       clientPort: 5173,

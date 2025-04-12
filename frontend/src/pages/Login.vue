@@ -76,32 +76,33 @@
 
 <script setup>
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { useAuthStore } from '../store/auth';
+import { useRouter } from 'vue-router';
 
-const router = useRouter();
 const authStore = useAuthStore();
+const router = useRouter();
 
 const username = ref('');
 const password = ref('');
+const error = ref(null);
 const isLoading = ref(false);
-const error = ref('');
 
 const handleLogin = async () => {
+  isLoading.value = true;
+  error.value = null;
+
   try {
-    error.value = '';
-    isLoading.value = true;
-    
     // Call the login method from auth store
     await authStore.login({
       username: username.value,
-      password: password.value
+      password: password.value,
     });
-    
+
     // Navigate to dashboard after successful login
     router.push('/dashboard');
   } catch (err) {
-    error.value = err.message || 'Login failed. Please check your credentials.';
+    // Handle login error
+    error.value = err.response?.data?.detail || 'Login failed. Please check your credentials.';
   } finally {
     isLoading.value = false;
   }
