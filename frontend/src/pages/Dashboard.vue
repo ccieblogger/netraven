@@ -82,11 +82,46 @@
         </div>
       </NrCard>
     </div>
+
+    <!-- Recent Activity Section -->
+    <NrCard title="Recent Activity" subtitle="Latest system events and logs">
+      <template #header>
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-lg font-semibold text-text-primary">Recent Activity</h2>
+            <p class="text-xs text-text-secondary">Latest system events and logs</p>
+          </div>
+          <router-link to="/logs" class="flex items-center text-sm font-medium text-primary hover:text-primary-light">
+            View All Logs
+            <svg class="ml-1 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </router-link>
+        </div>
+      </template>
+      
+      <div v-if="isLoading" class="flex justify-center items-center py-6">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <span class="ml-3 text-text-secondary">Loading recent activity...</span>
+      </div>
+      <div v-else-if="recentLogs.length === 0" class="py-6 text-center">
+        <p class="text-text-secondary">No recent activity found</p>
+      </div>
+      <div v-else class="divide-y divide-divider">
+        <div v-for="(log, index) in recentLogs" :key="index" class="py-3 px-4">
+          <div class="flex justify-between">
+            <span class="text-text-primary font-medium">{{ log.title }}</span>
+            <span class="text-text-secondary text-sm">{{ log.timestamp }}</span>
+          </div>
+          <p class="text-text-secondary text-sm mt-1">{{ log.message }}</p>
+        </div>
+      </div>
+    </NrCard>
   </PageContainer>
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useDeviceStore } from '../store/device';
 import { useJobStore } from '../store/job';
 import { useBackupStore } from '../store/backup'; // Import the backup store
@@ -96,10 +131,36 @@ const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
 const backupStore = useBackupStore(); // Initialize the backup store
 
+// Simulated data for recent activity
+const isLoading = ref(true);
+const recentLogs = ref([]);
+
 // Fetch data on component mount
 onMounted(() => {
   deviceStore.fetchDevices();
   jobStore.fetchJobs();
-  backupStore.fetchBackups(); // Fetch backup data
+  backupStore.fetchBackups();
+
+  // Simulate loading delay for recent activity
+  setTimeout(() => {
+    recentLogs.value = [
+      { 
+        title: 'Config Backup Complete', 
+        message: 'Successfully backed up configurations for 12 devices',
+        timestamp: '10 minutes ago'
+      },
+      { 
+        title: 'New Device Added', 
+        message: 'Added device core-sw-01 to the inventory',
+        timestamp: '2 hours ago'
+      },
+      { 
+        title: 'Job Failed', 
+        message: 'Config deployment job failed on edge-rtr-02',
+        timestamp: '4 hours ago'
+      }
+    ];
+    isLoading.value = false;
+  }, 1500);
 });
 </script>
