@@ -110,3 +110,6 @@ frontend/tailwindcss
 
 # Startup 
 .pids/
+
+# Vite
+frontend/.vite/
