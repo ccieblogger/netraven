@@ -3,7 +3,7 @@
 database:
   # Standard PostgreSQL connection URL
   # Format: postgresql+<driver>://<user>:<password>@<host>:<port>/<database>
-  url: "postgresql+psycopg2://netraven:netraven@localhost:5432/netraven"
+  url: "postgresql+psycopg2://netraven:netraven@postgres:5432/netraven"
 
 scheduler:
   # URL for the Redis instance used by RQ and RQ Scheduler

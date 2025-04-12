@@ -32,28 +32,26 @@ if ! command -v poetry &> /dev/null; then
     exit 1
 fi
 
-# Check for PostgreSQL and Redis
-echo -e "\n${YELLOW}Checking required services...${NC}"
+# Check for containerized services
+echo -e "\n${YELLOW}Checking required containerized services...${NC}"
 
-if ! sudo systemctl is-active --quiet postgresql; then
-    echo -e "${YELLOW}Starting PostgreSQL...${NC}"
-    sudo systemctl start postgresql
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Failed to start PostgreSQL. Aborting.${NC}"
-        exit 1
-    fi
+# Check if PostgreSQL container is running
+if ! docker ps | grep -q netraven-postgres; then
+    echo -e "${YELLOW}PostgreSQL container not running. Please start with docker-compose.${NC}"
+    echo -e "${YELLOW}Run: docker-compose up -d postgres${NC}"
+    exit 1
+else
+    echo -e "${GREEN}PostgreSQL container is running.${NC}"
 fi
-echo -e "${GREEN}PostgreSQL is running.${NC}"
 
-if ! sudo systemctl is-active --quiet redis-server; then
-    echo -e "${YELLOW}Starting Redis...${NC}"
-    sudo systemctl start redis-server
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Failed to start Redis. Aborting.${NC}"
-        exit 1
-    fi
+# Check if Redis container is running
+if ! docker ps | grep -q netraven-redis; then
+    echo -e "${YELLOW}Redis container not running. Please start with docker-compose.${NC}"
+    echo -e "${YELLOW}Run: docker-compose up -d redis${NC}"
+    exit 1
+else
+    echo -e "${GREEN}Redis container is running.${NC}"
 fi
-echo -e "${GREEN}Redis is running.${NC}"
 
 # Create default admin user if it doesn't exist
 echo -e "\n${YELLOW}Checking for default admin user...${NC}"

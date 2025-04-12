@@ -30,7 +30,7 @@ usage() {
     echo "  reset-db      Reset the database (drop and recreate tables)"
     echo "  install-deps  Install all dependencies (Python, Node.js, Redis)"
     echo "  switch-env    Switch between dev and release environments"
-    echo "  restart       Restart individual services (frontend, backend, redis)"
+    echo "  restart       Restart individual services (frontend, backend, redis, postgres)"
     echo ""
     echo "Environment:"
     echo "  dev           Development environment"
@@ -60,11 +60,11 @@ fi
 if [ "$COMMAND" != "restart" ]; then
     if [ "$ENVIRONMENT" == "dev" ]; then
         export APP_ENV="dev"
-        export DATABASE_URL="postgresql+psycopg2://netraven:netraven@localhost:5432/netraven_dev"
+        export DATABASE_URL="postgresql+psycopg2://netraven:netraven@postgres:5432/netraven"
         export VITE_API_URL="http://localhost:8000"
     else
         export APP_ENV="release"
-        export DATABASE_URL="postgresql+psycopg2://netraven:netraven@localhost:5432/netraven"
+        export DATABASE_URL="postgresql+psycopg2://netraven:netraven@postgres:5432/netraven"
         export VITE_API_URL="https://api.netraven.com"
     fi
 fi
@@ -112,7 +112,17 @@ reset_db() {
         exit 0
     fi
 
-    # Drop and recreate schema
+    echo -e "${YELLOW}Ensuring PostgreSQL container is running...${NC}"
+    if ! docker ps | grep -q netraven-postgres; then
+        echo -e "${YELLOW}Starting PostgreSQL container...${NC}"
+        docker-compose up -d postgres
+        # Wait for PostgreSQL to be ready
+        echo -e "${YELLOW}Waiting for PostgreSQL to be ready...${NC}"
+        sleep 5
+    fi
+
+    # Drop and recreate schema using the containerized PostgreSQL
+    echo -e "${YELLOW}Dropping and recreating database schema...${NC}"
     poetry run python "$ROOT_DIR/setup/dev_runner.py" --drop-schema
     poetry run python "$ROOT_DIR/setup/dev_runner.py" --create-schema
 
@@ -123,8 +133,28 @@ reset_db() {
 start_services() {
     echo -e "${YELLOW}Starting NetRaven services...${NC}"
 
-    # Start Docker Compose services (including Redis)
+    # Start Docker Compose services (including Redis and PostgreSQL)
+    echo -e "${YELLOW}Starting Docker containers (Redis, PostgreSQL)...${NC}"
     docker-compose up -d
+
+    # Check if PostgreSQL is up and running
+    echo -e "${YELLOW}Verifying PostgreSQL connection...${NC}"
+    max_attempts=10
+    attempt=0
+    while [ $attempt -lt $max_attempts ]; do
+        if docker exec netraven-postgres pg_isready -U netraven > /dev/null 2>&1; then
+            echo -e "${GREEN}PostgreSQL is ready.${NC}"
+            break
+        fi
+        attempt=$((attempt+1))
+        echo -e "${YELLOW}Waiting for PostgreSQL to be ready (attempt $attempt/$max_attempts)...${NC}"
+        sleep 3
+    done
+
+    if [ $attempt -eq $max_attempts ]; then
+        echo -e "${RED}PostgreSQL failed to start. Check the logs with 'docker logs netraven-postgres'.${NC}"
+        exit 1
+    fi
 
     # Start API service
     "$ROOT_DIR/setup/start_netraven.sh"
@@ -146,7 +176,7 @@ stop_services() {
     # Stop backend services
     "$ROOT_DIR/setup/stop_netraven.sh"
 
-    # Stop Docker Compose services (including frontend and Redis)
+    # Stop Docker Compose services (including frontend, Redis, and PostgreSQL)
     echo -e "${YELLOW}Stopping Docker Compose services...${NC}"
     docker-compose down
 
@@ -174,8 +204,20 @@ restart_service() {
             docker-compose restart redis
             echo -e "${GREEN}Redis container restarted.${NC}"
             ;;
+        postgres)
+            echo -e "${YELLOW}Restarting PostgreSQL container...${NC}"
+            docker-compose restart postgres
+            # Wait for PostgreSQL to be ready again
+            echo -e "${YELLOW}Waiting for PostgreSQL to be ready...${NC}"
+            while ! docker exec netraven-postgres pg_isready -U netraven > /dev/null 2>&1; do
+                echo -n "."
+                sleep 1
+            done
+            echo ""
+            echo -e "${GREEN}PostgreSQL container restarted.${NC}"
+            ;;
         *)
-            echo -e "${RED}Invalid service: $service. Use 'frontend', 'backend', or 'redis'.${NC}"
+            echo -e "${RED}Invalid service: $service. Use 'frontend', 'backend', 'redis', or 'postgres'.${NC}"
             exit 1
             ;;
     esac
@@ -204,7 +246,7 @@ case "$COMMAND" in
         ;;
     restart)
         if [ "$#" -lt 2 ]; then
-            echo -e "${RED}Please specify a service to restart (frontend, backend, redis).${NC}"
+            echo -e "${RED}Please specify a service to restart (frontend, backend, redis, postgres).${NC}"
             usage
         fi
         restart_service "$2"
