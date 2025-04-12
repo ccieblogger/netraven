@@ -30,7 +30,7 @@ usage() {
     echo "  reset-db      Reset the database (drop and recreate tables)"
     echo "  install-deps  Install all dependencies (Python, Node.js, Redis)"
     echo "  switch-env    Switch between dev and release environments"
-    echo "  restart       Restart individual services (frontend, backend, redis, postgres)"
+    echo "  restart       Restart individual services (frontend, api, backend, redis, postgres)"
     echo ""
     echo "Environment:"
     echo "  dev           Development environment"
@@ -56,16 +56,24 @@ if [ "$COMMAND" != "restart" ]; then
     fi
 fi
 
+# Map release to prod for Docker Compose files
+DOCKER_ENV="$ENVIRONMENT"
+if [ "$ENVIRONMENT" == "release" ]; then
+    DOCKER_ENV="prod"
+fi
+
 # Set environment-specific variables
 if [ "$COMMAND" != "restart" ]; then
     if [ "$ENVIRONMENT" == "dev" ]; then
         export APP_ENV="dev"
         export DATABASE_URL="postgresql+psycopg2://netraven:netraven@postgres:5432/netraven"
         export VITE_API_URL="http://localhost:8000"
+        export DOCKER_COMPOSE_FILE="docker-compose.yml"
     else
         export APP_ENV="release"
         export DATABASE_URL="postgresql+psycopg2://netraven:netraven@postgres:5432/netraven"
         export VITE_API_URL="https://api.netraven.com"
+        export DOCKER_COMPOSE_FILE="docker-compose.prod.yml"
     fi
 fi
 
@@ -115,7 +123,7 @@ reset_db() {
     echo -e "${YELLOW}Ensuring PostgreSQL container is running...${NC}"
     if ! docker ps | grep -q netraven-postgres; then
         echo -e "${YELLOW}Starting PostgreSQL container...${NC}"
-        docker-compose up -d postgres
+        docker-compose -f $DOCKER_COMPOSE_FILE up -d postgres
         # Wait for PostgreSQL to be ready
         echo -e "${YELLOW}Waiting for PostgreSQL to be ready...${NC}"
         sleep 5
@@ -131,18 +139,23 @@ reset_db() {
 
 # Start services
 start_services() {
-    echo -e "${YELLOW}Starting NetRaven services...${NC}"
+    echo -e "${YELLOW}Starting NetRaven services for ${ENVIRONMENT} environment...${NC}"
 
-    # Start Docker Compose services (including Redis and PostgreSQL)
-    echo -e "${YELLOW}Starting Docker containers (Redis, PostgreSQL)...${NC}"
-    docker-compose up -d
+    # Start Docker Compose services (Redis, PostgreSQL, API)
+    echo -e "${YELLOW}Starting containerized services (Redis, PostgreSQL, API)...${NC}"
+    docker-compose -f $DOCKER_COMPOSE_FILE up -d redis postgres api
 
     # Check if PostgreSQL is up and running
     echo -e "${YELLOW}Verifying PostgreSQL connection...${NC}"
     max_attempts=10
     attempt=0
+    POSTGRES_CONTAINER="netraven-postgres"
+    if [ "$ENVIRONMENT" == "release" ]; then
+        POSTGRES_CONTAINER="netraven-postgres-prod"
+    fi
+    
     while [ $attempt -lt $max_attempts ]; do
-        if docker exec netraven-postgres pg_isready -U netraven > /dev/null 2>&1; then
+        if docker exec $POSTGRES_CONTAINER pg_isready -U netraven > /dev/null 2>&1; then
             echo -e "${GREEN}PostgreSQL is ready.${NC}"
             break
         fi
@@ -152,33 +165,52 @@ start_services() {
     done
 
     if [ $attempt -eq $max_attempts ]; then
-        echo -e "${RED}PostgreSQL failed to start. Check the logs with 'docker logs netraven-postgres'.${NC}"
+        echo -e "${RED}PostgreSQL failed to start. Check the logs with 'docker logs $POSTGRES_CONTAINER'.${NC}"
         exit 1
     fi
 
-    # Start API service
+    # Check if API is up and running
+    echo -e "${YELLOW}Verifying API connection...${NC}"
+    max_attempts=10
+    attempt=0
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if curl -s http://localhost:8000/health > /dev/null; then
+            echo -e "${GREEN}API service is ready.${NC}"
+            break
+        fi
+        attempt=$((attempt+1))
+        echo -e "${YELLOW}Waiting for API to be ready (attempt $attempt/$max_attempts)...${NC}"
+        sleep 3
+    done
+
+    if [ $attempt -eq $max_attempts ]; then
+        echo -e "${RED}API service failed to start. Check the logs with 'docker logs netraven-api-${DOCKER_ENV}'.${NC}"
+    fi
+
+    # Start other backend services that aren't containerized yet
     "$ROOT_DIR/setup/start_netraven.sh"
 
-    # Start Frontend
-    echo -e "${YELLOW}Starting frontend development server...${NC}"
-    cd "$FRONTEND_DIR"
-    npm run dev &> "$LOG_DIR/frontend.log" &
-    echo $! > "$PID_DIR/frontend.pid"
-    cd "$ROOT_DIR"
+    # Start Frontend via Docker Compose
+    echo -e "${YELLOW}Starting frontend container...${NC}"
+    docker-compose -f $DOCKER_COMPOSE_FILE up -d frontend
 
     echo -e "${GREEN}NetRaven services started.${NC}"
+    echo -e "${GREEN}API is accessible at http://localhost:8000${NC}"
+    echo -e "${GREEN}API documentation is available at http://localhost:8000/api/docs${NC}"
+    echo -e "${GREEN}Frontend is accessible at http://localhost:5173 (dev) or http://localhost:80 (release)${NC}"
 }
 
 # Stop services
 stop_services() {
     echo -e "${YELLOW}Stopping NetRaven services...${NC}"
 
-    # Stop backend services
+    # Stop backend services that aren't containerized yet
     "$ROOT_DIR/setup/stop_netraven.sh"
 
-    # Stop Docker Compose services (including frontend, Redis, and PostgreSQL)
+    # Stop Docker Compose services (including frontend, Redis, PostgreSQL, API)
     echo -e "${YELLOW}Stopping Docker Compose services...${NC}"
-    docker-compose down
+    docker-compose -f $DOCKER_COMPOSE_FILE down
 
     echo -e "${GREEN}NetRaven services stopped.${NC}"
 }
@@ -190,8 +222,15 @@ restart_service() {
     case "$service" in
         frontend)
             echo -e "${YELLOW}Restarting frontend container...${NC}"
-            docker-compose restart frontend
+            docker-compose -f $DOCKER_COMPOSE_FILE restart frontend
             echo -e "${GREEN}Frontend container restarted.${NC}"
+            ;;
+        api)
+            echo -e "${YELLOW}Restarting API container...${NC}"
+            docker-compose -f $DOCKER_COMPOSE_FILE restart api
+            echo -e "${GREEN}API container restarted.${NC}"
+            echo -e "${GREEN}API is accessible at http://localhost:8000${NC}"
+            echo -e "${GREEN}API documentation is available at http://localhost:8000/api/docs${NC}"
             ;;
         backend)
             echo -e "${YELLOW}Restarting backend service...${NC}"
@@ -201,15 +240,19 @@ restart_service() {
             ;;
         redis)
             echo -e "${YELLOW}Restarting Redis container...${NC}"
-            docker-compose restart redis
+            docker-compose -f $DOCKER_COMPOSE_FILE restart redis
             echo -e "${GREEN}Redis container restarted.${NC}"
             ;;
         postgres)
             echo -e "${YELLOW}Restarting PostgreSQL container...${NC}"
-            docker-compose restart postgres
+            docker-compose -f $DOCKER_COMPOSE_FILE restart postgres
             # Wait for PostgreSQL to be ready again
             echo -e "${YELLOW}Waiting for PostgreSQL to be ready...${NC}"
-            while ! docker exec netraven-postgres pg_isready -U netraven > /dev/null 2>&1; do
+            POSTGRES_CONTAINER="netraven-postgres"
+            if [ "$ENVIRONMENT" == "release" ]; then
+                POSTGRES_CONTAINER="netraven-postgres-prod"
+            fi
+            while ! docker exec $POSTGRES_CONTAINER pg_isready -U netraven > /dev/null 2>&1; do
                 echo -n "."
                 sleep 1
             done
@@ -217,7 +260,7 @@ restart_service() {
             echo -e "${GREEN}PostgreSQL container restarted.${NC}"
             ;;
         *)
-            echo -e "${RED}Invalid service: $service. Use 'frontend', 'backend', 'redis', or 'postgres'.${NC}"
+            echo -e "${RED}Invalid service: $service. Use 'frontend', 'api', 'backend', 'redis', or 'postgres'.${NC}"
             exit 1
             ;;
     esac
@@ -227,7 +270,19 @@ restart_service() {
 switch_env() {
     echo -e "${YELLOW}Switching to $ENVIRONMENT environment...${NC}"
     export APP_ENV="$ENVIRONMENT"
+    
+    # Stop services in the old environment
+    stop_services
+    
+    # Update environment variable for Docker Compose file
+    if [ "$ENVIRONMENT" == "dev" ]; then
+        export DOCKER_COMPOSE_FILE="docker-compose.yml"
+    else
+        export DOCKER_COMPOSE_FILE="docker-compose.prod.yml"
+    fi
+    
     echo -e "${GREEN}Environment switched to $ENVIRONMENT.${NC}"
+    echo -e "${YELLOW}You can now start services in the $ENVIRONMENT environment.${NC}"
 }
 
 # Execute command
@@ -246,7 +301,7 @@ case "$COMMAND" in
         ;;
     restart)
         if [ "$#" -lt 2 ]; then
-            echo -e "${RED}Please specify a service to restart (frontend, backend, redis, postgres).${NC}"
+            echo -e "${RED}Please specify a service to restart (frontend, api, backend, redis, postgres).${NC}"
             usage
         fi
         restart_service "$2"

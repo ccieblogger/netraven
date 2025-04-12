@@ -94,11 +94,47 @@ The system is installed locally using Python-based services with PostgreSQL and 
 - Diffs and history available via Git
 
 ### Deployment
+
+#### Traditional Deployment
 NetRaven is intended to be installed and run locally using Python and system packages. Each component can be launched individually via CLI or system service manager.
 
 - PostgreSQL and Redis are assumed to be locally installed (can later be containerized)
 - System services can be managed via `systemd`, `supervisord`, or developer CLI runners
 - Frontend runs with standard **Vite/Node.js** tooling
+
+#### Containerized Deployment
+NetRaven now supports containerized deployment using Docker and Docker Compose for easier setup and consistent environments:
+
+- **Available Containers**:
+  - Frontend (Vue 3 UI)
+  - API (FastAPI service)
+  - PostgreSQL (database)
+  - Redis (queue and caching)
+
+- **Development Environment**:
+  ```bash
+  # Start all services in development mode
+  docker-compose up -d
+  
+  # Start just the API service
+  ./setup/build_api_container.sh
+  
+  # Rebuild and start API service
+  ./setup/build_api_container.sh --rebuild
+  ```
+
+- **Production Environment**:
+  ```bash
+  # Start all services in production mode
+  docker-compose -f docker-compose.prod.yml up -d
+  
+  # Start just the API service in production mode
+  ./setup/build_api_container.sh --env prod
+  ```
+
+- **Environment Configuration**:
+  - Development: `.env.dev` file and `dev.yaml` configuration
+  - Production: `.env.prod` file and `prod.yaml` configuration
 
 ### Testing Strategy
 - **Unit Tests**: Business logic, validation, utilities
