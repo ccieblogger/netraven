@@ -3,11 +3,16 @@ from typing import Optional
 
 from jose import jwt
 from passlib.context import CryptContext
+from netraven.config.loader import load_config
 
-# Configuration (replace with proper config loading later)
-SECRET_KEY = "a_very_secret_key_that_should_be_in_config_or_env" # IMPORTANT: Replace and move to config!
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Load configuration
+config = load_config()
+api_config = config.get('api', {})
+
+# Configuration from environment or config files
+SECRET_KEY = api_config.get('jwt_secret', "a_very_secret_key_that_should_be_in_config_or_env")
+ALGORITHM = api_config.get('jwt_algorithm', "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = api_config.get('access_token_expire_minutes', 30)
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
