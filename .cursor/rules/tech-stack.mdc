@@ -1,0 +1,186 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# NetRaven Technology Stack Reference
+
+## System Architecture Overview
+```
+                        ┌────────────────────┐
+                        │     Frontend UI    │
+                        │   (Vue / REST)     │
+                        └────────▲───────────┘
+                                 │ REST API
+                                 │
+                        ┌────────┴───────────┐
+                        │     API Service    │
+                        │     (FastAPI)      │
+                        └───────▲────────────┘
+                                │
+             ┌──────────────────┼────────────────────┐
+             │                  │                    │do
+      Device │          Job CRUD│           User/Auth│
+     Records │                  ▼                    ▼
+         ┌───┴─────┐     ┌──────────────┐      ┌──────────────┐
+         │ Devices │     │  Jobs Table  │      │  Users/Roles │
+         └───┬─────┘     └──────┬───────┘      └──────┬───────┘
+             │                  │                     │
+             │                  ▼                     │
+             │        ┌───────────────┐               │
+             │        │   Scheduler   │◄───────┐      │
+             │        │   (RQ Only)   │        │      │
+             │        └──────┬────────┘        │      │
+             │               │                 │      │
+             ▼               ▼                 ▼      ▼
+      ┌────────────┐  ┌───────────────────┐  ┌──────────────┐
+      │ PostgreSQL │  │ RQ + RQ Scheduler │  │ JWT Security │
+      └────┬───────┘  └──────┬────────────┘  └──────────────┘
+           │                 │
+           ▼                 ▼
+   ┌─────────────────────────────────┐
+   │     Device Communication        │
+   │        (device_comm)            │
+   └────────────┬────────────────────┘
+                │                 ▲
+                ▼                 │
+       ┌───────────────────┐      │
+       │  Netmiko (SSH/API)│      │ 
+       └────────┬──────────┘      │
+                │                 │
+                ▼                 │
+        ┌─────────────┐           │
+        │ Network Gear│           │
+        └─────────────┘           │
+                                  ▼
+        ┌──────────────────────────────────┐
+        │ Git Repo (configs & versioning)  │
+        └──────────────────────────────────┘
+```
+
+## Core Technologies
+
+| Category | Technology | Version | Purpose |
+|----------|------------|---------|---------|
+| **Language** | Python | 3.10+ | Primary backend language |
+| **Database** | PostgreSQL | 14 | Primary data store for persistent application data |
+| **Cache/Queue** | Redis | 7 | Job queuing and scheduling |
+| **Version Control** | Git/GitPython | 3.1.43 | Configuration version storage |
+
+## Service Components
+
+### API Service
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| FastAPI | 0.115+ | REST API framework |
+| Uvicorn | 0.34+ | ASGI server |
+| python-jose | 3.4+ | JWT token handling |
+| passlib | 1.7+ | Password hashing |
+
+**Responsibilities**: 
+- User authentication via JWT
+- Expose endpoints for device/job/user management
+- Serve API documentation
+
+### Device Communication Service
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Netmiko | 4.3+ | Network device SSH/API access |
+| ThreadPoolExecutor | - | Parallel device access |
+| GitPython | 3.1+ | Store configs in version control |
+
+**Responsibilities**:
+- Connect to network devices
+- Execute commands and retrieve configurations
+- Handle connection retries and error categorization
+- Redact sensitive information from output
+
+### Scheduler Service
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| RQ (Redis Queue) | 2.3+ | Job queuing system |
+| rq-scheduler | 0.14+ | Schedule recurring jobs |
+| Croniter | 6.0+ | Parse cron expressions |
+
+**Responsibilities**:
+- Schedule one-time and recurring jobs
+- Trigger device communication processes
+- Manage job retry logic
+
+### Database Layer
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| SQLAlchemy | 2.0+ | ORM for database access |
+| Alembic | 1.15+ | Database migrations |
+| psycopg2 | 2.9+ | PostgreSQL driver |
+
+**Responsibilities**:
+- Store device information, job definitions, and results
+- Manage schema migrations
+- Provide data access layer for other services
+
+### Frontend Application
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Vue | 3.5+ | JavaScript framework |
+| Vite | 5.0+ | Build tool |
+| Pinia | 3.0+ | State management |
+| Vue Router | 4.5+ | Client-side routing |
+| Axios | 1.8+ | HTTP client |
+| TailwindCSS | 3.3+ | Utility-first CSS framework |
+| Headless UI | 1.7+ | Unstyled accessible components |
+| Chart.js | 4.4+ | Data visualization |
+| Diff2html | 3.4+ | Show configuration differences |
+
+**Responsibilities**:
+- Provide user interface for all system functions
+- Visualize device data and job statuses
+- Display configuration diffs between job runs
+
+## Integration Points
+
+### API to Frontend
+- REST API endpoints with JWT authentication
+- JSON response format for all data exchange
+
+### API to Scheduler
+- Database polling for scheduled jobs
+- RQ job enqueuing for immediate execution
+
+### Scheduler to Device Communication
+- Job parameters passed via Redis queue
+- Results stored in PostgreSQL database
+
+### Device Communication to Network Devices
+- SSH/API connections via Netmiko
+- Configuration storage in Git repository
+
+## Development Environment
+
+### Requirements
+- Python 3.10+
+- Node.js (for frontend)
+- PostgreSQL 14
+- Redis 7
+
+### Containerization
+- Docker and Docker Compose for development and production environments
+- Nginx for production frontend hosting
+
+### Package Management
+- Poetry for Python dependencies
+- npm for frontend dependencies
+
+### Configuration
+- Environment variables for sensitive configuration
+- YAML files for structured configuration
+- Local configuration overrides for development
+
+## System Architecture Highlights
+
+- **Synchronous-First Design**: Simpler debugging and development workflow
+- **Targeted Concurrency**: Threaded execution only where necessary
+- **Git-Based Versioning**: Simple, reliable config storage with built-in version history
+- **Role-Based Security**: JWT-based authentication with role enforcement
+- **Modular Design**: Isolated services with clear responsibilities
+- **Structured Logging**: Comprehensive logging with sensitive data redaction 

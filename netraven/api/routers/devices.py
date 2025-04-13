@@ -7,6 +7,9 @@ from netraven.api import schemas # Import schemas module
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role # Import dependencies
 from netraven.db import models # Import DB models
 
+# Constants
+DEFAULT_TAG_NAME = "default"
+
 router = APIRouter(
     prefix="/devices",
     tags=["Devices"],
@@ -40,8 +43,17 @@ def create_device(
     db_device = models.Device(**device.model_dump(exclude={'tags'})) # Use model_dump in Pydantic v2
     
     # Handle tags if provided
-    if device.tags:
-        tags = get_tags_by_ids(db, device.tags)
+    tag_ids = device.tags or []
+    
+    # Get the default tag
+    default_tag = db.query(models.Tag).filter(models.Tag.name == DEFAULT_TAG_NAME).first()
+    
+    # If default tag exists and not already in the list, add it
+    if default_tag and default_tag.id not in tag_ids:
+        tag_ids.append(default_tag.id)
+    
+    if tag_ids:
+        tags = get_tags_by_ids(db, tag_ids)
         db_device.tags = tags
 
     db.add(db_device)

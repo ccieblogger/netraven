@@ -58,6 +58,7 @@ export const useAuthStore = defineStore('auth', () => {
   // Login action
   async function login(credentials) {
     loginError.value = null;
+    isLoading.value = true;
 
     try {
       // Use URLSearchParams to format the payload as x-www-form-urlencoded

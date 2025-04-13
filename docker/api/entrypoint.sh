@@ -17,9 +17,9 @@ echo "Postgres is up - continuing"
 echo "Running database migrations..."
 poetry run alembic upgrade head
 
-# Create admin user if it doesn't exist
-echo "Setting up admin user..."
-poetry run python setup/create_admin.py
+# Initialize database with default data (admin user and default tag)
+echo "Initializing database with default data..."
+poetry run python -m netraven.db.init_data
 
 # Start the API server
 echo "Starting API server..."
