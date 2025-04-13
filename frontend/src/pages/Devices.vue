@@ -44,9 +44,11 @@
               </span>
               <span v-if="!device.tags || device.tags.length === 0">-</span>
             </td>
-             <td class="py-3 px-6 text-left">
-                <span v-if="device.credential">{{ device.credential.name }}</span>
-                <span v-else class="text-gray-400">-</span>
+            <td class="py-3 px-6 text-left">
+              <!-- TEMPORARY: Handle credential display until proper tag-based credential matching is implemented -->
+              <span v-if="device.credential && device.credential.name">{{ device.credential.name }}</span>
+              <span v-else-if="device.credential_id">ID: {{ device.credential_id }}</span>
+              <span v-else class="text-gray-400">-</span>
             </td>
             <td class="py-3 px-6 text-center">
               <div class="flex item-center justify-center">
@@ -64,8 +66,14 @@
     </div>
 
     <!-- No Devices Message -->
-    <div v-if="!deviceStore.isLoading && devices.length === 0" class="text-center text-gray-500 py-6">
-      No devices found. Add one!
+    <div v-if="!deviceStore.isLoading && devices.length === 0" class="text-center py-12">
+      <div class="text-gray-500 mb-4">
+        <h3 class="text-lg font-medium">No devices found</h3>
+        <p>Get started by adding your first network device</p>
+      </div>
+      <button @click="openCreateModal" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+        + Add Device
+      </button>
     </div>
 
     <!-- Create/Edit Modal -->

@@ -14,8 +14,18 @@ export const useJobStore = defineStore('jobs', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await api.get('/jobs');
-      jobs.value = response.data;
+      const response = await api.get('/jobs/');
+      // Handle pagination response structure
+      if (response.data && response.data.items) {
+        // API returns paginated response with items array
+        jobs.value = response.data.items;
+      } else if (Array.isArray(response.data)) {
+        // Fallback for array response
+        jobs.value = response.data;
+      } else {
+        // Default to empty array if response format is unexpected
+        jobs.value = [];
+      }
     } catch (err) {
       error.value = err.response?.data?.detail || 'Failed to fetch jobs';
       console.error("Fetch Jobs Error:", err);
@@ -28,7 +38,7 @@ export const useJobStore = defineStore('jobs', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await api.post('/jobs', jobData);
+      const response = await api.post('/jobs/', jobData);
       jobs.value.push(response.data);
       // notifications.addMessage({ type: 'success', text: 'Job created successfully' });
       return true;
@@ -46,7 +56,7 @@ export const useJobStore = defineStore('jobs', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await api.put(`/jobs/${jobId}`, jobData);
+      const response = await api.put(`/jobs/${jobId}/`, jobData);
       const index = jobs.value.findIndex(j => j.id === jobId);
       if (index !== -1) {
         jobs.value[index] = response.data;
@@ -67,7 +77,7 @@ export const useJobStore = defineStore('jobs', () => {
     isLoading.value = true;
     error.value = null;
     try {
-      await api.delete(`/jobs/${jobId}`);
+      await api.delete(`/jobs/${jobId}/`);
       jobs.value = jobs.value.filter(j => j.id !== jobId);
       // notifications.addMessage({ type: 'success', text: 'Job deleted successfully' });
       return true;
@@ -84,7 +94,7 @@ export const useJobStore = defineStore('jobs', () => {
   async function runJobNow(jobId) {
     runStatus.value = { jobId: jobId, status: 'running', error: null }; // Reset status
     try {
-      const response = await api.post(`/jobs/run/${jobId}`);
+      const response = await api.post(`/jobs/run/${jobId}/`);
       runStatus.value = { jobId: jobId, status: 'queued', data: response.data, error: null };
       // notifications.addMessage({ type: 'info', text: `Job ${jobId} queued successfully.` });
       return true;

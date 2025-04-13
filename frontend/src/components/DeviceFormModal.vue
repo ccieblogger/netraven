@@ -60,6 +60,8 @@
         />
 
         <!-- Credentials -->
+        <!-- TEMPORARY: Direct credential selection until proper tag-based credential matching is implemented -->
+        <!-- TODO: Replace with tag-based credential matching in future implementation -->
         <CredentialSelector
           id="credential"
           v-model="form.credential_id"
