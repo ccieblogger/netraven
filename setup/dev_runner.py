@@ -13,14 +13,16 @@ except ImportError:
     print("Warning: netraven.config.loader not found. Falling back to DATABASE_URL environment variable or default.")
 
 from netraven.db.base import Base
-from netraven.db.session import engine as default_engine # Use the engine from session.py
 
-# Determine DB URL: Env Var > Config File > Default
+# Always use environment variable if provided (for scripts run outside container)
 db_url = os.getenv("DATABASE_URL")
+print(f"Using database URL from environment: {db_url}")
+
 if not db_url and CONFIG_LOADER_AVAILABLE:
     try:
         config = load_config(env=os.getenv("APP_ENV", "dev"))
         db_url = config.get("database", {}).get("url")
+        print(f"Using database URL from config: {db_url}")
     except Exception as e:
         print(f"Warning: Failed to load config: {e}. Using default DB URL.")
 
@@ -28,9 +30,9 @@ if not db_url:
     db_url = "postgresql+psycopg2://netraven:netraven@localhost:5432/netraven"
     print(f"Warning: Using default DB URL: {db_url}")
 
-# Create a dedicated engine for the runner script if needed, or reuse from session
-# Reusing the engine from session.py is generally better to ensure consistency
-engine = default_engine
+# Create a dedicated engine for the script
+engine = create_engine(db_url)
+print(f"Created engine with URL: {engine.url}")
 
 def run_db_check():
     """Checks the database connection."""
@@ -50,6 +52,9 @@ def run_create_schema():
     print("Creating database schema directly from models...")
     print("Note: This is usually for initial dev setup or testing. Use 'alembic upgrade head' for migrations.")
     try:
+        # Import all models to ensure they're registered with Base
+        import netraven.db.models  # noqa
+        
         Base.metadata.create_all(engine)
         print("✅ Schema created successfully (if tables didn't exist).")
     except Exception as e:
@@ -63,7 +68,7 @@ def run_drop_schema():
         print("Dropping tables...")
         try:
             # Ensure all models are loaded before dropping
-            import netraven.db.models # noqa
+            import netraven.db.models  # noqa
             Base.metadata.drop_all(engine)
             print("✅ All tables dropped successfully.")
         except Exception as e:

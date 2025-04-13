@@ -1,8 +1,22 @@
 import sys
-from sqlalchemy.orm import Session
-from netraven.db.session import get_db
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from netraven.db.base import Base
 from netraven.db.models.user import User
 from netraven.api.auth import get_password_hash
+
+# Use localhost for direct connection outside container
+db_url = "postgresql+psycopg2://netraven:netraven@localhost:5432/netraven"
+engine = create_engine(db_url)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def create_admin_user():
     try:

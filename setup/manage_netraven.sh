@@ -22,12 +22,13 @@ NC='\033[0m' # No Color
 
 # Print usage
 usage() {
-    echo "Usage: $0 [start|stop|reset-db|install-deps|switch-env|restart] [dev|release|service]"
+    echo "Usage: $0 [start|stop|reset-db|reset-all|install-deps|switch-env|restart] [dev|release|service]"
     echo ""
     echo "Commands:"
     echo "  start         Start all NetRaven services"
     echo "  stop          Stop all NetRaven services"
-    echo "  reset-db      Reset the database (drop and recreate tables)"
+    echo "  reset-db      Reset only the database (drop and recreate PostgreSQL)"
+    echo "  reset-all     Reset all containers and volumes (complete reinstall)"
     echo "  install-deps  Install all dependencies (Python, Node.js, Redis)"
     echo "  switch-env    Switch between dev and release environments"
     echo "  restart       Restart individual services (frontend, api, backend, redis, postgres)"
@@ -120,21 +121,179 @@ reset_db() {
         exit 0
     fi
 
-    echo -e "${YELLOW}Ensuring PostgreSQL container is running...${NC}"
-    if ! docker ps | grep -q netraven-postgres; then
-        echo -e "${YELLOW}Starting PostgreSQL container...${NC}"
-        docker-compose -f $DOCKER_COMPOSE_FILE up -d postgres
-        # Wait for PostgreSQL to be ready
-        echo -e "${YELLOW}Waiting for PostgreSQL to be ready...${NC}"
+    # Stop and remove PostgreSQL container 
+    echo -e "${YELLOW}Stopping and removing PostgreSQL container...${NC}"
+    docker-compose -f $DOCKER_COMPOSE_FILE stop postgres
+    docker-compose -f $DOCKER_COMPOSE_FILE rm -f postgres
+
+    # Remove PostgreSQL volume to completely clear data
+    echo -e "${YELLOW}Removing PostgreSQL volume to clear all data...${NC}"
+    docker volume rm $(docker volume ls -q | grep postgres-data) || true
+    
+    # Start PostgreSQL container fresh
+    echo -e "${YELLOW}Starting fresh PostgreSQL container...${NC}"
+    docker-compose -f $DOCKER_COMPOSE_FILE up -d postgres
+    
+    # Wait for PostgreSQL to be ready
+    echo -e "${YELLOW}Waiting for PostgreSQL to initialize...${NC}"
+    max_attempts=15
+    attempt=0
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if docker exec netraven-postgres pg_isready -U netraven > /dev/null 2>&1; then
+            echo -e "${GREEN}PostgreSQL is ready.${NC}"
+            break
+        fi
+        attempt=$((attempt+1))
+        echo -e "${YELLOW}Waiting for PostgreSQL to be ready (attempt $attempt/$max_attempts)...${NC}"
         sleep 5
+    done
+    
+    if [ $attempt -eq $max_attempts ]; then
+        echo -e "${RED}PostgreSQL failed to start. Check the logs with 'docker logs netraven-postgres'.${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}PostgreSQL container reset successfully.${NC}"
+    
+    # Check if other services are running, if not ask if user wants to start them
+    API_RUNNING=false
+    if docker ps | grep -q netraven-api; then
+        API_RUNNING=true
+        echo -e "${YELLOW}API container is already running. You may need to restart it to connect to the new database.${NC}"
+        read -p "Would you like to restart the API container? (yes/no): " restart_api
+        if [[ "$restart_api" == "yes" ]]; then
+            echo -e "${YELLOW}Restarting API container...${NC}"
+            docker-compose -f $DOCKER_COMPOSE_FILE restart api
+        fi
+    else
+        read -p "API container is not running. Would you like to start it? (yes/no): " start_api
+        if [[ "$start_api" == "yes" ]]; then
+            echo -e "${YELLOW}Starting API container...${NC}"
+            docker-compose -f $DOCKER_COMPOSE_FILE up -d api
+            API_RUNNING=true
+        fi
+    fi
+    
+    # If API was started/restarted, wait for it to be ready
+    if [[ "$API_RUNNING" == true && ("$restart_api" == "yes" || "$start_api" == "yes") ]]; then
+        echo -e "${YELLOW}Waiting for API to initialize...${NC}"
+        max_attempts=15
+        attempt=0
+        
+        while [ $attempt -lt $max_attempts ]; do
+            if curl -s http://localhost:8000/health > /dev/null; then
+                echo -e "${GREEN}API service is ready.${NC}"
+                break
+            fi
+            attempt=$((attempt+1))
+            echo -e "${YELLOW}Waiting for API to be ready (attempt $attempt/$max_attempts)...${NC}"
+            sleep 5
+        done
+        
+        if [ $attempt -eq $max_attempts ]; then
+            echo -e "${RED}API service failed to start. Check the logs with 'docker logs netraven-api-${DOCKER_ENV}'.${NC}"
+        fi
+    fi
+    
+    # Check if other containers are running
+    REDIS_RUNNING=false
+    FRONTEND_RUNNING=false
+    
+    if docker ps | grep -q netraven-redis; then
+        REDIS_RUNNING=true
+    fi
+    
+    if docker ps | grep -q netraven-frontend; then
+        FRONTEND_RUNNING=true
+    fi
+    
+    # Ask to start other containers if they're not running
+    if [[ "$REDIS_RUNNING" == false || "$FRONTEND_RUNNING" == false || "$API_RUNNING" == false ]]; then
+        read -p "Some containers are not running. Would you like to start them all? (yes/no): " start_all
+        if [[ "$start_all" == "yes" ]]; then
+            if [[ "$REDIS_RUNNING" == false ]]; then
+                echo -e "${YELLOW}Starting Redis container...${NC}"
+                docker-compose -f $DOCKER_COMPOSE_FILE up -d redis
+            fi
+            
+            if [[ "$API_RUNNING" == false ]]; then
+                echo -e "${YELLOW}Starting API container...${NC}"
+                docker-compose -f $DOCKER_COMPOSE_FILE up -d api
+            fi
+            
+            if [[ "$FRONTEND_RUNNING" == false ]]; then
+                echo -e "${YELLOW}Starting Frontend container...${NC}"
+                docker-compose -f $DOCKER_COMPOSE_FILE up -d frontend
+            fi
+            
+            echo -e "${GREEN}All containers started.${NC}"
+        fi
+    fi
+    
+    echo -e "${GREEN}Database reset completed.${NC}"
+}
+
+# Reset all containers
+reset_all() {
+    echo -e "${RED}Resetting all containers and data...${NC}"
+    read -p "Are you sure you want to reset all containers? This will delete all data. (yes/no): " confirmation
+    if [[ "$confirmation" != "yes" ]]; then
+        echo "Reset cancelled."
+        exit 0
     fi
 
-    # Drop and recreate schema using the containerized PostgreSQL
-    echo -e "${YELLOW}Dropping and recreating database schema...${NC}"
-    poetry run python "$ROOT_DIR/setup/dev_runner.py" --drop-schema
-    poetry run python "$ROOT_DIR/setup/dev_runner.py" --create-schema
-
-    echo -e "${GREEN}Database reset successfully.${NC}"
+    # Stop and remove all containers
+    echo -e "${YELLOW}Stopping and removing all containers...${NC}"
+    docker-compose -f $DOCKER_COMPOSE_FILE down
+    
+    # Remove volumes to completely clear data
+    echo -e "${YELLOW}Removing volumes to clear all data...${NC}"
+    docker volume rm $(docker volume ls -q | grep postgres-data) || true
+    docker volume rm $(docker volume ls -q | grep redis-data) || true
+    
+    # Start all containers fresh
+    echo -e "${YELLOW}Starting all containers fresh...${NC}"
+    docker-compose -f $DOCKER_COMPOSE_FILE up -d
+    
+    # Wait for PostgreSQL to be ready
+    echo -e "${YELLOW}Waiting for PostgreSQL to initialize...${NC}"
+    max_attempts=15
+    attempt=0
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if docker exec netraven-postgres pg_isready -U netraven > /dev/null 2>&1; then
+            echo -e "${GREEN}PostgreSQL is ready.${NC}"
+            break
+        fi
+        attempt=$((attempt+1))
+        echo -e "${YELLOW}Waiting for PostgreSQL to be ready (attempt $attempt/$max_attempts)...${NC}"
+        sleep 5
+    done
+    
+    # Wait for API to be ready
+    echo -e "${YELLOW}Waiting for API to initialize...${NC}"
+    max_attempts=15
+    attempt=0
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if curl -s http://localhost:8000/health > /dev/null; then
+            echo -e "${GREEN}API service is ready.${NC}"
+            break
+        fi
+        attempt=$((attempt+1))
+        echo -e "${YELLOW}Waiting for API to be ready (attempt $attempt/$max_attempts)...${NC}"
+        sleep 5
+    done
+    
+    if [ $attempt -eq $max_attempts ]; then
+        echo -e "${RED}API service failed to start. Check the logs with 'docker logs netraven-api-${DOCKER_ENV}'.${NC}"
+    else
+        echo -e "${GREEN}All containers reset and started successfully.${NC}"
+        echo -e "${GREEN}API is accessible at http://localhost:8000${NC}"
+        echo -e "${GREEN}API documentation is available at http://localhost:8000/api/docs${NC}"
+        echo -e "${GREEN}Frontend is accessible at http://localhost:5173 (dev) or http://localhost:80 (release)${NC}"
+    fi
 }
 
 # Start services
@@ -285,31 +444,37 @@ switch_env() {
     echo -e "${YELLOW}You can now start services in the $ENVIRONMENT environment.${NC}"
 }
 
-# Execute command
+# Process commands
 case "$COMMAND" in
-    install-deps)
-        install_deps
-        ;;
-    reset-db)
-        reset_db
-        ;;
     start)
         start_services
         ;;
     stop)
         stop_services
         ;;
-    restart)
-        if [ "$#" -lt 2 ]; then
-            echo -e "${RED}Please specify a service to restart (frontend, api, backend, redis, postgres).${NC}"
-            usage
-        fi
-        restart_service "$2"
+    reset-db)
+        reset_db
+        ;;
+    reset-all)
+        reset_all
+        ;;
+    install-deps)
+        install_deps
         ;;
     switch-env)
         switch_env
+        ;;
+    restart)
+        if [ "$#" -lt 2 ]; then
+            echo -e "${RED}Missing service name. Usage: $0 restart [frontend|api|backend|redis|postgres]${NC}"
+            exit 1
+        fi
+        SERVICE=$2
+        restart_service "$SERVICE"
         ;;
     *)
         usage
         ;;
 esac
+
+exit 0
