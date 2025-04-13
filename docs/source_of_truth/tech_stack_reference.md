@@ -179,3 +179,47 @@
 - **Role-Based Security**: JWT-based authentication with role enforcement
 - **Modular Design**: Isolated services with clear responsibilities
 - **Structured Logging**: Comprehensive logging with sensitive data redaction 
+
+## Utility Scripts
+
+### Development Environment Management
+
+NetRaven provides utility scripts to simplify development workflow and environment management:
+
+#### manage_netraven.sh
+
+Located in the `/setup` directory, this script serves as the primary tool for managing NetRaven's containerized environment:
+
+```bash
+./setup/manage_netraven.sh [command] [environment]
+```
+
+**Commands:**
+- `start` - Start all NetRaven services (Redis, PostgreSQL, API, Frontend)
+- `stop` - Stop all running services
+- `reset-db` - Reset only the database (drop and recreate PostgreSQL)
+- `reset-all` - Reset all containers and volumes (complete reinstall)
+- `install-deps` - Install all dependencies (Python, Node.js, Redis)
+- `switch-env` - Switch between development and release environments
+- `restart [service]` - Restart individual services (frontend, api, backend, redis, postgres)
+
+**Environments:**
+- `dev` - Development environment (default)
+- `release` - Production/Release environment
+
+**Examples:**
+```bash
+# Start development environment
+./setup/manage_netraven.sh start dev
+
+# Reset database in development environment
+./setup/manage_netraven.sh reset-db dev
+
+# Restart just the API service
+./setup/manage_netraven.sh restart api
+
+# Switch to release environment
+./setup/manage_netraven.sh switch-env release
+```
+
+This script handles Docker container management, environment configuration, and service health checks, making it the recommended way to interact with the NetRaven development environment. 
