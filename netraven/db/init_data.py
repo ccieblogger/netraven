@@ -4,6 +4,7 @@ Initialize the NetRaven database with default data.
 This script creates:
 1. Default admin user
 2. Default system tag
+3. Default admin credential
 """
 
 import sys
@@ -18,12 +19,14 @@ logger = logging.getLogger(__name__)
 # Import project modules
 try:
     from netraven.db.session import get_db
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, text
     from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.exc import OperationalError
     from netraven.db.base import Base
     from netraven.db.models.user import User
     from netraven.db.models.tag import Tag
     from netraven.db.models.device import Device
+    from netraven.db.models.credential import Credential
     from netraven.api.auth import get_password_hash
 except ImportError as e:
     logger.error(f"Failed to import required modules: {e}")
@@ -42,6 +45,16 @@ DEFAULT_TAGS = [
     {
         "name": "default",
         "type": "system"
+    }
+]
+
+DEFAULT_CREDENTIALS = [
+    {
+        "username": "admin",
+        "password": "Password1",  # This will be hashed
+        "description": "Default admin credential for device access",
+        "priority": 10,  # High priority (lower number)
+        "is_system": True
     }
 ]
 
@@ -116,6 +129,51 @@ def create_default_tags(db):
     
     return created_tags
 
+def create_default_credentials(db):
+    """Create default system credentials if they don't exist."""
+    created_credentials = []
+    
+    for cred_data in DEFAULT_CREDENTIALS:
+        try:
+            # Check if credential already exists using a basic query
+            # This avoids referencing columns that might not exist yet
+            stmt = text("SELECT id, username FROM credentials WHERE username = :username")
+            result = db.execute(stmt, {"username": cred_data["username"]}).first()
+            
+            if result:
+                logger.info(f"Credential with username '{cred_data['username']}' already exists with ID: {result[0]}")
+                # Skip to next credential
+                continue
+                
+            # Create with basic fields that are guaranteed to exist
+            hashed_password = get_password_hash(cred_data["password"])
+            
+            # Create the credential with only the basic fields
+            new_cred = Credential(
+                username=cred_data["username"],
+                password=hashed_password,
+                priority=cred_data.get("priority", 100)
+            )
+            
+            # Try to set optional fields if schema supports them
+            if hasattr(Credential, 'description'):
+                new_cred.description = cred_data.get("description")
+            if hasattr(Credential, 'is_system'):
+                new_cred.is_system = cred_data.get("is_system", False)
+            
+            db.add(new_cred)
+            db.commit()
+            db.refresh(new_cred)
+            logger.info(f"System credential '{cred_data['username']}' created with ID: {new_cred.id}")
+            created_credentials.append(new_cred)
+            
+        except Exception as e:
+            logger.error(f"Error creating credential: {e}")
+            # Continue with other credentials
+            db.rollback()
+    
+    return created_credentials
+
 def associate_default_tag_with_devices(db):
     """Associate the default tag with all existing devices that don't have it."""
     try:
@@ -165,6 +223,9 @@ def init_database():
         
         # Create default tags
         create_default_tags(db)
+        
+        # Create default credentials
+        create_default_credentials(db)
         
         # Associate default tag with existing devices
         associate_default_tag_with_devices(db)

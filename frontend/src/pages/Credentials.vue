@@ -31,7 +31,10 @@
         <tbody class="text-gray-600 text-sm font-light">
           <tr v-for="cred in credentials" :key="cred.id" class="border-b border-gray-200 hover:bg-gray-100">
             <td class="py-3 px-6 text-left whitespace-nowrap">{{ cred.id }}</td>
-            <td class="py-3 px-6 text-left">{{ cred.username }}</td>
+            <td class="py-3 px-6 text-left">
+              {{ cred.username }}
+              <span v-if="cred.is_system" class="bg-yellow-100 text-yellow-800 ml-2 py-1 px-2 rounded-full text-xs">System</span>
+            </td>
             <td class="py-3 px-6 text-left">{{ cred.description || '-' }}</td>
             <td class="py-3 px-6 text-left">{{ cred.priority }}</td>
             <td class="py-3 px-6 text-left">
@@ -43,7 +46,13 @@
             <td class="py-3 px-6 text-center">
               <div class="flex item-center justify-center">
                  <button @click="openEditModal(cred)" class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110">✏️</button>
-                 <button @click="confirmDelete(cred)" class="w-4 mr-2 transform hover:text-red-500 hover:scale-110">🗑️</button>
+                 <button 
+                   @click="confirmDelete(cred)" 
+                   class="w-4 mr-2 transform hover:text-red-500 hover:scale-110"
+                   :class="{ 'opacity-50 cursor-not-allowed': cred.is_system }"
+                   :disabled="cred.is_system"
+                   :title="cred.is_system ? 'System credentials cannot be deleted' : ''"
+                 >🗑️</button>
               </div>
             </td>
           </tr>
@@ -85,6 +94,12 @@ function openEditModal(cred) {
    alert(`Placeholder: Open Edit Credential Modal for ${cred.username}`);
 }
 function confirmDelete(cred) {
+  // Skip deletion for system credentials
+  if (cred.is_system) {
+    alert('System credentials cannot be deleted.');
+    return;
+  }
+  
   if (confirm(`Are you sure you want to delete the credential set "${cred.username}"?`)) {
      alert(`Placeholder: Delete credential ${cred.id}`);
      // credentialStore.deleteCredential(cred.id);

@@ -113,6 +113,10 @@ class CredentialUpdate(BaseSchema):
 
 # Response model, excludes password
 class Credential(CredentialBase, BaseSchemaWithId):
+    is_system: bool = Field(
+        default=False,
+        description="Whether this is a system credential (cannot be deleted)"
+    )
     tags: List[Tag] = Field(
         default=[],
         description="List of tags associated with this credential"
