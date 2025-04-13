@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/auth';
 
-// Determine API base URL from environment variables or use a default
-// Ensure the backend service address is correct (e.g., localhost:8000 for local dev)
-const API_BASE_URL = 'http://localhost:8000'; // Force to use localhost:8000
+// Use the Vite proxy for API requests in development
+// This works by proxying requests through the Vite dev server
+// In production, you may need to adjust this URL based on your deployment
+const API_BASE_URL = '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

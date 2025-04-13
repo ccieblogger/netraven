@@ -33,6 +33,14 @@ export default defineConfig({
     watch: {
       usePolling: true, // Needed for some environments
       interval: 1000
+    },
+    // Add proxy configuration for API requests
+    proxy: {
+      '/api': {
+        target: 'http://api:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
     }
   }
 })
