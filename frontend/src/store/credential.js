@@ -11,8 +11,14 @@ export const useCredentialStore = defineStore('credential', () => {
     isLoading.value = true
     error.value = null
     try {
-      const response = await api.get('/credentials')
-      credentials.value = Array.isArray(response.data) ? response.data : []
+      const response = await api.get('/credentials/')
+      if (response.data && response.data.items) {
+        credentials.value = response.data.items
+      } else if (Array.isArray(response.data)) {
+        credentials.value = response.data
+      } else {
+        credentials.value = []
+      }
     } catch (err) {
       console.error("Error fetching credentials:", err)
       error.value = err.response?.data?.detail || 'Failed to fetch credentials'
@@ -26,7 +32,7 @@ export const useCredentialStore = defineStore('credential', () => {
      isLoading.value = true
      error.value = null
      try {
-       const response = await api.post('/credentials', credentialData)
+       const response = await api.post('/credentials/', credentialData)
        credentials.value.push(response.data) 
        return true
      } catch (err) {
@@ -42,7 +48,7 @@ export const useCredentialStore = defineStore('credential', () => {
     isLoading.value = true
     error.value = null
     try {
-      const response = await api.put(`/credentials/${credentialId}`, credentialData)
+      const response = await api.put(`/credentials/${credentialId}/`, credentialData)
       const index = credentials.value.findIndex(c => c.id === credentialId)
       if (index !== -1) {
         credentials.value[index] = response.data
@@ -61,7 +67,7 @@ export const useCredentialStore = defineStore('credential', () => {
     isLoading.value = true
     error.value = null
     try {
-      await api.delete(`/credentials/${credentialId}`)
+      await api.delete(`/credentials/${credentialId}/`)
       credentials.value = credentials.value.filter(c => c.id !== credentialId)
       return true
     } catch (err) {
