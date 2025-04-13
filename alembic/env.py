@@ -8,10 +8,20 @@ from alembic import context
 from netraven.db.base import Base
 # Import all models here so Base.metadata is populated
 import netraven.db.models
+# Import config loader to get DB URL from environment
+from netraven.config.loader import load_config
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Load configuration from netraven config
+netraven_config = load_config()
+db_url = netraven_config.get('database', {}).get('url')
+
+# Override sqlalchemy.url with the one from config if available
+if db_url:
+    config.set_main_option('sqlalchemy.url', db_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
