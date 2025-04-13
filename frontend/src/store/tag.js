@@ -13,10 +13,18 @@ export const useTagStore = defineStore('tag', () => {
     isLoading.value = true
     error.value = null
     try {
-      const response = await api.get('/tags')
-      // Assuming the API returns an array of tag objects
-      // Check if the response data is an array, default to empty array if not
-      tags.value = Array.isArray(response.data) ? response.data : []
+      const response = await api.get('/tags/')
+      // Handle pagination response structure
+      if (response.data && response.data.items) {
+        // API returns paginated response with items array
+        tags.value = response.data.items;
+      } else if (Array.isArray(response.data)) {
+        // Fallback for array response
+        tags.value = response.data;
+      } else {
+        // Default to empty array if response format is unexpected
+        tags.value = [];
+      }
     } catch (err) {
       console.error("Error fetching tags:", err)
       error.value = err.response?.data?.detail || 'Failed to fetch tags'
@@ -30,7 +38,7 @@ export const useTagStore = defineStore('tag', () => {
      isLoading.value = true
      error.value = null
      try {
-       const response = await api.post('/tags', tagData)
+       const response = await api.post('/tags/', tagData)
        tags.value.push(response.data) // Add to local state
        // notifications.addMessage({ type: 'success', text: 'Tag created successfully' })
        return true // Indicate success
@@ -48,7 +56,7 @@ export const useTagStore = defineStore('tag', () => {
     isLoading.value = true
     error.value = null
     try {
-      const response = await api.put(`/tags/${tagId}`, tagData)
+      const response = await api.put(`/tags/${tagId}/`, tagData)
       // Update local state
       const index = tags.value.findIndex(t => t.id === tagId)
       if (index !== -1) {
@@ -70,7 +78,7 @@ export const useTagStore = defineStore('tag', () => {
     isLoading.value = true
     error.value = null
     try {
-      await api.delete(`/tags/${tagId}`)
+      await api.delete(`/tags/${tagId}/`)
       // Remove from local state
       tags.value = tags.value.filter(t => t.id !== tagId)
       // notifications.addMessage({ type: 'success', text: 'Tag deleted successfully' })

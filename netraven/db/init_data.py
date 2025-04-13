@@ -33,7 +33,7 @@ except ImportError as e:
 DEFAULT_ADMIN = {
     "username": "admin",
     "password": "admin123",  # This will be hashed
-    "email": "admin@netraven.local",
+    "email": "admin@netraven.example.com",
     "is_active": True,
     "role": "admin"
 }
