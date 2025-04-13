@@ -168,10 +168,17 @@ def delete_credential(
     db: Session = Depends(get_db_session),
     _: models.User = Depends(require_admin_role) # Protect deletion
 ):
-    """Delete a credential set."""
+    """Delete a credential set. System credentials cannot be deleted."""
     db_credential = db.query(models.Credential).filter(models.Credential.id == credential_id).first()
     if db_credential is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credential not found")
+    
+    # Prevent deletion of system credentials
+    if db_credential.is_system:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="System credentials cannot be deleted"
+        )
 
     db.delete(db_credential)
     db.commit()

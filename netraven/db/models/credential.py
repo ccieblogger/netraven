@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import expression
 
 from netraven.db.base import Base
 from .tag import credential_tag_association
@@ -21,6 +22,10 @@ class Credential(Base):
     priority = Column(Integer, default=100) # Lower number means higher priority
     last_used = Column(DateTime(timezone=True))
     success_rate = Column(Float, default=1.0) # Track connection success
+    
+    # New fields - these might not exist in the database yet
+    description = Column(String, nullable=True)
+    is_system = Column(Boolean, server_default=expression.false(), nullable=True)
 
     tags = relationship(
         "Tag",

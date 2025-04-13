@@ -64,18 +64,27 @@ export const useCredentialStore = defineStore('credential', () => {
   }
 
   async function deleteCredential(credentialId) {
-    isLoading.value = true
-    error.value = null
+    isLoading.value = true;
+    error.value = null;
+    
+    // Get the credential to check if it's a system credential
+    const credential = credentials.value.find(c => c.id === credentialId);
+    if (credential && credential.is_system) {
+      error.value = 'System credentials cannot be deleted';
+      isLoading.value = false;
+      return false;
+    }
+    
     try {
-      await api.delete(`/credentials/${credentialId}/`)
-      credentials.value = credentials.value.filter(c => c.id !== credentialId)
-      return true
+      await api.delete(`/credentials/${credentialId}/`);
+      credentials.value = credentials.value.filter(c => c.id !== credentialId);
+      return true;
     } catch (err) {
-      error.value = err.response?.data?.detail || 'Failed to delete credential'
-      console.error("Delete Credential Error:", err)
-      return false
+      error.value = err.response?.data?.detail || 'Failed to delete credential';
+      console.error("Delete Credential Error:", err);
+      return false;
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
 
