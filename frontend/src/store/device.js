@@ -30,13 +30,12 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoading.value = true
     error.value = null
     try {
-      // TEMPORARY: Handle credential_id until proper tag-based credential matching is implemented
-      // TODO: Replace with tag-based credential matching in future implementation
+      // Prepare API data - standardize field names between frontend and backend
       const apiData = {
         ...deviceData,
-        // Rename tag_ids to tags as expected by API
+        // Convert tag_ids from the form to tags expected by the API
         tags: deviceData.tag_ids || [],
-        // Include credential_id if present (temporary implementation)
+        // Include credential_id if present (temporary implementation until tag-based credential matching)
         credential_id: deviceData.credential_id
       }
       
@@ -59,13 +58,12 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoading.value = true
     error.value = null
     try {
-      // TEMPORARY: Handle credential_id until proper tag-based credential matching is implemented
-      // TODO: Replace with tag-based credential matching in future implementation
+      // Prepare API data - standardize field names between frontend and backend
       const apiData = {
         ...deviceData,
-        // Rename tag_ids to tags as expected by API
+        // Convert tag_ids from the form to tags expected by the API
         tags: deviceData.tag_ids || [],
-        // Include credential_id if present (temporary implementation)
+        // Include credential_id if present (temporary implementation until tag-based credential matching)
         credential_id: deviceData.credential_id
       }
       

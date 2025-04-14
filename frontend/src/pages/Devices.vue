@@ -25,6 +25,7 @@
             <th class="py-3 px-6 text-left">Hostname</th>
             <th class="py-3 px-6 text-left">IP Address</th>
             <th class="py-3 px-6 text-left">Type</th>
+            <th class="py-3 px-6 text-left">Description</th>
             <th class="py-3 px-6 text-left">Port</th>
             <th class="py-3 px-6 text-left">Tags</th>
             <th class="py-3 px-6 text-left">Credential</th>
@@ -37,7 +38,8 @@
             <td class="py-3 px-6 text-left">{{ device.hostname }}</td>
             <td class="py-3 px-6 text-left">{{ device.ip_address }}</td>
             <td class="py-3 px-6 text-left">{{ device.device_type }}</td>
-             <td class="py-3 px-6 text-left">{{ device.port }}</td>
+            <td class="py-3 px-6 text-left">{{ device.description || '-' }}</td>
+            <td class="py-3 px-6 text-left">{{ device.port }}</td>
             <td class="py-3 px-6 text-left">
               <span v-for="tag in device.tags" :key="tag.id" class="bg-blue-100 text-blue-600 py-1 px-3 rounded-full text-xs mr-1">
                 {{ tag.name }}

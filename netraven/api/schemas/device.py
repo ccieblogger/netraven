@@ -139,6 +139,11 @@ class DeviceUpdate(BaseSchema):
 
 # Response model
 class Device(DeviceBase, BaseSchemaWithId):
+    created_at: Optional[datetime] = Field(
+        None,
+        description="Timestamp when the device was created",
+        example="2025-04-09T12:34:56.789Z"
+    )
     last_seen: Optional[datetime] = Field(
         None,
         description="Timestamp when the device was last contacted successfully",

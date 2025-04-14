@@ -50,6 +50,17 @@
           help-text="SSH port (default: 22)"
         />
 
+        <!-- Description -->
+        <FormField
+          id="description"
+          v-model="form.description"
+          label="Description"
+          type="text"
+          :error="validationErrors.description"
+          placeholder="e.g., Core Switch in Data Center 1"
+          help-text="Optional description of this device"
+        />
+
         <!-- Tags (multi-select) -->
         <TagSelector
           id="tags"
@@ -131,6 +142,7 @@ const form = ref({
     port: 22, // Default SSH port
     tag_ids: [], // Store array of selected tag IDs
     credential_id: null,
+    description: '',
 });
 
 const modalTitle = computed(() => props.deviceToEdit ? 'Edit Device' : 'Create New Device');
@@ -160,6 +172,7 @@ function resetForm() {
         form.value.ip_address = props.deviceToEdit.ip_address;
         form.value.device_type = props.deviceToEdit.device_type;
         form.value.port = props.deviceToEdit.port || 22;
+        form.value.description = props.deviceToEdit.description || '';
         // API likely returns full tag objects, we need just the IDs for the form model
         form.value.tag_ids = props.deviceToEdit.tags ? props.deviceToEdit.tags.map(tag => tag.id) : [];
         form.value.credential_id = props.deviceToEdit.credential ? props.deviceToEdit.credential.id : null;
@@ -172,6 +185,7 @@ function resetForm() {
         form.value.port = 22;
         form.value.tag_ids = [];
         form.value.credential_id = null;
+        form.value.description = '';
     }
     isSaving.value = false; // Reset saving state
 }

@@ -12,9 +12,10 @@ class Device(Base):
     hostname = Column(String, nullable=False, unique=True, index=True)
     ip_address = Column(String, nullable=False, unique=True) # Consider IPAddress type if needed
     device_type = Column(String, nullable=False) # Corresponds to Netmiko device_type
+    description = Column(String, nullable=True)
+    port = Column(Integer, default=22, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_seen = Column(DateTime(timezone=True), onupdate=func.now())
-    # Consider adding created_at timestamp
-    # created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     tags = relationship(
         "Tag",
@@ -23,4 +24,7 @@ class Device(Base):
     )
 
     configurations = relationship("DeviceConfiguration", back_populates="device", cascade="all, delete-orphan")
-    connection_logs = relationship("ConnectionLog", back_populates="device", cascade="all, delete-orphan") 
+    connection_logs = relationship("ConnectionLog", back_populates="device", cascade="all, delete-orphan")
+    
+    # This comment is a placeholder for future credential relationship
+    # credentials = relationship("Credential", back_populates="devices") 
