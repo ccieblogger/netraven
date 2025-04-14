@@ -11,11 +11,11 @@ api_config = config.get('api', {})
 
 app = FastAPI(
     title="NetRaven API",
-    description="API for managing NetRaven network configuration backups and jobs.",
-    version="0.1.0",
-    openapi_url="/api/v1/openapi.json",  # Customize OpenAPI path if needed
-    docs_url="/api/docs",              # Customize Swagger UI path
-    redoc_url="/api/redoc"             # Customize ReDoc path
+    description="NetRaven Network Configuration Management System API",
+    version="1.0.0",
+    docs_url="/docs",  # Remove /api prefix
+    redoc_url="/redoc",  # Remove /api prefix
+    openapi_url="/openapi.json"  # Remove /api prefix
 )
 
 # Configure CORS - expand to include containerized frontend URLs
@@ -49,10 +49,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health", tags=["Health"])
+@app.get("/health", status_code=200)  # Remove /api prefix
 def health_check():
-    """Basic health check endpoint."""
-    return {"status": "ok"}
+    """Health check endpoint."""
+    return {"status": "healthy"}
 
 # Include routers
 app.include_router(auth_router.router)

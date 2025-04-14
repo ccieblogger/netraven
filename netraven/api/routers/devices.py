@@ -6,6 +6,7 @@ from sqlalchemy import or_, and_, func
 from netraven.api import schemas # Import schemas module
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role # Import dependencies
 from netraven.db import models # Import DB models
+from netraven.services.device_credential import get_matching_credentials_for_device
 
 # Constants
 DEFAULT_TAG_NAME = "default"
@@ -40,7 +41,12 @@ def create_device(
     if existing_device:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hostname or IP address already registered")
 
-    db_device = models.Device(**device.model_dump(exclude={'tags'})) # Use model_dump in Pydantic v2
+    # Create a dict with device data and explicitly convert IP to string
+    device_data = device.model_dump(exclude={'tags'})
+    device_data['ip_address'] = str(device_data['ip_address'])
+    
+    # Create the device instance with the updated data
+    db_device = models.Device(**device_data)
     
     # Handle tags if provided
     tag_ids = device.tags or []
@@ -110,9 +116,27 @@ def list_devices(
     # Get paginated devices
     devices = query.offset(offset).limit(size).all()
     
+    # Enhance with credential counts
+    device_list = []
+    for device in devices:
+        # Convert SQLAlchemy model to dictionary
+        device_dict = {
+            column.name: getattr(device, column.name)
+            for column in device.__table__.columns
+        }
+        
+        # Add tags relationship
+        device_dict["tags"] = device.tags
+        
+        # Get matching credential count using the service function
+        matching_credentials = get_matching_credentials_for_device(db, device.id)
+        device_dict["matching_credentials_count"] = len(matching_credentials)
+        
+        device_list.append(device_dict)
+    
     # Return paginated response
     return {
-        "items": devices,
+        "items": device_list,
         "total": total,
         "page": page,
         "size": size,
@@ -156,6 +180,10 @@ def update_device(
          if db.query(models.Device).filter(models.Device.ip_address == str(update_data['ip_address'])).first():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="IP address already exists")
 
+    # Convert IP address to string if present
+    if 'ip_address' in update_data:
+        update_data['ip_address'] = str(update_data['ip_address'])
+
     # Update simple attributes
     for key, value in update_data.items():
         if key != "tags": # Handle tags separately
@@ -189,3 +217,16 @@ def delete_device(
     db.delete(db_device)
     db.commit()
     return None # Return None for 204 status
+
+@router.get("/{device_id}/credentials", response_model=List[schemas.credential.Credential])
+def get_device_credentials(
+    device_id: int,
+    db: Session = Depends(get_db_session)
+):
+    """Get credentials that match this device's tags, ordered by priority."""
+    device = db.query(models.Device).filter(models.Device.id == device_id).first()
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+        
+    matching_credentials = get_matching_credentials_for_device(db, device_id)
+    return matching_credentials

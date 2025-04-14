@@ -31,12 +31,30 @@
           id="device_type"
           v-model="form.device_type"
           label="Device Type"
-          type="text"
+          type="select"
           required
           :error="validationErrors.device_type"
-          placeholder="e.g., cisco_ios, junos"
           help-text="Netmiko device type"
-        />
+        >
+          <option value="">Select a device type</option>
+          <option value="cisco_ios">cisco_ios</option>
+          <option value="cisco_xe">cisco_xe</option>
+          <option value="cisco_nxos">cisco_nxos</option>
+          <option value="cisco_asa">cisco_asa</option>
+          <option value="cisco_xr">cisco_xr</option>
+          <option value="juniper_junos">juniper_junos</option>
+          <option value="arista_eos">arista_eos</option>
+          <option value="hp_comware">hp_comware</option>
+          <option value="hp_procurve">hp_procurve</option>
+          <option value="huawei">huawei</option>
+          <option value="fortinet">fortinet</option>
+          <option value="paloalto_panos">paloalto_panos</option>
+          <option value="f5_tmsh">f5_tmsh</option>
+          <option value="linux">linux</option>
+          <option value="dell_os10">dell_os10</option>
+          <option value="dell_os6">dell_os6</option>
+          <option value="dell_os9">dell_os9</option>
+        </FormField>
 
         <!-- Port -->
         <FormField
@@ -73,6 +91,7 @@
         <!-- Credentials -->
         <!-- TEMPORARY: Direct credential selection until proper tag-based credential matching is implemented -->
         <!-- TODO: Replace with tag-based credential matching in future implementation -->
+        <!--
         <CredentialSelector
           id="credential"
           v-model="form.credential_id"
@@ -81,6 +100,13 @@
           :error="validationErrors.credential_id"
           help-text="Credentials used to access this device"
         />
+        -->
+
+        <!-- Add this explanation instead -->
+        <div class="mt-4 bg-blue-50 p-3 rounded text-sm text-blue-800">
+          <h4 class="font-medium">About Credentials</h4>
+          <p>Device credentials are assigned automatically through tags. Select appropriate tags above to associate credentials with this device.</p>
+        </div>
       </form>
     </template>
     <template #actions>
@@ -221,10 +247,8 @@ function validateForm() {
     errors.port = 'Port must be between 1 and 65535';
   }
   
-  // Credential validation
-  if (!form.value.credential_id) {
-    errors.credential_id = 'Please select credentials for this device';
-  }
+  // Remove credential validation since we're using tag-based credential matching
+  // No longer need to validate credential_id
   
   validationErrors.value = errors;
   return Object.keys(errors).length === 0;
@@ -234,39 +258,20 @@ function closeModal() {
   emit('close');
 }
 
-async function submitForm() {
-  // Validate form
+function submitForm() {
+  clearValidationErrors();
+  
   if (!validateForm()) {
-    notificationStore.error('Please correct the validation errors before saving.');
     return;
   }
-
+  
   isSaving.value = true;
-  try {
-    // Prepare payload
-    const payload = {
-        ...form.value,
-        credential_id: form.value.credential_id || null
-    };
-    
-    // Remove id if it's null (for create operation)
-    if (payload.id === null) {
-        delete payload.id;
-    }
-
-    await emit('save', payload);
-    notificationStore.success(`Device ${props.deviceToEdit ? 'updated' : 'created'} successfully!`);
-    // Parent component should close modal on successful save
-  } catch (error) {
-    console.error("Error saving device:", error);
-    notificationStore.error({
-      title: 'Save Failed',
-      message: error.message || 'Failed to save device. Please try again.',
-      duration: 0 // Make error persistent
-    });
-  } finally {
-    isSaving.value = false;
-  }
+  
+  // Remove credential_id from the form data
+  const formData = { ...form.value };
+  delete formData.credential_id; // Remove direct credential selection
+  
+  emit('save', formData);
 }
 
 // Fetch initial data if needed (e.g., when modal is initially open)

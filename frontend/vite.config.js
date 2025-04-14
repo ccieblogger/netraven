@@ -20,27 +20,33 @@ export default defineConfig({
     devSourcemap: true,
   },
   server: {
-    host: 'localhost', // Change from '0.0.0.0' to 'localhost'
+    host: '0.0.0.0', // Listen on all interfaces to be accessible from Nginx
     port: 5173,
     strictPort: true, // Fail if port is already in use
+    proxy: {
+      // Proxy API requests to backend - disable redirects
+      '/api': {
+        target: 'http://api:8000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            // Log the proxied URL for debugging
+            console.log(`Proxying request to: ${req.url}`);
+          });
+        }
+      }
+    },
     hmr: {
-      host: 'localhost', // Ensure HMR uses 'localhost'
-      port: 5173,
-      protocol: 'ws',
-      clientPort: 5173,
-      overlay: false
+      // HMR settings for working behind Nginx
+      clientPort: 80, // Port the browser will connect to
+      path: '/@vite/client', // WebSocket endpoint path
+      timeout: 120000, // Increase timeout for reconnection attempts
     },
     watch: {
       usePolling: true, // Needed for some environments
       interval: 1000
-    },
-    // Add proxy configuration for API requests
-    proxy: {
-      '/api': {
-        target: 'http://api:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
-      }
     }
   }
 })

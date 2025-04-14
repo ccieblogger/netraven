@@ -47,9 +47,30 @@
               <span v-if="!device.tags || device.tags.length === 0">-</span>
             </td>
             <td class="py-3 px-6 text-left">
-              <!-- TEMPORARY: Handle credential display until proper tag-based credential matching is implemented -->
-              <span v-if="device.credential && device.credential.name">{{ device.credential.name }}</span>
-              <span v-else-if="device.credential_id">ID: {{ device.credential_id }}</span>
+              <!-- Updated credential display with count and hover -->
+              <div v-if="device.matching_credentials_count > 0" class="relative">
+                <span 
+                  @mouseenter="showCredentialPopover(device.id)" 
+                  @mouseleave="hideCredentialPopover()"
+                  class="text-blue-600 cursor-pointer hover:text-blue-800 underline"
+                >
+                  {{ device.matching_credentials_count }} credential(s)
+                </span>
+                <!-- Popover that appears on hover -->
+                <div 
+                  v-if="activeCredentialPopover === device.id"
+                  class="absolute z-10 left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg p-2 w-64"
+                >
+                  <h3 class="text-sm font-medium mb-1">Matching Credentials:</h3>
+                  <div v-if="isLoadingDeviceCredentials" class="text-sm text-gray-500">Loading...</div>
+                  <ul v-else class="text-xs max-h-48 overflow-y-auto">
+                    <li v-for="cred in deviceCredentials" :key="cred.id" class="py-1 border-b border-gray-100 last:border-b-0">
+                      <div class="font-medium">{{ cred.username }}</div>
+                      <div class="text-gray-500">Priority: {{ cred.priority }}</div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
               <span v-else class="text-gray-400">-</span>
             </td>
             <td class="py-3 px-6 text-center">
@@ -113,6 +134,11 @@ const isFormModalOpen = ref(false)
 const selectedDevice = ref(null) // null for create, device object for edit
 const isDeleteModalOpen = ref(false)
 const deviceToDelete = ref(null)
+
+// Add credential popover logic
+const activeCredentialPopover = ref(null);
+const deviceCredentials = ref([]);
+const isLoadingDeviceCredentials = ref(false);
 
 onMounted(() => {
     // Fetch devices only if the list is empty initially
@@ -190,6 +216,25 @@ async function handleDeleteConfirm() {
       // Close modal even on error to avoid being stuck
       closeDeleteModal();
   }
+}
+
+async function showCredentialPopover(deviceId) {
+  activeCredentialPopover.value = deviceId;
+  if (deviceId) {
+    isLoadingDeviceCredentials.value = true;
+    try {
+      const credentials = await deviceStore.fetchDeviceCredentials(deviceId);
+      deviceCredentials.value = credentials;
+    } catch (error) {
+      console.error("Error fetching device credentials:", error);
+    } finally {
+      isLoadingDeviceCredentials.value = false;
+    }
+  }
+}
+
+function hideCredentialPopover() {
+  activeCredentialPopover.value = null;
 }
 
 </script>

@@ -153,6 +153,11 @@ class Device(DeviceBase, BaseSchemaWithId):
         default=[],
         description="List of tags associated with the device"
     )
+    matching_credentials_count: int = Field(
+        0,
+        description="Number of credentials matching this device's tags",
+        example=2
+    )
     # configurations: List[...] # TBD: Add DeviceConfiguration schema later if needed
 
 # Paginated response model
