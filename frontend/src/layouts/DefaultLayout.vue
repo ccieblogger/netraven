@@ -1,5 +1,8 @@
 <template>
   <div class="flex h-screen overflow-hidden">
+    <!-- Notification Toast -->
+    <NotificationToast />
+    
     <!-- Sidebar -->
     <aside class="h-screen w-sidebar flex-shrink-0 flex flex-col bg-sidebar border-r border-divider">
       <!-- Sidebar header with logo -->
@@ -96,6 +99,7 @@
 import { useAuthStore } from '../store/auth';
 import { BellIcon } from '@heroicons/vue/24/outline';
 import ThemeSwitcher from '../components/ui/ThemeSwitcher.vue';
+import NotificationToast from '../components/NotificationToast.vue';
 
 const authStore = useAuthStore();
 

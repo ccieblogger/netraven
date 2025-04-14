@@ -6,12 +6,15 @@ export const useDeviceStore = defineStore('devices', () => {
   const devices = ref([])
   const isLoading = ref(false)
   const error = ref(null)
+  const deviceCredentials = ref([])
+  const isLoadingCredentials = ref(false)
+  const credentialError = ref(null)
 
   async function fetchDevices() {
     isLoading.value = true
     error.value = null
     try {
-      const response = await api.get('/devices/')
+      const response = await api.get('/api/devices/')
       if (response.data && response.data.items) {
         devices.value = response.data.items
       } else {
@@ -26,24 +29,41 @@ export const useDeviceStore = defineStore('devices', () => {
     }
   }
 
+  async function fetchDeviceCredentials(deviceId) {
+    isLoadingCredentials.value = true
+    credentialError.value = null
+    
+    try {
+      const response = await api.get(`/api/devices/${deviceId}/credentials`)
+      deviceCredentials.value = response.data
+      return response.data
+    } catch (err) {
+      credentialError.value = err.response?.data?.detail || 'Failed to fetch device credentials'
+      console.error("Fetch Device Credentials Error:", err)
+      return []
+    } finally {
+      isLoadingCredentials.value = false
+    }
+  }
+
   async function createDevice(deviceData) {
     isLoading.value = true
     error.value = null
     try {
-      // TEMPORARY: Handle credential_id until proper tag-based credential matching is implemented
-      // TODO: Replace with tag-based credential matching in future implementation
+      // Prepare API data - standardize field names between frontend and backend
       const apiData = {
         ...deviceData,
-        // Rename tag_ids to tags as expected by API
-        tags: deviceData.tag_ids || [],
-        // Include credential_id if present (temporary implementation)
-        credential_id: deviceData.credential_id
+        // Convert tag_ids from the form to tags expected by the API
+        tags: deviceData.tag_ids || []
       }
       
       // Remove properties not needed by API
       delete apiData.tag_ids
       
-      const response = await api.post('/devices/', apiData)
+      // Use consistent API path format
+      console.log(`Creating device with data:`, apiData);
+      const response = await api.post('/api/devices/', apiData);
+      
       devices.value.push(response.data)
       return true
     } catch (err) {
@@ -59,20 +79,20 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoading.value = true
     error.value = null
     try {
-      // TEMPORARY: Handle credential_id until proper tag-based credential matching is implemented
-      // TODO: Replace with tag-based credential matching in future implementation
+      // Prepare API data - standardize field names between frontend and backend
       const apiData = {
         ...deviceData,
-        // Rename tag_ids to tags as expected by API
-        tags: deviceData.tag_ids || [],
-        // Include credential_id if present (temporary implementation)
-        credential_id: deviceData.credential_id
+        // Convert tag_ids from the form to tags expected by the API
+        tags: deviceData.tag_ids || []
       }
       
       // Remove properties not needed by API
       delete apiData.tag_ids
       
-      const response = await api.put(`/devices/${deviceId}/`, apiData)
+      // Use consistent API path format with trailing slash
+      console.log(`Updating device ${deviceId} with data:`, apiData);
+      const response = await api.put(`/api/devices/${deviceId}/`, apiData);
+      
       const index = devices.value.findIndex(d => d.id === deviceId)
       if (index !== -1) {
         devices.value[index] = response.data
@@ -91,7 +111,10 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoading.value = true
     error.value = null
     try {
-      await api.delete(`/devices/${deviceId}/`)
+      // Use consistent API path format with trailing slash
+      console.log(`Deleting device ${deviceId}`);
+      await api.delete(`/api/devices/${deviceId}/`);
+      
       devices.value = devices.value.filter(d => d.id !== deviceId)
       return true
     } catch (err) {
@@ -107,7 +130,23 @@ export const useDeviceStore = defineStore('devices', () => {
     devices.value = []
     isLoading.value = false
     error.value = null
+    deviceCredentials.value = []
+    isLoadingCredentials.value = false
+    credentialError.value = null
   }
 
-  return { devices, isLoading, error, fetchDevices, createDevice, updateDevice, deleteDevice, $reset }
+  return { 
+    devices, 
+    isLoading, 
+    error, 
+    deviceCredentials,
+    isLoadingCredentials,
+    credentialError,
+    fetchDevices, 
+    createDevice, 
+    updateDevice, 
+    deleteDevice, 
+    fetchDeviceCredentials,
+    $reset 
+  }
 }) 

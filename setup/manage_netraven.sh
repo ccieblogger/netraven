@@ -31,7 +31,7 @@ usage() {
     echo "  reset-all     Reset all containers and volumes (complete reinstall)"
     echo "  install-deps  Install all dependencies (Python, Node.js, Redis)"
     echo "  switch-env    Switch between dev and release environments"
-    echo "  restart       Restart individual services (frontend, api, backend, redis, postgres)"
+    echo "  restart       Restart individual services (nginx, frontend, api, backend, redis, postgres)"
     echo ""
     echo "Environment:"
     echo "  dev           Development environment"
@@ -199,6 +199,7 @@ reset_db() {
     # Check if other containers are running
     REDIS_RUNNING=false
     FRONTEND_RUNNING=false
+    NGINX_RUNNING=false
     
     if docker ps | grep -q netraven-redis; then
         REDIS_RUNNING=true
@@ -208,8 +209,12 @@ reset_db() {
         FRONTEND_RUNNING=true
     fi
     
+    if docker ps | grep -q netraven-nginx; then
+        NGINX_RUNNING=true
+    fi
+    
     # Ask to start other containers if they're not running
-    if [[ "$REDIS_RUNNING" == false || "$FRONTEND_RUNNING" == false || "$API_RUNNING" == false ]]; then
+    if [[ "$REDIS_RUNNING" == false || "$FRONTEND_RUNNING" == false || "$API_RUNNING" == false || "$NGINX_RUNNING" == false ]]; then
         read -p "Some containers are not running. Would you like to start them all? (yes/no): " start_all
         if [[ "$start_all" == "yes" ]]; then
             if [[ "$REDIS_RUNNING" == false ]]; then
@@ -225,6 +230,11 @@ reset_db() {
             if [[ "$FRONTEND_RUNNING" == false ]]; then
                 echo -e "${YELLOW}Starting Frontend container...${NC}"
                 docker-compose -f $DOCKER_COMPOSE_FILE up -d frontend
+            fi
+            
+            if [[ "$NGINX_RUNNING" == false ]]; then
+                echo -e "${YELLOW}Starting Nginx container...${NC}"
+                docker-compose -f $DOCKER_COMPOSE_FILE up -d nginx
             fi
             
             echo -e "${GREEN}All containers started.${NC}"
@@ -286,13 +296,31 @@ reset_all() {
         sleep 5
     done
     
+    # Wait for Nginx to be ready
+    echo -e "${YELLOW}Waiting for Nginx to initialize...${NC}"
+    max_attempts=10
+    attempt=0
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if curl -s http://localhost/health > /dev/null; then
+            echo -e "${GREEN}Nginx service is ready.${NC}"
+            break
+        fi
+        attempt=$((attempt+1))
+        echo -e "${YELLOW}Waiting for Nginx to be ready (attempt $attempt/$max_attempts)...${NC}"
+        sleep 3
+    done
+    
+    if [ $attempt -eq $max_attempts ]; then
+        echo -e "${RED}Nginx service failed to start. Check the logs with 'docker logs netraven-nginx-${DOCKER_ENV}'.${NC}"
+    fi
+    
     if [ $attempt -eq $max_attempts ]; then
         echo -e "${RED}API service failed to start. Check the logs with 'docker logs netraven-api-${DOCKER_ENV}'.${NC}"
     else
         echo -e "${GREEN}All containers reset and started successfully.${NC}"
-        echo -e "${GREEN}API is accessible at http://localhost:8000${NC}"
-        echo -e "${GREEN}API documentation is available at http://localhost:8000/api/docs${NC}"
-        echo -e "${GREEN}Frontend is accessible at http://localhost:5173 (dev) or http://localhost:80 (release)${NC}"
+        echo -e "${GREEN}Application is accessible at http://localhost/${NC}"
+        echo -e "${GREEN}API documentation is available at http://localhost/docs${NC}"
     fi
 }
 
@@ -353,11 +381,39 @@ start_services() {
     # Start Frontend via Docker Compose
     echo -e "${YELLOW}Starting frontend container...${NC}"
     docker-compose -f $DOCKER_COMPOSE_FILE up -d frontend
+    
+    # Start Nginx container
+    echo -e "${YELLOW}Starting Nginx container...${NC}"
+    docker-compose -f $DOCKER_COMPOSE_FILE up -d nginx
+    
+    # Check if Nginx is up and running
+    echo -e "${YELLOW}Verifying Nginx connection...${NC}"
+    max_attempts=5
+    attempt=0
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if curl -s http://localhost/health > /dev/null; then
+            echo -e "${GREEN}Nginx service is ready.${NC}"
+            break
+        fi
+        attempt=$((attempt+1))
+        echo -e "${YELLOW}Waiting for Nginx to be ready (attempt $attempt/$max_attempts)...${NC}"
+        sleep 2
+    done
+    
+    if [ $attempt -eq $max_attempts ]; then
+        echo -e "${RED}Nginx service failed to start. Check the logs with 'docker logs netraven-nginx-${DOCKER_ENV}'.${NC}"
+    fi
 
     echo -e "${GREEN}NetRaven services started.${NC}"
-    echo -e "${GREEN}API is accessible at http://localhost:8000${NC}"
-    echo -e "${GREEN}API documentation is available at http://localhost:8000/api/docs${NC}"
-    echo -e "${GREEN}Frontend is accessible at http://localhost:5173 (dev) or http://localhost:80 (release)${NC}"
+    
+    if [ "$ENVIRONMENT" == "dev" ]; then
+        echo -e "${GREEN}Application is accessible at http://localhost/${NC}"
+        echo -e "${GREEN}API documentation is available at http://localhost/docs${NC}"
+    else
+        echo -e "${GREEN}Application is accessible at https://netraven.com/${NC}"
+        echo -e "${GREEN}API documentation is available at https://netraven.com/docs${NC}"
+    fi
 }
 
 # Stop services
@@ -379,6 +435,12 @@ restart_service() {
     local service=$1
 
     case "$service" in
+        nginx)
+            echo -e "${YELLOW}Restarting Nginx container...${NC}"
+            docker-compose -f $DOCKER_COMPOSE_FILE restart nginx
+            echo -e "${GREEN}Nginx container restarted.${NC}"
+            echo -e "${GREEN}Application is accessible at http://localhost/${NC}"
+            ;;
         frontend)
             echo -e "${YELLOW}Restarting frontend container...${NC}"
             docker-compose -f $DOCKER_COMPOSE_FILE restart frontend
@@ -388,8 +450,6 @@ restart_service() {
             echo -e "${YELLOW}Restarting API container...${NC}"
             docker-compose -f $DOCKER_COMPOSE_FILE restart api
             echo -e "${GREEN}API container restarted.${NC}"
-            echo -e "${GREEN}API is accessible at http://localhost:8000${NC}"
-            echo -e "${GREEN}API documentation is available at http://localhost:8000/api/docs${NC}"
             ;;
         backend)
             echo -e "${YELLOW}Restarting backend service...${NC}"
@@ -419,7 +479,7 @@ restart_service() {
             echo -e "${GREEN}PostgreSQL container restarted.${NC}"
             ;;
         *)
-            echo -e "${RED}Invalid service: $service. Use 'frontend', 'api', 'backend', 'redis', or 'postgres'.${NC}"
+            echo -e "${RED}Invalid service: $service. Use 'nginx', 'frontend', 'api', 'backend', 'redis', or 'postgres'.${NC}"
             exit 1
             ;;
     esac
@@ -466,7 +526,7 @@ case "$COMMAND" in
         ;;
     restart)
         if [ "$#" -lt 2 ]; then
-            echo -e "${RED}Missing service name. Usage: $0 restart [frontend|api|backend|redis|postgres]${NC}"
+            echo -e "${RED}Missing service name. Usage: $0 restart [nginx|frontend|api|backend|redis|postgres]${NC}"
             exit 1
         fi
         SERVICE=$2

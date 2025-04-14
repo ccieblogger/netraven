@@ -187,8 +187,10 @@ function removeTag(tag) {
 
 // Handle click outside to close dropdown
 function handleClickOutside(event) {
-  if (isDropdownOpen.value && inputRef.value && !inputRef.value.contains(event.target)) {
+  const container = document.querySelector('.tag-selector');
+  if (isDropdownOpen.value && container && !container.contains(event.target)) {
     isDropdownOpen.value = false;
+    searchTerm.value = ''; // Clear search term when closing dropdown
   }
 }
 

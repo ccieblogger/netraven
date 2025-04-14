@@ -205,6 +205,35 @@ def associate_default_tag_with_devices(db):
     except Exception as e:
         logger.error(f"Error associating default tag with devices: {e}")
 
+def associate_default_credential_with_default_tag(db):
+    """Associate the default credential with the default tag."""
+    try:
+        # Get the default tag
+        default_tag = db.query(Tag).filter(Tag.name == "default").first()
+        if not default_tag:
+            logger.warning("Default tag not found, cannot associate with credential")
+            return
+        
+        # Get the default credential
+        default_cred = db.query(Credential).filter(Credential.username == "admin").first()
+        if not default_cred:
+            logger.warning("Default credential not found, cannot associate with tag")
+            return
+        
+        # Check if the association already exists
+        if default_tag in default_cred.tags:
+            logger.info("Default credential is already associated with default tag")
+            return
+        
+        # Associate the default tag with the default credential
+        default_cred.tags.append(default_tag)
+        db.commit()
+        
+        logger.info(f"Successfully associated default credential (ID: {default_cred.id}) with default tag (ID: {default_tag.id})")
+    except Exception as e:
+        logger.error(f"Error associating default credential with default tag: {e}")
+        db.rollback()
+
 def init_database():
     """Initialize the database with default data."""
     try:
@@ -229,6 +258,9 @@ def init_database():
         
         # Associate default tag with existing devices
         associate_default_tag_with_devices(db)
+        
+        # Associate default credential with default tag
+        associate_default_credential_with_default_tag(db)
         
         logger.info("Database initialization completed successfully")
         return 0

@@ -1,68 +1,81 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/auth';
 
-// Use the Vite proxy for API requests in development
-// This works by proxying requests through the Vite dev server
-// In production, you may need to adjust this URL based on your deployment
-const API_BASE_URL = '/api';
+/**
+ * API Service for NetRaven
+ * 
+ * This service creates an Axios instance configured for the NetRaven API.
+ * With Nginx in place, we use a consistent /api prefix for all API requests.
+ */
 
+// Simple configuration with consistent base URL
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000, // Optional: Set a request timeout (e.g., 10 seconds)
-  withCredentials: true, // Add this to enable sending cookies with CORS requests
+  baseURL: '', // Don't set a baseURL since we handle /api prefix in the interceptor
+  timeout: 10000,
+  withCredentials: true,
   headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
   }
 });
 
-// Request Interceptor: Add JWT token to Authorization header
+// Request interceptor - Add authentication token
 api.interceptors.request.use((config) => {
-  const authStore = useAuthStore(); // Get store instance inside interceptor
+  // Add Auth token
+  const authStore = useAuthStore();
   const token = authStore.token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Ensure proper URL formatting with '/api' prefix
+  if (config.url && !config.url.startsWith('/api') && !config.url.match(/^https?:\/\//)) {
+    // If URL doesn't have /api prefix and isn't absolute, prepend /api
+    config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
+  }
+  
+  // Set the baseURL directly in the config to ensure it's used
+  // This fixes issues where the baseURL wasn't being applied correctly
+  config.baseURL = '';
+  
+  // Optional debug logging in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('API Request:', {
+      method: config.method,
+      url: config.url,
+      fullPath: config.url
+    });
+  }
+  
   return config;
 }, (error) => {
-  // Handle request error
-  console.error('Axios Request Error:', error);
+  console.error('API Request Error:', error);
   return Promise.reject(error);
 });
 
-// Response Interceptor (Optional): Handle common responses/errors globally
+// Response interceptor - Handle common response scenarios
 api.interceptors.response.use(
   (response) => {
-    // Any status code that lie within the range of 2xx cause this function to trigger
-    // Do something with response data
     return response;
   },
   (error) => {
-    // Any status codes that falls outside the range of 2xx cause this function to trigger
-    console.error('Axios Response Error:', error.response || error.message);
-    const authStore = useAuthStore();
-
-    if (error.response) {
-        // Handle specific status codes (e.g., 401 Unauthorized)
-        if (error.response.status === 401) {
-            console.error('Unauthorized access - 401. Logging out.');
-            // Token might be invalid or expired, attempt logout
-            authStore.logout();
-            // Optionally redirect to login page
-            // window.location.href = '/login'; 
-        }
-        // Handle other error statuses (403 Forbidden, 404 Not Found, 500 Server Error etc.)
-
-    } else if (error.request) {
-        // The request was made but no response was received
-        console.error('Network Error: No response received from server.');
-        // Handle network errors (e.g., show a notification)
-    } else {
-        // Something happened in setting up the request that triggered an Error
-        console.error('Axios Error', error.message);
+    // Handle 401 Unauthorized globally
+    if (error.response && error.response.status === 401) {
+      const authStore = useAuthStore();
+      console.warn('Authentication failed or token expired. Logging out.');
+      authStore.logout();
+    } 
+    
+    // Log network errors
+    else if (error.request && !error.response) {
+      console.error('Network Error: No response received from server.');
     }
     
-    // Do something with response error
+    // Log other errors
+    else {
+      console.error('API Error:', error.message);
+    }
+    
     return Promise.reject(error);
   }
 );

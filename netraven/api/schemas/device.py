@@ -139,6 +139,11 @@ class DeviceUpdate(BaseSchema):
 
 # Response model
 class Device(DeviceBase, BaseSchemaWithId):
+    created_at: Optional[datetime] = Field(
+        None,
+        description="Timestamp when the device was created",
+        example="2025-04-09T12:34:56.789Z"
+    )
     last_seen: Optional[datetime] = Field(
         None,
         description="Timestamp when the device was last contacted successfully",
@@ -147,6 +152,11 @@ class Device(DeviceBase, BaseSchemaWithId):
     tags: List[Tag] = Field(
         default=[],
         description="List of tags associated with the device"
+    )
+    matching_credentials_count: int = Field(
+        0,
+        description="Number of credentials matching this device's tags",
+        example=2
     )
     # configurations: List[...] # TBD: Add DeviceConfiguration schema later if needed
 
