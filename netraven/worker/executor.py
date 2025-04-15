@@ -48,6 +48,10 @@ from netraven.worker.device_capabilities import (
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
 from git import GitCommandError
 
+# Import credential-related components
+from netraven.services.device_credential import get_matching_credentials_for_device
+from netraven.services.credential_metrics import record_credential_attempt
+
 # Configure logging
 log = logging.getLogger(__name__)
 
@@ -107,190 +111,138 @@ def handle_device(
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
     device_type = getattr(device, 'device_type', 'default')
 
-    # --- Check Circuit Breaker ---
-    circuit_breaker = get_circuit_breaker()
-    if not circuit_breaker.can_connect(device_id):
-        # Circuit is open, don't attempt connection
-        circuit_state = circuit_breaker.get_state(device_id)
-        failure_count = circuit_breaker.get_failure_count(device_id)
-        
-        error_message = (
-            f"Connection blocked by circuit breaker. "
-            f"Circuit is {circuit_state.value} after {failure_count} failures. "
-            f"Try again later."
-        )
-        
-        log.warning(f"[Job: {job_id}] {error_message} for device: {device_name}")
-        
-        error_info = ErrorInfo(
-            category=ErrorCategory.DEVICE_BUSY,
-            message=error_message,
-            is_retriable=False,  # Don't retry in this job run
-            log_level=logging.WARNING,
-            context={"job_id": job_id, "device_id": device_id, "circuit_state": circuit_state.value}
-        )
-        
-        log_utils.save_job_log(device_id, job_id, error_message, success=False, db=db)
-        
-        return {
-            "success": False,
-            "result": None,
-            "error": error_message,
-            "error_info": error_info.to_dict(),
+    # --- Credential Retry Logic ---
+    credentials_to_try = []
+    if db is not None:
+        credentials_to_try = get_matching_credentials_for_device(db, device_id)
+    # If no matching credentials, fall back to device's own username/password if present
+    if not credentials_to_try and hasattr(device, 'username') and hasattr(device, 'password'):
+        from types import SimpleNamespace
+        credentials_to_try = [SimpleNamespace(id=None, username=device.username, password=device.password)]
+
+    last_exception = None
+    for cred in credentials_to_try:
+        # Prepare a device object with the credential
+        device_with_cred = device
+        # If the device doesn't already have the credential, set it
+        if hasattr(device, 'username'):
+            setattr(device_with_cred, 'username', cred.username)
+        if hasattr(device, 'password'):
+            setattr(device_with_cred, 'password', cred.password)
+        # --- Load Configurable Values --- 
+        repo_path = DEFAULT_GIT_REPO_PATH
+        if config and 'worker' in config:
+            repo_path = config.get('worker', {}).get('git_repo_path', DEFAULT_GIT_REPO_PATH)
+        # --- Initialize --- 
+        result = {
+            "success": False, 
+            "result": None, 
+            "error": None, 
             "device_id": device_id,
-            "circuit_blocked": True
+            "capabilities": {}
         }
-
-    # --- Load Configurable Values --- 
-    repo_path = DEFAULT_GIT_REPO_PATH
-    
-    if config and 'worker' in config:
-        repo_path = config.get('worker', {}).get('git_repo_path', DEFAULT_GIT_REPO_PATH)
-
-    # --- Initialize --- 
-    result = {
-        "success": False, 
-        "result": None, 
-        "error": None, 
-        "device_id": device_id,
-        "capabilities": {}
-    }
-    raw_output = None
-    commit_hash = None
-    device_info = {}
-
-    try:
-        log.info(f"[Job: {job_id}] Starting processing for device: {device_name}")
-
-        # --- Perform comprehensive capability detection ---
-        log.info(f"[Job: {job_id}] Detecting capabilities for device: {device_name}")
-        device_capabilities = execute_capability_detection(
-            device, 
-            netmiko_driver.run_command,
-            job_id
-        )
-        
-        # Store device capabilities in result
-        result["capabilities"] = device_capabilities
-        device_info = {k: v for k, v in device_capabilities.items() 
-                       if k in ['model', 'version', 'serial', 'hardware']}
-        
-        log.info(f"[Job: {job_id}] Detected capabilities for {device_name}: " 
-                 f"Model={device_info.get('model', 'Unknown')}, "
-                 f"Version={device_info.get('version', 'Unknown')}")
-
-        # --- Get configuration command based on device type ---
-        show_running_cmd = get_command(device_type, "show_running")
-        
-        # --- Get appropriate timeout for this command and device ---
-        command_timeout = get_command_timeout(device_type, "show_running")
-        
-        # --- Set command-specific timeout in config ---
-        config_with_timeout = config.copy() if config else {}
-        if 'worker' not in config_with_timeout:
-            config_with_timeout['worker'] = {}
-        config_with_timeout['worker']['command_timeout'] = command_timeout
-        
-        # --- Execute command to get configuration ---
-        log.info(f"[Job: {job_id}] Retrieving configuration from {device_name} with {command_timeout}s timeout")
-        raw_output = netmiko_driver.run_command(
-            device, 
-            job_id, 
-            command=show_running_cmd, 
-            config=config_with_timeout
-        )
-        
-        if not raw_output:
-            raise ValueError("Device returned empty configuration")
-            
-        log.info(f"[Job: {job_id}] Successfully retrieved configuration from device: {device_name}")
-        
-        # Record success in circuit breaker
-        circuit_breaker.record_success(device_id)
-
-        # 2. Redact output
-        redacted_output = redactor.redact(raw_output, config=config)
-
-        # 3. Log redacted output to connection log
-        log_utils.save_connection_log(device_id, job_id, redacted_output, db=db)
-        log.info(f"[Job: {job_id}] Connection log saved for device: {device_name}")
-
-        # 4. Commit raw config to Git
-        log.info(f"[Job: {job_id}] Committing configuration to Git for device: {device_name}")
-        
-        # Add device metadata to Git commit from detected capabilities
-        metadata = {
-            "device_type": device_type,
-            "job_id": job_id,
-            "model": device_info.get("model", "Unknown"),
-            "version": device_info.get("version", "Unknown"),
-            "serial": device_info.get("serial", "Unknown"),
-            "hardware": device_info.get("hardware", "Unknown")
-        }
-            
-        commit_hash = git_writer.commit_configuration_to_git(
-            device_id=device_id,
-            config_data=raw_output, # Commit the original, unredacted data
-            job_id=job_id,
-            repo_path=repo_path,
-            metadata=metadata
-        )
-
-        if commit_hash:
-            result["success"] = True
-            result["result"] = commit_hash
-            log_message = f"Success. Configuration committed to Git. Commit: {commit_hash}"
-            log_utils.save_job_log(device_id, job_id, log_message, success=True, db=db)
-            log.info(f"[Job: {job_id}] Successfully committed configuration for device: {device_name}")
-        else:
-            error_info = ErrorInfo(
-                category=ErrorCategory.CONFIG_SAVE_FAILURE,
-                message="Failed to commit configuration to Git repository.",
-                is_retriable=True,
-                log_level=logging.ERROR,
-                context={"job_id": job_id, "device_id": device_id}
+        raw_output = None
+        commit_hash = None
+        device_info = {}
+        try:
+            log.info(f"[Job: {job_id}] Starting processing for device: {device_name} using credential: {cred.username}")
+            # --- Perform comprehensive capability detection ---
+            log.info(f"[Job: {job_id}] Detecting capabilities for device: {device_name}")
+            device_capabilities = execute_capability_detection(
+                device_with_cred, 
+                netmiko_driver.run_command,
+                job_id
             )
-            result["error"] = error_info.message
-            result["error_info"] = error_info.to_dict()
-            log_utils.save_job_log(device_id, job_id, error_info.message, success=False, db=db)
-            log.error(f"[Job: {job_id}] Failed to commit configuration for device: {device_name}")
-            
-            # Record failure in circuit breaker only for connection/retrieval failures
-            circuit_breaker.record_failure(device_id)
-
-    except Exception as e:
-        # Record failure in circuit breaker 
-        circuit_breaker.record_failure(device_id)
-        
-        # Classify the exception
-        error_info = classify_exception(e, job_id=job_id, device_id=device_id)
-        
-        # Format error and log it
-        error_info.log(log)
-        
-        # Add error details to result
-        result["error"] = error_info.message
-        result["error_info"] = error_info.to_dict()
-        
-        # Add circuit breaker state to result
-        result["circuit_state"] = circuit_breaker.get_state(device_id).value
-        result["failure_count"] = circuit_breaker.get_failure_count(device_id)
-        
-        # Save error to job log
-        log_utils.save_job_log(device_id, job_id, error_info.message, success=False, db=db)
-        
-        # If we have partial output, try to save it in the connection log
-        if raw_output:
-            try:
-                partial_redacted = redactor.redact(raw_output, config=config)
-                log_utils.save_connection_log(
-                    device_id, 
-                    job_id, 
-                    f"PARTIAL LOG (ERROR OCCURRED):\n{partial_redacted}", 
-                    db=db
+            result["capabilities"] = device_capabilities
+            device_info = {k: v for k, v in device_capabilities.items() 
+                           if k in ['model', 'version', 'serial', 'hardware']}
+            log.info(f"[Job: {job_id}] Detected capabilities for {device_name}: " 
+                     f"Model={device_info.get('model', 'Unknown')}, "
+                     f"Version={device_info.get('version', 'Unknown')}")
+            show_running_cmd = get_command(device_type, "show_running")
+            command_timeout = get_command_timeout(device_type, "show_running")
+            config_with_timeout = config.copy() if config else {}
+            if 'worker' not in config_with_timeout:
+                config_with_timeout['worker'] = {}
+            config_with_timeout['worker']['command_timeout'] = command_timeout
+            log.info(f"[Job: {job_id}] Retrieving configuration from {device_name} with {command_timeout}s timeout")
+            raw_output = netmiko_driver.run_command(
+                device_with_cred, 
+                job_id, 
+                command=show_running_cmd, 
+                config=config_with_timeout
+            )
+            if not raw_output:
+                raise ValueError("Device returned empty configuration")
+            log.info(f"[Job: {job_id}] Successfully retrieved configuration from device: {device_name}")
+            circuit_breaker = get_circuit_breaker()
+            circuit_breaker.record_success(device_id)
+            redacted_output = redactor.redact(raw_output, config=config)
+            log_utils.save_connection_log(device_id, job_id, redacted_output, db=db)
+            log.info(f"[Job: {job_id}] Connection log saved for device: {device_name}")
+            log.info(f"[Job: {job_id}] Committing configuration to Git for device: {device_name}")
+            metadata = {
+                "device_type": device_type,
+                "job_id": job_id,
+                "model": device_info.get("model", "Unknown"),
+                "version": device_info.get("version", "Unknown"),
+                "serial": device_info.get("serial", "Unknown"),
+                "hardware": device_info.get("hardware", "Unknown")
+            }
+            commit_hash = git_writer.commit_configuration_to_git(
+                device_id=device_id,
+                config_data=raw_output, # Commit the original, unredacted data
+                job_id=job_id,
+                repo_path=repo_path,
+                metadata=metadata
+            )
+            if commit_hash:
+                result["success"] = True
+                result["result"] = commit_hash
+                log_message = f"Success. Configuration committed to Git. Commit: {commit_hash}"
+                log_utils.save_job_log(device_id, job_id, log_message, success=True, db=db)
+                log.info(f"[Job: {job_id}] Successfully committed configuration for device: {device_name}")
+                # Record credential success
+                if db is not None and hasattr(cred, 'id') and cred.id is not None:
+                    record_credential_attempt(db, device_id, cred.id, job_id, success=True)
+                return result
+            else:
+                error_info = ErrorInfo(
+                    category=ErrorCategory.CONFIG_SAVE_FAILURE,
+                    message="Failed to commit configuration to Git repository.",
+                    is_retriable=True,
+                    log_level=logging.ERROR,
+                    context={"job_id": job_id, "device_id": device_id}
                 )
-                log.info(f"[Job: {job_id}] Saved partial configuration for device: {device_name}")
-            except Exception as log_e:
-                log.error(f"[Job: {job_id}] Error saving partial connection log for device {device_name}: {log_e}")
-
+                result["error"] = error_info.message
+                result["error_info"] = error_info.to_dict()
+                log_utils.save_job_log(device_id, job_id, error_info.message, success=False, db=db)
+                log.error(f"[Job: {job_id}] Failed to commit configuration for device: {device_name}")
+                # Record credential failure
+                if db is not None and hasattr(cred, 'id') and cred.id is not None:
+                    record_credential_attempt(db, device_id, cred.id, job_id, success=False, error=error_info.message)
+                last_exception = error_info.message
+        except (NetmikoAuthenticationException, ValueError) as e:
+            # Authentication or empty config failure: try next credential
+            log.warning(f"[Job: {job_id}] Credential failed for device: {device_name} with username: {cred.username} - {e}")
+            if db is not None and hasattr(cred, 'id') and cred.id is not None:
+                record_credential_attempt(db, device_id, cred.id, job_id, success=False, error=str(e))
+            last_exception = e
+            continue
+        except Exception as e:
+            # Other errors: treat as fatal for this credential, but try next
+            log.error(f"[Job: {job_id}] Unexpected error for device: {device_name} with username: {cred.username} - {e}")
+            if db is not None and hasattr(cred, 'id') and cred.id is not None:
+                record_credential_attempt(db, device_id, cred.id, job_id, success=False, error=str(e))
+            last_exception = e
+            continue
+    # If we reach here, all credentials failed
+    result = {
+        "success": False,
+        "result": None,
+        "error": str(last_exception) if last_exception else "All credentials failed",
+        "device_id": device_id,
+        "capabilities": {},
+        "error_info": None
+    }
     return result

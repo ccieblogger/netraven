@@ -526,3 +526,65 @@ def test_run_job_no_devices_found_via_tags(
 # test_run_job_timeout_retry_live_config_db -> covered by success/partial/total
 # test_run_job_timeout_max_retry_fail_live_db -> covered by partial/total
 # test_run_job_no_device_found -> replaced by test_run_job_no_devices_found_via_tags
+
+def test_credential_retry_and_metrics(
+    db_session: Session,
+    create_test_job_with_tags,
+    create_test_device,
+    create_test_tag,
+    mock_external_io,
+    mocker
+):
+    """Test that credential retry logic works and metrics are updated."""
+    # --- Setup ---
+    tag1 = create_test_tag(name="tag-cred-retry")
+    device = create_test_device(hostname="dev-retry", ip="2.2.2.2")
+    device.tags.append(tag1)
+    db_session.flush()
+    test_job = create_test_job_with_tags(job_name="backup-cred-retry", tags=[tag1])
+
+    # Create two credentials: first will fail, second will succeed
+    cred1 = models.Credential(username="failuser", password="failpass", priority=1)
+    cred2 = models.Credential(username="gooduser", password="goodpass", priority=2)
+    cred1.tags.append(tag1)
+    cred2.tags.append(tag1)
+    db_session.add_all([cred1, cred2])
+    db_session.flush()
+
+    # Patch run_command: fail for failuser, succeed for gooduser
+    def run_command_side_effect(device_obj, job_id, command=None, config=None):
+        if getattr(device_obj, 'username', None) == "failuser":
+            raise NetmikoAuthenticationException("Auth failed for failuser")
+        elif getattr(device_obj, 'username', None) == "gooduser":
+            return "config data"
+        else:
+            raise Exception("Unexpected credential")
+    mock_external_io["run_command"].side_effect = run_command_side_effect
+
+    # Patch record_credential_attempt to track calls
+    record_calls = []
+    def record_attempt(db, device_id, credential_id, job_id, success=False, error=None):
+        record_calls.append((credential_id, success, error))
+    mocker.patch("netraven.services.credential_metrics.record_credential_attempt", side_effect=record_attempt)
+
+    # Patch commit_git to always succeed
+    mock_external_io["commit_git"].return_value = "commit123"
+
+    # --- Run ---
+    runner.run_job(test_job.id, db=db_session)
+
+    # --- Assertions ---
+    # Should have two credential attempts: first fail, second success
+    assert len(record_calls) == 2
+    assert record_calls[0][0] == cred1.id and record_calls[0][1] is False
+    assert record_calls[1][0] == cred2.id and record_calls[1][1] is True
+
+    # Job should be marked as COMPLETED_SUCCESS
+    updated_job = db_session.get(models.Job, test_job.id)
+    assert updated_job.status == "COMPLETED_SUCCESS"
+
+    # Only one connection log and job log should be present (for the successful attempt)
+    conn_logs = get_connection_logs(db_session, test_job.id)
+    assert len(conn_logs) == 1
+    job_logs = get_job_logs(db_session, test_job.id)
+    assert any("Success" in log.message for log in job_logs)
