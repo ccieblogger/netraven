@@ -5,9 +5,24 @@ in parallel using thread pools. It handles task submission, execution with
 retry logic, and result collection, providing scalable concurrent device
 operations with appropriate error handling.
 
+Key components:
+- ThreadPoolExecutor: For concurrent device operations
+- Retry mechanism: With exponential backoff for transient failures
+- Error classification: To determine if errors are retriable
+- Result collection: Aggregating results from parallel operations
+
 The dispatcher is a core component that orchestrates device communication,
 ensuring efficient use of resources while maintaining robustness through
-retry mechanisms and comprehensive error categorization.
+retry mechanisms and comprehensive error categorization. It implements
+a producer-consumer pattern where:
+1. The main thread submits device tasks to the thread pool
+2. Worker threads execute device operations concurrently
+3. The main thread collects and processes results as they complete
+
+Configuration options control behavior such as:
+- Maximum concurrent operations via thread pool size
+- Retry policies for failed operations
+- Timeout settings for various operation stages
 """
 
 from typing import List, Dict, Any, Optional
@@ -42,24 +57,39 @@ def dispatch_tasks(
     
     Thread pool execution ensures that device operations are performed in parallel
     up to the configured maximum, optimizing throughput while managing resource usage.
+    The implementation uses concurrent.futures.ThreadPoolExecutor for thread management
+    and as_completed() for non-blocking result collection.
     
     Args:
-        devices: List of device objects to process (must have id and hostname attributes)
-        job_id: ID of the parent job for correlation and logging purposes
-        config: Optional configuration dictionary with worker settings:
-               - worker.thread_pool_size: Number of concurrent device operations
-               - worker.retry_attempts: Maximum number of retry attempts
-               - worker.retry_backoff: Delay between retry attempts in seconds
-        db: Optional SQLAlchemy session for database operations
+        devices (List[Any]): List of device objects to process. Each device must have
+                           the following attributes:
+                           - id: Unique identifier
+                           - hostname: Device hostname for logging
+                           - Other attributes required by handle_device()
+        job_id (int): ID of the parent job for correlation and logging purposes
+        config (Optional[Dict[str, Any]]): Configuration dictionary with these options:
+                                         - worker.thread_pool_size: Max concurrent operations
+                                         - worker.retry_attempts: Maximum retry attempts
+                                         - worker.retry_backoff: Base delay between retries
+                                         - Additional options passed to handle_device()
+        db (Optional[Session]): SQLAlchemy session for database operations,
+                               passed to device handlers
     
     Returns:
-        List of task result dictionaries, one per device, containing:
-        - device_id: Device identifier
-        - device_name: Device hostname
-        - success: Boolean indicating success or failure
-        - error: Error message if applicable
-        - error_info: Structured error information if applicable
-        - Additional task-specific result data
+        List[Dict[str, Any]]: List of task result dictionaries, one per device, each containing:
+                             - device_id: Device identifier
+                             - device_name: Device hostname
+                             - success: Boolean indicating success or failure
+                             - error: Error message if applicable
+                             - error_info: Structured error information if applicable 
+                             - retries: Number of retry attempts performed
+                             - Additional task-specific result data
+    
+    Note:
+        This function handles failures at multiple levels:
+        1. Device-level failures within the task_with_retry function
+        2. Thread-level failures if the thread itself encounters an error
+        All failures are captured, classified, and included in the results.
     """
     # Load thread pool size from config, with fallback
     thread_pool_size = DEFAULT_THREAD_POOL_SIZE
@@ -186,33 +216,47 @@ def task_with_retry(
     
     This function wraps device operation execution with retry capabilities.
     It attempts to execute the device operation, and if it fails with a
-    retriable error, it will wait and retry up to the configured maximum
-    number of attempts.
+    retriable error (as determined by the error classification system),
+    it will wait using exponential backoff and retry up to the configured
+    maximum number of attempts.
     
-    The function intelligently classifies errors to determine if they are
-    retriable, and includes comprehensive metadata about retry attempts in
-    the result.
+    The function includes sophisticated error handling:
+    1. All exceptions are caught and classified using the error_handler system
+    2. Classification determines if the error is retriable 
+    3. Retriable errors trigger retry with exponential backoff
+    4. Non-retriable errors fail immediately
+    5. Comprehensive error details are included in the result
     
     Args:
-        device: Device object to process (must have id and hostname attributes)
-        job_id: ID of the parent job for correlation and logging
-        config: Optional configuration dictionary for device operations
-        db: Optional SQLAlchemy session for database operations
-        retry_config: Configuration dictionary for retry behavior:
-                     - max_retries: Maximum number of retry attempts
-                     - retry_delay: Base delay between retries in seconds
-        metadata: Optional additional metadata to include in the result
+        device (Any): Device object to process with attributes:
+                    - id: Unique identifier
+                    - hostname: Device hostname for logging
+                    - Other attributes needed by handle_device()
+        job_id (int): ID of the parent job for correlation and logging
+        config (Optional[Dict[str, Any]]): Configuration dictionary for device operations,
+                                         passed to handle_device()
+        db (Optional[Session]): SQLAlchemy session for database operations,
+                              passed to handle_device()
+        retry_config (Optional[Dict[str, Any]]): Retry configuration with:
+                                                - max_retries: Maximum retry attempts
+                                                - retry_delay: Base delay in seconds
+        metadata (Optional[Dict[str, Any]]): Additional metadata to include in the result
         
     Returns:
-        Task result dictionary containing:
-        - device_id: Device identifier
-        - device_name: Device hostname
-        - success: Boolean indicating success or failure
-        - error: Error message if failure occurred
-        - error_info: Structured error information if failure occurred
-        - retries: Number of retry attempts performed
-        - retry_delays: List of delays between retries (if any)
-        - Additional operation-specific result data
+        Dict[str, Any]: Task result dictionary containing:
+                       - device_id: Device identifier
+                       - device_name: Device hostname
+                       - success: Boolean indicating success or failure
+                       - error: Error message if failure occurred
+                       - error_info: Structured error information if failure
+                       - retries: Number of retry attempts performed
+                       - max_retries: Maximum configured retry attempts
+                       - Additional operation-specific result data from handle_device()
+    
+    Note:
+        The retry logic implements exponential backoff where each successive
+        retry waits longer than the previous one. The wait time is calculated as:
+        retry_delay * (2^retry_count).
     """
     if retry_config is None:
         retry_config = {

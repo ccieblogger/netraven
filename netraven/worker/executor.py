@@ -1,3 +1,29 @@
+"""Device operation executor for network device interactions.
+
+This module is responsible for executing the core device operations in the system.
+It coordinates the entire process of interacting with a network device, including:
+
+1. Checking circuit breaker state to prevent overwhelming failing devices
+2. Detecting device capabilities to adapt commands appropriately
+3. Connecting to devices and retrieving configurations
+4. Redacting sensitive information from device outputs
+5. Logging both raw and redacted configurations
+6. Storing configurations in Git with appropriate metadata
+7. Handling errors with proper classification and retry guidance
+
+The executor acts as the central orchestration point for device operations,
+integrating various components like the circuit breaker, capability detection,
+driver backends, redaction, and error handling into a cohesive workflow.
+
+Key components used by the executor:
+- Circuit breaker: Prevents overwhelm of failing devices
+- Device capabilities: Adapts commands to specific device types
+- Netmiko driver: Handles actual device connections
+- Redactor: Removes sensitive information from outputs
+- Git writer: Commits configurations to version control
+- Error handler: Classifies exceptions for appropriate handling
+"""
+
 import time
 from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
@@ -34,24 +60,48 @@ def handle_device(
     config: Optional[Dict[str, Any]] = None,
     db: Optional[Session] = None
 ) -> Dict[str, Any]:
-    """Handles the entire process for a single device.
-
-    Connects to the device, executes 'show running-config',
-    redacts sensitive information, logs output, commits config, logs status.
-    Uses the provided DB session for logging.
-
+    """Handle the complete device operation workflow from connection to configuration storage.
+    
+    This function orchestrates the entire process of interacting with a network device,
+    executing a series of steps including circuit breaker checks, capability detection,
+    command execution, configuration retrieval, redaction, logging, and Git storage.
+    
+    The workflow includes comprehensive error handling with circuit breaker integration
+    to prevent overwhelming failing devices, and detailed logging at each step for
+    visibility and troubleshooting.
+    
     Args:
-        device: A device object with attributes like id, device_type,
-                ip_address, username, password.
-        job_id: The ID of the parent job.
-        config: The loaded application configuration dictionary.
-        db: The SQLAlchemy session to use for database operations.
-
+        device (Any): A device object with required attributes:
+                     - id: Unique identifier
+                     - hostname: Device hostname
+                     - device_type: Netmiko device type (e.g., "cisco_ios")
+                     - ip_address: Device IP address
+                     - username: Authentication username
+                     - password: Authentication password
+        job_id (int): ID of the parent job for correlation and logging
+        config (Optional[Dict[str, Any]]): Configuration parameters including:
+                                          - worker.git_repo_path: Path to Git repository
+                                          - worker.connection_timeout: Connection timeout in seconds
+                                          - worker.command_timeout: Command timeout in seconds
+        db (Optional[Session]): SQLAlchemy database session for logging operations
+    
     Returns:
-        A dictionary containing:
-        - success (bool): True if all steps completed successfully, False otherwise.
-        - result (str | None): The Git commit hash if successful, otherwise None.
-        - error (str | None): An error message if success is False, otherwise None.
+        Dict[str, Any]: Result dictionary containing:
+                       - success (bool): Whether the operation succeeded
+                       - result (str|None): Git commit hash if successful, None otherwise
+                       - error (str|None): Error message if failed, None otherwise
+                       - device_id (int): ID of the processed device
+                       - capabilities (Dict): Detected device capabilities
+                       - error_info (Dict|None): Structured error information if failed
+                       - circuit_state (str|None): Circuit breaker state if failed
+                       - failure_count (int|None): Circuit breaker failure count if failed
+                       - circuit_blocked (bool|None): Whether circuit breaker blocked connection
+    
+    Note:
+        The function integrates with the circuit breaker pattern to prevent
+        overwhelming devices that are consistently failing. If a device has
+        exceeded its failure threshold, the connection will be blocked until
+        the circuit breaker resets.
     """
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
