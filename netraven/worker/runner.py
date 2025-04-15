@@ -1,3 +1,14 @@
+"""Job runner for network device operations.
+
+This module provides the main entry point for running jobs that perform operations on 
+network devices. It handles job orchestration including loading devices from tags,
+dispatching tasks to devices in parallel, collecting results, and updating job status.
+
+The runner integrates with the database for job and device information, the dispatcher
+for parallel execution, and provides comprehensive error handling and retry logic to
+ensure robust device operations even in the face of network issues or device failures.
+"""
+
 from typing import List, Any, Dict, Optional, Set
 import time
 import logging # Use standard logging
@@ -19,7 +30,23 @@ log = logging.getLogger(__name__)
 # These replace the placeholders
 
 def load_devices_for_job(job_id: int, db: Session) -> List[Device]:
-    """Loads all unique Device objects associated with a specific job ID via Tags."""
+    """Loads all unique Device objects associated with a specific job ID via Tags.
+    
+    This function retrieves a job from the database, loads its associated tags,
+    and collects all unique devices associated with those tags. It efficiently
+    uses selectinload to minimize database queries.
+    
+    Args:
+        job_id: ID of the job to load devices for
+        db: SQLAlchemy database session
+        
+    Returns:
+        List of unique Device objects associated with the job's tags
+        
+    Notes:
+        - Returns an empty list if no job is found, or if the job has no tags
+        - Devices are deduplicated if they appear in multiple tags
+    """
     log.info(f"[Job: {job_id}] Loading devices from database via tags...")
     job = (
         db.query(Job)
@@ -56,7 +83,26 @@ def load_devices_for_job(job_id: int, db: Session) -> List[Device]:
     return loaded_devices
 
 def update_job_status(job_id: int, status: str, db: Session, start_time: float = None, end_time: float = None):
-    """Updates the status and timestamps of a job in the database."""
+    """Updates the status and timestamps of a job in the database.
+    
+    This function retrieves a job from the database and updates its status and timestamps.
+    It optionally records the start and end times of the job execution for tracking
+    job duration and performance.
+    
+    Args:
+        job_id: ID of the job to update
+        status: New status value to set (e.g., "RUNNING", "COMPLETED_SUCCESS")
+        db: SQLAlchemy database session
+        start_time: Optional Unix timestamp when the job started
+        end_time: Optional Unix timestamp when the job finished
+        
+    Raises:
+        Exception: If the job is not found or if an error occurs during the update
+        
+    Notes:
+        - Does not commit the session - this is left to the caller
+        - Converts Unix timestamps to formatted datetime strings for database storage
+    """
     duration_msg = f" in {end_time - start_time:.2f}s" if start_time and end_time else ""
     log.info(f"[Job: {job_id}] Updating job status to '{status}'{duration_msg}.")
     try:
@@ -81,7 +127,22 @@ def update_job_status(job_id: int, status: str, db: Session, start_time: float =
 
 # Optional: Helper for logging critical runner errors directly to job log
 def log_runner_error(job_id: int, message: str, db: Session):
-    """Logs a critical runner error using the provided session."""
+    """Logs a critical runner error to the job log in the database.
+    
+    This function creates a JobLog entry with CRITICAL level for job-level errors
+    that occur during runner execution. It provides a structured way to record
+    significant failures that affect the entire job rather than specific devices.
+    
+    Args:
+        job_id: ID of the job to log the error for
+        message: Error message to log
+        db: SQLAlchemy database session
+        
+    Notes:
+        - Sets device_id to None to indicate a job-level error
+        - Does not commit the session - this is left to the caller
+        - Uses the LogLevel.CRITICAL enum value from JobLog
+    """
     try:
         from netraven.db.models.job_log import LogLevel, JobLog 
         entry = JobLog(
@@ -100,13 +161,29 @@ def log_runner_error(job_id: int, message: str, db: Session):
 def run_job(job_id: int, db: Optional[Session] = None) -> None:
     """Main entry point to run a specific job by its ID.
 
-    Loads job details and associated devices (via Tags) from DB, loads configuration,
-    dispatches tasks for all devices, processes results, and updates job status in DB.
-    If a db session is provided, it uses it; otherwise, it creates its own.
+    This function orchestrates the entire job execution process:
+    1. Sets up database session management
+    2. Updates job status to RUNNING
+    3. Loads configuration settings
+    4. Loads devices associated with the job via tags
+    5. Dispatches tasks for parallel execution on devices
+    6. Processes results to determine overall job success/failure
+    7. Updates final job status and timestamps
+    
+    The function handles session management and comprehensive error handling,
+    ensuring that jobs are properly tracked and errors are logged even if
+    exceptions occur during execution.
 
     Args:
         job_id: The ID of the job to execute.
-        db: Optional SQLAlchemy session to use. Defaults to None, creating a new session.
+        db: Optional SQLAlchemy session to use. If None, creates a new session.
+        
+    Notes:
+        - Creates and manages its own database session if none is provided
+        - Commits the session at appropriate points if managing it
+        - Uses circuit-breaker patterns and retry logic via the dispatcher
+        - Logs comprehensive details about job execution
+        - Sets appropriate final status based on task results
     """
     start_time = time.time()
     log.info(f"[Job: {job_id}] Received job request. Starting...")
@@ -198,10 +275,15 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
     finally:
          # Only close the session if it was created internally
          if session_managed and db_internal:
-            log.debug(f"[Job: {job_id}] Closing internally managed DB session.")
-            db_internal.close() 
-
-    log.info(f"[Job: {job_id}] Finished job execution.")
+             db_internal.close()
+             log.debug(f"[Job: {job_id}] Database session closed.")
+    
+    end_time = time.time()
+    elapsed = end_time - start_time
+    if job_failed:
+        log.error(f"[Job: {job_id}] Job completed with status '{final_status}' in {elapsed:.2f}s")
+    else:
+        log.info(f"[Job: {job_id}] Job completed successfully in {elapsed:.2f}s")
 
 # Example of how this might be called (e.g., from setup/dev_runner.py)
 # if __name__ == "__main__":

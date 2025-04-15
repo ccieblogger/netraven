@@ -3,6 +3,10 @@ Device capability detection and command adaptation.
 
 This module provides functionality to detect device capabilities and adapt
 command execution based on the device type, model, and capabilities.
+
+It includes patterns to automatically detect device information from command outputs,
+mappings for device-specific commands, timeout settings, and functions to dynamically
+adapt operations based on detected capabilities.
 """
 
 import re
@@ -276,148 +280,122 @@ ERROR_PATTERNS = {
 }
 
 def get_device_commands(device_type: str) -> Dict[str, str]:
-    """
-    Get the command set for a specific device type.
+    """Get all available commands for a specific device type.
+    
+    Retrieves the full mapping of command types to actual command strings for the 
+    specified device type. Falls back to default commands if the device type is not recognized.
     
     Args:
-        device_type: The device type string (e.g., 'cisco_ios', 'juniper_junos')
+        device_type: The type of device to get commands for (e.g., "cisco_ios")
         
     Returns:
-        Dictionary of command types and their device-specific implementation
+        A dictionary mapping command types to actual command strings
     """
-    # Look up command set or use default
-    return COMMAND_VARIATIONS.get(device_type, COMMAND_VARIATIONS["default"])
+    if device_type in COMMAND_VARIATIONS:
+        return COMMAND_VARIATIONS[device_type]
+    return COMMAND_VARIATIONS["default"]
 
 def get_command(device_type: str, command_type: str) -> str:
-    """
-    Get a specific command for a device type.
+    """Get a specific command for a device type.
+    
+    Retrieves the actual command string for a given command type on the specified device type.
+    Falls back to the default command if either the device type or command type is not recognized.
     
     Args:
-        device_type: The device type string
-        command_type: The type of command (e.g., 'show_running', 'show_version')
+        device_type: The type of device (e.g., "cisco_ios")
+        command_type: The type of command to retrieve (e.g., "show_running")
         
     Returns:
-        The device-specific command string
+        The actual command string to execute on the device
     """
     commands = get_device_commands(device_type)
-    # First check if command exists in device-specific commands
     if command_type in commands:
         return commands[command_type]
-    # Then check if it exists in default commands
-    elif command_type in COMMAND_VARIATIONS["default"]:
+    
+    # Fall back to default if this command type isn't defined for this device
+    if command_type in COMMAND_VARIATIONS["default"]:
         return COMMAND_VARIATIONS["default"][command_type]
-    # Return None if command doesn't exist anywhere
-    return None
+    
+    # Return empty string if command not found
+    return ""
 
 def get_command_timeout(device_type: str, command_type: str) -> int:
-    """
-    Get the recommended timeout for a specific command on a device type.
+    """Get the appropriate timeout value for a command on a device type.
+    
+    Different commands may require different timeout values depending on the device type.
+    This function retrieves the timeout value in seconds for the specified command and device.
     
     Args:
-        device_type: The device type string
-        command_type: The type of command
+        device_type: The type of device (e.g., "cisco_ios")
+        command_type: The type of command to get timeout for (e.g., "show_running")
         
     Returns:
-        Recommended timeout in seconds
+        The timeout value in seconds for the command
     """
-    device_timings = COMMAND_TIMING.get(device_type, COMMAND_TIMING["default"])
-    return device_timings.get(command_type, 30)  # Default 30 seconds if not specified
+    # First look for device-specific timeout
+    if device_type in COMMAND_TIMING and command_type in COMMAND_TIMING[device_type]:
+        return COMMAND_TIMING[device_type][command_type]
+    
+    # Then try default timeout for this command type
+    if command_type in COMMAND_TIMING["default"]:
+        return COMMAND_TIMING["default"][command_type]
+    
+    # Fallback default
+    return 30  # Default timeout of 30 seconds
 
 def parse_device_capabilities(device_type: str, version_output: str) -> Dict[str, str]:
-    """
-    Parse device capabilities from version command output.
+    """Parse device capabilities from version output.
+    
+    Extracts device model, version, serial number, and other capabilities from the output
+    of a version command by applying device-specific regex patterns.
     
     Args:
-        device_type: The device type string
-        version_output: Output from the show version command
+        device_type: The type of device (e.g., "cisco_ios")
+        version_output: The output from the show version command or equivalent
         
     Returns:
-        Dictionary of device capabilities (model, version, serial)
+        A dictionary containing extracted capability information (model, version, serial, etc.)
     """
-    capabilities = {
-        "model": "Unknown",
-        "version": "Unknown",
-        "serial": "Unknown",
-        "hardware": "Unknown",
-    }
+    capabilities = {}
     
-    # Get regex patterns for this device type
-    patterns = CAPABILITY_PATTERNS.get(device_type, {})
+    # Use default patterns if device type not recognized
+    patterns = CAPABILITY_PATTERNS.get(device_type, CAPABILITY_PATTERNS.get("cisco_ios", {}))
     
-    # Apply each pattern
+    # Apply each pattern and extract the information
     for capability, pattern in patterns.items():
-        match = re.search(pattern, version_output, re.IGNORECASE | re.MULTILINE)
+        match = re.search(pattern, version_output, re.MULTILINE | re.DOTALL)
         if match:
-            capabilities[capability] = match.group(1)
+            capabilities[capability] = match.group(1).strip()
     
-    # Special case for Cisco IOS to handle various model formats
-    if device_type == "cisco_ios" and capabilities["model"] == "Unknown":
-        # Try more patterns for different Cisco model formats
-        model_patterns = [
-            r"cisco\s+(WS-C\S+)\s+",                # Catalyst switches
-            r"cisco\s+(CISCO\d+/K9)\s+",            # ISR routers with K9
-            r"cisco\s+(CISCO\d+)\s+",               # ISR routers
-            r"cisco\s+(ASR\S+)\s+",                 # ASR routers
-            r"cisco\s+(C\d+\S*)\s+",                # Generic Cisco model
-            r"[Mm]odel number\s*:\s*(\S+)",         # Model number format
-            r"[Pp]latform\s*:\s*(\S+)",             # Platform format
-        ]
-        
-        for pattern in model_patterns:
-            model_match = re.search(pattern, version_output, re.IGNORECASE | re.MULTILINE)
-            if model_match:
-                capabilities["model"] = model_match.group(1)
-                break
-    
-    # Special case for Juniper to handle various version formats
-    if device_type == "juniper_junos" and capabilities["version"] == "Unknown":
-        # Try more patterns for different Juniper version formats
-        version_patterns = [
-            r"JUNOS\s+(\d+\.\d+R\d+\.\d+)",             # Standard format
-            r"JUNOS.*?[Vv]ersion\s+(\d+\.\d+R\d+\.\d+)", # Version in text
-            r"JUNOS.*?\[(\d+\.\d+R\d+\.\d+)\]",          # Version in brackets
-            r"JUNOS Base OS boot\s+\[?(\d+\.\d+R\d+\.\d+)", # Base OS format
-        ]
-        
-        for pattern in version_patterns:
-            version_match = re.search(pattern, version_output, re.IGNORECASE | re.MULTILINE)
-            if version_match:
-                capabilities["version"] = version_match.group(1)
-                break
-    
-    # Special case for Cisco IOS vs IOS-XE detection
-    if device_type == "cisco_ios" and "ios_type" in capabilities:
-        if capabilities["ios_type"] == "IOS-XE":
-            capabilities["platform_subtype"] = "ios_xe"
-        else:
-            capabilities["platform_subtype"] = "ios"
-            
-    # Add static capabilities based on device type
-    capabilities.update(get_static_capabilities(device_type))
-            
     return capabilities
 
 def get_static_capabilities(device_type: str) -> Dict[str, bool]:
-    """
-    Get the static capability flags for a device type.
+    """Get static (non-detectable) capabilities for a device type.
+    
+    Returns information about device capabilities that are known based on the device type,
+    rather than being detected from command output.
     
     Args:
-        device_type: The device type string
+        device_type: The type of device (e.g., "cisco_ios")
         
     Returns:
-        Dictionary of capability flags
+        A dictionary mapping capability names to boolean values
     """
-    return DEVICE_CAPABILITIES.get(device_type, DEVICE_CAPABILITIES["default"])
+    if device_type in DEVICE_CAPABILITIES:
+        return DEVICE_CAPABILITIES[device_type]
+    return DEVICE_CAPABILITIES.get("default", {})
 
 def get_command_sequence(device_type: str) -> List[Tuple[str, str]]:
-    """
-    Get the sequence of commands needed for a complete device backup.
+    """Get the sequence of commands for a device type.
+    
+    Returns the ordered sequence of commands that should be executed
+    when connecting to a device to properly initialize the session.
     
     Args:
-        device_type: The device type string
+        device_type: The type of device (e.g., "cisco_ios")
         
     Returns:
-        List of (command_type, command) tuples in execution order
+        A list of (command_type, actual_command) tuples in execution order
     """
     device_caps = get_static_capabilities(device_type)
     command_sequence = []
@@ -459,78 +437,108 @@ def get_command_sequence(device_type: str) -> List[Tuple[str, str]]:
     return command_sequence
 
 def detect_capabilities_from_device_type(device_type: str) -> Dict[str, Any]:
-    """
-    Detect device capabilities from the device type.
+    """Detect capabilities from device type without device interaction.
+    
+    Creates a capabilities dictionary based solely on the device type,
+    without executing any commands on the device.
     
     Args:
-        device_type: The device type string
+        device_type: The type of device (e.g., "cisco_ios")
         
     Returns:
-        Dictionary of device capabilities and command information
+        A dictionary containing basic capability information
     """
-    commands = get_device_commands(device_type)
-    command_sequence = get_command_sequence(device_type)
-    static_capabilities = get_static_capabilities(device_type)
+    # Start with empty capabilities
+    capabilities = {}
     
-    result = {
-        "device_type": device_type,
-        "commands": commands,
-        "command_sequence": command_sequence,
-    }
+    # Add static capabilities
+    capabilities.update(get_static_capabilities(device_type))
     
-    # Add static capabilities to result
-    result.update(static_capabilities)
+    # Add command mappings
+    capabilities["commands"] = get_device_commands(device_type)
     
-    return result
+    # Add empty placeholders for dynamic capabilities
+    capabilities["model"] = "Unknown"
+    capabilities["version"] = "Unknown"
+    capabilities["serial"] = "Unknown"
+    capabilities["hardware"] = "Unknown"
+    
+    return capabilities
 
 def adapt_device_commands_by_type(device: Any) -> Dict[str, Any]:
-    """
-    Adapt commands for a device based on its type.
+    """Adapt commands for a device based on its type.
+    
+    Creates a dictionary of device-specific commands and capabilities
+    based on the device object's device_type attribute.
     
     Args:
-        device: The device object with device_type attribute
+        device: Device object with a device_type attribute
         
     Returns:
-        Dictionary of device capabilities and command information
+        A dictionary containing device-specific command mappings and capabilities
     """
-    device_type = getattr(device, 'device_type', 'default')
+    device_type = getattr(device, "device_type", "default")
     return detect_capabilities_from_device_type(device_type)
 
 def detect_error_from_output(device_type: str, command_output: str) -> Optional[str]:
-    """
-    Detect if a command output contains an error based on vendor-specific patterns.
+    """Detect errors in command output based on device type.
+    
+    Analyzes command output for device-specific error patterns and returns
+    an error message if an error is detected.
     
     Args:
-        device_type: The device type string
-        command_output: The output from a command
+        device_type: The type of device (e.g., "cisco_ios")
+        command_output: The output from a command execution
         
     Returns:
-        Error message if an error is detected, None otherwise
+        An error message if an error is detected, None otherwise
     """
-    if not command_output:
-        return None
-        
-    # Get error patterns for this device type
-    patterns = ERROR_PATTERNS.get(device_type, ERROR_PATTERNS["default"])
+    # Common error patterns
+    error_patterns = {
+        "cisco_ios": [
+            r"% Invalid input",
+            r"% Incomplete command",
+            r"% Command rejected",
+            r"% Error",
+        ],
+        "juniper_junos": [
+            r"syntax error",
+            r"unknown command",
+            r"error:",
+        ],
+        "default": [
+            r"% Invalid",
+            r"% Error",
+            r"syntax error",
+            r"unknown command",
+        ]
+    }
+    
+    # Get device-specific patterns or fall back to default
+    patterns = error_patterns.get(device_type, error_patterns["default"])
     
     # Check each pattern
-    for pattern, error_message in patterns.items():
-        if re.search(pattern, command_output, re.IGNORECASE | re.MULTILINE):
-            return error_message
-            
+    for pattern in patterns:
+        if re.search(pattern, command_output, re.IGNORECASE):
+            return f"Error detected in command output: {pattern}"
+    
     return None
 
 def execute_capability_detection(device: Any, run_command_func, job_id: Optional[int] = None) -> Dict[str, Any]:
-    """
-    Execute capability detection for a device by running commands.
+    """Execute capability detection on a device.
+    
+    Connects to a device, executes commands to detect capabilities, and returns
+    a comprehensive capabilities dictionary.
+    
+    This function is the main entry point for device capability detection.
     
     Args:
-        device: The device object with connection information
-        run_command_func: Function to run commands on the device
+        device: Device object with connection attributes
+        run_command_func: Function to execute commands on the device
         job_id: Optional job ID for logging
         
     Returns:
-        Dictionary of detected capabilities
+        A dictionary containing comprehensive capability information
     """
     device_type = getattr(device, 'device_type', 'default')
     device_caps = detect_capabilities_from_device_type(device_type)

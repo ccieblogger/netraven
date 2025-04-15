@@ -1,3 +1,14 @@
+"""Redaction utilities for sensitive information in device outputs.
+
+This module provides functionality to identify and redact sensitive information
+from network device command outputs, such as passwords, secrets, and other
+confidential data. It uses pattern matching to detect sensitive content and
+replaces entire lines containing such content with a redaction marker.
+
+The redaction system helps prevent inadvertent exposure of sensitive information
+in logs, configurations, and other outputs from network devices.
+"""
+
 import re
 from typing import List, Optional, Dict, Any
 
@@ -6,19 +17,34 @@ DEFAULT_REDACTION_KEYWORDS = ["password", "secret"]
 REDACTED_LINE_MARKER = "[REDACTED LINE]"
 
 def redact(output: str, config: Optional[Dict[str, Any]] = None) -> str:
-    """Redacts sensitive information from the given output string.
+    """Redact sensitive information from device command output.
 
-    Iterates through each line of the output. If a line contains
-    any of the keywords (case-insensitive) defined in the configuration
-    (under worker.redaction.patterns) or the defaults, the entire line is
-    replaced with REDACTED_LINE_MARKER.
+    This function scans the provided output text line by line, looking for
+    sensitive information patterns that match the configured keywords.
+    When a match is found, the entire line is replaced with a redaction marker.
+    
+    The function can use either default redaction patterns or custom patterns
+    specified in the application configuration.
 
     Args:
-        output: The multi-line string output from a device command.
-        config: The loaded application configuration dictionary (optional).
+        output: The multi-line string output from a device command
+        config: Optional configuration dictionary with the following structure:
+               {
+                 "worker": {
+                   "redaction": {
+                     "patterns": List[str]  # List of keywords to redact
+                   }
+                 }
+               }
+               If not provided or if the structure is incorrect, default patterns are used
 
     Returns:
-        A string with sensitive lines redacted.
+        A string with sensitive lines redacted, preserving the original line count and structure
+
+    Notes:
+        - The redaction is case-insensitive
+        - Entire lines are redacted, not just the sensitive portions
+        - Default redaction keywords are "password" and "secret"
     """
     if not output:
         return ""

@@ -1,3 +1,13 @@
+"""Netmiko-based backend driver for SSH device communication.
+
+This module provides functions for connecting to network devices using the Netmiko
+library, which is a multi-vendor SSH connection handler. It implements the core
+functionality for executing commands on network devices and retrieving their output.
+
+The driver handles connection timeouts, authentication failures, and other common
+connection issues, providing detailed logging throughout the process.
+"""
+
 from typing import Any, Optional, Dict
 import logging
 import time
@@ -20,25 +30,34 @@ def run_command(
     command: Optional[str] = None,
     config: Optional[Dict] = None
 ) -> str:
-    """
-    Connects to a device using Netmiko, runs the specified command (or 'show running-config' by default),
-    and returns the output.
+    """Connect to a device using Netmiko and execute a command.
+    
+    This function establishes an SSH connection to a network device using Netmiko,
+    executes the specified command (or 'show running-config' by default), and returns
+    the command output. It handles connection establishment, command execution,
+    error handling, and clean disconnection.
+    
+    The function supports configurable timeouts for both connection establishment
+    and command execution, with sensible defaults if not specified.
 
     Args:
-        device: A device object containing connection details (e.g.,
-                device_type, ip_address, username, password).
-                Expected attributes: device_type, ip_address, username, password.
-        job_id: Optional job ID for logging purposes.
-        command: The command to execute. Defaults to 'show running-config' if not specified.
-        config: Optional configuration dictionary with timeout settings.
+        device: A device object containing connection details. Must have the following
+               attributes: device_type, ip_address, username, password.
+        job_id: Optional job ID for correlating log messages
+        command: The command to execute on the device. If not specified,
+                'show running-config' will be used as the default command.
+        config: Optional configuration dictionary with timeout settings:
+               - worker.connection_timeout: Seconds to wait for SSH connection
+               - worker.command_timeout: Seconds to wait for command completion
 
     Returns:
         The output of the command as a string.
 
     Raises:
-        NetmikoTimeoutException: If the connection times out.
-        NetmikoAuthenticationException: If authentication fails.
-        Exception: For other connection or command execution errors.
+        NetmikoTimeoutException: If the connection or command times out
+        NetmikoAuthenticationException: If authentication fails
+        ValueError: If the command returns no output
+        Exception: For other connection or command execution errors
     """
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")

@@ -1,3 +1,15 @@
+"""Task dispatcher for parallel device processing.
+
+This module provides functionality for dispatching tasks to network devices
+in parallel using thread pools. It handles task submission, execution with
+retry logic, and result collection, providing scalable concurrent device
+operations with appropriate error handling.
+
+The dispatcher is a core component that orchestrates device communication,
+ensuring efficient use of resources while maintaining robustness through
+retry mechanisms and comprehensive error categorization.
+"""
+
 from typing import List, Dict, Any, Optional
 import time
 import concurrent.futures
@@ -21,16 +33,33 @@ def dispatch_tasks(
     config: Optional[Dict[str, Any]] = None,
     db: Optional[Session] = None
 ) -> List[Dict[str, Any]]:
-    """Dispatches device tasks to a thread pool for parallel execution.
+    """Dispatch device tasks to a thread pool for parallel execution.
+    
+    This function is the primary entry point for executing operations against multiple
+    devices concurrently. It sets up a thread pool, submits tasks for each device,
+    monitors their execution, and collects results. The function handles configuration
+    of retry policies and manages thread pool sizing based on configuration.
+    
+    Thread pool execution ensures that device operations are performed in parallel
+    up to the configured maximum, optimizing throughput while managing resource usage.
     
     Args:
-        devices: List of device objects to process
-        job_id: ID of the parent job
-        config: Optional configuration dictionary
-        db: Optional SQLAlchemy session
+        devices: List of device objects to process (must have id and hostname attributes)
+        job_id: ID of the parent job for correlation and logging purposes
+        config: Optional configuration dictionary with worker settings:
+               - worker.thread_pool_size: Number of concurrent device operations
+               - worker.retry_attempts: Maximum number of retry attempts
+               - worker.retry_backoff: Delay between retry attempts in seconds
+        db: Optional SQLAlchemy session for database operations
     
     Returns:
-        List of task result dictionaries, one per device
+        List of task result dictionaries, one per device, containing:
+        - device_id: Device identifier
+        - device_name: Device hostname
+        - success: Boolean indicating success or failure
+        - error: Error message if applicable
+        - error_info: Structured error information if applicable
+        - Additional task-specific result data
     """
     # Load thread pool size from config, with fallback
     thread_pool_size = DEFAULT_THREAD_POOL_SIZE
@@ -153,19 +182,37 @@ def task_with_retry(
     retry_config: Optional[Dict[str, Any]] = None,
     metadata: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """
-    Execute a device task with retry logic.
+    """Execute a device task with automatic retry logic.
+    
+    This function wraps device operation execution with retry capabilities.
+    It attempts to execute the device operation, and if it fails with a
+    retriable error, it will wait and retry up to the configured maximum
+    number of attempts.
+    
+    The function intelligently classifies errors to determine if they are
+    retriable, and includes comprehensive metadata about retry attempts in
+    the result.
     
     Args:
-        device: Device object to process
-        job_id: ID of the parent job
-        config: Optional configuration dictionary
-        db: Optional SQLAlchemy session
-        retry_config: Configuration for retries
-        metadata: Optional metadata to include in the result
+        device: Device object to process (must have id and hostname attributes)
+        job_id: ID of the parent job for correlation and logging
+        config: Optional configuration dictionary for device operations
+        db: Optional SQLAlchemy session for database operations
+        retry_config: Configuration dictionary for retry behavior:
+                     - max_retries: Maximum number of retry attempts
+                     - retry_delay: Base delay between retries in seconds
+        metadata: Optional additional metadata to include in the result
         
     Returns:
-        Task result dictionary including retry information
+        Task result dictionary containing:
+        - device_id: Device identifier
+        - device_name: Device hostname
+        - success: Boolean indicating success or failure
+        - error: Error message if failure occurred
+        - error_info: Structured error information if failure occurred
+        - retries: Number of retry attempts performed
+        - retry_delays: List of delays between retries (if any)
+        - Additional operation-specific result data
     """
     if retry_config is None:
         retry_config = {

@@ -1,3 +1,13 @@
+"""Git-based configuration storage and versioning.
+
+This module provides functionality to store network device configurations in a
+Git repository, enabling version control and history tracking of device configs.
+It handles repository initialization, file creation/updates, and commit operations.
+
+The Git repository serves as a source of truth for device configurations, allowing
+for historical review, change detection, and configuration rollback capabilities.
+"""
+
 import os
 from typing import Optional
 from git import Repo, GitCommandError
@@ -8,20 +18,26 @@ def commit_configuration_to_git(
     job_id: int,
     repo_path: str # Should be loaded from config
 ) -> Optional[str]:
-    """Commits the device configuration to a local Git repository.
+    """Commits a device configuration to a local Git repository.
 
-    Initializes the repository if it doesn't exist. Writes the configuration
-    to a file named '{device_id}_config.txt' within the repository, stages
-    the file, and commits it with a structured message.
+    This function manages the storage of device configurations in a Git repository,
+    providing version control for configuration changes. It handles the entire process
+    including repository initialization (if needed), file writing, staging, and committing.
+    
+    The function uses the device ID to create a unique filename for each device's
+    configuration, and includes job information in the commit message for traceability.
 
     Args:
-        device_id: Unique identifier for the device (used in filename).
-        config_data: The raw configuration data retrieved from the device.
-        job_id: Identifier for the job that retrieved this configuration.
-        repo_path: Absolute or relative path to the local Git repository.
+        device_id: Unique identifier for the device (used in the filename)
+        config_data: The raw configuration data retrieved from the device
+        job_id: Identifier for the job that retrieved this configuration
+        repo_path: Absolute or relative path to the local Git repository
 
     Returns:
-        The commit hexsha (str) if successful, None otherwise.
+        The commit hexsha (str) if successful, None if an error occurred
+
+    Raises:
+        No exceptions are raised; errors are caught and returned as None
     """
     try:
         # Ensure the base repository directory exists
