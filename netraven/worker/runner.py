@@ -17,9 +17,11 @@ from netraven.worker import dispatcher
 # Assume these imports will work once the db module is built
 from netraven.db.session import get_db
 from netraven.db.models import Job, Device, JobLog, Tag
+from netraven.db.models.job_status import JobStatus
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from netraven.config.loader import load_config
+from netraven.services.device_credential_resolver import resolve_device_credentials_batch
 
 # Setup basic logging for the runner
 # TODO: Integrate with structlog if used elsewhere
@@ -126,7 +128,7 @@ def update_job_status(job_id: int, status: str, db: Session, start_time: float =
         raise # Re-raise so caller knows update failed
 
 # Optional: Helper for logging critical runner errors directly to job log
-def log_runner_error(job_id: int, message: str, db: Session):
+def log_runner_error(job_id: int, message: str, db: Session, error_type: str = "GENERAL"):
     """Logs a critical runner error to the job log in the database.
     
     This function creates a JobLog entry with CRITICAL level for job-level errors
@@ -137,6 +139,7 @@ def log_runner_error(job_id: int, message: str, db: Session):
         job_id: ID of the job to log the error for
         message: Error message to log
         db: SQLAlchemy database session
+        error_type: Type of error for categorization
         
     Notes:
         - Sets device_id to None to indicate a job-level error
@@ -145,16 +148,47 @@ def log_runner_error(job_id: int, message: str, db: Session):
     """
     try:
         from netraven.db.models.job_log import LogLevel, JobLog 
+        
+        # Set appropriate log level based on error type
+        log_level = LogLevel.CRITICAL
+        if error_type == "CREDENTIAL":
+            log_level = LogLevel.ERROR
+            
         entry = JobLog(
             job_id=job_id,
             device_id=None, # Explicitly set device_id to None for job-level errors
             message=message,
-            level=LogLevel.CRITICAL
+            level=log_level,
+            data={"error_type": error_type}  # Store error type in the data field
         )
         db.add(entry)
         # db.commit() # REMOVED - handled by caller or session context
     except Exception as log_e:
         log.error(f"[Job: {job_id}] CRITICAL: Failed to save runner error to job log: {log_e}")
+
+def record_credential_resolution_metrics(
+    job_id: int,
+    device_count: int,
+    resolved_count: int,
+    db: Session
+) -> None:
+    """Record metrics about credential resolution process.
+    
+    Args:
+        job_id: ID of the job
+        device_count: Total number of devices processed
+        resolved_count: Number of devices that had credentials resolved
+        db: Database session
+    """
+    log.info(
+        f"[Job: {job_id}] Credential resolution metrics: "
+        f"{resolved_count}/{device_count} devices resolved "
+        f"({resolved_count/device_count*100:.1f}%)"
+    )
+    
+    # Additional metrics tracking could be implemented
+    # For example, storing these metrics in a database table
+    # or updating job metadata
 
 # --- Main Job Runner --- 
 
@@ -166,9 +200,10 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
     2. Updates job status to RUNNING
     3. Loads configuration settings
     4. Loads devices associated with the job via tags
-    5. Dispatches tasks for parallel execution on devices
-    6. Processes results to determine overall job success/failure
-    7. Updates final job status and timestamps
+    5. Resolves credentials for devices
+    6. Dispatches tasks for parallel execution on devices
+    7. Processes results to determine overall job success/failure
+    8. Updates final job status and timestamps
     
     The function handles session management and comprehensive error handling,
     ensuring that jobs are properly tracked and errors are logged even if
@@ -205,7 +240,7 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
 
     try:
         # Update status using the determined session
-        update_job_status(job_id, "RUNNING", db_to_use, start_time=start_time)
+        update_job_status(job_id, JobStatus.RUNNING, db_to_use, start_time=start_time)
         if session_managed:
              db_to_use.commit() # Commit status update only if session is managed here
 
@@ -217,73 +252,96 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         devices_to_process = load_devices_for_job(job_id, db_to_use)
 
         if not devices_to_process:
-            final_status = "COMPLETED_NO_DEVICES" # Changed status
+            final_status = JobStatus.COMPLETED_NO_DEVICES
             # Not necessarily a failure, just nothing to do
             log.warning(f"[Job: {job_id}] No devices found for this job. Final Status: {final_status}")
         else:
-            # 2. Dispatch tasks for all devices
-            device_count = len(devices_to_process)
-            log.info(f"[Job: {job_id}] Handing off {device_count} device(s) to dispatcher...")
-            # Pass device list and the current db session
-            results: List[Dict] = dispatcher.dispatch_tasks(devices_to_process, job_id, config=config, db=db_to_use)
-
-            # 3. Process results
-            if not results or len(results) != device_count:
-                 final_status = "FAILED_DISPATCHER_ERROR"
-                 job_failed = True
-                 log.error(f"[Job: {job_id}] Dispatcher returned incorrect number of results ({len(results)} vs {device_count}). Final Status: {final_status}")
-            else:
-                success_count = sum(1 for r in results if r.get("success"))
-                failure_count = device_count - success_count
-                log.info(f"[Job: {job_id}] Dispatcher finished. Success: {success_count}, Failure: {failure_count}")
-
-                if failure_count == 0:
-                    final_status = "COMPLETED_SUCCESS"
-                elif success_count > 0:
-                    final_status = "COMPLETED_PARTIAL_FAILURE"
-                    job_failed = True # Mark job as failed overall if any device failed
-                else: # All failed
-                    final_status = "COMPLETED_FAILURE"
-                    job_failed = True
+            # 1.5 Resolve credentials for devices
+            try:
+                log.info(f"[Job: {job_id}] Resolving credentials for {len(devices_to_process)} device(s)...")
+                devices_with_credentials = resolve_device_credentials_batch(
+                    devices_to_process, db_to_use, job_id
+                )
                 
-            log.info(f"[Job: {job_id}] Tasks finished. Final Status: {final_status}")
+                # Record metrics about credential resolution
+                record_credential_resolution_metrics(
+                    job_id, 
+                    len(devices_to_process),
+                    len(devices_with_credentials),
+                    db_to_use
+                )
+                
+                if not devices_with_credentials:
+                    final_status = JobStatus.COMPLETED_NO_CREDENTIALS
+                    log.warning(f"[Job: {job_id}] No devices with valid credentials found. Final Status: {final_status}")
+                else:
+                    # 2. Dispatch tasks for all devices (now with credentials)
+                    device_count = len(devices_with_credentials)
+                    log.info(f"[Job: {job_id}] Handing off {device_count} device(s) with credentials to dispatcher...")
+                    
+                    # Pass devices with credentials instead of original devices
+                    results: List[Dict] = dispatcher.dispatch_tasks(
+                        devices_with_credentials,
+                        job_id, 
+                        config=config, 
+                        db=db_to_use
+                    )
 
-        # 4. Update final status
-        end_time = time.time()
-        update_job_status(job_id, final_status, db_to_use, start_time=start_time, end_time=end_time)
-        if session_managed:
-            db_to_use.commit() # Commit final status only if session is managed here
+                    # 3. Process results
+                    if not results or len(results) != device_count:
+                        final_status = JobStatus.FAILED_DISPATCHER_ERROR
+                        job_failed = True
+                        log.error(f"[Job: {job_id}] Dispatcher returned incorrect number of results ({len(results)} vs {device_count}). Final Status: {final_status}")
+                    else:
+                        success_count = sum(1 for r in results if r.get("success"))
+                        failure_count = device_count - success_count
+                        log.info(f"[Job: {job_id}] Dispatcher finished. Success: {success_count}, Failure: {failure_count}")
+
+                        if failure_count == 0:
+                            final_status = JobStatus.COMPLETED_SUCCESS
+                        elif success_count > 0:
+                            final_status = JobStatus.COMPLETED_PARTIAL_FAILURE
+                            job_failed = True # Mark job as failed overall if any device failed
+                        else: # All failed
+                            final_status = JobStatus.COMPLETED_FAILURE
+                            job_failed = True
+                    
+                    log.info(f"[Job: {job_id}] Tasks finished. Final Status: {final_status}")
+                    
+            except Exception as cred_e:
+                # Handle credential resolution errors
+                log.error(f"[Job: {job_id}] Error resolving credentials: {cred_e}")
+                final_status = JobStatus.FAILED_CREDENTIAL_RESOLUTION
+                job_failed = True
+                error_msg_for_log = f"Failed to resolve credentials: {cred_e}"
+                log_runner_error(job_id, error_msg_for_log, db_to_use, error_type="CREDENTIAL")
 
     except Exception as e:
-        job_failed = True # Mark as failed on any unexpected error
-        final_status = "FAILED_UNEXPECTED"
-        log.exception(f"[Job: {job_id}] Unexpected error during run_job", exc_info=e)
-        error_msg_for_log = f"Unexpected runner error: {e}"
-        try:
-            # Rollback potential partial changes before final update/log
-            # Only rollback if we manage the session
-            if session_managed:
-                 db_to_use.rollback()
-            update_job_status(job_id, final_status, db_to_use, start_time=start_time, end_time=time.time())
-            log_runner_error(job_id, error_msg_for_log, db_to_use)
-            if session_managed:
-                db_to_use.commit() # Commit final failure status and log only if managed here
-        except Exception as update_e:
-             log.error(f"[Job: {job_id}] CRITICAL: Failed even to update job status/log to {final_status}: {update_e}")
-             if session_managed:
-                 db_to_use.rollback() # Rollback again if final update failed
+        # Generic job execution error
+        log.error(f"[Job: {job_id}] Unexpected Error in job execution: {e}")
+        final_status = JobStatus.FAILED_UNEXPECTED
+        job_failed = True
+        error_msg = f"Unexpected error in job execution: {str(e)}"
+        log_runner_error(job_id, error_msg, db_to_use)
     finally:
-         # Only close the session if it was created internally
-         if session_managed and db_internal:
-             db_internal.close()
-             log.debug(f"[Job: {job_id}] Database session closed.")
+        # Always update job status, even if an exception occurred
+        end_time = time.time()
+        try:
+            update_job_status(job_id, final_status, db_to_use, start_time=start_time, end_time=end_time)
+            
+            if session_managed and db_internal:
+                db_internal.commit()
+                db_internal.close()
+        except Exception as status_e:
+            log.error(f"[Job: {job_id}] Failed to update final job status: {status_e}")
+            if session_managed and db_internal:
+                db_internal.rollback()
+                db_internal.close()
     
-    end_time = time.time()
-    elapsed = end_time - start_time
-    if job_failed:
-        log.error(f"[Job: {job_id}] Job completed with status '{final_status}' in {elapsed:.2f}s")
-    else:
-        log.info(f"[Job: {job_id}] Job completed successfully in {elapsed:.2f}s")
+    # Final logging
+    execution_time = end_time - start_time
+    success_msg = "completed" if not job_failed else "failed"
+    log.info(f"[Job: {job_id}] Job {success_msg} with status '{final_status}' in {execution_time:.2f}s")
 
 # Example of how this might be called (e.g., from setup/dev_runner.py)
 # if __name__ == "__main__":

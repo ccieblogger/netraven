@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 
 from netraven.db.base import Base
 from netraven.db.models.tag import job_tags_association
+from netraven.db.models.job_status import JobStatus
 
 class Job(Base):
     """Represents a task to be performed, usually against a group of devices via Tags.
@@ -34,7 +35,7 @@ class Job(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, index=True, nullable=False)
     description = Column(String)
-    status = Column(String, nullable=False, default="pending", index=True) # E.g., pending, running, completed, failed
+    status = Column(String, nullable=False, default=JobStatus.PENDING, index=True)
     scheduled_for = Column(DateTime(timezone=True), index=True)
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
