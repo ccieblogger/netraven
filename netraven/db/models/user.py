@@ -3,8 +3,20 @@ from sqlalchemy.orm import relationship
 from netraven.db.base import Base
 
 class User(Base):
-    """
-    User model for NetRaven authentication and access control.
+    """User model for NetRaven authentication and access control.
+    
+    This model manages user accounts for accessing the NetRaven system,
+    including authentication information and role-based permissions.
+    
+    Attributes:
+        id: Primary key identifier for the user
+        username: Unique username for login
+        email: Unique email address for the user
+        hashed_password: Securely hashed password (never store plaintext)
+        is_active: Whether the user account is currently active
+        role: User's role determining permissions ("admin" or "user")
+        created_at: Timestamp when the user account was created
+        updated_at: Timestamp when the user account was last updated
     """
     __tablename__ = "users"
 

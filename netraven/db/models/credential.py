@@ -10,9 +10,26 @@ from .tag import credential_tag_association
 #       a custom SQLAlchemy TypeDecorator or Hybrid Property.
 
 class Credential(Base):
-    """Stores credential information used to access devices.
+    """Stores credential information used to access network devices.
 
-    Passwords should be stored encrypted.
+    This model manages authentication credentials that are matched to devices 
+    based on tag associations. The credential system supports prioritization
+    and tracks success metrics.
+    
+    Security Note:
+        Passwords should be stored encrypted in the database.
+        
+    Attributes:
+        id: Primary key identifier
+        username: Username for device authentication
+        password: Password for device authentication (should be encrypted)
+        priority: Order of precedence when multiple credentials match a device
+                 (lower number = higher priority)
+        last_used: Timestamp when credential was last used for authentication
+        success_rate: Ratio of successful to total authentication attempts (0.0-1.0)
+        description: Optional description for the credential set
+        is_system: Flag indicating if this is a system-managed credential
+        tags: Related Tag objects via many-to-many relationship
     """
     __tablename__ = "credentials"
 

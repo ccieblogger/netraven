@@ -7,7 +7,27 @@ from netraven.db.models.tag import job_tags_association
 class Job(Base):
     """Represents a task to be performed, usually against a group of devices via Tags.
 
+    This model defines automated or manual tasks that execute operations against
+    network devices. Jobs can be one-time executions or scheduled recurring tasks
+    that target devices via tag associations.
+    
     Jobs are typically created and managed by the scheduler or API calls.
+    
+    Attributes:
+        id: Primary key identifier for the job
+        name: Human-readable name of the job
+        description: Detailed description of the job's purpose
+        status: Current execution status (pending, running, completed, failed)
+        scheduled_for: When the job is scheduled to run next
+        started_at: When the job last started execution
+        completed_at: When the job last finished execution
+        is_enabled: Whether the job is active in the scheduler
+        schedule_type: Type of schedule (one-time, interval, cron)
+        interval_seconds: For interval jobs, seconds between runs
+        cron_string: For cron jobs, the cron expression defining the schedule
+        logs: Related JobLog entries
+        connection_logs: Related ConnectionLog entries
+        tags: Tags associated with this job (for targeting devices)
     """
     __tablename__ = "jobs"
 
