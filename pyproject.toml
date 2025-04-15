@@ -24,6 +24,7 @@ rq = "^2.3.1"
 rq-scheduler = "^0.14.0"
 croniter = "^6.0.0"
 pydantic = {extras = ["email"], version = "^2.11.3"}
+requests = "^2.32.3"
 
 [tool.poetry.dev-dependencies]
 
