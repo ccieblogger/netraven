@@ -1,3 +1,15 @@
+"""User management router for authentication and access control.
+
+This module provides API endpoints for managing user accounts in the system.
+It implements CRUD operations for users with proper security practices
+including password hashing and role-based access control.
+
+Most endpoints in this router require administrator privileges, with the
+exception of the /me endpoint which allows users to retrieve their own
+information. The router handles user creation, retrieval, update, and deletion,
+with filtering and pagination capabilities.
+"""
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -20,7 +32,22 @@ def create_user(
     user: schemas.user.UserCreate,
     db: Session = Depends(get_db_session)
 ):
-    """Create a new user (requires admin privileges)."""
+    """Create a new user account in the system.
+    
+    Registers a new user with the provided details. The password is hashed
+    before storage for security. This endpoint is restricted to administrators.
+    
+    Args:
+        user: User creation schema with username, password, and other details
+        db: Database session
+        
+    Returns:
+        The created user object with its assigned ID (password not included)
+        
+    Raises:
+        HTTPException (400): If the username already exists
+        HTTPException (403): If the requester lacks admin privileges
+    """
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
@@ -35,7 +62,17 @@ def create_user(
 # Allow user to get their own info without needing admin role
 @router.get("/me", response_model=schemas.user.User, tags=["Current User"])
 async def read_users_me(current_user: models.User = Depends(get_current_active_user)):
-    """Get current logged in user."""
+    """Get the currently authenticated user's profile.
+    
+    Returns information about the currently logged-in user based on 
+    their JWT token. This endpoint is accessible to all authenticated users.
+    
+    Args:
+        current_user: User object injected by the authentication dependency
+        
+    Returns:
+        The current user's profile information
+    """
     return current_user
 
 # Admin routes
@@ -48,14 +85,24 @@ def list_users(
     is_active: Optional[bool] = None,
     db: Session = Depends(get_db_session)
 ):
-    """
-    Retrieve a list of users with pagination and filtering (requires admin privileges).
+    """Retrieve a list of all users with pagination and filtering.
     
-    - **page**: Page number (starts at 1)
-    - **size**: Number of items per page
-    - **username**: Filter by username (partial match)
-    - **role**: Filter by role (admin, user)
-    - **is_active**: Filter by active status
+    Returns a paginated list of users with optional filtering by username,
+    role, and active status. This endpoint is restricted to administrators.
+    
+    Args:
+        page: Page number (starts at 1)
+        size: Number of items per page (1-100)
+        username: Optional filter by username (partial match)
+        role: Optional filter by role (e.g., "admin", "user")
+        is_active: Optional filter by account active status
+        db: Database session
+        
+    Returns:
+        Paginated response containing user items, total count, and pagination info
+        
+    Raises:
+        HTTPException (403): If the requester lacks admin privileges
     """
     query = db.query(models.User)
     
@@ -96,7 +143,22 @@ def get_user(
     user_id: int,
     db: Session = Depends(get_db_session)
 ):
-    """Retrieve a specific user by ID (requires admin privileges)."""
+    """Retrieve a specific user by ID.
+    
+    Fetches detailed information about a single user by their ID.
+    This endpoint is restricted to administrators.
+    
+    Args:
+        user_id: ID of the user to retrieve
+        db: Database session
+        
+    Returns:
+        User object with its details (password not included)
+        
+    Raises:
+        HTTPException (404): If the user with the specified ID is not found
+        HTTPException (403): If the requester lacks admin privileges
+    """
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -108,7 +170,24 @@ def update_user(
     user: schemas.user.UserUpdate,
     db: Session = Depends(get_db_session)
 ):
-    """Update a user (requires admin privileges)."""
+    """Update an existing user account.
+    
+    Updates the specified user with the provided information. The password
+    is hashed if provided. Only fields that are explicitly set in the request
+    will be updated. This endpoint is restricted to administrators.
+    
+    Args:
+        user_id: ID of the user to update
+        user: Update schema containing fields to update
+        db: Database session
+        
+    Returns:
+        Updated user object (password not included)
+        
+    Raises:
+        HTTPException (404): If the user with the specified ID is not found
+        HTTPException (403): If the requester lacks admin privileges
+    """
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -133,7 +212,22 @@ def delete_user(
     user_id: int,
     db: Session = Depends(get_db_session)
 ):
-    """Delete a user (requires admin privileges)."""
+    """Delete a user account from the system.
+    
+    Removes the specified user from the system. This operation cannot be undone.
+    This endpoint is restricted to administrators.
+    
+    Args:
+        user_id: ID of the user to delete
+        db: Database session
+        
+    Returns:
+        No content (204) if successful
+        
+    Raises:
+        HTTPException (404): If the user with the specified ID is not found
+        HTTPException (403): If the requester lacks admin privileges
+    """
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")

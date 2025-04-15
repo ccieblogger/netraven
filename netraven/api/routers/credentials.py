@@ -1,3 +1,14 @@
+"""Credential management router for network device authentication.
+
+This module provides API endpoints for managing device credentials in the system.
+It implements CRUD operations for credentials with proper security practices
+including password hashing and controlled access.
+
+The router handles credential creation, retrieval, update, and deletion, with
+filtering and pagination capabilities. Credentials are associated with tags
+to enable dynamic credential selection for devices based on matching tags.
+"""
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload

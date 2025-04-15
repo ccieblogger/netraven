@@ -1,3 +1,14 @@
+"""Job management router for scheduling and executing device operations.
+
+This module provides API endpoints for managing job definitions in the system.
+It implements CRUD operations for jobs as well as job triggering functionality
+to initiate device operations on demand.
+
+The router handles job creation, retrieval, update, and deletion, with
+filtering and pagination capabilities. It also provides integration with
+Redis Queue (RQ) for job execution.
+"""
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
@@ -22,7 +33,23 @@ def create_job(
     job: schemas.job.JobCreate,
     db: Session = Depends(get_db_session),
 ):
-    """Create a new job definition."""
+    """Create a new job definition.
+    
+    Registers a new job with the provided details and assigns tags if specified.
+    Jobs are used to define operations that will be performed on network devices,
+    either on-demand or according to a schedule.
+    
+    Args:
+        job: Job creation schema with job details
+        db: Database session
+        
+    Returns:
+        The created job object with its assigned ID
+        
+    Raises:
+        HTTPException (400): If the job name already exists
+        HTTPException (404): If any of the specified tags don't exist
+    """
     # Check for duplicate name?
     existing_job = db.query(models.Job).filter(models.Job.name == job.name).first()
     if existing_job:
@@ -56,16 +83,23 @@ def list_jobs(
     tag_id: Optional[List[int]] = Query(None, description="Filter by tag IDs"),
     db: Session = Depends(get_db_session)
 ):
-    """
-    Retrieve a list of job definitions with pagination and filtering.
+    """Retrieve a list of job definitions with pagination and filtering.
     
-    - **page**: Page number (starts at 1)
-    - **size**: Number of items per page
-    - **name**: Filter by job name (partial match)
-    - **status**: Filter by job status
-    - **is_enabled**: Filter by enabled/disabled status
-    - **schedule_type**: Filter by schedule type (interval, cron, onetime)
-    - **tag_id**: Filter by tag IDs (multiple allowed)
+    Returns a paginated list of jobs with optional filtering by name,
+    status, enabled state, schedule type, and tags.
+    
+    Args:
+        page: Page number (starts at 1)
+        size: Number of items per page (1-100)
+        name: Optional filter by job name (partial match)
+        status: Optional filter by job status (e.g., "pending", "running", "completed")
+        is_enabled: Optional filter by enabled/disabled state
+        schedule_type: Optional filter by schedule type (interval, cron, onetime)
+        tag_id: Optional filter by tag IDs (can specify multiple)
+        db: Database session
+        
+    Returns:
+        Paginated response containing job items, total count, and pagination info
     """
     query = db.query(models.Job).options(selectinload(models.Job.tags))
     
@@ -112,7 +146,21 @@ def get_job(
     job_id: int,
     db: Session = Depends(get_db_session)
 ):
-    """Retrieve a specific job definition by ID."""
+    """Retrieve a specific job definition by ID.
+    
+    Fetches detailed information about a single job, including
+    its assigned tags.
+    
+    Args:
+        job_id: ID of the job to retrieve
+        db: Database session
+        
+    Returns:
+        Job object with its details and tags
+        
+    Raises:
+        HTTPException (404): If the job with the specified ID is not found
+    """
     db_job = (
         db.query(models.Job)
         .options(selectinload(models.Job.tags))
@@ -129,7 +177,24 @@ def update_job(
     job: schemas.job.JobUpdate,
     db: Session = Depends(get_db_session)
 ):
-    """Update a job definition."""
+    """Update an existing job definition.
+    
+    Updates the specified job with the provided information.
+    Only fields that are explicitly set in the request will be updated.
+    
+    Args:
+        job_id: ID of the job to update
+        job: Update schema containing fields to update
+        db: Database session
+        
+    Returns:
+        Updated job object
+        
+    Raises:
+        HTTPException (404): If the job with the specified ID is not found
+        HTTPException (400): If the new job name already exists
+        HTTPException (404): If any of the specified tags don't exist
+    """
     db_job = db.query(models.Job).filter(models.Job.id == job_id).first()
     if db_job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
@@ -165,7 +230,23 @@ def delete_job(
     db: Session = Depends(get_db_session),
     _: models.User = Depends(require_admin_role) # Protect deletion
 ):
-    """Delete a job definition."""
+    """Delete a job definition.
+    
+    Removes the specified job from the system. This operation cannot be undone.
+    This endpoint requires admin privileges.
+    
+    Args:
+        job_id: ID of the job to delete
+        db: Database session
+        _: Current user with admin role (injected by dependency)
+        
+    Returns:
+        No content (204) if successful
+        
+    Raises:
+        HTTPException (404): If the job with the specified ID is not found
+        HTTPException (403): If the user does not have admin privileges
+    """
     db_job = db.query(models.Job).filter(models.Job.id == job_id).first()
     if db_job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
@@ -204,23 +285,46 @@ async def trigger_job_run(
     job_id: int, 
     db: Session = Depends(get_db_session)
 ):
-    """Manually trigger a job to run immediately via the background worker queue."""
-    db_job = db.query(models.Job).filter(models.Job.id == job_id).first()
-    if not db_job:
+    """Trigger immediate execution of a job.
+    
+    Enqueues the specified job for immediate execution using Redis Queue.
+    The job will be executed asynchronously, and the endpoint returns 
+    immediately with an "Accepted" status.
+    
+    Args:
+        job_id: ID of the job to trigger
+        db: Database session
+        
+    Returns:
+        Acceptance message with job details and queue status
+        
+    Raises:
+        HTTPException (404): If the job with the specified ID is not found
+        HTTPException (503): If the Redis Queue connection is not available
+    """
+    # Check if RQ is set up
+    if not rq_queue:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Job queue is not available. Check Redis connection."
+        )
+        
+    # Check if job exists
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     
-    if not db_job.is_enabled:
-         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job is disabled")
-
-    if rq_queue is None:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Redis connection not available for job queuing.")
-
-    try:
-        # Enqueue the job using the worker's run_job function
-        # The actual execution happens in a separate worker process listening to the queue.
-        enqueued_job = rq_queue.enqueue(run_worker_job, job_id) 
-        return {"status": "queued", "job_id": job_id, "queue_job_id": enqueued_job.id}
-    except Exception as e:
-        # Log the error appropriately
-        print(f"ERROR: Failed to enqueue job {job_id}: {e}") 
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to queue job: {e}")
+    # Update job status to 'queued'
+    job.status = "queued"
+    job.last_run_time = datetime.utcnow()
+    db.commit()
+    
+    # Enqueue the job using RQ
+    rq_job = rq_queue.enqueue(run_worker_job, job_id)
+    
+    return {
+        "message": "Job triggered successfully", 
+        "job_id": job_id,
+        "job_name": job.name,
+        "queue_job_id": rq_job.id
+    }

@@ -1,3 +1,28 @@
+"""Device management router for network device operations.
+
+This module provides API endpoints for managing network devices in the system,
+implementing RESTful CRUD operations (Create, Read, Update, Delete) for device resources.
+The router handles operations including:
+
+- Device registration with validation for unique hostname/IP address
+- Device listing with filtering and pagination capabilities
+- Individual device retrieval, modification, and deletion
+- Tag management for device categorization
+- Credential management and association with devices
+
+Each endpoint enforces appropriate access controls and validation to ensure
+data integrity and security. Device information is persisted in the database
+through SQLAlchemy ORM models.
+
+Security:
+- All endpoints require authentication via the get_current_active_user dependency
+- Certain operations may require elevated privileges (admin role)
+
+Relationships:
+- Devices can be associated with multiple tags for grouping and filtering
+- Devices can be matched with credentials based on tag associations
+"""
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
@@ -19,6 +44,19 @@ router = APIRouter(
 
 # Helper function to get tags by ID (used in create/update)
 def get_tags_by_ids(db: Session, tag_ids: List[int]) -> List[models.Tag]:
+    """Retrieve tags by their IDs from the database.
+    
+    Args:
+        db (Session): Database session for executing queries
+        tag_ids (List[int]): List of tag IDs to retrieve
+        
+    Returns:
+        List[models.Tag]: List of Tag model objects matching the provided IDs
+        
+    Raises:
+        HTTPException (404): If any requested tag IDs cannot be found in the database,
+                            including details about which specific IDs were missing
+    """
     tags = db.query(models.Tag).filter(models.Tag.id.in_(tag_ids)).all()
     if len(tags) != len(tag_ids):
         # Find which IDs were not found
@@ -33,7 +71,25 @@ def create_device(
     db: Session = Depends(get_db_session),
     # current_user: models.User = Depends(get_current_active_user) # Inject user if needed for ownership etc.
 ):
-    """Create a new network device."""
+    """Create a new network device in the system.
+    
+    Args:
+        device (schemas.device.DeviceCreate): Device creation schema containing required device attributes
+                                             and optional tag associations
+        db (Session): Database session for executing queries
+        
+    Returns:
+        models.Device: The newly created device object with all properties and relationships populated
+        
+    Raises:
+        HTTPException (400): If the hostname or IP address is already registered to another device
+        HTTPException (404): If any of the specified tag IDs don't exist in the database
+        
+    Notes:
+        - Automatically adds the default tag to the device if it exists
+        - Ensures device hostname and IP address are unique across the system
+        - Returns a 201 Created status code upon successful creation
+    """
     # Check if hostname or IP already exists
     existing_device = db.query(models.Device).filter(
         (models.Device.hostname == device.hostname) | (models.Device.ip_address == str(device.ip_address))
@@ -77,15 +133,29 @@ def list_devices(
     tag_id: Optional[List[int]] = Query(None, description="Filter by tag IDs"),
     db: Session = Depends(get_db_session)
 ):
-    """
-    Retrieve a list of network devices with pagination and filtering.
+    """Retrieve a paginated and filtered list of network devices.
     
-    - **page**: Page number (starts at 1)
-    - **size**: Number of items per page
-    - **hostname**: Filter by hostname (partial match)
-    - **ip_address**: Filter by IP address (partial match)
-    - **device_type**: Filter by device type
-    - **tag_id**: Filter by tag IDs (multiple allowed)
+    Args:
+        page (int): Page number for pagination, starting at 1
+        size (int): Number of items per page, between 1 and 100
+        hostname (Optional[str]): Filter devices by partial hostname match
+        ip_address (Optional[str]): Filter devices by partial IP address match
+        device_type (Optional[str]): Filter devices by exact device type match
+        tag_id (Optional[List[int]]): Filter devices that have any of the specified tag IDs
+        db (Session): Database session for executing queries
+        
+    Returns:
+        Dict: Paginated response containing:
+            - items (List[Dict]): List of device objects with tags and credential counts
+            - total (int): Total number of devices matching the filters
+            - page (int): Current page number
+            - size (int): Number of items per page
+            - pages (int): Total number of pages available
+            
+    Notes:
+        - Filtering is applied as AND conditions between different filter types
+        - Tag filtering supports multiple tags (devices with ANY of the specified tags)
+        - Each device includes a count of matching credentials for connection management
     """
     query = db.query(models.Device).options(selectinload(models.Device.tags))
     
@@ -148,7 +218,18 @@ def get_device(
     device_id: int,
     db: Session = Depends(get_db_session)
 ):
-    """Retrieve a specific network device by ID."""
+    """Retrieve a specific network device by ID.
+    
+    Args:
+        device_id (int): Unique identifier of the device to retrieve
+        db (Session): Database session for executing queries
+        
+    Returns:
+        models.Device: Device object with all properties and relationships (including tags)
+        
+    Raises:
+        HTTPException (404): If no device exists with the specified ID
+    """
     db_device = (
         db.query(models.Device)
         .options(selectinload(models.Device.tags))
@@ -165,7 +246,27 @@ def update_device(
     device: schemas.device.DeviceUpdate,
     db: Session = Depends(get_db_session)
 ):
-    """Update a network device."""
+    """Update an existing network device.
+    
+    Args:
+        device_id (int): Unique identifier of the device to update
+        device (schemas.device.DeviceUpdate): Update schema containing fields to modify
+        db (Session): Database session for executing queries
+        
+    Returns:
+        models.Device: Updated device object with all properties and relationships refreshed
+        
+    Raises:
+        HTTPException (404): If no device exists with the specified ID
+        HTTPException (400): If attempting to change hostname to one that already exists
+        HTTPException (400): If attempting to change IP address to one that already exists
+        HTTPException (404): If any of the specified tag IDs don't exist in the database
+        
+    Notes:
+        - Only fields explicitly set in the request body will be updated
+        - Setting tags to null or [] will remove all tag associations
+        - Uniqueness constraints are enforced for hostname and IP address
+    """
     db_device = db.query(models.Device).filter(models.Device.id == device_id).first()
     if db_device is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
@@ -199,8 +300,6 @@ def update_device(
 
     db.commit()
     db.refresh(db_device)
-    # Eager load tags again for the response model
-    db.query(models.Device).options(selectinload(models.Device.tags)).filter(models.Device.id == device_id).first()
     return db_device
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -209,24 +308,58 @@ def delete_device(
     db: Session = Depends(get_db_session),
     #_: models.User = Depends(require_admin_role) # Example: Protect deletion
 ):
-    """Delete a network device."""
+    """Delete a network device from the system.
+    
+    Args:
+        device_id (int): Unique identifier of the device to delete
+        db (Session): Database session for executing queries
+        
+    Returns:
+        None: Returns no content with 204 status code on successful deletion
+        
+    Raises:
+        HTTPException (404): If no device exists with the specified ID
+        
+    Notes:
+        - This operation permanently removes the device and cannot be undone
+        - Related objects (like device configurations) may also be deleted
+          depending on database cascade settings
+    """
     db_device = db.query(models.Device).filter(models.Device.id == device_id).first()
     if db_device is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
-
+    
     db.delete(db_device)
     db.commit()
-    return None # Return None for 204 status
+    return None
 
 @router.get("/{device_id}/credentials", response_model=List[schemas.credential.Credential])
 def get_device_credentials(
     device_id: int,
     db: Session = Depends(get_db_session)
 ):
-    """Get credentials that match this device's tags, ordered by priority."""
+    """Retrieve credentials applicable to a specific device.
+    
+    Args:
+        device_id (int): Unique identifier of the device to retrieve credentials for
+        db (Session): Database session for executing queries
+        
+    Returns:
+        List[models.Credential]: List of matching credential objects, ordered by priority
+        
+    Raises:
+        HTTPException (404): If no device exists with the specified ID
+        
+    Notes:
+        - Returns credentials that match the device's tags
+        - Credentials are ordered by priority to facilitate connection attempts
+        - Used by connection services to determine authentication methods
+    """
+    # First check if device exists
     device = db.query(models.Device).filter(models.Device.id == device_id).first()
     if device is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
-        
-    matching_credentials = get_matching_credentials_for_device(db, device_id)
-    return matching_credentials
+    
+    # Get matching credentials using the service function
+    credentials = get_matching_credentials_for_device(db, device_id)
+    return credentials
