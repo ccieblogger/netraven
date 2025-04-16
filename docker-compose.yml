@@ -28,9 +28,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.dev
     container_name: netraven-frontend-dev
-    # Remove direct port exposure - only accessible through Nginx now
-    # ports:
-    #   - "5173:5173"
+    ports:
+      - "5173:5173"
     volumes:
       # Mount source code for live updates
       - ./frontend:/app
@@ -57,9 +56,8 @@ services:
       context: .
       dockerfile: docker/api/Dockerfile.dev
     container_name: netraven-api-dev
-    # Remove direct port exposure - only accessible through Nginx now
-    # ports:
-    #   - "8000:8000"
+    ports:
+      - "8000:8000"
     volumes:
       # Mount source code for live updates
       - .:/app

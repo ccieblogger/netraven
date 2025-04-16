@@ -112,6 +112,19 @@ install_deps() {
     echo -e "${GREEN}Dependencies installed successfully.${NC}"
 }
 
+# Helper to run the seed script in the API container (dev only)
+run_seed_script() {
+    if [ "$ENVIRONMENT" == "dev" ]; then
+        # Run the seed script, capture output and status
+        output=$(docker exec netraven-api-dev bash -c "cd /app && PYTHONPATH=/app poetry run python scripts/seed_dev_data.py" 2>&1)
+        status=$?
+        if [ $status -ne 0 ]; then
+            echo -e "${RED}Seeding development database with test data failed!${NC}"
+            echo "$output"
+        fi
+    fi
+}
+
 # Reset database
 reset_db() {
     echo -e "${RED}Resetting the database...${NC}"
@@ -242,6 +255,8 @@ reset_db() {
     fi
     
     echo -e "${GREEN}Database reset completed.${NC}"
+    run_seed_script
+    print_status_table
 }
 
 # Reset all containers
@@ -321,6 +336,8 @@ reset_all() {
         echo -e "${GREEN}All containers reset and started successfully.${NC}"
         echo -e "${GREEN}Application is accessible at http://localhost/${NC}"
         echo -e "${GREEN}API documentation is available at http://localhost/docs${NC}"
+        run_seed_script
+        print_status_table
     fi
 }
 
@@ -407,6 +424,8 @@ start_services() {
 
     echo -e "${GREEN}NetRaven services started.${NC}"
     
+    run_seed_script
+    print_status_table
     if [ "$ENVIRONMENT" == "dev" ]; then
         echo -e "${GREEN}Application is accessible at http://localhost/${NC}"
         echo -e "${GREEN}API documentation is available at http://localhost/docs${NC}"
@@ -502,6 +521,72 @@ switch_env() {
     
     echo -e "${GREEN}Environment switched to $ENVIRONMENT.${NC}"
     echo -e "${YELLOW}You can now start services in the $ENVIRONMENT environment.${NC}"
+}
+
+# Print a summary table of container and HTTP status
+print_status_table() {
+    local services=(postgres redis api frontend nginx)
+    local containers=(netraven-postgres netraven-redis netraven-api-dev netraven-frontend-dev netraven-nginx-dev)
+    local http_urls=("" "" "http://localhost:8000/health" "http://localhost:5173" "http://localhost/health")
+    local statuses=()
+    local details=()
+    local all_healthy=true
+
+    printf "\n+-----------+----------+-----------------------------+\n"
+    printf "| %-9s | %-8s | %-27s |\n" "Service" "Status" "Details"
+    printf "+-----------+----------+-----------------------------+\n"
+
+    for i in "${!services[@]}"; do
+        local service="${services[$i]}"
+        local container="${containers[$i]}"
+        local url="${http_urls[$i]}"
+        local health="unknown"
+        local http_status=""
+        local detail=""
+
+        # Check container health (if healthcheck exists)
+        if docker inspect --format='{{.State.Health.Status}}' $container &>/dev/null; then
+            health=$(docker inspect --format='{{.State.Health.Status}}' $container)
+        else
+            # Fallback: check if running
+            if docker ps | grep -q $container; then
+                health="running"
+            else
+                health="not running"
+            fi
+        fi
+
+        # Check HTTP endpoint if applicable
+        if [ -n "$url" ]; then
+            if curl -s --max-time 2 "$url" > /dev/null; then
+                http_status="HTTP: OK"
+            else
+                http_status="HTTP: not responding"
+                all_healthy=false
+            fi
+            detail="$http_status"
+        else
+            detail="Ready"
+        fi
+
+        # Color status
+        local color="$GREEN"
+        if [ "$health" != "healthy" ] && [ "$health" != "running" ]; then
+            color="$RED"
+            all_healthy=false
+        elif [ -n "$http_status" ] && [ "$http_status" != "HTTP: OK" ]; then
+            color="$YELLOW"
+        fi
+
+        printf "| %-9s | %b%-8s%b | %-27s |\n" "$service" "$color" "$health" "$NC" "$detail"
+    done
+    printf "+-----------+----------+-----------------------------+\n"
+
+    if [ "$all_healthy" = true ]; then
+        echo -e "${GREEN}All containers are up and healthy. Application is accessible at http://localhost/${NC}"
+    else
+        echo -e "${RED}Some services are not healthy or not responding. Check logs with: docker ps; docker logs <container>${NC}"
+    fi
 }
 
 # Process commands
