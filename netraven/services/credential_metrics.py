@@ -7,6 +7,7 @@ including last used timestamps and success rates.
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
+import threading, os
 
 from netraven.db import models
 
@@ -85,6 +86,8 @@ def record_credential_attempt(
         success: Whether the connection succeeded
         error: Optional error message
     """
+    print(f"[DEBUG REAL] record_credential_attempt called: pid={os.getpid()} thread={threading.current_thread().name} device_id={device_id} credential_id={credential_id} job_id={job_id} success={success} error={error}")
+    
     # This is a placeholder for more sophisticated tracking if needed
     if success:
         update_credential_success(db, credential_id)

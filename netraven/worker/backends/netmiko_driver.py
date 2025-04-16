@@ -88,6 +88,7 @@ def run_command(
         spent for connection and command execution, which can be useful for
         identifying slow network devices or commands.
     """
+    print(f"[DEBUG netmiko_driver] REAL run_command CALLED: device={getattr(device, 'hostname', None)}, username={getattr(device, 'username', None)}, job_id={job_id}")
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
     device_ip = getattr(device, 'ip_address', 'Unknown')

@@ -130,7 +130,7 @@ def dispatch_tasks(
         for device in devices:
             device_id = getattr(device, 'id', 0)
             device_name = getattr(device, 'hostname', f"Device_{device_id}")
-            
+            print(f"[DEBUG dispatcher] Submitting device_id={device_id} device_name={device_name} job_id={job_id}")
             log.info(f"[Job: {job_id}] Submitting task for device: {device_name}")
             
             # Submit the task to the executor, capturing the Future
@@ -266,6 +266,7 @@ def task_with_retry(
     
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
+    print(f"[DEBUG dispatcher] task_with_retry ENTRY: device_id={device_id} device_name={device_name} job_id={job_id}")
     
     # First attempt
     try:
@@ -274,12 +275,23 @@ def task_with_retry(
         
         # If success, return immediately
         if result.get('success', False):
+            print(f"[DEBUG dispatcher] task_with_retry SUCCESS: device_id={device_id} device_name={device_name} job_id={job_id} retries=0")
             result['retries'] = 0  # No retries needed
             # Ensure device info is in the result
             result['device_id'] = device_id
             result['device_name'] = device_name
             return result
-            
+
+        # --- PATCH: If all credentials are exhausted, do NOT retry ---
+        # If result indicates all credentials failed (no error_info), return immediately
+        if not result.get('success', False) and not result.get('error_info'):
+            print(f"[DEBUG dispatcher] task_with_retry: All credentials exhausted for device_id={device_id} device_name={device_name} job_id={job_id}. Not retrying.")
+            result['retries'] = 0
+            result['device_id'] = device_id
+            result['device_name'] = device_name
+            return result
+        # --- END PATCH ---
+
         # If not success but no exception was raised, classify as unknown
         error_info = classify_exception(
             Exception(result.get('error', 'Unknown error')),
@@ -317,7 +329,7 @@ def task_with_retry(
             
             # Calculate backoff time
             backoff_time = error_info.next_retry_delay()
-            
+            print(f"[DEBUG dispatcher] Scheduling retry for device_id={device_id} device_name={device_name} job_id={job_id} attempt={retry_count}/{max_retries} in {backoff_time}s")
             log.info(
                 f"[Job: {job_id}] Retrying device {device_name} in {backoff_time}s "
                 f"(attempt {retry_count}/{max_retries})"

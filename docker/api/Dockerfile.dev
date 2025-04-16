@@ -26,7 +26,7 @@ COPY pyproject.toml poetry.lock* ./
 
 # Install dependencies only (this layer can be cached)
 # Use --no-root to avoid trying to install the current project
-RUN poetry install --no-interaction --no-ansi --no-root
+RUN poetry install --no-interaction --no-ansi --no-root --with dev
 
 # Copy the rest of the application code
 COPY . .

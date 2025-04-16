@@ -28,6 +28,8 @@ import time
 from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 import logging
+import threading, os
+from types import SimpleNamespace
 
 # Import worker components
 from netraven.worker.backends import netmiko_driver
@@ -107,6 +109,7 @@ def handle_device(
         exceeded its failure threshold, the connection will be blocked until
         the circuit breaker resets.
     """
+    print(f"[DEBUG handle_device ENTRY] pid={os.getpid()} thread={threading.current_thread().name} device={getattr(device, 'hostname', None)} job_id={job_id}")
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
     device_type = getattr(device, 'device_type', 'default')
@@ -117,35 +120,41 @@ def handle_device(
         credentials_to_try = get_matching_credentials_for_device(db, device_id)
     # If no matching credentials, fall back to device's own username/password if present
     if not credentials_to_try and hasattr(device, 'username') and hasattr(device, 'password'):
-        from types import SimpleNamespace
         credentials_to_try = [SimpleNamespace(id=None, username=device.username, password=device.password)]
 
-    last_exception = None
+    print(f"[DEBUG executor] credentials_to_try: {[str(c) for c in credentials_to_try]}")
     for cred in credentials_to_try:
-        # Prepare a device object with the credential
-        device_with_cred = device
-        # If the device doesn't already have the credential, set it
-        if hasattr(device, 'username'):
-            setattr(device_with_cred, 'username', cred.username)
-        if hasattr(device, 'password'):
-            setattr(device_with_cred, 'password', cred.password)
-        # --- Load Configurable Values --- 
-        repo_path = DEFAULT_GIT_REPO_PATH
-        if config and 'worker' in config:
-            repo_path = config.get('worker', {}).get('git_repo_path', DEFAULT_GIT_REPO_PATH)
-        # --- Initialize --- 
-        result = {
-            "success": False, 
-            "result": None, 
-            "error": None, 
-            "device_id": device_id,
-            "capabilities": {}
-        }
-        raw_output = None
-        commit_hash = None
-        device_info = {}
+        print(f"[DEBUG executor] Top of credential loop: device_id={device_id}, cred={cred}, type={type(cred)}, dir={dir(cred)}")
         try:
+            cred_id = getattr(cred, 'id', None)
+            print(f"[DEBUG executor] After cred.id: cred_id={cred_id}")
+            cred_username = getattr(cred, 'username', None)
+            print(f"[DEBUG executor] After cred.username: cred_username={cred_username}")
+            # Prepare a mutable device object with credential fields
+            if hasattr(device, '__table__'):
+                device_attrs = {k: getattr(device, k) for k in device.__table__.columns.keys()}
+            else:
+                device_attrs = vars(device)
+            device_with_cred = SimpleNamespace(**device_attrs)
+            device_with_cred.username = cred.username
+            device_with_cred.password = cred.password
+            # --- Load Configurable Values --- 
+            repo_path = DEFAULT_GIT_REPO_PATH
+            if config and 'worker' in config:
+                repo_path = config.get('worker', {}).get('git_repo_path', DEFAULT_GIT_REPO_PATH)
+            # --- Initialize --- 
+            result = {
+                "success": False, 
+                "result": None, 
+                "error": None, 
+                "device_id": device_id,
+                "capabilities": {}
+            }
+            raw_output = None
+            commit_hash = None
+            device_info = {}
             log.info(f"[Job: {job_id}] Starting processing for device: {device_name} using credential: {cred.username}")
+            print(f"[DEBUG executor] About to call execute_capability_detection: device={repr(device_with_cred)}, device_attrs={device_with_cred.__dict__ if hasattr(device_with_cred, '__dict__') else str(device_with_cred)}, cred={repr(cred)}")
             # --- Perform comprehensive capability detection ---
             log.info(f"[Job: {job_id}] Detecting capabilities for device: {device_name}")
             device_capabilities = execute_capability_detection(
@@ -197,14 +206,22 @@ def handle_device(
                 metadata=metadata
             )
             if commit_hash:
-                result["success"] = True
-                result["result"] = commit_hash
-                log_message = f"Success. Configuration committed to Git. Commit: {commit_hash}"
-                log_utils.save_job_log(device_id, job_id, log_message, success=True, db=db)
-                log.info(f"[Job: {job_id}] Successfully committed configuration for device: {device_name}")
-                # Record credential success
-                if db is not None and hasattr(cred, 'id') and cred.id is not None:
-                    record_credential_attempt(db, device_id, cred.id, job_id, success=True)
+                print(f"[DEBUG executor] Successful commit for device_id={device_id}, credential_id={getattr(cred, 'id', None)}. Returning from handle_device.")
+                try:
+                    if db is not None and hasattr(cred, 'id') and cred.id is not None:
+                        record_credential_attempt(db, device_id, cred.id, job_id, success=True, error=None)
+                except Exception as db_log_exc:
+                    print(f"[DEBUG executor] Exception during post-commit logging: {db_log_exc}")
+                    log.warning(f"[Job: {job_id}] Exception during post-commit logging for device: {device_name}: {db_log_exc}")
+                result = {
+                    "success": True,
+                    "result": commit_hash,
+                    "error": None,
+                    "device_id": device_id,
+                    "capabilities": device_capabilities,
+                    "error_info": None
+                }
+                print(f"[DEBUG executor] handle_device returning after success: {result}")
                 return result
             else:
                 error_info = ErrorInfo(
@@ -220,23 +237,30 @@ def handle_device(
                 log.error(f"[Job: {job_id}] Failed to commit configuration for device: {device_name}")
                 # Record credential failure
                 if db is not None and hasattr(cred, 'id') and cred.id is not None:
+                    print(f"[DEBUG executor] About to call record_credential_attempt: cred={cred}, id={getattr(cred, 'id', None)}, username={getattr(cred, 'username', None)}, record_credential_attempt={record_credential_attempt} (type={type(record_credential_attempt)})")
                     record_credential_attempt(db, device_id, cred.id, job_id, success=False, error=error_info.message)
                 last_exception = error_info.message
         except (NetmikoAuthenticationException, ValueError) as e:
+            print(f"[DEBUG executor] NetmikoAuthenticationException/ValueError caught: {e}")
             # Authentication or empty config failure: try next credential
             log.warning(f"[Job: {job_id}] Credential failed for device: {device_name} with username: {cred.username} - {e}")
             if db is not None and hasattr(cred, 'id') and cred.id is not None:
+                print(f"[DEBUG executor] About to call record_credential_attempt: cred={cred}, id={getattr(cred, 'id', None)}, username={getattr(cred, 'username', None)}, record_credential_attempt={record_credential_attempt} (type={type(record_credential_attempt)})")
                 record_credential_attempt(db, device_id, cred.id, job_id, success=False, error=str(e))
             last_exception = e
+            print(f"[DEBUG executor] continue after NetmikoAuthenticationException/ValueError: device_id={device_id}, cred_id={getattr(cred, 'id', None)}")
             continue
         except Exception as e:
+            print(f"[DEBUG executor] General Exception caught: {e}")
             # Other errors: treat as fatal for this credential, but try next
             log.error(f"[Job: {job_id}] Unexpected error for device: {device_name} with username: {cred.username} - {e}")
             if db is not None and hasattr(cred, 'id') and cred.id is not None:
+                print(f"[DEBUG executor] About to call record_credential_attempt: cred={cred}, id={getattr(cred, 'id', None)}, username={getattr(cred, 'username', None)}, record_credential_attempt={record_credential_attempt} (type={type(record_credential_attempt)})")
                 record_credential_attempt(db, device_id, cred.id, job_id, success=False, error=str(e))
             last_exception = e
+            print(f"[DEBUG executor] continue after general Exception: device_id={device_id}, cred_id={getattr(cred, 'id', None)}")
             continue
-    # If we reach here, all credentials failed
+    print(f"[DEBUG executor] All credentials failed for device_id={device_id}, job_id={job_id} (end of credential loop)")
     result = {
         "success": False,
         "result": None,
@@ -245,4 +269,5 @@ def handle_device(
         "capabilities": {},
         "error_info": None
     }
+    print(f"[DEBUG executor] handle_device returning after all credentials failed: {result}")
     return result
