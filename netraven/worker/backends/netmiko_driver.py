@@ -1,3 +1,24 @@
+"""Netmiko-based backend driver for SSH device communication.
+
+This module provides functions for connecting to network devices using the Netmiko
+library, which is a multi-vendor SSH connection handler. It implements the core
+functionality for executing commands on network devices and retrieving their output.
+
+The driver serves as the primary interface between the NetRaven system and network
+devices, encapsulating the complexities of establishing SSH connections, executing
+commands, and handling various connection-related exceptions.
+
+Key features:
+- Standardized connection interface for all supported device types
+- Comprehensive timeout handling for both connection and command execution
+- Detailed error reporting with specific exception types
+- Connection lifecycle management with proper cleanup
+- Configurable timeouts through configuration parameters
+
+The module is designed to be robust in the face of network connectivity issues,
+providing appropriate error handling and logging throughout the connection process.
+"""
+
 from typing import Any, Optional, Dict
 import logging
 import time
@@ -20,26 +41,54 @@ def run_command(
     command: Optional[str] = None,
     config: Optional[Dict] = None
 ) -> str:
-    """
-    Connects to a device using Netmiko, runs the specified command (or 'show running-config' by default),
-    and returns the output.
-
+    """Connect to a device using Netmiko and execute a command.
+    
+    This function establishes an SSH connection to a network device using Netmiko,
+    executes the specified command (or 'show running-config' by default), and returns
+    the command output. It handles connection establishment, command execution,
+    error handling, and clean disconnection.
+    
+    The function follows a structured workflow:
+    1. Prepares connection parameters from device attributes
+    2. Establishes SSH connection with appropriate timeout
+    3. Executes the requested command with configurable timeout
+    4. Validates the command output
+    5. Cleans up the connection in all cases (success or failure)
+    6. Returns the command output or raises appropriate exceptions
+    
+    All errors are captured and translated into specific exception types
+    that allow higher-level components to implement appropriate retry logic.
+    
     Args:
-        device: A device object containing connection details (e.g.,
-                device_type, ip_address, username, password).
-                Expected attributes: device_type, ip_address, username, password.
-        job_id: Optional job ID for logging purposes.
-        command: The command to execute. Defaults to 'show running-config' if not specified.
-        config: Optional configuration dictionary with timeout settings.
+        device (Any): Device object containing connection details with these attributes:
+                    - device_type: Netmiko device type (e.g., "cisco_ios")
+                    - ip_address: IP address or hostname of the device
+                    - username: Username for authentication
+                    - password: Password for authentication
+                    - id: Optional device identifier for logging
+                    - hostname: Optional device name for logging
+        job_id (Optional[int]): Job ID for correlation in logs
+        command (Optional[str]): Command to execute. If not specified,
+                               'show running-config' is used as the default.
+        config (Optional[Dict]): Configuration dictionary with options:
+                               - worker.connection_timeout: SSH connection timeout (seconds)
+                               - worker.command_timeout: Command execution timeout (seconds)
 
     Returns:
-        The output of the command as a string.
+        str: The command output text from the network device.
 
     Raises:
-        NetmikoTimeoutException: If the connection times out.
-        NetmikoAuthenticationException: If authentication fails.
-        Exception: For other connection or command execution errors.
+        NetmikoTimeoutException: If the connection or command times out
+        NetmikoAuthenticationException: If authentication fails
+        ValueError: If the command returns no output
+        Exception: For other connection or command execution errors
+        
+    Note:
+        The function includes performance tracking, logging the total time
+        spent for connection and command execution, which can be useful for
+        identifying slow network devices or commands.
     """
+    print(f"[DEBUG netmiko_driver] REAL run_command CALLED: device={getattr(device, 'hostname', None)}, username={getattr(device, 'username', None)}, job_id={job_id}")
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
     device_ip = getattr(device, 'ip_address', 'Unknown')

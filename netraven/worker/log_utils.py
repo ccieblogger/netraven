@@ -1,3 +1,13 @@
+"""Logging utilities for worker operations.
+
+This module provides functions for persisting various types of logs to the database.
+It includes utilities for saving both connection logs (raw device interaction logs)
+and job logs (structured event logs) for jobs and devices.
+
+The logging functions manage database sessions and transactions appropriately,
+handling both externally provided sessions and creating new sessions when needed.
+"""
+
 from netraven.db.session import get_db
 # Use actual model imports
 from netraven.db.models import JobLog, ConnectionLog
@@ -8,9 +18,24 @@ from sqlalchemy.orm import Session # Add Session
 log = logging.getLogger(__name__)
 
 def save_connection_log(device_id: int, job_id: int, log_data: str, db: Optional[Session] = None) -> None:
-    """Saves the connection log for a specific device and job to the database.
+    """Save a device connection log to the database.
     
-    Uses the provided session or gets a new one if None.
+    This function creates a ConnectionLog entry containing the raw output from
+    a device connection session. These logs are useful for troubleshooting
+    connection issues and reviewing device interaction details.
+    
+    The function handles session management and transaction control, allowing
+    it to be used both within existing transactions or as a standalone operation.
+    
+    Args:
+        device_id: ID of the device that was connected to
+        job_id: ID of the job that initiated the connection
+        log_data: Raw log output from the device connection
+        db: Optional database session; if not provided, a new session will be created
+        
+    Raises:
+        Exception: If using an external session and an error occurs. In this case,
+                  the caller is responsible for handling the rollback.
     """
     session_managed = False
     if db is None:
@@ -49,10 +74,27 @@ def save_connection_log(device_id: int, job_id: int, log_data: str, db: Optional
             db.close()
 
 def save_job_log(device_id: Optional[int], job_id: int, message: str, success: bool, db: Optional[Session] = None) -> None:
-    """Saves a job log message for a specific device and job to the database.
+    """Save a job log entry to the database.
     
-    device_id can be None for job-level messages.
-    Uses the provided session or gets a new one if None.
+    This function creates a JobLog entry with a structured message and severity level.
+    These logs provide a record of job execution events and can be associated with
+    either a specific device or just the job itself (for job-level events).
+    
+    The severity level is automatically set based on the success parameter:
+    - If success is True, LogLevel.INFO is used
+    - If success is False, LogLevel.ERROR is used
+    
+    Args:
+        device_id: Optional ID of the device related to this log entry;
+                  can be None for job-level messages
+        job_id: ID of the job that this log entry belongs to
+        message: The log message text
+        success: Whether the operation was successful (determines severity level)
+        db: Optional database session; if not provided, a new session will be created
+        
+    Raises:
+        Exception: If using an external session and an error occurs. In this case,
+                  the caller is responsible for handling the rollback.
     """
     session_managed = False
     if db is None:

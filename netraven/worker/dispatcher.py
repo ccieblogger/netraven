@@ -1,3 +1,30 @@
+"""Task dispatcher for parallel device processing.
+
+This module provides functionality for dispatching tasks to network devices
+in parallel using thread pools. It handles task submission, execution with
+retry logic, and result collection, providing scalable concurrent device
+operations with appropriate error handling.
+
+Key components:
+- ThreadPoolExecutor: For concurrent device operations
+- Retry mechanism: With exponential backoff for transient failures
+- Error classification: To determine if errors are retriable
+- Result collection: Aggregating results from parallel operations
+
+The dispatcher is a core component that orchestrates device communication,
+ensuring efficient use of resources while maintaining robustness through
+retry mechanisms and comprehensive error categorization. It implements
+a producer-consumer pattern where:
+1. The main thread submits device tasks to the thread pool
+2. Worker threads execute device operations concurrently
+3. The main thread collects and processes results as they complete
+
+Configuration options control behavior such as:
+- Maximum concurrent operations via thread pool size
+- Retry policies for failed operations
+- Timeout settings for various operation stages
+"""
+
 from typing import List, Dict, Any, Optional
 import time
 import concurrent.futures
@@ -21,16 +48,48 @@ def dispatch_tasks(
     config: Optional[Dict[str, Any]] = None,
     db: Optional[Session] = None
 ) -> List[Dict[str, Any]]:
-    """Dispatches device tasks to a thread pool for parallel execution.
+    """Dispatch device tasks to a thread pool for parallel execution.
+    
+    This function is the primary entry point for executing operations against multiple
+    devices concurrently. It sets up a thread pool, submits tasks for each device,
+    monitors their execution, and collects results. The function handles configuration
+    of retry policies and manages thread pool sizing based on configuration.
+    
+    Thread pool execution ensures that device operations are performed in parallel
+    up to the configured maximum, optimizing throughput while managing resource usage.
+    The implementation uses concurrent.futures.ThreadPoolExecutor for thread management
+    and as_completed() for non-blocking result collection.
     
     Args:
-        devices: List of device objects to process
-        job_id: ID of the parent job
-        config: Optional configuration dictionary
-        db: Optional SQLAlchemy session
+        devices (List[Any]): List of device objects to process. Each device must have
+                           the following attributes:
+                           - id: Unique identifier
+                           - hostname: Device hostname for logging
+                           - Other attributes required by handle_device()
+        job_id (int): ID of the parent job for correlation and logging purposes
+        config (Optional[Dict[str, Any]]): Configuration dictionary with these options:
+                                         - worker.thread_pool_size: Max concurrent operations
+                                         - worker.retry_attempts: Maximum retry attempts
+                                         - worker.retry_backoff: Base delay between retries
+                                         - Additional options passed to handle_device()
+        db (Optional[Session]): SQLAlchemy session for database operations,
+                               passed to device handlers
     
     Returns:
-        List of task result dictionaries, one per device
+        List[Dict[str, Any]]: List of task result dictionaries, one per device, each containing:
+                             - device_id: Device identifier
+                             - device_name: Device hostname
+                             - success: Boolean indicating success or failure
+                             - error: Error message if applicable
+                             - error_info: Structured error information if applicable 
+                             - retries: Number of retry attempts performed
+                             - Additional task-specific result data
+    
+    Note:
+        This function handles failures at multiple levels:
+        1. Device-level failures within the task_with_retry function
+        2. Thread-level failures if the thread itself encounters an error
+        All failures are captured, classified, and included in the results.
     """
     # Load thread pool size from config, with fallback
     thread_pool_size = DEFAULT_THREAD_POOL_SIZE
@@ -71,7 +130,7 @@ def dispatch_tasks(
         for device in devices:
             device_id = getattr(device, 'id', 0)
             device_name = getattr(device, 'hostname', f"Device_{device_id}")
-            
+            print(f"[DEBUG dispatcher] Submitting device_id={device_id} device_name={device_name} job_id={job_id}")
             log.info(f"[Job: {job_id}] Submitting task for device: {device_name}")
             
             # Submit the task to the executor, capturing the Future
@@ -153,19 +212,51 @@ def task_with_retry(
     retry_config: Optional[Dict[str, Any]] = None,
     metadata: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """
-    Execute a device task with retry logic.
+    """Execute a device task with automatic retry logic.
+    
+    This function wraps device operation execution with retry capabilities.
+    It attempts to execute the device operation, and if it fails with a
+    retriable error (as determined by the error classification system),
+    it will wait using exponential backoff and retry up to the configured
+    maximum number of attempts.
+    
+    The function includes sophisticated error handling:
+    1. All exceptions are caught and classified using the error_handler system
+    2. Classification determines if the error is retriable 
+    3. Retriable errors trigger retry with exponential backoff
+    4. Non-retriable errors fail immediately
+    5. Comprehensive error details are included in the result
     
     Args:
-        device: Device object to process
-        job_id: ID of the parent job
-        config: Optional configuration dictionary
-        db: Optional SQLAlchemy session
-        retry_config: Configuration for retries
-        metadata: Optional metadata to include in the result
+        device (Any): Device object to process with attributes:
+                    - id: Unique identifier
+                    - hostname: Device hostname for logging
+                    - Other attributes needed by handle_device()
+        job_id (int): ID of the parent job for correlation and logging
+        config (Optional[Dict[str, Any]]): Configuration dictionary for device operations,
+                                         passed to handle_device()
+        db (Optional[Session]): SQLAlchemy session for database operations,
+                              passed to handle_device()
+        retry_config (Optional[Dict[str, Any]]): Retry configuration with:
+                                                - max_retries: Maximum retry attempts
+                                                - retry_delay: Base delay in seconds
+        metadata (Optional[Dict[str, Any]]): Additional metadata to include in the result
         
     Returns:
-        Task result dictionary including retry information
+        Dict[str, Any]: Task result dictionary containing:
+                       - device_id: Device identifier
+                       - device_name: Device hostname
+                       - success: Boolean indicating success or failure
+                       - error: Error message if failure occurred
+                       - error_info: Structured error information if failure
+                       - retries: Number of retry attempts performed
+                       - max_retries: Maximum configured retry attempts
+                       - Additional operation-specific result data from handle_device()
+    
+    Note:
+        The retry logic implements exponential backoff where each successive
+        retry waits longer than the previous one. The wait time is calculated as:
+        retry_delay * (2^retry_count).
     """
     if retry_config is None:
         retry_config = {
@@ -175,6 +266,7 @@ def task_with_retry(
     
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
+    print(f"[DEBUG dispatcher] task_with_retry ENTRY: device_id={device_id} device_name={device_name} job_id={job_id}")
     
     # First attempt
     try:
@@ -183,12 +275,23 @@ def task_with_retry(
         
         # If success, return immediately
         if result.get('success', False):
+            print(f"[DEBUG dispatcher] task_with_retry SUCCESS: device_id={device_id} device_name={device_name} job_id={job_id} retries=0")
             result['retries'] = 0  # No retries needed
             # Ensure device info is in the result
             result['device_id'] = device_id
             result['device_name'] = device_name
             return result
-            
+
+        # --- PATCH: If all credentials are exhausted, do NOT retry ---
+        # If result indicates all credentials failed (no error_info), return immediately
+        if not result.get('success', False) and not result.get('error_info'):
+            print(f"[DEBUG dispatcher] task_with_retry: All credentials exhausted for device_id={device_id} device_name={device_name} job_id={job_id}. Not retrying.")
+            result['retries'] = 0
+            result['device_id'] = device_id
+            result['device_name'] = device_name
+            return result
+        # --- END PATCH ---
+
         # If not success but no exception was raised, classify as unknown
         error_info = classify_exception(
             Exception(result.get('error', 'Unknown error')),
@@ -226,7 +329,7 @@ def task_with_retry(
             
             # Calculate backoff time
             backoff_time = error_info.next_retry_delay()
-            
+            print(f"[DEBUG dispatcher] Scheduling retry for device_id={device_id} device_name={device_name} job_id={job_id} attempt={retry_count}/{max_retries} in {backoff_time}s")
             log.info(
                 f"[Job: {job_id}] Retrying device {device_name} in {backoff_time}s "
                 f"(attempt {retry_count}/{max_retries})"

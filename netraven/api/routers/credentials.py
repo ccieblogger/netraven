@@ -1,3 +1,14 @@
+"""Credential management router for network device authentication.
+
+This module provides API endpoints for managing device credentials in the system.
+It implements CRUD operations for credentials with proper security practices
+including password hashing and controlled access.
+
+The router handles credential creation, retrieval, update, and deletion, with
+filtering and pagination capabilities. Credentials are associated with tags
+to enable dynamic credential selection for devices based on matching tags.
+"""
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, selectinload
@@ -31,15 +42,14 @@ def create_credential(
 ):
     """Create a new credential set.
 
-    Password will be hashed before storing.
+    Password will be encrypted before storing.
     """
-    # Optionally check for duplicate username/description? Depends on requirements.
-    
-    hashed_password = auth.get_password_hash(credential.password)
-    
-    db_credential = models.Credential(
-        **credential.model_dump(exclude={'tags', 'password'}), 
-        hashed_password=hashed_password # Store the hash
+    # Use the factory method to create credential with encrypted password
+    db_credential = models.Credential.create_with_encrypted_password(
+        username=credential.username,
+        password=credential.password,
+        priority=credential.priority,
+        description=credential.description
     )
     
     # Handle tags if provided
@@ -50,6 +60,7 @@ def create_credential(
     db.add(db_credential)
     db.commit()
     db.refresh(db_credential)
+    
     # Eager load tags for response
     db.query(models.Credential).options(selectinload(models.Credential.tags)).filter(models.Credential.id == db_credential.id).first()
     return db_credential
@@ -132,7 +143,7 @@ def update_credential(
 ):
     """Update a credential set.
     
-    If password is provided, it will be re-hashed.
+    If password is provided, it will be re-encrypted.
     """
     db_credential = db.query(models.Credential).filter(models.Credential.id == credential_id).first()
     if db_credential is None:
@@ -140,12 +151,13 @@ def update_credential(
 
     update_data = credential.model_dump(exclude_unset=True)
 
-    # Update simple attributes and hash password if provided
+    # Update simple attributes and encrypt password if provided
     for key, value in update_data.items():
-        if key == "password":
-            if value: # Check if password is actually provided
-                db_credential.hashed_password = auth.get_password_hash(value)
-        elif key != "tags":
+        if key == "password" and value:
+            # Update password field with encrypted password
+            from netraven.services.crypto import encrypt_password
+            db_credential.password = encrypt_password(value)
+        elif key != "tags" and key != "password":
             setattr(db_credential, key, value)
 
     # Handle tags update
@@ -158,8 +170,6 @@ def update_credential(
 
     db.commit()
     db.refresh(db_credential)
-    # Eager load tags again for the response model
-    db.query(models.Credential).options(selectinload(models.Credential.tags)).filter(models.Credential.id == credential_id).first()
     return db_credential
 
 @router.delete("/{credential_id}", status_code=status.HTTP_204_NO_CONTENT)

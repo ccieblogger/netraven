@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 
-from jose import jwt
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 from netraven.config.loader import load_config
 
@@ -35,6 +35,24 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def decode_access_token(token: str) -> Dict[str, Any]:
+    """Decodes a JWT access token.
+    
+    Args:
+        token: The JWT token to decode
+        
+    Returns:
+        Dict containing the token claims
+        
+    Raises:
+        JWTError: If the token is invalid
+    """
+    try:
+        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return decoded_token
+    except JWTError as e:
+        raise JWTError(f"Could not validate credentials: {str(e)}")
 
 # Placeholder for the actual token endpoint logic
 # This would typically involve authenticating a user (e.g., from username/password)

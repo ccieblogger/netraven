@@ -1,3 +1,25 @@
+"""Error classification and handling for device operations.
+
+This module provides structured error handling for network device operations,
+implementing a classification system for various types of failures that can
+occur during device connections and command execution.
+
+Key components:
+- ErrorCategory: Enum defining different categories of errors
+- ErrorInfo: Class containing structured error information with retry guidance
+- classify_exception: Function to classify exceptions into appropriate error types
+- format_error_for_db: Helper to format error information for database storage
+
+The error handling system supports:
+- Intelligent classification of exceptions by type and context
+- Configurable retry policies with exponential backoff
+- Structured error information for logging and reporting
+- Context preservation for debugging and analysis
+
+This system is used throughout the worker components to provide consistent
+error handling and reporting across all device operations.
+"""
+
 from enum import Enum, auto
 from typing import Dict, Any, Optional, Tuple, List
 import logging
@@ -14,7 +36,12 @@ from netmiko.exceptions import (
 logger = logging.getLogger(__name__)
 
 class ErrorCategory(Enum):
-    """Classification for device connection and operation errors."""
+    """Classification for device connection and operation errors.
+    
+    These categories group various failure modes to facilitate standardized
+    error handling, reporting, and retry policies. Each category represents
+    a specific class of errors that may occur during device operations.
+    """
     
     # Connection errors
     AUTHENTICATION = auto()      # Credentials incorrect
@@ -37,7 +64,28 @@ class ErrorCategory(Enum):
     INTERNAL = auto()            # Internal system error
 
 class ErrorInfo:
-    """Structured error information with retry guidance."""
+    """Structured error information with retry guidance.
+    
+    This class encapsulates all information about an error that occurred
+    during a device operation, including its classification, whether it
+    should be retried, and if so, with what parameters.
+    
+    It provides methods to determine if retry should be attempted,
+    calculate appropriate backoff times, and format the error information
+    for logging and storage.
+    
+    Attributes:
+        category (ErrorCategory): The categorization of this error
+        message (str): Human-readable error message
+        exception (Optional[Exception]): The original exception if applicable
+        is_retriable (bool): Whether this error should be retried
+        retry_count (int): How many retry attempts have been made so far
+        max_retries (int): Maximum number of retry attempts allowed
+        retry_delay (int): Base delay in seconds between retry attempts
+        log_level (int): Logging level to use when logging this error
+        context (Dict[str, Any]): Additional contextual information
+        timestamp (float): When the error occurred (time.time() value)
+    """
     
     def __init__(
         self,
@@ -51,6 +99,19 @@ class ErrorInfo:
         log_level: int = logging.ERROR,
         context: Optional[Dict[str, Any]] = None
     ):
+        """Initialize a new ErrorInfo instance.
+        
+        Args:
+            category: Classification category for this error
+            message: Human-readable error message
+            exception: Original exception that caused this error (if any)
+            is_retriable: Whether this error should be retried
+            retry_count: Current number of retry attempts made
+            max_retries: Maximum number of retry attempts to allow
+            retry_delay: Base delay in seconds between retry attempts
+            log_level: Logging level for this error
+            context: Additional context information (e.g., job_id, device_id)
+        """
         self.category = category
         self.message = message
         self.exception = exception
@@ -63,11 +124,27 @@ class ErrorInfo:
         self.timestamp = time.time()
     
     def should_retry(self) -> bool:
-        """Determine if another retry attempt should be made."""
+        """Determine if another retry attempt should be made.
+        
+        Checks both that the error is marked as retriable and that
+        the maximum number of retries has not been reached.
+        
+        Returns:
+            bool: True if another retry should be attempted, False otherwise
+        """
         return self.is_retriable and self.retry_count < self.max_retries
     
     def next_retry_delay(self) -> int:
-        """Calculate the next retry delay using exponential backoff."""
+        """Calculate the next retry delay using exponential backoff.
+        
+        Implements an exponential backoff strategy where each successive
+        retry waits longer than the previous one, using the formula:
+        delay = base_delay * (2^retry_count)
+        
+        Returns:
+            int: Number of seconds to wait before the next retry attempt,
+                 or 0 if no more retries should be attempted
+        """
         if not self.is_retriable or self.retry_count >= self.max_retries:
             return 0
         
@@ -75,7 +152,14 @@ class ErrorInfo:
         return self.retry_delay * (2 ** self.retry_count)
     
     def increment_retry(self) -> 'ErrorInfo':
-        """Create a new ErrorInfo with retry_count incremented."""
+        """Create a new ErrorInfo with retry_count incremented.
+        
+        Creates a new instance with an incremented retry counter while
+        preserving all other attributes, ensuring immutability.
+        
+        Returns:
+            ErrorInfo: A new ErrorInfo instance with retry_count incremented
+        """
         new_error = ErrorInfo(
             category=self.category,
             message=self.message,
@@ -90,7 +174,14 @@ class ErrorInfo:
         return new_error
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for logging and storage."""
+        """Convert to dictionary for logging and storage.
+        
+        Creates a dictionary representation of this error information
+        suitable for JSON serialization, logging, and database storage.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all relevant error information
+        """
         result = {
             'category': self.category.name,
             'message': self.message,
@@ -111,7 +202,15 @@ class ErrorInfo:
         return result
     
     def log(self, logger_instance=None):
-        """Log the error with appropriate severity level."""
+        """Log the error with appropriate severity level.
+        
+        Logs the error using either the provided logger instance or the
+        module-level logger. Uses the error's configured log level and
+        includes all relevant error information as structured data.
+        
+        Args:
+            logger_instance: Optional logger to use instead of the module logger
+        """
         logger_to_use = logger_instance or logger
         
         log_data = self.to_dict()
@@ -133,17 +232,27 @@ def classify_exception(
     device_id: Optional[int] = None,
     retry_config: Optional[Dict[str, Any]] = None
 ) -> ErrorInfo:
-    """
-    Classify an exception into a structured error type with retry guidance.
+    """Classify an exception into a structured error type with retry guidance.
+    
+    This function inspects exceptions raised during device operations and
+    categorizes them into appropriate ErrorCategory types, determining whether
+    they are retriable and setting appropriate retry parameters.
+    
+    The function handles common network operation exceptions like authentication
+    failures, timeouts, and connection errors, as well as command execution issues.
+    It also provides special handling for Git operations and other system-level errors.
     
     Args:
-        ex: The exception to classify
-        job_id: Optional job ID for context
-        device_id: Optional device ID for context
-        retry_config: Configuration for retries (attempts, delay)
+        ex (Exception): The exception to classify
+        job_id (Optional[int]): Optional job ID for context
+        device_id (Optional[int]): Optional device ID for context
+        retry_config (Optional[Dict[str, Any]]): Configuration for retries:
+                                               - max_retries: Maximum attempts
+                                               - retry_delay: Base delay in seconds
     
     Returns:
-        ErrorInfo with classification and retry information
+        ErrorInfo: Structured error information with appropriate classification
+                  and retry guidance
     """
     # Default retry configuration if not provided
     if retry_config is None:
@@ -248,14 +357,24 @@ def classify_exception(
 
 
 def format_error_for_db(error_info: ErrorInfo) -> Dict[str, Any]:
-    """
-    Format an ErrorInfo object for storage in the database.
+    """Format an ErrorInfo object for storage in the database.
+    
+    Converts the ErrorInfo object to a dictionary format suitable for
+    database storage, with standardized field names.
     
     Args:
-        error_info: The error information to format
+        error_info (ErrorInfo): The error information to format
         
     Returns:
-        Dictionary with formatted error information suitable for DB storage
+        Dict[str, Any]: Dictionary with formatted error information suitable
+                       for database storage with the following fields:
+                       - error_category: Name of the error category
+                       - error_message: Human-readable error message
+                       - is_retriable: Whether this error can be retried
+                       - retry_count: Number of retry attempts made
+                       - retry_max: Maximum allowed retry attempts
+                       - exception_type: Type of the original exception (if any)
+                       - exception_details: String representation of the exception
     """
     result = {
         'error_category': error_info.category.name,

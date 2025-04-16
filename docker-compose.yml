@@ -67,6 +67,8 @@ services:
       - NETRAVEN_ENV=dev
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
+      - NETRAVEN_SECURITY__ENCRYPTION_KEY=dev_encryption_key_replace_in_production
+      - NETRAVEN_SECURITY__ENCRYPTION_SALT=dev_encryption_salt_replace_in_production
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,3 +1,14 @@
+"""Device credential matching service.
+
+This module provides services for matching network device credentials based on tags.
+It implements the core logic for finding appropriate credentials for devices,
+which is vital for secure and efficient device connections.
+
+The credential matching system uses device tags to identify which credentials
+should be used for a particular device, allowing for flexible credential management
+across the network infrastructure.
+"""
+
 from typing import List
 from sqlalchemy.orm import Session, selectinload
 

@@ -216,10 +216,17 @@ const statusClass = computed(() => {
   if (!job.value) return '';
   
   switch (job.value.status) {
-    case 'COMPLETED': return 'text-green-500';
+    case 'COMPLETED_SUCCESS': return 'text-green-500';
     case 'RUNNING': return 'text-blue-500';
     case 'PENDING': return 'text-yellow-500';
-    case 'FAILED': return 'text-red-500';
+    case 'COMPLETED_PARTIAL_FAILURE': return 'text-orange-500';
+    case 'COMPLETED_FAILURE': return 'text-red-500';
+    case 'FAILED_UNEXPECTED': return 'text-red-500';
+    case 'FAILED_DISPATCHER_ERROR': return 'text-red-500';
+    case 'COMPLETED_NO_DEVICES': return 'text-gray-500';
+    // New credential-related statuses
+    case 'COMPLETED_NO_CREDENTIALS': return 'text-yellow-500';
+    case 'FAILED_CREDENTIAL_RESOLUTION': return 'text-red-500';
     default: return 'text-gray-500';
   }
 });
@@ -254,11 +261,26 @@ function formatDateTime(dateTime) {
 
 function getStatusBadgeClass(status) {
   switch (status) {
-    case 'COMPLETED': return 'bg-green-100 text-green-800';
-    case 'RUNNING': return 'bg-blue-100 text-blue-800';
-    case 'PENDING': return 'bg-yellow-100 text-yellow-800';
-    case 'FAILED': return 'bg-red-100 text-red-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case 'COMPLETED': 
+    case 'COMPLETED_SUCCESS': 
+      return 'bg-green-100 text-green-800';
+    case 'RUNNING': 
+      return 'bg-blue-100 text-blue-800';
+    case 'PENDING': 
+      return 'bg-yellow-100 text-yellow-800';
+    case 'COMPLETED_PARTIAL_FAILURE': 
+      return 'bg-orange-100 text-orange-800';
+    case 'COMPLETED_FAILURE': 
+    case 'FAILED_UNEXPECTED': 
+    case 'FAILED_DISPATCHER_ERROR': 
+    case 'FAILED_CREDENTIAL_RESOLUTION':
+      return 'bg-red-100 text-red-800';
+    case 'COMPLETED_NO_DEVICES':
+      return 'bg-gray-100 text-gray-800';
+    case 'COMPLETED_NO_CREDENTIALS':
+      return 'bg-yellow-100 text-yellow-800';
+    default: 
+      return 'bg-gray-100 text-gray-800';
   }
 }
 

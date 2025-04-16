@@ -5,7 +5,20 @@ from sqlalchemy.orm import relationship
 from netraven.db.base import Base
 
 class DeviceConfiguration(Base):
-    """Stores a retrieved configuration snapshot for a specific device."""
+    """Stores a retrieved configuration snapshot for a specific device.
+    
+    This model manages configuration backups from network devices. Each record 
+    represents a point-in-time snapshot of a device's configuration, enabling
+    configuration tracking, comparison, and restoration capabilities.
+    
+    Attributes:
+        id: Primary key identifier for the configuration
+        device_id: Foreign key reference to the associated Device
+        config_data: The actual device configuration text
+        retrieved_at: Timestamp when the configuration was captured
+        config_metadata: JSON metadata about the configuration (commit hash, job ID, etc.)
+        device: Relationship to the parent Device
+    """
     __tablename__ = "device_configurations"
 
     id = Column(Integer, primary_key=True)
