@@ -31,11 +31,23 @@ class TestDevicesAPI(BaseAPITest):
         db_session.refresh(tag)
         return tag
 
-    def test_create_device(self, client: TestClient, admin_headers: Dict, test_device_data: Dict):
+    def test_create_device(self, client: TestClient, admin_headers: Dict, test_device_data: Dict, db_session: Session):
         """Test creating a device."""
+        # Ensure default tag and credential exist
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if not default_tag:
+            default_tag = models.Tag(name="default", type="device")
+            db_session.add(default_tag)
+            db_session.commit()
+            db_session.refresh(default_tag)
+        cred = db_session.query(models.Credential).filter(models.Credential.username == "default-user").first()
+        if not cred:
+            cred = models.Credential(username="default-user", password="default-pass", priority=1)
+            cred.tags.append(default_tag)
+            db_session.add(cred)
+            db_session.commit()
         response = client.post("/devices/", json=test_device_data, headers=admin_headers)
         self.assert_successful_response(response, 201)
-        
         data = response.json()
         assert data["hostname"] == test_device_data["hostname"]
         assert data["ip_address"] == test_device_data["ip_address"]
@@ -44,18 +56,30 @@ class TestDevicesAPI(BaseAPITest):
         
         # Clean up is handled by the db_session fixture and transaction rollback
 
-    def test_create_device_with_tags(self, client: TestClient, admin_headers: Dict, test_device_data: Dict, test_tag):
+    def test_create_device_with_tags(self, client: TestClient, admin_headers: Dict, test_device_data: Dict, test_tag, db_session: Session):
         """Test creating a device with tags."""
+        # Ensure default tag and credential exist
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if not default_tag:
+            default_tag = models.Tag(name="default", type="device")
+            db_session.add(default_tag)
+            db_session.commit()
+            db_session.refresh(default_tag)
+        cred = db_session.query(models.Credential).filter(models.Credential.username == "default-user").first()
+        if not cred:
+            cred = models.Credential(username="default-user", password="default-pass", priority=1)
+            cred.tags.append(default_tag)
+            db_session.add(cred)
+            db_session.commit()
         # Add tag to device data
         device_data = test_device_data.copy()
         device_data["tags"] = [test_tag.id]
-        
         response = client.post("/devices/", json=device_data, headers=admin_headers)
         self.assert_successful_response(response, 201)
-        
         data = response.json()
-        assert len(data["tags"]) == 1
-        assert data["tags"][0]["id"] == test_tag.id
+        tag_ids = {t["id"] for t in data["tags"]}
+        assert test_tag.id in tag_ids
+        assert default_tag.id in tag_ids
 
     def test_create_device_duplicate_hostname(self, client: TestClient, admin_headers: Dict, test_device_data: Dict, db_session: Session):
         """Test creating a device with duplicate hostname."""
@@ -251,4 +275,86 @@ class TestDevicesAPI(BaseAPITest):
         device = create_test_device(hostname="update-tag-missing-default", ip_address="192.168.210.2")
         update_data = {"tags": []}
         response = client.put(f"/devices/{device.id}", json=update_data, headers=admin_headers)
-        self.assert_error_response(response, 400, "Default tag does not exist") 
+        self.assert_error_response(response, 400, "Default tag does not exist")
+
+    def test_create_device_enforces_default_credential(self, client: TestClient, admin_headers: Dict, db_session: Session):
+        """Test device creation always results in at least one matching credential (default tag fallback)."""
+        # Ensure default tag and credential exist
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if not default_tag:
+            default_tag = models.Tag(name="default", type="device")
+            db_session.add(default_tag)
+            db_session.commit()
+            db_session.refresh(default_tag)
+        # Create a default credential with the default tag
+        cred = models.Credential(username="default-user", password="default-pass", priority=1)
+        cred.tags.append(default_tag)
+        db_session.add(cred)
+        db_session.commit()
+        # Create device with no tags
+        device_data = {
+            "hostname": "enforce-default-cred",
+            "ip_address": "192.168.250.1",
+            "device_type": "cisco_ios",
+            "port": 22,
+            "description": "Should get default credential",
+            "tags": []
+        }
+        response = client.post("/devices/", json=device_data, headers=admin_headers)
+        self.assert_successful_response(response, 201)
+        data = response.json()
+        # The device should have the default tag
+        tag_names = [t["name"] for t in data["tags"]]
+        assert "default" in tag_names
+        # The device should have at least one matching credential
+        device_id = data["id"]
+        cred_response = client.get(f"/devices/{device_id}/credentials", headers=admin_headers)
+        self.assert_successful_response(cred_response)
+        creds = cred_response.json()
+        assert any(c["username"] == "default-user" for c in creds)
+
+    def test_create_device_error_if_no_default_tag(self, client: TestClient, admin_headers: Dict, db_session: Session):
+        """Test error if no credentials match and default tag is missing."""
+        # Remove default tag if exists
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if default_tag:
+            db_session.delete(default_tag)
+            db_session.commit()
+        # Ensure no credentials exist
+        db_session.query(models.Credential).delete()
+        db_session.commit()
+        # Create device with no tags
+        device_data = {
+            "hostname": "no-default-tag",
+            "ip_address": "192.168.250.2",
+            "device_type": "cisco_ios",
+            "port": 22,
+            "description": "Should error if no default tag",
+            "tags": []
+        }
+        response = client.post("/devices/", json=device_data, headers=admin_headers)
+        self.assert_error_response(response, 400, "default tag does not exist")
+
+    def test_create_device_error_if_no_matching_credential(self, client: TestClient, admin_headers: Dict, db_session: Session):
+        """Test error if default tag exists but no credentials match even after adding it."""
+        # Ensure default tag exists
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if not default_tag:
+            default_tag = models.Tag(name="default", type="device")
+            db_session.add(default_tag)
+            db_session.commit()
+            db_session.refresh(default_tag)
+        # Ensure no credentials exist
+        db_session.query(models.Credential).delete()
+        db_session.commit()
+        # Create device with no tags
+        device_data = {
+            "hostname": "no-matching-cred",
+            "ip_address": "192.168.250.3",
+            "device_type": "cisco_ios",
+            "port": 22,
+            "description": "Should error if no matching credential",
+            "tags": []
+        }
+        response = client.post("/devices/", json=device_data, headers=admin_headers)
+        self.assert_error_response(response, 400, "No credentials match this device") 
