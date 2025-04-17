@@ -12,10 +12,12 @@ api_config = config.get('api', {})
 # Configuration from environment or config files
 SECRET_KEY = api_config.get('jwt_secret', "a_very_secret_key_that_should_be_in_config_or_env")
 ALGORITHM = api_config.get('jwt_algorithm', "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = api_config.get('access_token_expire_minutes', 30)
+ACCESS_TOKEN_EXPIRE_MINUTES = int(api_config.get('access_token_expire_minutes', 30))
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+print(f"[DEBUG] JWT SECRET_KEY: {SECRET_KEY} | ALGORITHM: {ALGORITHM}")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifies a plain password against a hashed password."""

@@ -47,7 +47,8 @@ def create_test_device(db_session: Session): # Fixture to create devices (can as
     def _create_test_device(hostname: str, ip: str, dev_type: str = "cisco_ios") -> Device:
         device = Device(hostname=hostname, ip_address=ip, device_type=dev_type)
         db_session.add(device)
-        db_session.flush() # Get ID
+        db_session.commit()  # Ensure commit so device is visible
+        db_session.refresh(device)  # Refresh to get ID and state
         return device
     return _create_test_device
 

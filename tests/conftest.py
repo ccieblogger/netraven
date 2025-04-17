@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=".env.dev")
+
 import pytest
 import os
 import subprocess
@@ -51,27 +54,23 @@ def apply_migrations():
 
 @pytest.fixture(scope="function")
 def db_session(apply_migrations):
-    """Provides a transactional SQLAlchemy session for each test function.
+    """Provides a SQLAlchemy session for each test function, truncating all tables before each test for isolation."""
+    # Use a separate connection for truncation
+    with engine.connect() as connection:
+        connection.execute(text("SET session_replication_role = 'replica';"))
+        for table in [
+            'credential_tag_association', 'device_tag_association', 'job_tags',
+            'credentials', 'devices', 'jobs', 'tags', 'users'
+        ]:
+            connection.execute(text(f'TRUNCATE TABLE {table} RESTART IDENTITY CASCADE;'))
+        connection.execute(text("SET session_replication_role = 'origin';"))
+        connection.commit()
 
-    Starts a transaction, yields the session, and rolls back the transaction
-    after the test completes, ensuring test isolation.
-    Depends on the schema being up-to-date via apply_migrations.
-    """
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = SessionLocal(bind=connection) # Create session bound to this connection
-    
-    # Optional: Begin nested transaction if SessionLocal doesn't handle it automatically
-    # nested = connection.begin_nested() 
-    # @pytest.mark.usefixtures("nested")
-    
-    print("\n[Fixture] Starting DB transaction for test...")
+    # Now create a session for the test (not bound to the truncation connection)
+    session = SessionLocal()
     yield session
-
-    print("\n[Fixture] Rolling back DB transaction...")
-    session.close() # Close the session first
-    transaction.rollback() # Rollback the transaction
-    connection.close() # Close the connection
+    session.commit()
+    session.close()
 
 # --- Test Data Fixtures --- 
 
@@ -84,7 +83,7 @@ def create_test_device(db_session: Session):
         default_args = {
             "hostname": f"test-device-{len(created_devices)+1}",
             "ip_address": f"192.168.255.{len(created_devices)+1}",
-            "device_type": "pytest_device",
+            "device_type": "cisco_ios",  # Use a valid device type
         }
         default_args.update(kwargs) # Override defaults with provided args
         

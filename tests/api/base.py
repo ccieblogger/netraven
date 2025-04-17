@@ -7,9 +7,12 @@ import logging
 from netraven.api.main import app
 from netraven.db import models
 from netraven.api import auth, dependencies
+import netraven.api.auth
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+print(f"[DEBUG][TEST] JWT SECRET_KEY: {netraven.api.auth.SECRET_KEY} | ALGORITHM: {netraven.api.auth.ALGORITHM}")
 
 class BaseAPITest:
     """Base class for API testing with authentication support.
@@ -19,10 +22,17 @@ class BaseAPITest:
     """
     
     @pytest.fixture
-    def client(self):
-        """Test client with clean dependency overrides."""
+    def client(self, test_admin):
+        """Test client with clean dependency overrides and test admin auth. Does NOT override get_db."""
         app.dependency_overrides = {}
-        return TestClient(app)
+        from netraven.api.dependencies import get_current_active_user, require_admin_role
+        app.dependency_overrides[get_current_active_user] = lambda: test_admin
+        app.dependency_overrides[require_admin_role] = lambda: test_admin
+        client = TestClient(app)
+        try:
+            yield client
+        finally:
+            app.dependency_overrides = {}
     
     @pytest.fixture
     def admin_token(self, test_admin):
