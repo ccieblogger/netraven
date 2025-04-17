@@ -226,7 +226,7 @@ async function showCredentialPopover(deviceId) {
       const credentials = await deviceStore.fetchDeviceCredentials(deviceId);
       // Debugging statement removed to avoid unintended console output in production.
       deviceCredentials.value = credentials;
-      credentials.forEach(c => console.log(`Credential ID: ${c.id}, Username: ${c.username}, Priority: ${c.priority}`));
+      // Removed debug logging of credential details to avoid exposing sensitive information in production.
     } catch (error) {
       console.error("Error fetching device credentials:", error);
     } finally {
