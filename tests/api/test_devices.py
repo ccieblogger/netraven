@@ -198,3 +198,57 @@ class TestDevicesAPI(BaseAPITest):
         assert creds[0]["username"] == "test-user"
         # Password should be redacted in response
         assert "password" not in creds[0] 
+
+    def test_update_device_tags_enforces_default(self, client: TestClient, admin_headers: Dict, create_test_device, db_session: Session):
+        """Test updating device tags always enforces the default tag."""
+        # Ensure default tag exists
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if not default_tag:
+            default_tag = models.Tag(name="default", type="device")
+            db_session.add(default_tag)
+            db_session.commit()
+            db_session.refresh(default_tag)
+
+        # Create another tag
+        tag = models.Tag(name="other-tag", type="device")
+        db_session.add(tag)
+        db_session.commit()
+        db_session.refresh(tag)
+
+        device = create_test_device(hostname="update-tag-test", ip_address="192.168.210.1")
+
+        # Update with only other tag (should auto-add default)
+        update_data = {"tags": [tag.id]}
+        response = client.put(f"/devices/{device.id}", json=update_data, headers=admin_headers)
+        self.assert_successful_response(response)
+        tags = response.json()["tags"]
+        tag_ids = {t["id"] for t in tags}
+        assert default_tag.id in tag_ids
+        assert tag.id in tag_ids
+
+        # Update with empty tags (should set to only default)
+        update_data = {"tags": []}
+        response = client.put(f"/devices/{device.id}", json=update_data, headers=admin_headers)
+        self.assert_successful_response(response)
+        tags = response.json()["tags"]
+        assert len(tags) == 1 and tags[0]["id"] == default_tag.id
+
+        # Update with default tag only (should remain unchanged)
+        update_data = {"tags": [default_tag.id]}
+        response = client.put(f"/devices/{device.id}", json=update_data, headers=admin_headers)
+        self.assert_successful_response(response)
+        tags = response.json()["tags"]
+        assert len(tags) == 1 and tags[0]["id"] == default_tag.id
+
+    def test_update_device_tags_error_if_default_missing(self, client: TestClient, admin_headers: Dict, create_test_device, db_session: Session):
+        """Test error if default tag is missing from DB during update."""
+        # Remove default tag if exists
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if default_tag:
+            db_session.delete(default_tag)
+            db_session.commit()
+
+        device = create_test_device(hostname="update-tag-missing-default", ip_address="192.168.210.2")
+        update_data = {"tags": []}
+        response = client.put(f"/devices/{device.id}", json=update_data, headers=admin_headers)
+        self.assert_error_response(response, 400, "Default tag does not exist") 
