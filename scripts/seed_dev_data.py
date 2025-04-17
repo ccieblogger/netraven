@@ -41,7 +41,8 @@ def seed():
     cred1 = Credential.create_with_encrypted_password(username="admin", password="correct", description="Valid admin", tags=[tag_core])
     cred2 = Credential.create_with_encrypted_password(username="admin", password="wrong", description="Invalid admin", tags=[tag_core])
     cred3 = Credential.create_with_encrypted_password(username="edge", password="edgepass", description="Edge valid", tags=[tag_edge])
-    db.add_all([cred1, cred2, cred3])
+    cred4 = Credential.create_with_encrypted_password(username="testuser", password="testpass", description="Test credential", tags=[tag_test])
+    db.add_all([cred1, cred2, cred3, cred4])
     db.commit()
 
     # --- Jobs ---

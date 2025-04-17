@@ -65,13 +65,13 @@
                   <div v-if="isLoadingDeviceCredentials" class="text-sm text-gray-500">Loading...</div>
                   <ul v-else class="text-xs max-h-48 overflow-y-auto">
                     <li v-for="cred in deviceCredentials" :key="cred.id" class="py-1 border-b border-gray-100 last:border-b-0">
-                      <div class="font-medium">{{ cred.username }}</div>
+                      <div class="font-medium">{{ cred.username }} (ID: {{ cred.id }})</div>
                       <div class="text-gray-500">Priority: {{ cred.priority }}</div>
                     </li>
                   </ul>
                 </div>
               </div>
-              <span v-else class="text-gray-400">-</span>
+              <span v-else class="text-red-500 font-semibold">No credentials found.</span>
             </td>
             <td class="py-3 px-6 text-center">
               <div class="flex item-center justify-center">
@@ -224,7 +224,9 @@ async function showCredentialPopover(deviceId) {
     isLoadingDeviceCredentials.value = true;
     try {
       const credentials = await deviceStore.fetchDeviceCredentials(deviceId);
+      console.log('Credentials for device', deviceId, JSON.parse(JSON.stringify(credentials)));
       deviceCredentials.value = credentials;
+      credentials.forEach(c => console.log(`Credential ID: ${c.id}, Username: ${c.username}, Priority: ${c.priority}`));
     } catch (error) {
       console.error("Error fetching device credentials:", error);
     } finally {
