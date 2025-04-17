@@ -61,6 +61,8 @@ services:
     volumes:
       # Mount source code for live updates
       - .:/app
+    env_file:
+      - .env.dev
     environment:
       - NETRAVEN_ENV=dev
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven

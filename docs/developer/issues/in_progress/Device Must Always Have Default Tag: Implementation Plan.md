@@ -50,4 +50,29 @@ This log tracks the implementation of the plan to ensure all devices always have
 ## Notes
 - Confirm default tag's name/ID in DB and frontend.
 - Consider migration for legacy data if needed.
-- Reference this log and issue in all related PRs. 
+- Reference this log and issue in all related PRs.
+
+## Progress Update (Backend Enforcement & Testing)
+
+### Backend Changes
+- Updated `update_device` endpoint to always enforce the presence of the default tag, mirroring logic in `create_device`.
+- If tags are set to empty or missing, device is assigned only the default tag.
+- If tags are provided but do not include the default tag, it is appended.
+- If the default tag does not exist in the database, a clear error is returned.
+
+### Test Changes
+- Added tests to ensure:
+  - Updating device tags always enforces the default tag.
+  - Setting tags to empty results in only the default tag.
+  - Error is raised if the default tag is missing from the DB.
+- All device API tests were run using the required Docker command.
+
+### Test Results
+- **All device API tests failed with 401 Unauthorized** (`{"detail":"Could not validate credentials"}`) for every test.
+- This includes both new and existing device API tests.
+
+### Blocker & Next Steps
+- **Blocker:** Test environment authentication setup is failing (likely JWT secret/config mismatch, dependency override, or DB session issue).
+- **Next Steps:**
+  - Debug and fix test authentication setup (see issue for checklist).
+  - Rerun tests to validate backend logic and new tests. 

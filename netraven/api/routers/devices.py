@@ -292,10 +292,20 @@ def update_device(
 
     # Handle tags update
     if "tags" in update_data:
-        if update_data["tags"] is None: # Explicitly setting tags to empty list
-             db_device.tags = []
+        # Get the default tag
+        default_tag = db.query(models.Tag).filter(models.Tag.name == DEFAULT_TAG_NAME).first()
+        if not default_tag:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Default tag does not exist in the database.")
+
+        tag_ids = update_data["tags"]
+        if tag_ids is None or tag_ids == []:
+            # If tags are set to empty or None, set to [default_tag.id]
+            db_device.tags = [default_tag]
         else:
-            tags = get_tags_by_ids(db, update_data["tags"])
+            # Ensure default tag is present
+            if default_tag.id not in tag_ids:
+                tag_ids.append(default_tag.id)
+            tags = get_tags_by_ids(db, tag_ids)
             db_device.tags = tags
 
     db.commit()
