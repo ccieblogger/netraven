@@ -1,9 +1,34 @@
 import pytest
 from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient
+from netraven.api.main import app
 
 from netraven.db import models
 from netraven.services.device_credential import get_matching_credentials_for_device
+from netraven.api import auth as netraven_auth
+from netraven.db import models as db_models
+
+@pytest.fixture(scope="function")
+def client():
+    """Fixture for FastAPI TestClient."""
+    with TestClient(app) as c:
+        yield c
+
+@pytest.fixture(scope="function")
+def admin_user(db_session):
+    """Create a test admin user in the test database."""
+    hashed_password = netraven_auth.get_password_hash("admin123")
+    user = db_models.User(
+        username="admin",
+        email="admin@example.com",
+        hashed_password=hashed_password,
+        is_active=True,
+        role="admin"
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
 
 def test_get_matching_credentials_with_no_tags(db: Session):
     """Test that a device with no tags returns an empty list of credentials."""
@@ -183,4 +208,67 @@ def test_api_device_not_found(client: TestClient):
     
     # Assert that the API returns a 404 Not Found
     assert response.status_code == 404
-    assert response.json()["detail"] == "Device not found" 
+    assert response.json()["detail"] == "Device not found"
+
+def test_api_device_credentials_deduplication(client: TestClient, admin_user):
+    """Test that the API does not return duplicate credentials when a credential matches multiple device tags."""
+    # Authenticate as test admin user
+    login_resp = client.post(
+        "/auth/token",
+        data={"username": "admin", "password": "admin123"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
+    assert login_resp.status_code == 200, f"Login failed: {login_resp.text}"
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create two tags via API (no /api prefix)
+    tag1_resp = client.post("/tags/", json={"name": "dedup_tag1", "type": "test"}, headers=headers)
+    tag2_resp = client.post("/tags/", json={"name": "dedup_tag2", "type": "test"}, headers=headers)
+    assert tag1_resp.status_code == 201, tag1_resp.text
+    assert tag2_resp.status_code == 201, tag2_resp.text
+    tag1 = tag1_resp.json()
+    tag2 = tag2_resp.json()
+
+    # Create a credential linked to both tags via API (no /api prefix)
+    cred_resp = client.post(
+        "/credentials/",
+        json={
+            "username": "dedup_user",
+            "password": "dedup_pass",
+            "priority": 5,
+            "tags": [tag1["id"], tag2["id"]]
+        },
+        headers=headers
+    )
+    assert cred_resp.status_code == 201, cred_resp.text
+    cred = cred_resp.json()
+
+    # Create a device with both tags via API (no /api prefix)
+    device_resp = client.post(
+        "/devices/",
+        json={
+            "hostname": "dedup-device",
+            "ip_address": "192.168.1.150",
+            "device_type": "cisco_ios",
+            "port": 22,
+            "tags": [tag1["id"], tag2["id"]]
+        },
+        headers=headers
+    )
+    assert device_resp.status_code == 201, device_resp.text
+    device = device_resp.json()
+
+    # Call the API endpoint (no /api prefix)
+    response = client.get(f"/devices/{device['id']}/credentials", headers=headers)
+    assert response.status_code == 200, response.text
+    credentials = response.json()
+    # Should only return one instance of the credential
+    usernames = [c["username"] for c in credentials]
+    assert usernames.count("dedup_user") == 1, f"Expected 1, got {usernames.count('dedup_user')} (credentials: {credentials})"
+
+    # Clean up (delete device, credential, tags)
+    client.delete(f"/devices/{device['id']}", headers=headers)
+    client.delete(f"/credentials/{cred['id']}", headers=headers)
+    client.delete(f"/tags/{tag1['id']}", headers=headers)
+    client.delete(f"/tags/{tag2['id']}", headers=headers) 
