@@ -9,6 +9,7 @@ export const useDeviceStore = defineStore('devices', () => {
   const deviceCredentials = ref([])
   const isLoadingCredentials = ref(false)
   const credentialError = ref(null)
+  const deviceCredentialsCache = ref({})
 
   async function fetchDevices() {
     isLoading.value = true
@@ -33,10 +34,18 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoadingCredentials.value = true
     credentialError.value = null
     
+    if (deviceCredentialsCache.value[deviceId]) {
+      isLoadingCredentials.value = false
+      return deviceCredentialsCache.value[deviceId]
+    }
     try {
       const response = await api.get(`/api/devices/${deviceId}/credentials`)
-      deviceCredentials.value = response.data
-      return response.data
+      const deduped = Array.isArray(response.data)
+        ? response.data.filter((cred, idx, arr) => arr.findIndex(c => c.id === cred.id) === idx)
+        : []
+      deviceCredentials.value = deduped
+      deviceCredentialsCache.value[deviceId] = deduped
+      return deduped
     } catch (err) {
       credentialError.value = err.response?.data?.detail || 'Failed to fetch device credentials'
       console.error("Fetch Device Credentials Error:", err)
@@ -133,6 +142,7 @@ export const useDeviceStore = defineStore('devices', () => {
     deviceCredentials.value = []
     isLoadingCredentials.value = false
     credentialError.value = null
+    deviceCredentialsCache.value = {}
   }
 
   return { 
@@ -147,6 +157,7 @@ export const useDeviceStore = defineStore('devices', () => {
     updateDevice, 
     deleteDevice, 
     fetchDeviceCredentials,
-    $reset 
+    $reset,
+    deviceCredentialsCache
   }
 }) 

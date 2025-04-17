@@ -247,6 +247,11 @@ function validateForm() {
     errors.port = 'Port must be between 1 and 65535';
   }
   
+  // Tag validation (must select at least one tag)
+  if (!form.value.tag_ids || form.value.tag_ids.length === 0) {
+    errors.tag_ids = 'At least one tag is required to associate credentials.';
+  }
+  
   // Remove credential validation since we're using tag-based credential matching
   // No longer need to validate credential_id
   
