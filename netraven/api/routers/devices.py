@@ -121,6 +121,22 @@ def create_device(
     db.add(db_device)
     db.commit()
     db.refresh(db_device)
+
+    # --- Ensure at least one credential is associated ---
+    matching_credentials = get_matching_credentials_for_device(db, db_device.id)
+    if not matching_credentials:
+        # Try to add the default tag if not already present
+        default_tag = db.query(models.Tag).filter(models.Tag.name == DEFAULT_TAG_NAME).first()
+        if not default_tag:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No credentials match this device and the default tag does not exist. Please create a default tag and credential.")
+        if default_tag not in db_device.tags:
+            db_device.tags.append(default_tag)
+            db.commit()
+            db.refresh(db_device)
+            # Re-check credentials
+            matching_credentials = get_matching_credentials_for_device(db, db_device.id)
+        if not matching_credentials:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No credentials match this device, even after associating the default tag. Please check your credential configuration.")
     return db_device
 
 @router.get("/", response_model=schemas.device.PaginatedDeviceResponse)
