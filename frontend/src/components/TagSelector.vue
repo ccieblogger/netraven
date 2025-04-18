@@ -22,7 +22,9 @@
           class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
         >
           {{ tag.name }}
+          <span v-if="tag.id === defaultTagId" class="ml-1 text-[10px] font-bold text-blue-500">(default)</span>
           <button
+            v-if="tag.id !== defaultTagId"
             type="button"
             @click.stop="removeTag(tag)"
             :disabled="disabled"
@@ -145,6 +147,10 @@ const availableTags = computed(() => {
       tag.name.toLowerCase().includes(searchTerm.value.toLowerCase());
     return matchesSearch && !isSelected(tag.id);
   });
+});
+
+const defaultTagId = computed(() => {
+  return tags.value.find(tag => tag.name === 'default')?.id || null;
 });
 
 // Methods

@@ -65,19 +65,12 @@ export const useDeviceStore = defineStore('devices', () => {
         // Convert tag_ids from the form to tags expected by the API
         tags: deviceData.tag_ids || []
       }
-      
-      // Remove properties not needed by API
       delete apiData.tag_ids
-      
-      // Use consistent API path format
-      console.log(`Creating device with data:`, apiData);
       const response = await api.post('/api/devices/', apiData);
-      
       devices.value.push(response.data)
       return true
     } catch (err) {
-      error.value = err.response?.data?.detail || 'Failed to create device'
-      console.error("Create Device Error:", err)
+      error.value = err.response?.data?.detail || 'Failed to create device.'
       return false
     } finally {
       isLoading.value = false
@@ -88,28 +81,19 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoading.value = true
     error.value = null
     try {
-      // Prepare API data - standardize field names between frontend and backend
       const apiData = {
         ...deviceData,
-        // Convert tag_ids from the form to tags expected by the API
         tags: deviceData.tag_ids || []
       }
-      
-      // Remove properties not needed by API
       delete apiData.tag_ids
-      
-      // Use consistent API path format with trailing slash
-      console.log(`Updating device ${deviceId} with data:`, apiData);
       const response = await api.put(`/api/devices/${deviceId}/`, apiData);
-      
       const index = devices.value.findIndex(d => d.id === deviceId)
       if (index !== -1) {
         devices.value[index] = response.data
       }
       return true
     } catch (err) {
-      error.value = err.response?.data?.detail || 'Failed to update device'
-      console.error("Update Device Error:", err)
+      error.value = err.response?.data?.detail || 'Failed to update device.'
       return false
     } finally {
       isLoading.value = false
@@ -120,15 +104,11 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoading.value = true
     error.value = null
     try {
-      // Use consistent API path format with trailing slash
-      console.log(`Deleting device ${deviceId}`);
       await api.delete(`/api/devices/${deviceId}/`);
-      
       devices.value = devices.value.filter(d => d.id !== deviceId)
       return true
     } catch (err) {
-      error.value = err.response?.data?.detail || 'Failed to delete device'
-      console.error("Delete Device Error:", err)
+      error.value = err.response?.data?.detail || 'Failed to delete device.'
       return false
     } finally {
       isLoading.value = false
