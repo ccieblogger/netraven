@@ -104,7 +104,7 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoading.value = true
     error.value = null
     try {
-      await api.delete(`/api/devices/${deviceId}/`);
+      await api.delete(`/api/devices/${deviceId}`);
       devices.value = devices.value.filter(d => d.id !== deviceId)
       return true
     } catch (err) {
