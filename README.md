@@ -66,6 +66,8 @@ The system is installed locally using Python-based services with PostgreSQL and 
   - User settings and preferences
   - Log inspection
 
+ <img width="1637" alt="image" src="https://github.com/user-attachments/assets/5afdf605-9ddc-4ce3-915a-9cd2d4a1ce89" />
+
 ### Device Communication
 - Primary protocol: **SSH via Netmiko**
 - Vendor extensibility via Netmiko platform mapping
