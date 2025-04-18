@@ -76,7 +76,7 @@ export const useCredentialStore = defineStore('credential', () => {
     }
     
     try {
-      await api.delete(`/credentials/${credentialId}/`);
+      await api.delete(`/credentials/${credentialId}`);
       credentials.value = credentials.value.filter(c => c.id !== credentialId);
       return true;
     } catch (err) {
