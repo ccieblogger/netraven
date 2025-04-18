@@ -2,6 +2,10 @@
   <BaseModal :is-open="isOpen" :title="modalTitle" @close="closeModal">
     <template #content>
       <form @submit.prevent="submitForm" class="space-y-4">
+        <!-- Error Banner -->
+        <div v-if="generalError" class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-2">
+          {{ generalError }}
+        </div>
         <!-- Hostname -->
         <FormField
           id="hostname"
@@ -147,6 +151,10 @@ const props = defineProps({
   deviceToEdit: {
     type: Object,
     default: null // null indicates create mode
+  },
+  backendError: {
+    type: String,
+    default: ''
   }
 });
 
@@ -158,6 +166,7 @@ const notificationStore = useNotificationStore();
 
 const isSaving = ref(false);
 const validationErrors = ref({});
+const generalError = ref("");
 
 // Initialize form reactive object
 const form = ref({
@@ -178,6 +187,7 @@ watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     resetForm();
     clearValidationErrors();
+    generalError.value = props.backendError || "";
     
     // Fetch tags and credentials if they haven't been loaded
     if (tagStore.tags.length === 0 && !tagStore.isLoading) {
@@ -188,6 +198,19 @@ watch(() => props.isOpen, (newVal) => {
     }
   }
 });
+
+// Watch for backendError changes
+watch(() => props.backendError, (newVal) => {
+  if (props.isOpen) {
+    generalError.value = newVal || "";
+  }
+});
+
+// Helper to get the default tag ID from tagStore
+function getDefaultTagId() {
+  const defaultTag = tagStore.tags.find(tag => tag.name === 'default');
+  return defaultTag ? defaultTag.id : null;
+}
 
 // Function to reset form state
 function resetForm() {
@@ -201,6 +224,11 @@ function resetForm() {
         form.value.description = props.deviceToEdit.description || '';
         // API likely returns full tag objects, we need just the IDs for the form model
         form.value.tag_ids = props.deviceToEdit.tags ? props.deviceToEdit.tags.map(tag => tag.id) : [];
+        // Ensure default tag is always present
+        const defaultTagId = getDefaultTagId();
+        if (defaultTagId && !form.value.tag_ids.includes(defaultTagId)) {
+          form.value.tag_ids.push(defaultTagId);
+        }
         form.value.credential_id = props.deviceToEdit.credential ? props.deviceToEdit.credential.id : null;
     } else {
         // Create mode: Reset to defaults
@@ -210,6 +238,11 @@ function resetForm() {
         form.value.device_type = '';
         form.value.port = 22;
         form.value.tag_ids = [];
+        // Ensure default tag is always present
+        const defaultTagId = getDefaultTagId();
+        if (defaultTagId) {
+          form.value.tag_ids.push(defaultTagId);
+        }
         form.value.credential_id = null;
         form.value.description = '';
     }
@@ -263,20 +296,29 @@ function closeModal() {
   emit('close');
 }
 
-function submitForm() {
-  clearValidationErrors();
-  
-  if (!validateForm()) {
-    return;
-  }
-  
+async function submitForm() {
   isSaving.value = true;
-  
-  // Remove credential_id from the form data
-  const formData = { ...form.value };
-  delete formData.credential_id; // Remove direct credential selection
-  
-  emit('save', formData);
+  clearValidationErrors();
+  generalError.value = "";
+  try {
+    // Validate required fields (add more as needed)
+    if (!form.value.hostname) validationErrors.value.hostname = "Hostname is required.";
+    if (!form.value.ip_address) validationErrors.value.ip_address = "IP address is required.";
+    if (!form.value.device_type) validationErrors.value.device_type = "Device type is required.";
+    if (Object.keys(validationErrors.value).length > 0) throw new Error("Validation failed");
+    // Emit save event to parent (Devices.vue handles API call and error)
+    emit('save', { ...form.value });
+  } catch (err) {
+    if (err.response && err.response.data && err.response.data.detail) {
+      generalError.value = err.response.data.detail;
+    } else if (typeof err === 'string') {
+      generalError.value = err;
+    } else {
+      generalError.value = 'Failed to save device.';
+    }
+  } finally {
+    isSaving.value = false;
+  }
 }
 
 // Fetch initial data if needed (e.g., when modal is initially open)

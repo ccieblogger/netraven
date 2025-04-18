@@ -24,9 +24,10 @@ Relationships:
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, and_, func
+import logging
 
 from netraven.api import schemas # Import schemas module
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role # Import dependencies
@@ -69,8 +70,9 @@ def get_tags_by_ids(db: Session, tag_ids: List[int]) -> List[models.Tag]:
 def create_device(
     device: schemas.device.DeviceCreate,
     db: Session = Depends(get_db_session),
-    # current_user: models.User = Depends(get_current_active_user) # Inject user if needed for ownership etc.
+    request: Request = None
 ):
+    logger = logging.getLogger("netraven.api.routers.devices")
     """Create a new network device in the system.
     
     Args:
@@ -95,7 +97,11 @@ def create_device(
         (models.Device.hostname == device.hostname) | (models.Device.ip_address == str(device.ip_address))
     ).first()
     if existing_device:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hostname or IP address already registered")
+        conflict_field = "hostname" if existing_device.hostname == device.hostname else "ip_address"
+        conflict_value = getattr(existing_device, conflict_field)
+        msg = f"{conflict_field.capitalize()} already registered: {conflict_value}"
+        logger.warning(f"Device creation failed: {msg} (request: {request.url if request else 'N/A'})")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
     # Create a dict with device data and explicitly convert IP to string
     device_data = device.model_dump(exclude={'tags'})
@@ -115,7 +121,11 @@ def create_device(
         tag_ids.append(default_tag.id)
     
     if tag_ids:
-        tags = get_tags_by_ids(db, tag_ids)
+        try:
+            tags = get_tags_by_ids(db, tag_ids)
+        except HTTPException as e:
+            logger.error(f"Device creation failed: {e.detail} (request: {request.url if request else 'N/A'})")
+            raise
         db_device.tags = tags
 
     db.add(db_device)
@@ -125,18 +135,20 @@ def create_device(
     # --- Ensure at least one credential is associated ---
     matching_credentials = get_matching_credentials_for_device(db, db_device.id)
     if not matching_credentials:
-        # Try to add the default tag if not already present
         default_tag = db.query(models.Tag).filter(models.Tag.name == DEFAULT_TAG_NAME).first()
         if not default_tag:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No credentials match this device and the default tag does not exist. Please create a default tag and credential.")
+            msg = "No credentials match this device and the default tag does not exist. Please create a default tag and credential."
+            logger.error(f"Device creation failed: {msg} (request: {request.url if request else 'N/A'})")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
         if default_tag not in db_device.tags:
             db_device.tags.append(default_tag)
             db.commit()
             db.refresh(db_device)
-            # Re-check credentials
             matching_credentials = get_matching_credentials_for_device(db, db_device.id)
         if not matching_credentials:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No credentials match this device, even after associating the default tag. Please check your credential configuration.")
+            msg = "No credentials match this device, even after associating the default tag. Please check your credential configuration."
+            logger.error(f"Device creation failed: {msg} (request: {request.url if request else 'N/A'})")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     return db_device
 
 @router.get("/", response_model=schemas.device.PaginatedDeviceResponse)
@@ -260,8 +272,10 @@ def get_device(
 def update_device(
     device_id: int,
     device: schemas.device.DeviceUpdate,
-    db: Session = Depends(get_db_session)
+    db: Session = Depends(get_db_session),
+    request: Request = None
 ):
+    logger = logging.getLogger("netraven.api.routers.devices")
     """Update an existing network device.
     
     Args:
@@ -285,17 +299,25 @@ def update_device(
     """
     db_device = db.query(models.Device).filter(models.Device.id == device_id).first()
     if db_device is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+        msg = f"Device not found: {device_id}"
+        logger.warning(f"Device update failed: {msg} (request: {request.url if request else 'N/A'})")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg)
 
     update_data = device.model_dump(exclude_unset=True) # Get only fields that were set
 
     # Check for potential conflicts if hostname/IP are being changed
     if 'hostname' in update_data and update_data['hostname'] != db_device.hostname:
-        if db.query(models.Device).filter(models.Device.hostname == update_data['hostname']).first():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hostname already exists")
+        existing = db.query(models.Device).filter(models.Device.hostname == update_data['hostname']).first()
+        if existing:
+            msg = f"Hostname already exists: {update_data['hostname']}"
+            logger.warning(f"Device update failed: {msg} (request: {request.url if request else 'N/A'})")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     if 'ip_address' in update_data and str(update_data['ip_address']) != db_device.ip_address:
-         if db.query(models.Device).filter(models.Device.ip_address == str(update_data['ip_address'])).first():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="IP address already exists")
+        existing = db.query(models.Device).filter(models.Device.ip_address == str(update_data['ip_address'])).first()
+        if existing:
+            msg = f"IP address already exists: {update_data['ip_address']}"
+            logger.warning(f"Device update failed: {msg} (request: {request.url if request else 'N/A'})")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
     # Convert IP address to string if present
     if 'ip_address' in update_data:
@@ -308,20 +330,22 @@ def update_device(
 
     # Handle tags update
     if "tags" in update_data:
-        # Get the default tag
         default_tag = db.query(models.Tag).filter(models.Tag.name == DEFAULT_TAG_NAME).first()
         if not default_tag:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Default tag does not exist in the database.")
-
+            msg = "Default tag does not exist in the database."
+            logger.error(f"Device update failed: {msg} (request: {request.url if request else 'N/A'})")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
         tag_ids = update_data["tags"]
         if tag_ids is None or tag_ids == []:
-            # If tags are set to empty or None, set to [default_tag.id]
             db_device.tags = [default_tag]
         else:
-            # Ensure default tag is present
             if default_tag.id not in tag_ids:
                 tag_ids.append(default_tag.id)
-            tags = get_tags_by_ids(db, tag_ids)
+            try:
+                tags = get_tags_by_ids(db, tag_ids)
+            except HTTPException as e:
+                logger.error(f"Device update failed: {e.detail} (request: {request.url if request else 'N/A'})")
+                raise
             db_device.tags = tags
 
     db.commit()
