@@ -206,6 +206,12 @@ watch(() => props.backendError, (newVal) => {
   }
 });
 
+// Helper to get the default tag ID from tagStore
+function getDefaultTagId() {
+  const defaultTag = tagStore.tags.find(tag => tag.name === 'default');
+  return defaultTag ? defaultTag.id : null;
+}
+
 // Function to reset form state
 function resetForm() {
     if (props.deviceToEdit) {
@@ -218,6 +224,11 @@ function resetForm() {
         form.value.description = props.deviceToEdit.description || '';
         // API likely returns full tag objects, we need just the IDs for the form model
         form.value.tag_ids = props.deviceToEdit.tags ? props.deviceToEdit.tags.map(tag => tag.id) : [];
+        // Ensure default tag is always present
+        const defaultTagId = getDefaultTagId();
+        if (defaultTagId && !form.value.tag_ids.includes(defaultTagId)) {
+          form.value.tag_ids.push(defaultTagId);
+        }
         form.value.credential_id = props.deviceToEdit.credential ? props.deviceToEdit.credential.id : null;
     } else {
         // Create mode: Reset to defaults
@@ -227,6 +238,11 @@ function resetForm() {
         form.value.device_type = '';
         form.value.port = 22;
         form.value.tag_ids = [];
+        // Ensure default tag is always present
+        const defaultTagId = getDefaultTagId();
+        if (defaultTagId) {
+          form.value.tag_ids.push(defaultTagId);
+        }
         form.value.credential_id = null;
         form.value.description = '';
     }
