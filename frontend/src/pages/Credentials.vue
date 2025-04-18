@@ -65,7 +65,15 @@
       No credentials found. Add one!
     </div>
 
-    <!-- TODO: Add Create/Edit Modal Component (requires tag selection) -->
+    <!-- Credential Create/Edit Modal -->
+    <CredentialFormModal
+      v-if="showModal"
+      :is-open="showModal"
+      :credential-to-edit="isEditMode ? selectedCredential : null"
+      :backend-error="modalBackendError"
+      @close="closeModal"
+      @save="handleSave"
+    />
 
   </div>
 </template>
@@ -73,41 +81,71 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useCredentialStore } from '../store/credential'
+import CredentialFormModal from '../components/CredentialFormModal.vue'
 
 const credentialStore = useCredentialStore()
 const credentials = computed(() => credentialStore.credentials)
 
-// Modal state placeholders
+// Modal state
 const showModal = ref(false)
 const selectedCredential = ref(null)
 const isEditMode = ref(false)
+const modalBackendError = ref('')
 
 onMounted(() => {
   credentialStore.fetchCredentials()
 })
 
-// Placeholder actions
 function openCreateModal() {
-  alert('Placeholder: Open Create Credential Modal');
+  selectedCredential.value = null
+  isEditMode.value = false
+  modalBackendError.value = ''
+  showModal.value = true
 }
 function openEditModal(cred) {
-   alert(`Placeholder: Open Edit Credential Modal for ${cred.username}`);
+  selectedCredential.value = cred
+  isEditMode.value = true
+  modalBackendError.value = ''
+  showModal.value = true
 }
-function confirmDelete(cred) {
-  // Skip deletion for system credentials
-  if (cred.is_system) {
-    alert('System credentials cannot be deleted.');
-    return;
-  }
-  
-  if (confirm(`Are you sure you want to delete the credential set "${cred.username}"?`)) {
-     alert(`Placeholder: Delete credential ${cred.id}`);
-     // credentialStore.deleteCredential(cred.id);
-  }
+function closeModal() {
+  showModal.value = false
+  selectedCredential.value = null
+  isEditMode.value = false
+  modalBackendError.value = ''
 }
-function closeModal() { /* ... */ }
-async function handleSave(data) { /* ... */ }
 
+async function handleSave(data) {
+  let success = false
+  modalBackendError.value = ''
+  if (isEditMode.value && selectedCredential.value) {
+    success = await credentialStore.updateCredential(selectedCredential.value.id, data)
+  } else {
+    success = await credentialStore.createCredential(data)
+  }
+  if (success) {
+    await credentialStore.fetchCredentials()
+    closeModal()
+  } else {
+    modalBackendError.value = credentialStore.error || 'Failed to save credential.'
+  }
+}
+
+function confirmDelete(cred) {
+  if (cred.is_system) {
+    alert('System credentials cannot be deleted.')
+    return
+  }
+  if (confirm(`Are you sure you want to delete the credential set "${cred.username}"?`)) {
+    credentialStore.deleteCredential(cred.id).then(async (success) => {
+      if (success) {
+        await credentialStore.fetchCredentials()
+      } else {
+        alert(credentialStore.error || 'Failed to delete credential.')
+      }
+    })
+  }
+}
 </script>
 
 <style scoped>
