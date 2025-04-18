@@ -83,8 +83,10 @@
 import { ref, onMounted, computed } from 'vue'
 import { useCredentialStore } from '../store/credential'
 import CredentialFormModal from '../components/CredentialFormModal.vue'
+import { useNotificationStore } from '../store/notifications'
 
 const credentialStore = useCredentialStore()
+const notificationStore = useNotificationStore()
 const credentials = computed(() => credentialStore.credentials)
 
 // Modal state
@@ -137,15 +139,16 @@ async function handleSave(data) {
 
 function confirmDelete(cred) {
   if (cred.is_system) {
-    alert('System credentials cannot be deleted.')
+    notificationStore.error('System credentials cannot be deleted.')
     return
   }
   if (confirm(`Are you sure you want to delete the credential set "${cred.username}"?`)) {
     credentialStore.deleteCredential(cred.id).then(async (success) => {
       if (success) {
         await credentialStore.fetchCredentials()
+        notificationStore.success('Credential deleted successfully.')
       } else {
-        alert(credentialStore.error || 'Failed to delete credential.')
+        notificationStore.error(credentialStore.error || 'Failed to delete credential.')
       }
     })
   }
