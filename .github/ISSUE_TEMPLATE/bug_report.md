@@ -36,7 +36,8 @@ If applicable, add screenshots or error logs to help explain the issue.
 
 ---
 
-🤖 AI Assistant Rules:
+## 🤖 AI Assistant Rules:
+
 - Always start by doing a thorough analsysis of the projects codebase and technology stack
 - Conduct thorough analysis and research to understand issue and determine root cause.
 - Then create an implemenation plan to fix the root cause. If necessary break the work up into indivual work streams.
