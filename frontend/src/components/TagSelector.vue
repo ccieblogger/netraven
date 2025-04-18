@@ -51,7 +51,7 @@
       <!-- Dropdown with filterable options -->
       <div
         v-if="isDropdownOpen && !disabled"
-        class="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-300 py-1 max-h-60 overflow-auto"
+        class="absolute z-10 mt-1 w-full max-w-full bg-white shadow-lg rounded-md border border-gray-300 py-1 max-h-60 overflow-auto"
       >
         <div v-if="loading" class="px-4 py-2 text-sm text-gray-500">
           Loading tags...

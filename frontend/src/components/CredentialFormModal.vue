@@ -90,6 +90,7 @@ import { ref, watch, computed, onMounted } from 'vue';
 import BaseModal from './BaseModal.vue';
 import FormField from './FormField.vue';
 import TagSelector from './TagSelector.vue';
+import { useTagStore } from '../store/tag';
 
 const props = defineProps({
   isOpen: {
@@ -125,7 +126,10 @@ const form = ref({
 const isEditMode = computed(() => !!props.credentialToEdit);
 const modalTitle = computed(() => isEditMode.value ? 'Edit Credential' : 'Add Credential');
 
+const tagStore = useTagStore();
+
 function setFormFromProps() {
+  const defaultTagId = tagStore.tags.find(t => t.name === 'default')?.id;
   if (props.credentialToEdit && Object.keys(props.credentialToEdit).length > 0) {
     form.value = {
       id: props.credentialToEdit.id,
@@ -137,7 +141,9 @@ function setFormFromProps() {
     };
     showPasswordField.value = false;
   } else {
-    form.value = { id: null, username: '', password: '', priority: 100, description: '', tags: [] };
+    // In create mode, always include the default tag if available
+    const tags = defaultTagId ? [defaultTagId] : [];
+    form.value = { id: null, username: '', password: '', priority: 100, description: '', tags };
     showPasswordField.value = false;
   }
 }
@@ -189,12 +195,18 @@ function submitForm() {
   clearValidationErrors();
   if (!validateForm()) return;
   isSaving.value = true;
+  // Ensure default tag is always included
+  const defaultTagId = tagStore.tags.find(t => t.name === 'default')?.id;
+  let tags = [...form.value.tags];
+  if (defaultTagId && !tags.includes(defaultTagId)) {
+    tags.push(defaultTagId);
+  }
   // Emit only the necessary fields
   const payload = {
     username: form.value.username,
     priority: form.value.priority,
     description: form.value.description,
-    tags: form.value.tags,
+    tags,
   };
   if (!isEditMode.value || showPasswordField.value) {
     payload.password = form.value.password;

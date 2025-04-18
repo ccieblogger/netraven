@@ -135,7 +135,7 @@ def get_credential(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Credential not found")
     return db_credential
 
-@router.put("/{credential_id}", response_model=schemas.credential.Credential)
+@router.put("/{credential_id}/", response_model=schemas.credential.Credential)
 def update_credential(
     credential_id: int,
     credential: schemas.credential.CredentialUpdate,

@@ -36,7 +36,7 @@
               >
                 {{ title }}
               </DialogTitle>
-              <div class="mt-2">
+              <div class="mt-2 max-h-[70vh] overflow-y-auto">
                 <slot name="content"></slot>
               </div>
 
