@@ -79,7 +79,7 @@ export const useTagStore = defineStore('tag', () => {
     isLoading.value = true
     error.value = null
     try {
-      await api.delete(`/tags/${tagId}/`)
+      await api.delete(`/tags/${tagId}`)
       // Remove from local state
       tags.value = tags.value.filter(t => t.id !== tagId)
       // notifications.addMessage({ type: 'success', text: 'Tag deleted successfully' })
