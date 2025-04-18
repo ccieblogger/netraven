@@ -56,8 +56,8 @@ export const useTagStore = defineStore('tag', () => {
     isLoading.value = true
     error.value = null
     try {
-      // Use absolute URL to bypass Axios interceptor and avoid /api prefix
-      const response = await api.put(`${window.location.origin}/tags/${tagId}/`, tagData)
+      // Use relative URL without trailing slash to match backend
+      const response = await api.put(`/tags/${tagId}`, tagData)
       // Update local state
       const index = tags.value.findIndex(t => t.id === tagId)
       if (index !== -1) {
