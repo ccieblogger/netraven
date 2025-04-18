@@ -103,6 +103,7 @@
      <DeviceFormModal
         :is-open="isFormModalOpen"
         :device-to-edit="selectedDevice"
+        :backend-error="deviceStore.error"
         @close="closeFormModal"
         @save="handleSaveDevice"
       />
@@ -150,11 +151,13 @@ onMounted(() => {
 // Form Modal Handlers
 function openCreateModal() {
   selectedDevice.value = null // Ensure create mode
+  deviceStore.error = null // Clear error before opening
   isFormModalOpen.value = true
 }
 
 function openEditModal(device) {
   selectedDevice.value = { ...device } // Pass a copy to avoid reactivity issues
+  deviceStore.error = null // Clear error before opening
   isFormModalOpen.value = true
 }
 
@@ -164,26 +167,21 @@ function closeFormModal() {
 }
 
 async function handleSaveDevice(deviceData) {
-  console.log("Saving device:", deviceData)
   let success = false; // Flag to track success
   try {
       if (deviceData.id) {
-        await deviceStore.updateDevice(deviceData.id, deviceData);
+        success = await deviceStore.updateDevice(deviceData.id, deviceData);
       } else {
-        await deviceStore.createDevice(deviceData);
+        success = await deviceStore.createDevice(deviceData);
       }
-      success = true; // Mark as successful
-      closeFormModal();
-      // Refresh list might still be needed if store isn't fully reactive
-      // await deviceStore.fetchDevices();
+      if (success) {
+        closeFormModal();
+        await deviceStore.fetchDevices(); // Always refresh after create/update
+      }
   } catch (error) {
-       console.error("Failed to save device:", error);
-       // Show error from the store action directly
-       alert(`Error saving device: ${deviceStore.error || 'An unknown error occurred.'}`);
-       // Do NOT close the modal on error
-  } finally {
-      // Optional: Add logic here if needed regardless of success/fail
-      // For example, re-enable save button is handled in the modal itself
+       // Pass error to modal for inline display
+       // The modal will handle displaying the error
+       // No alert here
   }
 }
 
@@ -201,19 +199,15 @@ function closeDeleteModal() {
 
 async function handleDeleteConfirm() {
   if (!deviceToDelete.value) return;
-
-  console.log("Deleting device:", deviceToDelete.value.id)
-   let success = false;
+  let success = false;
   try {
-      await deviceStore.deleteDevice(deviceToDelete.value.id);
-      success = true;
-      closeDeleteModal();
-      // Refresh list might still be needed
-      // await deviceStore.fetchDevices();
+      success = await deviceStore.deleteDevice(deviceToDelete.value.id);
+      if (success) {
+        closeDeleteModal();
+        await deviceStore.fetchDevices(); // Always refresh after delete
+      }
   } catch (error) {
-      console.error("Failed to delete device:", error);
-      alert(`Error deleting device: ${deviceStore.error || 'An unknown error occurred.'}`);
-      // Close modal even on error to avoid being stuck
+      // No alert here; could be handled inline if needed
       closeDeleteModal();
   }
 }
