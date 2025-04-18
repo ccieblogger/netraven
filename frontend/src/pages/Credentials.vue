@@ -68,6 +68,7 @@
     <!-- Credential Create/Edit Modal -->
     <CredentialFormModal
       v-if="showModal"
+      :key="modalKey"
       :is-open="showModal"
       :credential-to-edit="isEditMode ? selectedCredential : null"
       :backend-error="modalBackendError"
@@ -91,6 +92,7 @@ const showModal = ref(false)
 const selectedCredential = ref(null)
 const isEditMode = ref(false)
 const modalBackendError = ref('')
+const modalKey = ref(0)
 
 onMounted(() => {
   credentialStore.fetchCredentials()
@@ -100,12 +102,14 @@ function openCreateModal() {
   selectedCredential.value = null
   isEditMode.value = false
   modalBackendError.value = ''
+  modalKey.value += 1 // Force remount
   showModal.value = true
 }
 function openEditModal(cred) {
   selectedCredential.value = cred
   isEditMode.value = true
   modalBackendError.value = ''
+  modalKey.value += 1 // Force remount
   showModal.value = true
 }
 function closeModal() {
