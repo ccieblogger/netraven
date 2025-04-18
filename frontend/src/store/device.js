@@ -86,7 +86,7 @@ export const useDeviceStore = defineStore('devices', () => {
         tags: deviceData.tag_ids || []
       }
       delete apiData.tag_ids
-      const response = await api.put(`/api/devices/${deviceId}/`, apiData);
+      const response = await api.put(`/api/devices/${deviceId}`, apiData);
       const index = devices.value.findIndex(d => d.id === deviceId)
       if (index !== -1) {
         devices.value[index] = response.data
