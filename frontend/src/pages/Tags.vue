@@ -61,7 +61,14 @@
     </div>
 
     <!-- TODO: Add Create/Edit Modal Component -->
-    <!-- <TagFormModal v-if="showModal" :tag="selectedTag" @close="closeModal" @save="handleSave" /> -->
+    <TagFormModal
+      v-if="showModal"
+      :is-open="showModal"
+      :tag-to-edit="isEditMode ? selectedTag : null"
+      :backend-error="modalBackendError"
+      @close="closeModal"
+      @save="handleSave"
+    />
 
   </div>
 </template>
@@ -69,63 +76,65 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useTagStore } from '../store/tag'
-// import TagFormModal from '../components/TagFormModal.vue' // Import modal component later
+import TagFormModal from '../components/TagFormModal.vue'
 
 const tagStore = useTagStore()
 
 // Compute tags from store
 const tags = computed(() => tagStore.tags)
 
-// Modal state (placeholders)
+// Modal state
 const showModal = ref(false)
 const selectedTag = ref(null) // For editing
 const isEditMode = ref(false)
+const modalBackendError = ref('')
 
 // Fetch tags when component mounts
 onMounted(() => {
   tagStore.fetchTags()
 })
 
-// --- CRUD Action Handlers (Placeholders) ---
-
+// --- CRUD Action Handlers ---
 function openCreateModal() {
-  // selectedTag.value = { name: '', type: '' }; // Reset for creation
-  // isEditMode.value = false;
-  // showModal.value = true;
-  alert('Placeholder: Open Create Tag Modal');
+  selectedTag.value = { name: '', type: '' }
+  isEditMode.value = false
+  modalBackendError.value = ''
+  showModal.value = true
 }
 
 function openEditModal(tag) {
-  // selectedTag.value = { ...tag }; // Copy tag data for editing
-  // isEditMode.value = true;
-  // showModal.value = true;
-   alert(`Placeholder: Open Edit Tag Modal for ${tag.name}`);
+  selectedTag.value = { ...tag }
+  isEditMode.value = true
+  modalBackendError.value = ''
+  showModal.value = true
 }
 
 function confirmDelete(tag) {
   if (confirm(`Are you sure you want to delete the tag "${tag.name}"?`)) {
-    // tagStore.deleteTag(tag.id);
-     alert(`Placeholder: Delete tag ${tag.id}`);
+    tagStore.deleteTag(tag.id)
   }
 }
 
 function closeModal() {
-  showModal.value = false;
-  selectedTag.value = null;
+  showModal.value = false
+  selectedTag.value = null
+  modalBackendError.value = ''
 }
 
 async function handleSave(tagData) {
-  // let success = false;
-  // if (isEditMode.value) {
-  //   success = await tagStore.updateTag(selectedTag.value.id, tagData);
-  // } else {
-  //   success = await tagStore.createTag(tagData);
-  // }
-  // if (success) {
-  //   closeModal();
-  // }
-  alert(`Placeholder: Save tag data: ${JSON.stringify(tagData)}`);
-  closeModal(); // Close modal after placeholder action
+  let success = false
+  modalBackendError.value = ''
+  if (isEditMode.value && selectedTag.value && selectedTag.value.id) {
+    success = await tagStore.updateTag(selectedTag.value.id, tagData)
+  } else {
+    success = await tagStore.createTag(tagData)
+  }
+  if (success) {
+    closeModal()
+  } else {
+    // Show backend error if present
+    modalBackendError.value = tagStore.error || 'Failed to save tag.'
+  }
 }
 
 </script>
