@@ -164,11 +164,20 @@ const navigation = [
     } 
   },
   { 
-    name: 'Logs', 
-    path: '/logs', 
+    name: 'Connection Logs', 
+    path: '/connection-logs', 
     icon: {
       template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 10v6M12 10l4-4M12 16l4 4M12 10l-4-4M12 16l-4 4" />
+      </svg>`
+    } 
+  },
+  { 
+    name: 'Job Logs', 
+    path: '/job-logs', 
+    icon: {
+      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v20M2 6h4m-2 4h2m14-4h4m-2 4h2M2 14h2m-2 4h4M18 14h2m-2 4h4" />
       </svg>`
     } 
   },

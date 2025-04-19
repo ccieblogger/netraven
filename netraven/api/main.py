@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from netraven.config.loader import load_config
 
 # Import routers
-from .routers import devices, jobs, users, logs, auth_router, tags, credentials, backups, job_logs  # Import the new job_logs router
+from .routers import devices, jobs, users, auth_router, tags, credentials, backups, job_logs, connection_logs  # Import the new connection_logs router
 
 # Load configuration
 config = load_config()
@@ -61,6 +61,6 @@ app.include_router(tags.router)
 app.include_router(credentials.router)
 app.include_router(devices.router)
 app.include_router(jobs.router)
-app.include_router(logs.router)
 app.include_router(job_logs.router)
 app.include_router(backups.router)  # Include the backups router
+app.include_router(connection_logs.router)

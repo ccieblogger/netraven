@@ -1,8 +1,7 @@
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_, desc, text, union_all
-from sqlalchemy.sql import select
+from sqlalchemy import desc
 import math
 
 from netraven.api import schemas
@@ -10,8 +9,8 @@ from netraven.api.dependencies import get_db_session, get_current_active_user
 from netraven.db import models
 
 router = APIRouter(
-    prefix="/logs",
-    tags=["Logs"],
+    prefix="/connection-logs",
+    tags=["Connection Logs"],
     dependencies=[Depends(get_current_active_user)] # Apply auth to all log routes
 )
 
@@ -45,7 +44,4 @@ def read_logs(
         "page": page,
         "size": size,
         "pages": pages
-    }
-
-# Optional: Add endpoint to get a specific log entry by ID if needed later
-# Requires determining if ID belongs to JobLog or ConnectionLog table
+    } 

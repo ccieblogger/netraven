@@ -1,10 +1,10 @@
 <template>
   <div class="container mx-auto p-4">
-    <h1 class="text-2xl font-semibold mb-4">System Logs</h1>
+    <h1 class="text-2xl font-semibold mb-4">Connection Logs</h1>
 
     <!-- Filters -->
     <ResourceFilter
-      title="Log Filters"
+      title="Connection Log Filters"
       :filter-fields="filterFields"
       :initial-filters="currentFilters"
       @apply-filters="applyFilters"
@@ -12,13 +12,13 @@
     />
 
     <!-- Loading/Error Indicators -->
-    <div v-if="logStore.isLoading && logs.length === 0" class="text-center py-4">Loading Logs...</div>
+    <div v-if="logStore.isLoading && logs.length === 0" class="text-center py-4">Loading Connection Logs...</div>
      <div v-if="logStore.error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
        <span v-if="logStore.error === 'Not authenticated' || logStore.error === '401 Unauthorized'">
          Your session has expired or you are not logged in. <router-link to="/login" class="underline text-blue-700">Please log in again.</router-link>
        </span>
        <span v-else-if="logStore.error === 'Not Found' || logStore.error === '404 Not Found'">
-         Logs endpoint not found. Please contact support.
+         Connection Logs endpoint not found. Please contact support.
        </span>
        <span v-else>
          Error: {{ logStore.error }}
@@ -31,32 +31,18 @@
         <thead>
           <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
             <th class="py-3 px-6 text-left">Timestamp</th>
-            <th class="py-3 px-6 text-left">Type</th>
             <th class="py-3 px-6 text-left">Job ID</th>
             <th class="py-3 px-6 text-left">Device ID</th>
-            <th class="py-3 px-6 text-left">Level</th>
-            <th class="py-3 px-6 text-left">Message / Log Content</th>
+            <th class="py-3 px-6 text-left">Log Content</th>
           </tr>
         </thead>
         <tbody class="text-gray-600 text-sm font-light">
-          <tr v-for="log in logs" :key="log.id + (log.message ? 'job' : 'conn')" class="border-b border-gray-200 hover:bg-gray-100">
+          <tr v-for="log in logs" :key="log.id + 'conn'" class="border-b border-gray-200 hover:bg-gray-100">
              <td class="py-3 px-6 text-left text-xs whitespace-nowrap">{{ formatDateTime(log.timestamp) }}</td>
-             <td class="py-3 px-6 text-left">
-                <span :class="log.message ? 'bg-purple-100 text-purple-600' : 'bg-green-100 text-green-600' " class="py-1 px-3 rounded-full text-xs">
-                  {{ log.message ? 'Job' : 'Connection' }}
-                </span>
-             </td>
              <td class="py-3 px-6 text-left">{{ log.job_id }}</td>
              <td class="py-3 px-6 text-left">{{ log.device_id || '-' }}</td>
              <td class="py-3 px-6 text-left">
-                 <span v-if="log.level" :class="logLevelClass(log.level)" class="py-1 px-3 rounded-full text-xs">
-                   {{ log.level }}
-                 </span>
-                 <span v-else>-</span>
-             </td>
-             <td class="py-3 px-6 text-left">
-                 <pre v-if="!log.message" class="text-xs whitespace-pre-wrap font-mono">{{ log.log }}</pre>
-                 <span v-else>{{ log.message }}</span>
+                 <pre class="text-xs whitespace-pre-wrap font-mono">{{ log.log }}</pre>
              </td>
           </tr>
         </tbody>
@@ -72,7 +58,7 @@
 
     <!-- No Logs Message -->
     <div v-if="!logStore.isLoading && logs.length === 0 && !logStore.error" class="text-center text-gray-500 py-6">
-      No logs found matching the criteria.
+      No connection logs found matching the criteria.
     </div>
 
   </div>
@@ -91,7 +77,7 @@ const totalPages = computed(() => logStore.totalPages) // Use computed from stor
 const route = useRoute()
 const router = useRouter()
 
-// Filter fields configuration
+// Filter fields configuration (no log_type)
 const filterFields = [
   {
     id: 'job_id',
@@ -104,25 +90,13 @@ const filterFields = [
     label: 'Device ID',
     type: 'number',
     placeholder: 'Filter by Device ID'
-  },
-  {
-    id: 'log_type',
-    label: 'Log Type',
-    type: 'select',
-    placeholder: 'Select log type',
-    options: [
-      { value: null, label: 'All' },
-      { value: 'job_log', label: 'Job Logs' },
-      { value: 'connection_log', label: 'Connection Logs' }
-    ]
   }
 ]
 
 // Local reactive state for filter inputs, initialized from route query
 const currentFilters = reactive({
   job_id: route.query.job_id ? parseInt(route.query.job_id) : null,
-  device_id: route.query.device_id ? parseInt(route.query.device_id) : null,
-  log_type: route.query.log_type || null,
+  device_id: route.query.device_id ? parseInt(route.query.device_id) : null
 })
 
 // Function to update route query params when filters or page change

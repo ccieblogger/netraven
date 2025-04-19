@@ -13,6 +13,8 @@ import ConfigDiff from '../pages/ConfigDiff.vue'; // Import the ConfigDiff compo
 import JobMonitor from '../pages/JobMonitor.vue'; // Import the JobMonitor component
 import Tags from '../pages/Tags.vue'; // Import the Tags component
 import Credentials from '../pages/Credentials.vue'; // Import the Credentials component
+import ConnectionLogs from '../pages/Logs.vue';
+import JobLogs from '../pages/JobLogs.vue';
 
 // Placeholder components for routes to work initially
 // const PlaceholderComponent = { template: '<div>Placeholder Page</div>' }; // No longer needed
@@ -65,10 +67,20 @@ const routes = [
     meta: { requiresAuth: true, roles: ['admin', 'user'] }
   },
   {
+    path: '/connection-logs',
+    name: 'ConnectionLogs',
+    component: ConnectionLogs,
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
+  },
+  {
+    path: '/job-logs',
+    name: 'JobLogs',
+    component: JobLogs,
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
+  },
+  {
     path: '/logs',
-    name: 'Logs',
-    component: Logs, // Use actual Logs component
-    meta: { requiresAuth: true, roles: ['admin', 'user'] } 
+    redirect: '/connection-logs'
   },
   {
     path: '/users',

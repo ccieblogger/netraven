@@ -40,7 +40,7 @@ export const useLogStore = defineStore('logs', () => {
         Object.keys(params).forEach(key => (params[key] == null || params[key] === '') && delete params[key]);
 
         console.log("Fetching logs with params:", params);
-        const response = await api.get('/logs/', { params })
+        const response = await api.get('/connection-logs/', { params })
 
         // Assuming API returns PaginatedResponse structure
         if (response.data && Array.isArray(response.data.items)) {
