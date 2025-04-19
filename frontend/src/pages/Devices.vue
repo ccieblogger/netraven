@@ -81,6 +81,21 @@
                  <button @click="openDeleteModal(device)" class="w-4 mr-2 transform hover:text-red-500 hover:scale-110">
                     <TrashIcon class="h-4 w-4" />
                  </button>
+                 <!-- Check Reachability Button -->
+                 <button
+                   :disabled="device.status === 'offline' || reachabilityLoading[device.id]"
+                   @click="checkReachability(device)"
+                   class="w-6 h-6 flex items-center justify-center rounded-full bg-green-100 hover:bg-green-200 text-green-700 ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                   :title="device.status === 'offline' ? 'Device offline' : 'Check Reachability'"
+                 >
+                   <span v-if="reachabilityLoading[device.id]">
+                     <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                   </span>
+                   <span v-else>
+                     <!-- Network check icon -->
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2l4-4m5 2a9 9 0 11-18 0a9 9 0 0118 0z" /></svg>
+                   </span>
+                 </button>
               </div>
             </td>
           </tr>
@@ -126,6 +141,9 @@ import { useDeviceStore } from '../store/device'
 import DeviceFormModal from '../components/DeviceFormModal.vue'
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue'
 import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline' // Using outline icons
+import api from '../services/api' // assumed API service
+import { useRouter } from 'vue-router'
+import { useNotificationStore } from '../store/notifications'
 
 const deviceStore = useDeviceStore()
 const devices = computed(() => deviceStore.devices)
@@ -140,6 +158,11 @@ const deviceToDelete = ref(null)
 const activeCredentialPopover = ref(null);
 const deviceCredentials = ref([]);
 const isLoadingDeviceCredentials = ref(false);
+
+const router = useRouter()
+const notificationStore = useNotificationStore()
+const reachabilityLoading = ref({}) // Track loading state per device
+const lastReachabilityJobId = ref(null) // For redirect in next phase
 
 onMounted(() => {
     // Fetch devices only if the list is empty initially
@@ -231,6 +254,21 @@ async function showCredentialPopover(deviceId) {
 
 function hideCredentialPopover() {
   activeCredentialPopover.value = null;
+}
+
+async function checkReachability(device) {
+  const name = `reachability-${device.hostname}-${Date.now()}`
+  reachabilityLoading.value[device.id] = true
+  try {
+    const response = await api.post('/jobs/reachability', { device_id: device.id, name })
+    lastReachabilityJobId.value = response.data.id
+    notificationStore.success('Reachability job started!')
+    router.push(`/jobs/${response.data.id}`)
+  } catch (err) {
+    notificationStore.error('Failed to start reachability job')
+  } finally {
+    reachabilityLoading.value[device.id] = false
+  }
 }
 
 </script>

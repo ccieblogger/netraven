@@ -8,6 +8,10 @@
             <h3 class="text-lg font-semibold">
               Job: {{ job ? job.name : 'Loading...' }}
               <span class="text-sm font-normal text-gray-500 ml-2">#{{ jobId }}</span>
+              <span v-if="job && job.job_type === 'reachability'" class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                <svg class="h-4 w-4 mr-1 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2l4-4m5 2a9 9 0 11-18 0a9 9 0 0118 0z" /></svg>
+                Check Reachability
+              </span>
             </h3>
             <div class="text-sm text-gray-600">
               <span v-if="job && job.description">{{ job.description }}</span>
@@ -88,6 +92,104 @@
             <p v-else class="text-gray-500">No device results available</p>
           </div>
           
+          <!-- Reachability Job Table -->
+          <table v-else-if="job && job.job_type === 'reachability'" class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reachability Results</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Started</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr v-for="result in deviceResults" :key="result.device_id">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="font-medium text-gray-900">{{ result.device_name || `Device #${result.device_id}` }}</div>
+                  <div class="text-xs text-gray-500">{{ result.device_ip || '' }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="flex flex-col space-y-1">
+                    <!-- ICMP Ping -->
+                    <div class="flex items-center">
+                      <span v-if="result.icmp_ping && result.icmp_ping.success" class="text-green-600 mr-1" title="Ping Success">
+                        <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                      </span>
+                      <span v-else class="text-red-600 mr-1" title="Ping Failed">
+                        <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </span>
+                      <span class="font-semibold">ICMP:</span>
+                      <span v-if="result.icmp_ping && result.icmp_ping.success" class="ml-1">{{ result.icmp_ping.latency }} ms</span>
+                      <span v-else-if="result.icmp_ping && result.icmp_ping.error" class="ml-1 text-xs text-gray-500">{{ result.icmp_ping.error }}</span>
+                      <span v-else class="ml-1 text-xs text-gray-400">No data</span>
+                    </div>
+                    <!-- TCP 22 -->
+                    <div class="flex items-center">
+                      <span v-if="result.tcp_22 && result.tcp_22.success" class="text-green-600 mr-1" title="TCP 22 Success">
+                        <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                      </span>
+                      <span v-else class="text-red-600 mr-1" title="TCP 22 Failed">
+                        <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </span>
+                      <span class="font-semibold">TCP 22:</span>
+                      <span v-if="result.tcp_22 && result.tcp_22.success" class="ml-1">Open</span>
+                      <span v-else-if="result.tcp_22 && result.tcp_22.error" class="ml-1 text-xs text-gray-500">{{ result.tcp_22.error }}</span>
+                      <span v-else class="ml-1 text-xs text-gray-400">No data</span>
+                    </div>
+                    <!-- TCP 443 -->
+                    <div class="flex items-center">
+                      <span v-if="result.tcp_443 && result.tcp_443.success" class="text-green-600 mr-1" title="TCP 443 Success">
+                        <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                      </span>
+                      <span v-else class="text-red-600 mr-1" title="TCP 443 Failed">
+                        <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </span>
+                      <span class="font-semibold">TCP 443:</span>
+                      <span v-if="result.tcp_443 && result.tcp_443.success" class="ml-1">Open</span>
+                      <span v-else-if="result.tcp_443 && result.tcp_443.error" class="ml-1 text-xs text-gray-500">{{ result.tcp_443.error }}</span>
+                      <span v-else class="ml-1 text-xs text-gray-400">No data</span>
+                    </div>
+                    <!-- General Errors -->
+                    <div v-if="result.errors && result.errors.length" class="flex items-center mt-1">
+                      <span class="text-red-500 mr-1">
+                        <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </span>
+                      <span class="text-xs text-red-500">{{ result.errors.join('; ') }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span :class="getStatusBadgeClass(result.status)" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
+                    {{ result.status }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ formatDateTime(result.started_at) || 'Pending' }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {{ formatDateTime(result.completed_at) || '-' }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <template v-if="job && jobTypeRegistry[job.job_type] && jobTypeRegistry[job.job_type].logComponents">
+                    <button v-if="jobTypeRegistry[job.job_type].logComponents.job" @click="openJobLogModal(result)" class="text-indigo-600 hover:text-indigo-900 cursor-pointer mr-2" title="View Job Log">
+                      <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h2a4 4 0 014 4v2" /></svg>
+                      Job Log
+                    </button>
+                    <button v-if="jobTypeRegistry[job.job_type].logComponents.connection" @click="openConnLogModal(result)" class="text-green-600 hover:text-green-900 cursor-pointer" title="View Connection Log">
+                      <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" /></svg>
+                      Conn Log
+                    </button>
+                  </template>
+                  <template v-else>
+                    <a v-if="result.has_log" @click="viewDeviceLog(result)" class="text-indigo-600 hover:text-indigo-900 cursor-pointer">View Log</a>
+                  </template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <!-- Default Table for Other Job Types -->
           <table v-else class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
@@ -116,11 +218,19 @@
                   {{ formatDateTime(result.completed_at) || '-' }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <a 
-                    v-if="result.has_log" 
-                    @click="viewDeviceLog(result)" 
-                    class="text-indigo-600 hover:text-indigo-900 cursor-pointer"
-                  >View Log</a>
+                  <template v-if="job && jobTypeRegistry[job.job_type] && jobTypeRegistry[job.job_type].logComponents">
+                    <button v-if="jobTypeRegistry[job.job_type].logComponents.job" @click="openJobLogModal(result)" class="text-indigo-600 hover:text-indigo-900 cursor-pointer mr-2" title="View Job Log">
+                      <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h2a4 4 0 014 4v2" /></svg>
+                      Job Log
+                    </button>
+                    <button v-if="jobTypeRegistry[job.job_type].logComponents.connection" @click="openConnLogModal(result)" class="text-green-600 hover:text-green-900 cursor-pointer" title="View Connection Log">
+                      <svg class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" /></svg>
+                      Conn Log
+                    </button>
+                  </template>
+                  <template v-else>
+                    <a v-if="result.has_log" @click="viewDeviceLog(result)" class="text-indigo-600 hover:text-indigo-900 cursor-pointer">View Log</a>
+                  </template>
                 </td>
               </tr>
             </tbody>
@@ -147,22 +257,16 @@
       </div>
     </div>
 
-    <!-- Device Log Modal -->
-    <BaseModal 
-      :is-open="isLogModalOpen" 
-      :title="`Log: ${selectedDevice ? selectedDevice.device_name || `Device #${selectedDevice.device_id}` : ''}`"
-      @close="closeLogModal"
-    >
+    <!-- Job Log Modal -->
+    <BaseModal :is-open="isJobLogModalOpen" :title="`Job Log: ${logModalDevice ? logModalDevice.device_name || `Device #${logModalDevice.device_id}` : ''}`" @close="closeJobLogModal">
       <template #content>
-        <div v-if="deviceLogLoading" class="text-center py-4">
-          <div class="text-blue-500">Loading log data...</div>
-        </div>
-        <div v-else-if="deviceLogError" class="text-center py-4">
-          <div class="text-red-500">{{ deviceLogError }}</div>
-        </div>
-        <div v-else-if="deviceLog" class="bg-gray-50 p-4 rounded overflow-auto max-h-96 font-mono text-sm">
-          <pre>{{ deviceLog }}</pre>
-        </div>
+        <JobLogTable v-if="isJobLogModalOpen && logModalDevice" :job-id="jobId" :device-id="logModalDevice.device_id" />
+      </template>
+    </BaseModal>
+    <!-- Connection Log Modal -->
+    <BaseModal :is-open="isConnLogModalOpen" :title="`Connection Log: ${logModalDevice ? logModalDevice.device_name || `Device #${logModalDevice.device_id}` : ''}`" @close="closeConnLogModal">
+      <template #content>
+        <ConnectionLogTable v-if="isConnLogModalOpen && logModalDevice" :job-id="jobId" :device-id="logModalDevice.device_id" />
       </template>
     </BaseModal>
   </div>
@@ -175,6 +279,9 @@ import { useJobStore } from '../store/job';
 import { useNotificationStore } from '../store/notifications';
 import BaseModal from './BaseModal.vue';
 import axios from 'axios';
+import JobLogTable from './JobLogTable.vue'
+import ConnectionLogTable from './ConnectionLogTable.vue'
+import { jobTypeRegistry } from '../jobTypeRegistry'
 
 const props = defineProps({
   jobId: {
@@ -200,11 +307,9 @@ const isLoading = ref(false);
 const error = ref(null);
 const deviceResults = ref([]);
 const refreshTimer = ref(null);
-const isLogModalOpen = ref(false);
-const selectedDevice = ref(null);
-const deviceLog = ref('');
-const deviceLogLoading = ref(false);
-const deviceLogError = ref(null);
+const isJobLogModalOpen = ref(false)
+const isConnLogModalOpen = ref(false)
+const logModalDevice = ref(null)
 
 // Computed properties
 const statusText = computed(() => {
@@ -330,26 +435,28 @@ function stopAutoRefresh() {
 }
 
 async function viewDeviceLog(device) {
-  selectedDevice.value = device;
-  isLogModalOpen.value = true;
-  deviceLogLoading.value = true;
-  deviceLogError.value = null;
-  
-  try {
-    const response = await axios.get(`/api/jobs/${props.jobId}/devices/${device.device_id}/logs`);
-    deviceLog.value = response.data.log || 'No log data available';
-  } catch (err) {
-    console.error('Error fetching device log:', err);
-    deviceLogError.value = 'Failed to load device log';
-  } finally {
-    deviceLogLoading.value = false;
-  }
+  logModalDevice.value = device
+  isJobLogModalOpen.value = true
 }
 
-function closeLogModal() {
-  isLogModalOpen.value = false;
-  selectedDevice.value = null;
-  deviceLog.value = '';
+function openJobLogModal(device) {
+  logModalDevice.value = device
+  isJobLogModalOpen.value = true
+}
+
+function openConnLogModal(device) {
+  logModalDevice.value = device
+  isConnLogModalOpen.value = true
+}
+
+function closeJobLogModal() {
+  isJobLogModalOpen.value = false
+  logModalDevice.value = null
+}
+
+function closeConnLogModal() {
+  isConnLogModalOpen.value = false
+  logModalDevice.value = null
 }
 
 async function retryFailedDevices() {
