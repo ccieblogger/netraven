@@ -14,7 +14,15 @@
     <!-- Loading/Error Indicators -->
     <div v-if="logStore.isLoading && logs.length === 0" class="text-center py-4">Loading Logs...</div>
      <div v-if="logStore.error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-       Error: {{ logStore.error }}
+       <span v-if="logStore.error === 'Not authenticated' || logStore.error === '401 Unauthorized'">
+         Your session has expired or you are not logged in. <router-link to="/login" class="underline text-blue-700">Please log in again.</router-link>
+       </span>
+       <span v-else-if="logStore.error === 'Not Found' || logStore.error === '404 Not Found'">
+         Logs endpoint not found. Please contact support.
+       </span>
+       <span v-else>
+         Error: {{ logStore.error }}
+       </span>
     </div>
 
     <!-- Logs Table -->

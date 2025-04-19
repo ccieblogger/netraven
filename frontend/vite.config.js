@@ -24,12 +24,13 @@ export default defineConfig({
     port: 5173,
     strictPort: true, // Fail if port is already in use
     proxy: {
-      // Proxy API requests to backend - disable redirects
+      // Proxy API requests to backend - do NOT rewrite the path, preserve /api for FastAPI/Nginx compatibility
       '/api': {
         target: 'http://api:8000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // Remove the rewrite so /api prefix is preserved
+        // rewrite: (path) => path.replace(/^\/api/, ''),
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             // Log the proxied URL for debugging

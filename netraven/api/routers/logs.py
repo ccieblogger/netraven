@@ -95,26 +95,51 @@ def read_logs(
     
     # Transform raw query results to appropriate schema objects
     result_logs = []
-    for log in logs:
-        if log.log_type == "job_log":
-            result_logs.append(schemas.log.JobLog(
-                id=log.id,
-                job_id=log.job_id,
-                device_id=log.device_id,
-                message=log.log,  # Using the aliased field
-                level=log.level,
-                timestamp=log.timestamp,
-                log_type="job_log"
-            ))
-        else:  # connection_log
-            result_logs.append(schemas.log.ConnectionLog(
-                id=log.id,
-                job_id=log.job_id,
-                device_id=log.device_id,
-                log=log.log,
-                timestamp=log.timestamp,
-                log_type="connection_log"
-            ))
+    if log_type is None:
+        # Union query: always use index-based access (tuples)
+        for log in logs:
+            # Tuple order: id, job_id, device_id, log, level, timestamp, log_type
+            if log[6] == "job_log":
+                result_logs.append(schemas.log.JobLog(
+                    id=log[0],
+                    job_id=log[1],
+                    device_id=log[2],
+                    message=log[3],
+                    level=log[4],
+                    timestamp=log[5],
+                    log_type="job_log"
+                ))
+            else:  # connection_log
+                result_logs.append(schemas.log.ConnectionLog(
+                    id=log[0],
+                    job_id=log[1],
+                    device_id=log[2],
+                    log=log[3],
+                    timestamp=log[5],
+                    log_type="connection_log"
+                ))
+    else:
+        # Non-union query: use attribute access (ORM objects)
+        for log in logs:
+            if hasattr(log, 'log_type') and log.log_type == "job_log":
+                result_logs.append(schemas.log.JobLog(
+                    id=log.id,
+                    job_id=log.job_id,
+                    device_id=log.device_id,
+                    message=log.log,
+                    level=log.level,
+                    timestamp=log.timestamp,
+                    log_type="job_log"
+                ))
+            else:
+                result_logs.append(schemas.log.ConnectionLog(
+                    id=log.id,
+                    job_id=log.job_id,
+                    device_id=log.device_id,
+                    log=log.log,
+                    timestamp=log.timestamp,
+                    log_type="connection_log"
+                ))
     
     # Return paginated response
     return {
