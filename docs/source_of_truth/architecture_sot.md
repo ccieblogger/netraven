@@ -124,6 +124,15 @@ The system is installed locally using Python-based services with PostgreSQL and 
   - Real-time job progress per device
   - Log inspection
 
+#### Logging & Log Endpoints
+
+NetRaven separates logging into two distinct types, each with its own API endpoint and UI page:
+
+- **Job Logs** (`/job-logs/`): Logs related to job execution events, such as job progress, errors, and status changes. These logs are filterable by job ID, device ID, and log level. Exposed via a dedicated FastAPI endpoint and a dedicated UI page/tab.
+- **Connection Logs** (`/connection-logs/`): Logs capturing raw output and metadata from device connection attempts (e.g., SSH/API sessions). These are filterable by job ID and device ID. Exposed via a separate FastAPI endpoint and UI page/tab.
+
+This separation improves clarity, maintainability, and user experience by allowing users to focus on the type of log relevant to their task. Each log type has its own schema, filters, and pagination, and the frontend navigation provides direct access to both log types.
+
 ### Device Communication
 
 - Primary protocol: **SSH via Netmiko**
