@@ -28,6 +28,7 @@ try:
     from netraven.db.models.device import Device
     from netraven.db.models.credential import Credential
     from netraven.api.auth import get_password_hash
+    from netraven.db.models.job import Job
 except ImportError as e:
     logger.error(f"Failed to import required modules: {e}")
     sys.exit(1)
@@ -234,6 +235,33 @@ def associate_default_credential_with_default_tag(db):
         logger.error(f"Error associating default credential with default tag: {e}")
         db.rollback()
 
+def create_system_reachability_job(db):
+    """Create the system reachability job if it doesn't exist, associated with the default tag."""
+    # Check for existing job
+    job = db.query(Job).filter(Job.name == "system-reachability", Job.is_system_job == True).first()
+    if job:
+        logger.info(f"System reachability job already exists with ID: {job.id}")
+        return job
+    # Get default tag
+    default_tag = db.query(Tag).filter(Tag.name == "default").first()
+    if not default_tag:
+        logger.warning("Default tag not found, cannot create system reachability job")
+        return None
+    # Create the job
+    job = Job(
+        name="system-reachability",
+        description="System job: checks device reachability via ICMP and TCP.",
+        job_type="reachability",
+        is_enabled=True,
+        is_system_job=True,
+        tags=[default_tag]
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    logger.info(f"System reachability job created with ID: {job.id}")
+    return job
+
 def init_database():
     """Initialize the database with default data."""
     try:
@@ -261,6 +289,9 @@ def init_database():
         
         # Associate default credential with default tag
         associate_default_credential_with_default_tag(db)
+        
+        # Create system reachability job
+        create_system_reachability_job(db)
         
         logger.info("Database initialization completed successfully")
         return 0

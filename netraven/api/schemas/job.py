@@ -243,6 +243,7 @@ class Job(JobBase, BaseSchemaWithId):
         started_at: When the job last started execution
         completed_at: When the job last finished execution
         tags: List of Tag objects associated with this job
+        is_system_job: Whether the job is a system job (not user-editable/deletable)
     """
     status: str = Field(
         ...,
@@ -262,6 +263,11 @@ class Job(JobBase, BaseSchemaWithId):
     tags: List[Tag] = Field(
         default=[],
         description="List of tags associated with the job"
+    )
+    is_system_job: bool = Field(
+        False,
+        description="Whether the job is a system job (not user-editable/deletable)",
+        example=False
     )
 
 # Paginated response model

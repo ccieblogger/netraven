@@ -94,7 +94,7 @@ export const useJobStore = defineStore('jobs', () => {
   async function runJobNow(jobId) {
     runStatus.value = { jobId: jobId, status: 'running', error: null }; // Reset status
     try {
-      const response = await api.post(`/jobs/run/${jobId}/`);
+      const response = await api.post(`/jobs/run/${jobId}`);
       runStatus.value = { jobId: jobId, status: 'queued', data: response.data, error: null };
       // notifications.addMessage({ type: 'info', text: `Job ${jobId} queued successfully.` });
       return true;

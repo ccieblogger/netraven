@@ -22,8 +22,8 @@ const api = axios.create({
 // Request interceptor - Add authentication token
 api.interceptors.request.use((config) => {
   // Add Auth token
-  const authStore = useAuthStore();
-  const token = authStore.token;
+  // Use localStorage directly to always get the latest token
+  const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

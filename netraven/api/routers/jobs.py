@@ -18,6 +18,8 @@ from datetime import datetime
 from netraven.api import schemas
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role
 from netraven.db import models
+from netraven.db.models import JobLog, Device
+from netraven.api.schemas.log import JobLog as JobLogSchema
 
 # Potentially move to utils?
 from .devices import get_tags_by_ids # Reuse tag helper from device router for now
@@ -198,6 +200,8 @@ def update_job(
     db_job = db.query(models.Job).filter(models.Job.id == job_id).first()
     if db_job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if db_job.is_system_job:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System jobs cannot be updated.")
 
     update_data = job.model_dump(exclude_unset=True)
 
@@ -250,6 +254,8 @@ def delete_job(
     db_job = db.query(models.Job).filter(models.Job.id == job_id).first()
     if db_job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    if db_job.is_system_job:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System jobs cannot be deleted.")
 
     # TODO: Consider implications - should deleting a job also cancel scheduled RQ jobs?
     # This might require interaction with the scheduler or RQ itself.
@@ -328,3 +334,26 @@ async def trigger_job_run(
         "job_name": job.name,
         "queue_job_id": rq_job.id
     }
+
+@router.get("/{job_id}/devices", response_model=List[dict])
+def get_job_device_results(
+    job_id: int,
+    db: Session = Depends(get_db_session)
+):
+    """Return per-device job results for a given job."""
+    # Query all job logs for this job that are associated with a device
+    logs = (
+        db.query(JobLog, Device)
+        .join(Device, JobLog.device_id == Device.id)
+        .filter(JobLog.job_id == job_id)
+        .all()
+    )
+    results = []
+    for log, device in logs:
+        results.append({
+            "device_id": device.id,
+            "device_name": device.hostname,
+            "device_ip": device.ip_address,
+            "log": JobLogSchema.model_validate(log).model_dump(),
+        })
+    return results

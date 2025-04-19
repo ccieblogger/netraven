@@ -17,12 +17,14 @@ class Job(Base):
     Attributes:
         id: Primary key identifier for the job
         name: Human-readable name of the job
+        job_type: Type of the job
         description: Detailed description of the job's purpose
         status: Current execution status (pending, running, completed, failed)
         scheduled_for: When the job is scheduled to run next
         started_at: When the job last started execution
         completed_at: When the job last finished execution
         is_enabled: Whether the job is active in the scheduler
+        is_system_job: Whether the job is a system job
         schedule_type: Type of schedule (one-time, interval, cron)
         interval_seconds: For interval jobs, seconds between runs
         cron_string: For cron jobs, the cron expression defining the schedule
@@ -34,12 +36,14 @@ class Job(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, index=True, nullable=False)
+    job_type = Column(String, nullable=False, default="backup", index=True)
     description = Column(String)
     status = Column(String, nullable=False, default=JobStatus.PENDING, index=True)
     scheduled_for = Column(DateTime(timezone=True), index=True)
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
     is_enabled = Column(Boolean, default=True, index=True)
+    is_system_job = Column(Boolean, default=False, index=True)
     schedule_type = Column(String)
     interval_seconds = Column(Integer)
     cron_string = Column(String)

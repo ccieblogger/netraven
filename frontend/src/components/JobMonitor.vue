@@ -278,7 +278,7 @@ import { useRouter } from 'vue-router';
 import { useJobStore } from '../store/job';
 import { useNotificationStore } from '../store/notifications';
 import BaseModal from './BaseModal.vue';
-import axios from 'axios';
+import api from '../services/api';
 import JobLogTable from './JobLogTable.vue'
 import ConnectionLogTable from './ConnectionLogTable.vue'
 import { jobTypeRegistry } from '../jobTypeRegistry'
@@ -394,12 +394,12 @@ async function fetchJobStatus() {
   error.value = null;
   
   try {
-    // Fetch job details
-    const jobResponse = await axios.get(`/api/jobs/${props.jobId}`);
+    // Fetch job details using the shared API service
+    const jobResponse = await api.get(`/jobs/${props.jobId}`);
     job.value = jobResponse.data;
     
     // Fetch device results for this job
-    const deviceResponse = await axios.get(`/api/jobs/${props.jobId}/devices`);
+    const deviceResponse = await api.get(`/jobs/${props.jobId}/devices`);
     deviceResults.value = deviceResponse.data;
     
     // If job is complete, stop auto-refresh
@@ -461,7 +461,7 @@ function closeConnLogModal() {
 
 async function retryFailedDevices() {
   try {
-    await axios.post(`/api/jobs/${props.jobId}/retry-failed`);
+    await api.post(`/jobs/${props.jobId}/retry-failed`);
     notificationStore.success('Retry initiated for failed devices');
     await fetchJobStatus(); // Refresh the job status
   } catch (err) {
