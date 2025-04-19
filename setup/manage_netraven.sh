@@ -280,6 +280,7 @@ reset_all() {
     # Start all containers fresh
     echo -e "${YELLOW}Starting all containers fresh...${NC}"
     docker-compose -f $DOCKER_COMPOSE_FILE up -d
+    docker-compose -f $DOCKER_COMPOSE_FILE up -d worker
     
     # Wait for PostgreSQL to be ready
     echo -e "${YELLOW}Waiting for PostgreSQL to initialize...${NC}"
@@ -345,9 +346,9 @@ reset_all() {
 start_services() {
     echo -e "${YELLOW}Starting NetRaven services for ${ENVIRONMENT} environment...${NC}"
 
-    # Start Docker Compose services (Redis, PostgreSQL, API)
-    echo -e "${YELLOW}Starting containerized services (Redis, PostgreSQL, API)...${NC}"
-    docker-compose -f $DOCKER_COMPOSE_FILE up -d redis postgres api
+    # Start Docker Compose services (Redis, PostgreSQL, API, Worker)
+    echo -e "${YELLOW}Starting containerized services (Redis, PostgreSQL, API, Worker)...${NC}"
+    docker-compose -f $DOCKER_COMPOSE_FILE up -d redis postgres api worker
 
     # Check if PostgreSQL is up and running
     echo -e "${YELLOW}Verifying PostgreSQL connection...${NC}"
@@ -497,8 +498,13 @@ restart_service() {
             echo ""
             echo -e "${GREEN}PostgreSQL container restarted.${NC}"
             ;;
+        worker)
+            echo -e "${YELLOW}Restarting worker container...${NC}"
+            docker-compose -f $DOCKER_COMPOSE_FILE restart worker
+            echo -e "${GREEN}Worker container restarted.${NC}"
+            ;;
         *)
-            echo -e "${RED}Invalid service: $service. Use 'nginx', 'frontend', 'api', 'backend', 'redis', or 'postgres'.${NC}"
+            echo -e "${RED}Invalid service: $service. Use 'nginx', 'frontend', 'api', 'backend', 'redis', 'postgres', or 'worker'.${NC}"
             exit 1
             ;;
     esac
@@ -525,9 +531,9 @@ switch_env() {
 
 # Print a summary table of container and HTTP status
 print_status_table() {
-    local services=(postgres redis api frontend nginx)
-    local containers=(netraven-postgres netraven-redis netraven-api-dev netraven-frontend-dev netraven-nginx-dev)
-    local http_urls=("" "" "http://localhost:8000/health" "http://localhost:5173" "http://localhost/health")
+    local services=(postgres redis api frontend nginx worker)
+    local containers=(netraven-postgres netraven-redis netraven-api-dev netraven-frontend-dev netraven-nginx-dev netraven-worker-dev)
+    local http_urls=("" "" "http://localhost:8000/health" "http://localhost:5173" "http://localhost/health" "")
     local statuses=()
     local details=()
     local all_healthy=true
@@ -611,7 +617,7 @@ case "$COMMAND" in
         ;;
     restart)
         if [ "$#" -lt 2 ]; then
-            echo -e "${RED}Missing service name. Usage: $0 restart [nginx|frontend|api|backend|redis|postgres]${NC}"
+            echo -e "${RED}Missing service name. Usage: $0 restart [nginx|frontend|api|backend|redis|postgres|worker]${NC}"
             exit 1
         fi
         SERVICE=$2
