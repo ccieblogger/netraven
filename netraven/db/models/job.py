@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, func, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 
 from netraven.db.base import Base
@@ -6,11 +6,11 @@ from netraven.db.models.tag import job_tags_association
 from netraven.db.models.job_status import JobStatus
 
 class Job(Base):
-    """Represents a task to be performed, usually against a group of devices via Tags.
+    """Represents a task to be performed, usually against a group of devices via Tags or a single device via device_id.
 
     This model defines automated or manual tasks that execute operations against
     network devices. Jobs can be one-time executions or scheduled recurring tasks
-    that target devices via tag associations.
+    that target devices via tag associations or a single device via device_id.
     
     Jobs are typically created and managed by the scheduler or API calls.
     
@@ -28,6 +28,7 @@ class Job(Base):
         schedule_type: Type of schedule (one-time, interval, cron)
         interval_seconds: For interval jobs, seconds between runs
         cron_string: For cron jobs, the cron expression defining the schedule
+        device_id: Optional single device targeted by this job
         logs: Related JobLog entries
         connection_logs: Related ConnectionLog entries
         tags: Tags associated with this job (for targeting devices)
@@ -47,6 +48,7 @@ class Job(Base):
     schedule_type = Column(String)
     interval_seconds = Column(Integer)
     cron_string = Column(String)
+    device_id = Column(Integer, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True, index=True)
 
     logs = relationship("JobLog", back_populates="job", cascade="all, delete-orphan")
     connection_logs = relationship("ConnectionLog", back_populates="job", cascade="all, delete-orphan")

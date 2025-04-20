@@ -8,7 +8,7 @@ and response payloads for job endpoints.
 
 from datetime import datetime
 from typing import Optional, List, Literal
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator, root_validator
 import re
 from croniter import croniter
 
@@ -124,16 +124,30 @@ class JobBase(BaseSchema):
 class JobCreate(JobBase):
     """Schema for creating a new job.
     
-    Extends JobBase to include tag associations for targeting devices.
+    Extends JobBase to include tag associations for targeting devices or a single device.
     
     Attributes:
         tags: Optional list of tag IDs to associate with the job
+        device_id: Optional single device ID to target
     """
     tags: Optional[List[int]] = Field(
         None,
         description="List of tag IDs to associate with the job. Devices with these tags will be targeted by the job.",
         example=[1, 2]
     )
+    device_id: Optional[int] = Field(
+        None,
+        description="ID of a single device to target with this job. Mutually exclusive with tags.",
+        example=42
+    )
+
+    @model_validator(mode='after')
+    def validate_targeting_fields(self):
+        if (self.device_id is None and (not self.tags or len(self.tags) == 0)):
+            raise ValueError("Either device_id or tags must be provided.")
+        if self.device_id is not None and self.tags and len(self.tags) > 0:
+            raise ValueError("Provide either device_id or tags, not both.")
+        return self
 
 class JobUpdate(BaseSchema):
     """Schema for updating an existing job.
@@ -150,6 +164,7 @@ class JobUpdate(BaseSchema):
         cron_string: Optional updated cron expression
         scheduled_for: Optional updated scheduled time
         tags: Optional updated list of tag IDs
+        device_id: Optional updated device ID
     """
     name: Optional[str] = Field(
         None,
@@ -199,35 +214,20 @@ class JobUpdate(BaseSchema):
         description="List of tag IDs to associate with the job",
         example=[1, 2]
     )
-    
+    device_id: Optional[int] = Field(
+        None,
+        description="ID of a single device to target with this job. Mutually exclusive with tags.",
+        example=42
+    )
+
     @model_validator(mode='after')
-    def validate_schedule_fields(self):
-        """Validate schedule fields for partial updates.
-        
-        This validator ensures that any schedule fields being updated are valid,
-        while accounting for the fact that not all fields may be provided in an update.
-        
-        Returns:
-            The validated model
-            
-        Raises:
-            ValueError: If provided schedule fields are invalid
-        """
-        # Skip validation if schedule_type not provided in update
-        if self.schedule_type is None:
-            return self
-            
-        # Only validate if schedule fields are being updated
-        if self.schedule_type == "interval" and self.interval_seconds is not None and self.interval_seconds < 60:
-            raise ValueError("interval_seconds must be at least 60 seconds (1 minute)")
-            
-        # Validate cron string if provided
-        if self.cron_string is not None:
-            try:
-                croniter(self.cron_string)
-            except ValueError as e:
-                raise ValueError(f"Invalid cron expression: {e}")
-                
+    def validate_targeting_fields(self):
+        # Only validate if either field is being updated
+        if (self.device_id is not None or self.tags is not None):
+            if (self.device_id is None and (not self.tags or len(self.tags) == 0)):
+                raise ValueError("Either device_id or tags must be provided.")
+            if self.device_id is not None and self.tags and len(self.tags) > 0:
+                raise ValueError("Provide either device_id or tags, not both.")
         return self
 
 # Response model
@@ -235,14 +235,15 @@ class Job(JobBase, BaseSchemaWithId):
     """Complete job schema used for responses.
     
     Extends JobBase and includes additional fields available when
-    retrieving job information, such as status, execution times, and tags.
+    retrieving job information, such as status, execution times, tags, and device_id.
     
     Attributes:
         id: Primary key identifier for the job
         status: Current execution status (pending, running, completed, failed)
         started_at: When the job last started execution
-        completed_at: When the job last finished execution
+        completed_at: When the job completed running
         tags: List of Tag objects associated with this job
+        device_id: ID of the single device targeted by this job (if any)
         is_system_job: Whether the job is a system job (not user-editable/deletable)
     """
     status: str = Field(
@@ -263,6 +264,10 @@ class Job(JobBase, BaseSchemaWithId):
     tags: List[Tag] = Field(
         default=[],
         description="List of tags associated with the job"
+    )
+    device_id: Optional[int] = Field(
+        None,
+        description="ID of the single device targeted by this job (if any)"
     )
     is_system_job: bool = Field(
         False,

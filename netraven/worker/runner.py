@@ -199,7 +199,7 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
     1. Sets up database session management
     2. Updates job status to RUNNING
     3. Loads configuration settings
-    4. Loads devices associated with the job via tags
+    4. Loads devices associated with the job via device_id or tags
     5. Resolves credentials for devices
     6. Dispatches tasks for parallel execution on devices
     7. Processes results to determine overall job success/failure
@@ -248,8 +248,26 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         config = load_config()
         log.info(f"[Job: {job_id}] Configuration loaded.")
 
-        # 1. Load associated devices from DB via tags
-        devices_to_process = load_devices_for_job(job_id, db_to_use)
+        # 1. Load associated devices from DB via device_id or tags
+        job_obj = db_to_use.query(Job).options(selectinload(Job.tags)).filter(Job.id == job_id).first()
+        if not job_obj:
+            log.error(f"[Job: {job_id}] Job not found in database.")
+            final_status = JobStatus.FAILED_UNEXPECTED
+            job_failed = True
+            raise Exception("Job not found")
+
+        if job_obj.device_id is not None:
+            # Single-device job
+            device = db_to_use.query(Device).filter(Device.id == job_obj.device_id).first()
+            if device:
+                devices_to_process = [device]
+                log.info(f"[Job: {job_id}] Loaded single device: {device.hostname} (ID: {device.id})")
+            else:
+                devices_to_process = []
+                log.warning(f"[Job: {job_id}] Device with ID {job_obj.device_id} not found.")
+        else:
+            # Tag-based job (existing logic)
+            devices_to_process = load_devices_for_job(job_id, db_to_use)
 
         if not devices_to_process:
             final_status = JobStatus.COMPLETED_NO_DEVICES

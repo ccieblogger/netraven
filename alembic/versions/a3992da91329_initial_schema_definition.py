@@ -80,20 +80,23 @@ def upgrade() -> None:
     )
     op.create_table('jobs',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('job_type', sa.String(), nullable=False, server_default='backup'),
+    sa.Column('name', sa.String(), nullable=False, index=True),
+    sa.Column('job_type', sa.String(), nullable=False, server_default='backup', index=True),
     sa.Column('description', sa.String(), nullable=True),
-    sa.Column('status', sa.String(), nullable=False),
-    sa.Column('scheduled_for', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('status', sa.String(), nullable=False, server_default='PENDING', index=True),
+    sa.Column('scheduled_for', sa.DateTime(timezone=True), nullable=True, index=True),
     sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('completed_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('is_enabled', sa.Boolean(), nullable=True),
-    sa.Column('is_system_job', sa.Boolean(), nullable=True, server_default=sa.text('false')),
+    sa.Column('is_enabled', sa.Boolean(), nullable=True, server_default=sa.sql.expression.true(), index=True),
+    sa.Column('is_system_job', sa.Boolean(), nullable=True, server_default=sa.sql.expression.false(), index=True),
     sa.Column('schedule_type', sa.String(), nullable=True),
     sa.Column('interval_seconds', sa.Integer(), nullable=True),
     sa.Column('cron_string', sa.String(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
+    sa.Column('device_id', sa.Integer(), nullable=True, index=True),
+    sa.PrimaryKeyConstraint('id'),
+    sa.ForeignKeyConstraint(['device_id'], ['devices.id'], ondelete='SET NULL'),
     )
+    op.create_index('ix_jobs_device_id', 'jobs', ['device_id'])
     op.create_index(op.f('ix_jobs_is_enabled'), 'jobs', ['is_enabled'], unique=False)
     op.create_index(op.f('ix_jobs_name'), 'jobs', ['name'], unique=False)
     op.create_index(op.f('ix_jobs_scheduled_for'), 'jobs', ['scheduled_for'], unique=False)
@@ -141,6 +144,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_jobs_scheduled_for'), table_name='jobs')
     op.drop_index(op.f('ix_jobs_name'), table_name='jobs')
     op.drop_index(op.f('ix_jobs_is_enabled'), table_name='jobs')
+    op.drop_index('ix_jobs_device_id', table_name='jobs')
     op.drop_table('jobs')
     op.drop_table('device_tag_association')
     op.drop_table('device_configurations')

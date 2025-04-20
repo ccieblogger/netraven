@@ -24,8 +24,39 @@
           help-text="Describe the purpose of this job"
         />
 
+        <!-- Target Type Toggle -->
+        <div class="flex items-center space-x-4">
+          <label class="flex items-center">
+            <input type="radio" value="device" v-model="targetType" class="mr-2" />
+            Target a single device
+          </label>
+          <label class="flex items-center">
+            <input type="radio" value="tags" v-model="targetType" class="mr-2" />
+            Target devices by tags
+          </label>
+          <span class="text-xs text-gray-500 ml-2">Choose how to select devices for this job.</span>
+        </div>
+
+        <!-- Device Selector (Single Device) -->
+        <FormField
+          v-if="targetType === 'device'"
+          id="jobDevice"
+          v-model="form.device_id"
+          label="Target Device"
+          type="select"
+          :error="validationErrors.device_id"
+          required
+          help-text="Select a single device to run this job against"
+        >
+          <option value="">Select a device</option>
+          <option v-for="device in deviceStore.devices" :key="device.id" :value="device.id">
+            {{ device.hostname }} ({{ device.ip_address }})
+          </option>
+        </FormField>
+
         <!-- Tags (Multi-select) -->
         <TagSelector
+          v-if="targetType === 'tags'"
           id="jobTags"
           v-model="form.tag_ids"
           label="Target Tags"
@@ -126,6 +157,7 @@ import BaseModal from './BaseModal.vue';
 import FormField from './FormField.vue';
 import TagSelector from './TagSelector.vue';
 import { useTagStore } from '../store/tag';
+import { useDeviceStore } from '../store/device';
 import { useNotificationStore } from '../store/notifications';
 
 const props = defineProps({
@@ -142,9 +174,13 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save']);
 
 const tagStore = useTagStore();
+const deviceStore = useDeviceStore();
 const notificationStore = useNotificationStore();
 const isSaving = ref(false);
 const validationErrors = ref({});
+
+// Target type: 'device' or 'tags'
+const targetType = ref('tags');
 
 // Initialize form reactive object
 const form = ref({
@@ -152,6 +188,7 @@ const form = ref({
     name: '',
     description: '',
     tag_ids: [], // Array of selected tag IDs
+    device_id: '', // Single device ID
     is_enabled: true,
     schedule_type: 'interval', // Default schedule type
     interval_seconds: 3600, // Default interval: 1 hour
@@ -179,6 +216,9 @@ watch(() => props.isOpen, (newVal) => {
     if (tagStore.tags.length === 0 && !tagStore.isLoading) {
       tagStore.fetchTags();
     }
+    if (deviceStore.devices.length === 0 && !deviceStore.isLoading) {
+      deviceStore.fetchDevices();
+    }
   }
 });
 
@@ -190,6 +230,7 @@ function resetForm() {
         form.value.name = props.jobToEdit.name;
         form.value.description = props.jobToEdit.description || '';
         form.value.tag_ids = props.jobToEdit.tags ? props.jobToEdit.tags.map(tag => tag.id) : [];
+        form.value.device_id = props.jobToEdit.device_id || '';
         form.value.is_enabled = props.jobToEdit.is_enabled;
         form.value.schedule_type = props.jobToEdit.schedule_type || 'interval';
         form.value.interval_seconds = props.jobToEdit.interval_seconds || 3600;
@@ -201,17 +242,24 @@ function resetForm() {
         } else {
           form.value.run_at = formatDateForInput(new Date(Date.now() + 3600000));
         }
+        if (props.jobToEdit.device_id) {
+          targetType.value = 'device';
+        } else {
+          targetType.value = 'tags';
+        }
     } else {
         // Create mode: Reset to defaults
         form.value.id = null;
         form.value.name = '';
         form.value.description = '';
         form.value.tag_ids = [];
+        form.value.device_id = '';
         form.value.is_enabled = true;
         form.value.schedule_type = 'interval';
         form.value.interval_seconds = 3600;
         form.value.cron_string = '';
         form.value.run_at = formatDateForInput(new Date(Date.now() + 3600000));
+        targetType.value = 'tags';
     }
     isSaving.value = false; // Reset saving state
 }
@@ -230,9 +278,14 @@ function validateForm() {
     errors.name = 'Job name must be at least 3 characters';
   }
   
-  // Tag validation
-  if (!form.value.tag_ids || form.value.tag_ids.length === 0) {
-    errors.tag_ids = 'Please select at least one target tag';
+  if (targetType.value === 'device') {
+    if (!form.value.device_id) {
+      errors.device_id = 'Please select a device';
+    }
+  } else if (targetType.value === 'tags') {
+    if (!form.value.tag_ids || form.value.tag_ids.length === 0) {
+      errors.tag_ids = 'Please select at least one target tag';
+    }
   }
   
   // Schedule type specific validation
@@ -290,6 +343,13 @@ async function submitForm() {
       delete payload.id;
     }
 
+    // Only send device_id or tag_ids, not both
+    if (targetType.value === 'device') {
+      payload.tag_ids = [];
+    } else if (targetType.value === 'tags') {
+      payload.device_id = '';
+    }
+
     await emit('save', payload);
     notificationStore.success(`Job ${props.jobToEdit ? 'updated' : 'created'} successfully!`);
     // Parent should handle closing on success
@@ -309,6 +369,9 @@ async function submitForm() {
 onMounted(() => {
   if (props.isOpen && tagStore.tags.length === 0 && !tagStore.isLoading) {
     tagStore.fetchTags();
+  }
+  if (props.isOpen && deviceStore.devices.length === 0 && !deviceStore.isLoading) {
+    deviceStore.fetchDevices();
   }
 });
 </script> 

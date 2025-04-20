@@ -37,7 +37,7 @@ def create_job(
 ):
     """Create a new job definition.
     
-    Registers a new job with the provided details and assigns tags if specified.
+    Registers a new job with the provided details and assigns tags or device_id if specified.
     Jobs are used to define operations that will be performed on network devices,
     either on-demand or according to a schedule.
     
@@ -57,15 +57,24 @@ def create_job(
     if existing_job:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job name already exists")
 
+    # Prepare job data
+    job_data = job.model_dump(exclude={'tags'})
     db_job = models.Job(
-        **job.model_dump(exclude={'tags'}),
+        **job_data,
         status="pending" # Initial status
     )
-    
-    # Handle tags
-    if job.tags:
+
+    # Handle tags or device_id
+    if job.device_id is not None:
+        db_job.device_id = job.device_id
+        db_job.tags = []  # Ensure no tags are set
+    elif job.tags:
         tags = get_tags_by_ids(db, job.tags)
         db_job.tags = tags
+        db_job.device_id = None
+    else:
+        # Should not happen due to schema validation, but double check
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Either device_id or tags must be provided.")
 
     db.add(db_job)
     db.commit()
