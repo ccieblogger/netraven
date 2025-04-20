@@ -38,6 +38,11 @@ This document outlines the complete architecture for NetRaven, a network device 
    │    (RQ + RQ Scheduler)          │
    └────────────┬───────────────────┘
                 ▼
+       ┌──────────────────────────────┐
+       │ Dedicated Worker Container   │
+       │ (RQ Worker, Python, Docker) │
+       └────────┬────────────────────┘
+                ▼
        ┌───────────────────┐
        │  Device Comm Job  │
        │   (Netmiko-based) │
@@ -86,13 +91,22 @@ The system is installed locally using Python-based services with PostgreSQL and 
   - Users and roles
 - Status endpoints for job monitoring.
 
-#### 2. Device Communication Worker
+#### 2. Device Communication Worker (now Dedicated Container)
 
 - Executes device jobs triggered by scheduler or on demand.
+- Runs as a dedicated Docker container (`worker` service) using RQ Worker.
 - Connects to network devices using **Netmiko**.
 - Retrieves `show running-config` and basic facts (hostname, serial number).
 - Uses `ThreadPoolExecutor` for concurrent device access (default: 5).
 - Reports logs and results to database.
+- Picks up jobs from the Redis queue and updates job status in the database.
+
+#### 2a. System Jobs (e.g., Reachability)
+- System jobs are created automatically during system installation (e.g., reachability job).
+- System jobs are associated with a default tag and credentials.
+- System jobs are not user-deletable or editable.
+- The worker processes system jobs just like regular jobs, but with special handling for job type and status.
+- If no devices are associated with the job's tags, the job is marked as `COMPLETED_NO_DEVICES`.
 
 #### 3. Job Scheduler
 
@@ -210,3 +224,10 @@ NetRaven uses a monorepo structure and is designed for local installation using 
 - Threaded jobs tested for isolation, timing, logging
 
 ---
+
+#### Job Lifecycle & Orchestration (Updated)
+- Jobs are created via the API or automatically (system jobs).
+- Jobs are enqueued in Redis and picked up by the dedicated worker container.
+- The worker updates job status (`QUEUED` → `RUNNING` → `COMPLETED`/`FAILED`/`COMPLETED_NO_DEVICES`).
+- Job logs and connection logs are written to the database for UI consumption.
+- System jobs are protected from deletion and have special status handling in the UI and backend.
