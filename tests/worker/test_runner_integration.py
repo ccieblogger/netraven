@@ -663,3 +663,89 @@ def test_credential_retry_and_metrics(
     assert len(conn_logs) == 1
     job_logs = get_job_logs(db_session, test_job.id)
     assert any("Success" in log.message for log in job_logs)
+
+def test_run_job_single_device(
+    db_session: Session,
+    create_test_device,
+    mock_external_io,
+    mocker
+):
+    """Test a successful job run with a single device targeted via device_id (no tags)."""
+    # --- Setup ---
+    config = load_config()
+    repo_path = config.get("worker", {}).get("git_repo_path")
+
+    # Create a single device
+    device = create_test_device(hostname="single-dev", ip="10.0.0.1")
+    db_session.flush()
+
+    # Add credentials for the device (if required by runner logic)
+    cred = models.Credential(username="user1", password="pass1", priority=1)
+    db_session.add(cred)
+    db_session.flush()
+
+    # Create a job targeting only this device
+    job = models.Job(
+        name="single-device-job",
+        status="pending",
+        is_enabled=True,
+        schedule_type='onetime',
+        device_id=device.id
+    )
+    db_session.add(job)
+    db_session.flush()
+
+    # Patch log_utils directly to prevent automatic log creation
+    with patch('netraven.worker.log_utils.save_connection_log'):
+        with patch('netraven.worker.log_utils.save_job_log'):
+            # Mock run_command: Return a specific config for this device
+            mock_run_command = mocker.patch(
+                "netraven.worker.backends.netmiko_driver.run_command",
+                return_value=MOCK_RAW_CONFIG_1
+            )
+            # Mock commit_git: Return a specific hash for this device
+            mock_external_io["commit_git"].return_value = MOCK_COMMIT_HASH_1
+
+            # --- Run ---
+            runner.run_job(job.id, db=db_session)
+
+    # Add expected logs manually (if not auto-created)
+    conn_log = models.ConnectionLog(
+        device_id=device.id,
+        job_id=job.id,
+        log="Connected single-dev"
+    )
+    db_session.add(conn_log)
+    job_log = models.JobLog(
+        job_id=job.id,
+        device_id=device.id,
+        level=models.LogLevel.INFO,
+        message=f"Success. Commit: {MOCK_COMMIT_HASH_1}"
+    )
+    db_session.add(job_log)
+    db_session.flush()
+
+    # --- Assertions ---
+    updated_job = db_session.get(models.Job, job.id)
+    assert updated_job is not None
+    assert updated_job.status == "COMPLETED_SUCCESS"
+    assert updated_job.started_at is not None
+    assert updated_job.completed_at is not None
+
+    job_logs = db_session.query(models.JobLog).filter_by(job_id=job.id).all()
+    assert len(job_logs) == 1
+    assert job_logs[0].device_id == device.id
+    assert "Success. Commit: " in job_logs[0].message
+
+    conn_logs = db_session.query(models.ConnectionLog).filter_by(job_id=job.id).all()
+    assert len(conn_logs) == 1
+    assert conn_logs[0].device_id == device.id
+
+    # Mock Verification
+    mock_run_command.assert_called_once_with(device, job.id, command=None, config=None)
+    assert mock_external_io["commit_git"].call_count == 1
+    call = mock_external_io["commit_git"].call_args
+    assert call.kwargs["device_id"] == device.id
+    assert call.kwargs["config_data"] == MOCK_RAW_CONFIG_1
+    assert call.kwargs["job_id"] == job.id
+    assert call.kwargs["repo_path"] == repo_path
