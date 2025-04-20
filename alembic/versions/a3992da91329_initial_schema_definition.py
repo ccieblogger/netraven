@@ -1,4 +1,12 @@
-"""Initial schema definition
+"""
+Initial schema definition
+
+NOTE FOR DEVELOPERS:
+- This is the *pre-release* initial schema migration for NetRaven.
+- All indexes are created *only* via op.create_index below, NOT via index=True in sa.Column definitions.
+- Do NOT add further migrations until after customer deployment. Any schema changes before release should be made by editing this file directly and resetting the database.
+- This approach avoids Alembic/SQLAlchemy index duplication issues and ensures a clean, reliable initial schema for containerized deployments.
+- After customer deployment, follow standard Alembic migration practices for schema changes.
 
 Revision ID: a3992da91329
 Revises: 
@@ -28,13 +36,18 @@ def upgrade() -> None:
     sa.Column('priority', sa.Integer(), nullable=True),
     sa.Column('last_used', sa.DateTime(timezone=True), nullable=True),
     sa.Column('success_rate', sa.Float(), nullable=True),
+    sa.Column('description', sa.String(), nullable=True),
+    sa.Column('is_system', sa.Boolean(), nullable=True, server_default=sa.text('false')),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('devices',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('hostname', sa.String(), nullable=False),
-    sa.Column('ip_address', sa.String(), nullable=False),
+    sa.Column('hostname', sa.String(), nullable=False, unique=True),
+    sa.Column('ip_address', sa.String(), nullable=False, unique=True),
     sa.Column('device_type', sa.String(), nullable=False),
+    sa.Column('description', sa.String(), nullable=True),
+    sa.Column('port', sa.Integer(), nullable=True, server_default='22'),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('last_seen', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('ip_address')
@@ -80,27 +93,27 @@ def upgrade() -> None:
     )
     op.create_table('jobs',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(), nullable=False, index=True),
-    sa.Column('job_type', sa.String(), nullable=False, server_default='backup', index=True),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('job_type', sa.String(), nullable=False, server_default='backup'),
     sa.Column('description', sa.String(), nullable=True),
-    sa.Column('status', sa.String(), nullable=False, server_default='PENDING', index=True),
-    sa.Column('scheduled_for', sa.DateTime(timezone=True), nullable=True, index=True),
+    sa.Column('status', sa.String(), nullable=False, server_default='PENDING'),
+    sa.Column('scheduled_for', sa.DateTime(timezone=True), nullable=True),
     sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('completed_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('is_enabled', sa.Boolean(), nullable=True, server_default=sa.sql.expression.true(), index=True),
-    sa.Column('is_system_job', sa.Boolean(), nullable=True, server_default=sa.sql.expression.false(), index=True),
+    sa.Column('is_enabled', sa.Boolean(), nullable=True, server_default=sa.sql.expression.true()),
+    sa.Column('is_system_job', sa.Boolean(), nullable=True, server_default=sa.sql.expression.false()),
     sa.Column('schedule_type', sa.String(), nullable=True),
     sa.Column('interval_seconds', sa.Integer(), nullable=True),
     sa.Column('cron_string', sa.String(), nullable=True),
-    sa.Column('device_id', sa.Integer(), nullable=True, index=True),
+    sa.Column('device_id', sa.Integer(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.ForeignKeyConstraint(['device_id'], ['devices.id'], ondelete='SET NULL'),
     )
-    op.create_index('ix_jobs_device_id', 'jobs', ['device_id'])
     op.create_index(op.f('ix_jobs_is_enabled'), 'jobs', ['is_enabled'], unique=False)
     op.create_index(op.f('ix_jobs_name'), 'jobs', ['name'], unique=False)
     op.create_index(op.f('ix_jobs_scheduled_for'), 'jobs', ['scheduled_for'], unique=False)
     op.create_index(op.f('ix_jobs_status'), 'jobs', ['status'], unique=False)
+    op.create_index('ix_jobs_device_id', 'jobs', ['device_id'])
     op.create_table('job_tags',
     sa.Column('job_id', sa.Integer(), nullable=False),
     sa.Column('tag_id', sa.Integer(), nullable=False),
@@ -130,6 +143,16 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_job_logs_device_id'), 'job_logs', ['device_id'], unique=False)
+    op.create_table('users',
+        sa.Column('id', sa.Integer(), primary_key=True),
+        sa.Column('username', sa.String(), nullable=False, unique=True),
+        sa.Column('email', sa.String(), nullable=False, unique=True),
+        sa.Column('hashed_password', sa.String(), nullable=False),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.sql.expression.true()),
+        sa.Column('role', sa.String(), nullable=False, server_default='user'),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    )
     # ### end Alembic commands ###
 
 
@@ -156,4 +179,5 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_devices_hostname'), table_name='devices')
     op.drop_table('devices')
     op.drop_table('credentials')
+    op.drop_table('users')
     # ### end Alembic commands ###

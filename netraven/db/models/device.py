@@ -27,7 +27,7 @@ class Device(Base):
     __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True)
-    hostname = Column(String, nullable=False, unique=True, index=True)
+    hostname = Column(String, nullable=False, unique=True)
     ip_address = Column(String, nullable=False, unique=True) # Consider IPAddress type if needed
     device_type = Column(String, nullable=False) # Corresponds to Netmiko device_type
     description = Column(String, nullable=True)

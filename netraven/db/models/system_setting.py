@@ -23,6 +23,6 @@ class SystemSetting(Base):
     __tablename__ = "system_settings"
 
     id = Column(Integer, primary_key=True)
-    key = Column(String, nullable=False, unique=True, index=True)
+    key = Column(String, nullable=False, unique=True)
     value = Column(JSONB, nullable=False)
     description = Column(String) 

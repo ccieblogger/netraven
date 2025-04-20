@@ -261,85 +261,29 @@ reset_db() {
 
 # Reset all containers
 reset_all() {
-    echo -e "${RED}Resetting all containers and data...${NC}"
-    read -p "Are you sure you want to reset all containers? This will delete all data. (yes/no): " confirmation
+    echo -e "${RED}This will remove ALL NetRaven containers, volumes, and networks. This cannot be undone!${NC}"
+    read -p "Are you sure you want to reset the entire NetRaven environment? This will delete ALL NetRaven data. (yes/no): " confirmation
     if [[ "$confirmation" != "yes" ]]; then
-        echo "Reset cancelled."
+        echo "Full environment reset cancelled."
         exit 0
     fi
 
-    # Stop and remove all containers
-    echo -e "${YELLOW}Stopping and removing all containers...${NC}"
-    docker-compose -f $DOCKER_COMPOSE_FILE down
-    
-    # Remove volumes to completely clear data
-    echo -e "${YELLOW}Removing volumes to clear all data...${NC}"
-    docker volume rm $(docker volume ls -q | grep postgres-data) || true
-    docker volume rm $(docker volume ls -q | grep redis-data) || true
-    
-    # Start all containers fresh
-    echo -e "${YELLOW}Starting all containers fresh...${NC}"
-    docker-compose -f $DOCKER_COMPOSE_FILE up -d
-    docker-compose -f $DOCKER_COMPOSE_FILE up -d worker
-    
-    # Wait for PostgreSQL to be ready
-    echo -e "${YELLOW}Waiting for PostgreSQL to initialize...${NC}"
-    max_attempts=15
-    attempt=0
-    
-    while [ $attempt -lt $max_attempts ]; do
-        if docker exec netraven-postgres pg_isready -U netraven > /dev/null 2>&1; then
-            echo -e "${GREEN}PostgreSQL is ready.${NC}"
-            break
-        fi
-        attempt=$((attempt+1))
-        echo -e "${YELLOW}Waiting for PostgreSQL to be ready (attempt $attempt/$max_attempts)...${NC}"
-        sleep 5
+    echo -e "${YELLOW}Stopping and removing all NetRaven containers...${NC}"
+    docker-compose -f $DOCKER_COMPOSE_FILE down --remove-orphans
+
+    echo -e "${YELLOW}Removing NetRaven-related Docker volumes...${NC}"
+    for vol in $(docker volume ls -q | grep -E 'netraven|postgres-data'); do
+        echo "Removing volume: $vol"
+        docker volume rm "$vol" || true
     done
-    
-    # Wait for API to be ready
-    echo -e "${YELLOW}Waiting for API to initialize...${NC}"
-    max_attempts=15
-    attempt=0
-    
-    while [ $attempt -lt $max_attempts ]; do
-        if curl -s http://localhost:8000/health > /dev/null; then
-            echo -e "${GREEN}API service is ready.${NC}"
-            break
-        fi
-        attempt=$((attempt+1))
-        echo -e "${YELLOW}Waiting for API to be ready (attempt $attempt/$max_attempts)...${NC}"
-        sleep 5
+
+    echo -e "${YELLOW}Removing NetRaven-related Docker networks (if any)...${NC}"
+    for net in $(docker network ls --format '{{.Name}}' | grep netraven); do
+        echo "Removing network: $net"
+        docker network rm "$net" || true
     done
-    
-    # Wait for Nginx to be ready
-    echo -e "${YELLOW}Waiting for Nginx to initialize...${NC}"
-    max_attempts=10
-    attempt=0
-    
-    while [ $attempt -lt $max_attempts ]; do
-        if curl -s http://localhost/health > /dev/null; then
-            echo -e "${GREEN}Nginx service is ready.${NC}"
-            break
-        fi
-        attempt=$((attempt+1))
-        echo -e "${YELLOW}Waiting for Nginx to be ready (attempt $attempt/$max_attempts)...${NC}"
-        sleep 3
-    done
-    
-    if [ $attempt -eq $max_attempts ]; then
-        echo -e "${RED}Nginx service failed to start. Check the logs with 'docker logs netraven-nginx-${DOCKER_ENV}'.${NC}"
-    fi
-    
-    if [ $attempt -eq $max_attempts ]; then
-        echo -e "${RED}API service failed to start. Check the logs with 'docker logs netraven-api-${DOCKER_ENV}'.${NC}"
-    else
-        echo -e "${GREEN}All containers reset and started successfully.${NC}"
-        echo -e "${GREEN}Application is accessible at http://localhost/${NC}"
-        echo -e "${GREEN}API documentation is available at http://localhost/docs${NC}"
-        run_seed_script
-        print_status_table
-    fi
+
+    echo -e "${GREEN}NetRaven environment fully reset. You may now run './setup/manage_netraven.sh start dev' to rebuild everything from scratch.${NC}"
 }
 
 # Start services

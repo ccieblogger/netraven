@@ -53,7 +53,7 @@ class Tag(Base):
     __tablename__ = "tags"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False, unique=True, index=True)
+    name = Column(String, nullable=False, unique=True)
     type = Column(String)  # E.g., 'location', 'role', 'custom'
 
     devices = relationship(
