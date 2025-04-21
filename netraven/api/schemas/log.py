@@ -28,6 +28,9 @@ class JobLog(BaseSchemaWithId):
         level: Severity level of the log entry (from LogLevel enum)
         timestamp: When the log entry was created
         log_type: Discriminator field to identify this as a job log
+        job_name: Human-readable job name
+        device_name: Human-readable device name
+        job_type: Job type string
     """
     job_id: int
     device_id: Optional[int] = None # Nullable as per model
@@ -35,6 +38,9 @@ class JobLog(BaseSchemaWithId):
     level: LogLevel # Use the enum
     timestamp: datetime
     log_type: Literal["job_log"] = "job_log"
+    job_name: Optional[str] = None  # Human-readable job name
+    device_name: Optional[str] = None  # Human-readable device name
+    job_type: Optional[str] = None  # Job type string
 
 class ConnectionLog(BaseSchemaWithId):
     """Schema for connection log entries.
