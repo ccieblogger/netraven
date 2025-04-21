@@ -13,7 +13,7 @@ class TestJobsAPI(BaseAPITest):
 
     @pytest.fixture
     def test_job_data(self, db_session: Session):
-        """Test job data for creation, always includes a valid tag ID."""
+        """Test job data for creation, always includes a valid tag ID and job_type."""
         # Create a tag for use in job creation
         from netraven.db.models.tag import Tag
         tag = Tag(name="test-job-tag-default", type="job")
@@ -25,7 +25,8 @@ class TestJobsAPI(BaseAPITest):
             "schedule_type": "onetime",
             "is_enabled": True,
             "tags": [tag.id],
-            "scheduled_for": "2025-01-01T00:00:00Z"
+            "scheduled_for": "2025-01-01T00:00:00Z",
+            "job_type": "reachability"
         }
 
     @pytest.fixture
@@ -72,6 +73,7 @@ class TestJobsAPI(BaseAPITest):
         job_data = test_job_data.copy()
         job_data.pop("tags", None)
         job_data["device_id"] = device.id
+        job_data["job_type"] = "reachability"  # Ensure job_type is present
         response = client.post("/jobs/", json=job_data, headers=admin_headers)
         self.assert_successful_response(response, 201)
         data = response.json()
@@ -359,4 +361,28 @@ class TestJobsAPI(BaseAPITest):
             assert "queue_job_id" in data
         # Verify no job was enqueued if disabled
         if response.status_code == 400:
-            mock_queue.enqueue.assert_not_called() 
+            mock_queue.enqueue.assert_not_called()
+
+    def test_jobs_api_includes_job_type(self, client: TestClient, admin_headers: Dict, db_session: Session):
+        """Test that the /jobs/ API response includes the job_type field for each job."""
+        # Create test jobs with job_type
+        jobs = [
+            models.Job(
+                name=f"jobtype-test-job-{i}",
+                schedule_type="onetime",
+                is_enabled=True,
+                status="pending",
+                scheduled_for="2025-01-01T00:00:00Z",
+                job_type="reachability" if i % 2 == 0 else "backup"
+            ) for i in range(2)
+        ]
+        db_session.add_all(jobs)
+        db_session.commit()
+        
+        response = client.get("/jobs/", headers=admin_headers)
+        self.assert_successful_response(response)
+        data = response.json()
+        assert "items" in data
+        for job in data["items"]:
+            assert "job_type" in job
+            assert job["job_type"] in ["reachability", "backup"] 
