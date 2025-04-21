@@ -41,6 +41,7 @@ class JobBase(BaseSchema):
         interval_seconds: For interval jobs, seconds between runs
         cron_string: For cron jobs, the cron expression defining the schedule
         scheduled_for: For onetime jobs, when the job should run
+        job_type: Type of the job (e.g., 'reachability', 'backup')
     """
     name: str = Field(
         ..., 
@@ -85,6 +86,11 @@ class JobBase(BaseSchema):
         None,
         description="Datetime when the job should run. Required when schedule_type is 'onetime'.",
         example="2025-06-01T02:00:00Z"
+    )
+    job_type: str = Field(
+        ..., 
+        description="Type of the job (e.g., 'reachability', 'backup')",
+        example="reachability"
     )
     
     @model_validator(mode='after')

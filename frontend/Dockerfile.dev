@@ -9,6 +9,7 @@ RUN node --version && npm --version
 # Install dependencies first (leveraging Docker cache)
 COPY package*.json ./
 RUN npm install
+RUN npm install dayjs
 
 # Copy the rest of the application
 COPY . .

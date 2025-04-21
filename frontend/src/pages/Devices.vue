@@ -25,6 +25,7 @@
             <th class="py-3 px-6 text-left">Hostname</th>
             <th class="py-3 px-6 text-left">IP Address</th>
             <th class="py-3 px-6 text-left">Type</th>
+            <th class="py-3 px-6 text-left">Reachability</th>
             <th class="py-3 px-6 text-left">Description</th>
             <th class="py-3 px-6 text-left">Port</th>
             <th class="py-3 px-6 text-left">Tags</th>
@@ -38,6 +39,34 @@
             <td class="py-3 px-6 text-left">{{ device.hostname }}</td>
             <td class="py-3 px-6 text-left">{{ device.ip_address }}</td>
             <td class="py-3 px-6 text-left">{{ device.device_type }}</td>
+            <td class="py-3 px-6 text-left">
+              <span
+                @mouseenter="activeReachabilityPopover = device.id"
+                @mouseleave="activeReachabilityPopover = null"
+                class="relative cursor-pointer"
+              >
+                <svg v-if="device.last_reachability_status === 'success'" class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <svg v-else-if="device.last_reachability_status === 'failure'" class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg v-else class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                <!-- Popover -->
+                <div
+                  v-if="activeReachabilityPopover === device.id"
+                  class="absolute z-10 left-0 mt-2 bg-white border border-gray-200 rounded shadow-lg p-3 w-64"
+                >
+                  <div class="font-medium mb-1">
+                    <span v-if="device.last_reachability_status === 'success'" class="text-green-600">Reachable</span>
+                    <span v-else-if="device.last_reachability_status === 'failure'" class="text-red-600">Unreachable</span>
+                    <span v-else class="text-gray-400">Never Checked</span>
+                  </div>
+                  <div v-if="device.last_reachability_timestamp" class="text-xs text-gray-500 mb-1">
+                    Last checked: {{ formatDateTime(device.last_reachability_timestamp) }}
+                  </div>
+                  <div v-if="device.last_reachability_message" class="text-xs text-gray-700">
+                    {{ device.last_reachability_message }}
+                  </div>
+                </div>
+              </span>
+            </td>
             <td class="py-3 px-6 text-left">{{ device.description || '-' }}</td>
             <td class="py-3 px-6 text-left">{{ device.port }}</td>
             <td class="py-3 px-6 text-left">
@@ -144,6 +173,7 @@ import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline' // Using outli
 import api from '../services/api' // assumed API service
 import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../store/notifications'
+import { useJobStore } from '../store/job'
 
 const deviceStore = useDeviceStore()
 const devices = computed(() => deviceStore.devices)
@@ -162,7 +192,9 @@ const isLoadingDeviceCredentials = ref(false);
 const router = useRouter()
 const notificationStore = useNotificationStore()
 const reachabilityLoading = ref({}) // Track loading state per device
-const lastReachabilityJobId = ref(null) // For redirect in next phase
+const jobStore = useJobStore()
+
+const activeReachabilityPopover = ref(null);
 
 onMounted(() => {
     // Fetch devices only if the list is empty initially
@@ -257,18 +289,54 @@ function hideCredentialPopover() {
 }
 
 async function checkReachability(device) {
-  const name = `reachability-${device.hostname}-${Date.now()}`
   reachabilityLoading.value[device.id] = true
   try {
-    const response = await api.post('/jobs/reachability', { device_id: device.id, name })
-    lastReachabilityJobId.value = response.data.id
-    notificationStore.success('Reachability job started!')
-    router.push(`/jobs/${response.data.id}`)
+    // Debug: log device and jobs
+    console.log('Device:', device);
+    if (!jobStore.jobs.length) {
+      await jobStore.fetchJobs();
+    }
+    console.log('Jobs:', jobStore.jobs);
+    // 2. Find a reachability job for this device (prefer device_id match, then tag match)
+    let reachJob = jobStore.jobs.find(j => j.job_type === 'reachability' && j.device_id === device.id);
+    if (!reachJob && device.tags && device.tags.length > 0) {
+      const deviceTagIds = device.tags.map(t => t.id);
+      reachJob = jobStore.jobs.find(j => j.job_type === 'reachability' && j.tags && j.tags.some(tag => deviceTagIds.includes(tag.id)));
+    }
+    if (!reachJob) {
+      notificationStore.error('No reachability job found for this device.');
+      return;
+    }
+    // 3. Trigger the job
+    const ok = await jobStore.runJobNow(reachJob.id);
+    if (ok && jobStore.runStatus && jobStore.runStatus.data && jobStore.runStatus.data.job_id) {
+      notificationStore.success('Reachability job started!');
+      router.push(`/jobs/${jobStore.runStatus.data.job_id}`);
+    } else {
+      notificationStore.error(jobStore.runStatus?.error || 'Failed to start reachability job');
+    }
   } catch (err) {
-    notificationStore.error('Failed to start reachability job')
+    notificationStore.error('Failed to start reachability job');
   } finally {
-    reachabilityLoading.value[device.id] = false
+    reachabilityLoading.value[device.id] = false;
   }
+}
+
+function formatDateTime(dateTimeString) {
+  if (!dateTimeString) return '-';
+  try {
+    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return new Date(dateTimeString).toLocaleString(undefined, options);
+  } catch (e) {
+    return dateTimeString; // Return original if formatting fails
+  }
+}
+
+function reachabilityTooltip(device, statusText) {
+  if (device.last_reachability_timestamp) {
+    return `${statusText} (${formatDateTime(device.last_reachability_timestamp)})`;
+  }
+  return statusText;
 }
 
 </script>

@@ -33,6 +33,7 @@ from netraven.api import schemas # Import schemas module
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role # Import dependencies
 from netraven.db import models # Import DB models
 from netraven.services.device_credential import get_matching_credentials_for_device
+from netraven.db.models import JobLog, Job
 
 # Constants
 DEFAULT_TAG_NAME = "default"
@@ -214,7 +215,29 @@ def list_devices(
     # Get paginated devices
     devices = query.offset(offset).limit(size).all()
     
-    # Enhance with credential counts
+    # --- Fetch latest reachability job log for all devices in one query ---
+    device_ids = [device.id for device in devices]
+    # Subquery to get latest reachability job log per device
+    subq = (
+        db.query(
+            JobLog.device_id,
+            func.max(JobLog.timestamp).label("max_ts")
+        )
+        .join(Job, JobLog.job_id == Job.id)
+        .filter(Job.job_type == "reachability", JobLog.device_id.in_(device_ids))
+        .group_by(JobLog.device_id)
+        .subquery()
+    )
+    # Join to get the full log row
+    latest_logs = (
+        db.query(JobLog)
+        .join(subq, (JobLog.device_id == subq.c.device_id) & (JobLog.timestamp == subq.c.max_ts))
+        .all()
+    )
+    # Map device_id -> log
+    latest_log_map = {log.device_id: log for log in latest_logs}
+
+    # Enhance with credential counts and reachability status
     device_list = []
     for device in devices:
         # Convert SQLAlchemy model to dictionary
@@ -222,14 +245,19 @@ def list_devices(
             column.name: getattr(device, column.name)
             for column in device.__table__.columns
         }
-        
         # Add tags relationship
         device_dict["tags"] = device.tags
-        
         # Get matching credential count using the service function
         matching_credentials = get_matching_credentials_for_device(db, device.id)
         device_dict["matching_credentials_count"] = len(matching_credentials)
-        
+        # Add reachability status fields
+        log = latest_log_map.get(device.id)
+        if log:
+            device_dict["last_reachability_status"] = log.status if hasattr(log, "status") else ("success" if log.success else "failure")
+            device_dict["last_reachability_timestamp"] = log.timestamp
+        else:
+            device_dict["last_reachability_status"] = "never_checked"
+            device_dict["last_reachability_timestamp"] = None
         device_list.append(device_dict)
     
     # Return paginated response
