@@ -1,7 +1,35 @@
 <template>
   <PageContainer title="Dashboard" subtitle="Overview of your network management system">
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- Stats Cards (now 4 columns) -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <!-- System Status Card -->
+      <NrCard className="border-l-4 border-l-gray-500">
+        <div class="p-4 flex flex-col items-start">
+          <h2 class="text-lg uppercase font-semibold text-text-secondary">SYSTEM STATUS</h2>
+          <div class="mt-2 grid grid-cols-2 md:grid-cols-2 gap-2 w-full">
+            <div v-for="service in services" :key="service.key" class="flex items-center space-x-2">
+              <span :title="serviceTooltip(service)" :aria-label="serviceTooltip(service)">
+                <span
+                  :class="[
+                    'inline-block w-4 h-4 rounded-full',
+                    service.status === 'healthy' ? 'bg-green-500' : service.status === 'unhealthy' ? 'bg-red-500' : 'bg-yellow-400',
+                    'border border-gray-300 mr-1'
+                  ]"
+                ></span>
+              </span>
+              <span class="text-sm font-medium text-text-primary">{{ service.label }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="border-t border-divider px-4 py-2 flex justify-between items-center text-xs text-text-secondary">
+          <span>Last checked: {{ lastCheckedDisplay }}</span>
+          <span>
+            Auto-refresh in: {{ countdown }}s
+            <a href="#" @click.prevent="manualRefresh" class="ml-2 text-blue-500 hover:underline" :aria-label="'Refresh system status'" :disabled="isLoading">Refresh now</a>
+          </span>
+        </div>
+      </NrCard>
+
       <!-- Devices Card -->
       <NrCard className="border-l-4 border-l-blue-500">
         <div class="p-4 flex justify-between items-start">
@@ -121,22 +149,92 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed, onUnmounted } from 'vue';
 import { useDeviceStore } from '../store/device';
 import { useJobStore } from '../store/job';
-import { useBackupStore } from '../store/backup'; // Import the backup store
+import { useBackupStore } from '../store/backup';
 
-// Initialize stores
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
-const backupStore = useBackupStore(); // Initialize the backup store
+const backupStore = useBackupStore();
+
+// --- System Status Card State ---
+const services = ref([
+  { key: 'api', label: 'API', status: 'unknown' },
+  { key: 'postgres', label: 'PostgreSQL', status: 'unknown' },
+  { key: 'redis', label: 'Redis', status: 'unknown' },
+  { key: 'worker', label: 'Worker', status: 'unknown' },
+  { key: 'scheduler', label: 'Scheduler', status: 'unknown' },
+]);
+const isLoading = ref(false);
+const lastChecked = ref(null);
+const countdown = ref(30);
+let intervalId = null;
+let countdownId = null;
+
+function serviceTooltip(service) {
+  if (service.status === 'healthy') return 'Healthy';
+  if (service.status === 'unhealthy') return 'Unhealthy';
+  return 'Unknown';
+}
+
+function updateServicesStatus(statusObj) {
+  services.value.forEach(s => {
+    s.status = statusObj[s.key] || 'unknown';
+  });
+}
+
+async function fetchSystemStatus(refresh = false) {
+  isLoading.value = true;
+  try {
+    const url = `/api/system/status${refresh ? '?refresh=true' : ''}`;
+    const token = localStorage.getItem('access_token');
+    const res = await fetch(url, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    const data = await res.json();
+    updateServicesStatus(data);
+    lastChecked.value = new Date();
+  } catch (e) {
+    console.error("Failed to fetch system status:", e);
+    services.value.forEach(s => (s.status = 'unknown'));
+  } finally {
+    isLoading.value = false;
+    countdown.value = 30;
+  }
+}
+
+function manualRefresh() {
+  fetchSystemStatus(true);
+}
+
+const lastCheckedDisplay = computed(() => {
+  if (!lastChecked.value) return 'Never';
+  return lastChecked.value.toLocaleTimeString();
+});
+
+function startPolling() {
+  intervalId = setInterval(() => {
+    fetchSystemStatus();
+  }, 30000);
+  countdownId = setInterval(() => {
+    if (countdown.value > 0) countdown.value--;
+  }, 1000);
+}
+function stopPolling() {
+  if (intervalId) clearInterval(intervalId);
+  if (countdownId) clearInterval(countdownId);
+}
 
 // Simulated data for recent activity
-const isLoading = ref(true);
 const recentLogs = ref([]);
 
-// Fetch data on component mount
 onMounted(() => {
+  fetchSystemStatus();
+  startPolling();
   deviceStore.fetchDevices();
   jobStore.fetchJobs();
   backupStore.fetchBackups();
@@ -160,7 +258,9 @@ onMounted(() => {
         timestamp: '4 hours ago'
       }
     ];
-    isLoading.value = false;
   }, 1500);
+});
+onUnmounted(() => {
+  stopPolling();
 });
 </script>

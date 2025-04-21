@@ -1,6 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from netraven.config.loader import load_config
+import time
+from sqlalchemy import text
+from netraven.db.session import engine
+from redis import Redis
+from rq import Worker
+from rq_scheduler import Scheduler
 
 # Import routers
 from .routers import devices, jobs, users, auth_router, tags, credentials, backups, job_logs, connection_logs  # Import the new connection_logs router
@@ -53,6 +59,64 @@ app.add_middleware(
 def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+# --- System Status Health Check ---
+_system_status_cache = {"result": None, "timestamp": 0}
+CACHE_TTL = 30  # seconds
+
+def check_postgres():
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return "healthy"
+    except Exception:
+        return "unhealthy"
+
+def check_redis(redis_url):
+    try:
+        redis_conn = Redis.from_url(redis_url)
+        redis_conn.ping()
+        return "healthy"
+    except Exception:
+        return "unhealthy"
+
+def check_worker(redis_url):
+    try:
+        redis_conn = Redis.from_url(redis_url)
+        workers = Worker.all(connection=redis_conn)
+        return "healthy" if workers else "unhealthy"
+    except Exception:
+        return "unhealthy"
+
+def check_scheduler(redis_url):
+    try:
+        redis_conn = Redis.from_url(redis_url)
+        scheduler = Scheduler(connection=redis_conn)
+        jobs = scheduler.get_jobs()
+        return "healthy" if jobs else "unhealthy"
+    except Exception:
+        return "unhealthy"
+
+@app.get("/system/status", status_code=200)
+def system_status(request: Request):
+    refresh = request.query_params.get("refresh", "false").lower() == "true"
+    now = time.time()
+    if not refresh and _system_status_cache["result"] and now - _system_status_cache["timestamp"] < CACHE_TTL:
+        return _system_status_cache["result"]
+
+    config = load_config()
+    redis_url = config.get('scheduler', {}).get('redis_url', 'redis://localhost:6379/0')
+
+    status = {
+        "api": "healthy",  # If this endpoint responds, API is healthy
+        "postgres": check_postgres(),
+        "redis": check_redis(redis_url),
+        "worker": check_worker(redis_url),
+        "scheduler": check_scheduler(redis_url),
+    }
+    _system_status_cache["result"] = status
+    _system_status_cache["timestamp"] = now
+    return status
 
 # Include routers
 app.include_router(auth_router.router)
