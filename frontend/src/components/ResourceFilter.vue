@@ -36,21 +36,23 @@
           />
           
           <!-- Select input -->
-          <select
-            v-else-if="field.type === 'select'"
-            :id="field.name"
-            v-model="filterValues[field.name]"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          >
-            <option value="">{{ field.placeholder || 'Select an option' }}</option>
-            <option 
-              v-for="option in field.options" 
-              :key="option.value"
-              :value="option.value"
+          <div v-else-if="field.type === 'select'">
+            <div v-if="getLoading(field)" class="text-xs text-gray-400 py-1">Loading...</div>
+            <select
+              :id="field.name"
+              v-model="filterValues[field.name]"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             >
-              {{ option.label }}
-            </option>
-          </select>
+              <option value="">{{ field.placeholder || 'Select an option' }}</option>
+              <option 
+                v-for="option in getOptions(field)" 
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
           
           <!-- Date input -->
           <input 
@@ -78,7 +80,7 @@
           
           <!-- Radio group -->
           <div v-else-if="field.type === 'radio'" class="mt-2">
-            <div v-for="option in field.options" :key="option.value" class="flex items-center">
+            <div v-for="option in getOptions(field)" :key="option.value" class="flex items-center">
               <input 
                 :id="`${field.name}-${option.value}`"
                 v-model="filterValues[field.name]"
@@ -94,7 +96,8 @@
           
           <!-- Multi-select (checkboxes) -->
           <div v-else-if="field.type === 'multiselect'" class="mt-2">
-            <div v-for="option in field.options" :key="option.value" class="flex items-center">
+            <div v-if="getLoading(field)" class="text-xs text-gray-400 py-1">Loading...</div>
+            <div v-for="option in getOptions(field)" :key="option.value" class="flex items-center">
               <input 
                 :id="`${field.name}-${option.value}`"
                 v-model="multiSelectValues[field.name]"
@@ -266,5 +269,19 @@ function resetFilters() {
   if (props.applyOnChange) {
     applyFilters();
   }
+}
+
+// Helper to get options from field (supports computed, function, or array)
+function getOptions(field) {
+  if (typeof field.options === 'function') return field.options();
+  if (field.options && typeof field.options.value !== 'undefined') return field.options.value;
+  return field.options || [];
+}
+
+// Helper to get loading state from field (supports computed, function, or boolean)
+function getLoading(field) {
+  if (typeof field.loading === 'function') return field.loading();
+  if (field.loading && typeof field.loading.value !== 'undefined') return field.loading.value;
+  return !!field.loading;
 }
 </script> 

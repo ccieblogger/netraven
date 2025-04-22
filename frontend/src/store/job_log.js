@@ -6,7 +6,19 @@ export const useJobLogStore = defineStore('job_logs', () => {
   const logs = ref([])
   const isLoading = ref(false)
   const error = ref(null)
-  const filters = ref({ job_id: null, device_id: null, level: null })
+  const jobNames = ref([])
+  const deviceNames = ref([])
+  const jobNamesLoading = ref(false)
+  const deviceNamesLoading = ref(false)
+  const jobNamesError = ref(null)
+  const deviceNamesError = ref(null)
+  const filters = ref({
+    search: '',
+    job_name: null,
+    device_names: [],
+    job_type: null,
+    level: null
+  })
   const pagination = ref({
       currentPage: 1,
       itemsPerPage: 20,
@@ -16,39 +28,73 @@ export const useJobLogStore = defineStore('job_logs', () => {
 
   const totalPages = computed(() => pagination.value.totalPages)
 
+  async function fetchJobNames() {
+    jobNamesLoading.value = true
+    jobNamesError.value = null
+    try {
+      const response = await api.get('/job-logs/job-names')
+      jobNames.value = response.data || []
+    } catch (err) {
+      jobNamesError.value = err.response?.data?.detail || 'Failed to fetch job names'
+      jobNames.value = []
+    } finally {
+      jobNamesLoading.value = false
+    }
+  }
+
+  async function fetchDeviceNames() {
+    deviceNamesLoading.value = true
+    deviceNamesError.value = null
+    try {
+      const response = await api.get('/devices')
+      console.log('Device fetch response:', response.data)
+      const items = response.data.items || response.data || []
+      deviceNames.value = items.map(d => d.hostname)
+    } catch (err) {
+      deviceNamesError.value = err.response?.data?.detail || 'Failed to fetch device names'
+      deviceNames.value = []
+    } finally {
+      deviceNamesLoading.value = false
+    }
+  }
+
   async function fetchLogs(page = 1, newFilters = null) {
     isLoading.value = true
     error.value = null
     if (newFilters) {
-        filters.value = { ...filters.value, ...newFilters }
-        pagination.value.currentPage = 1
-        page = 1
+      filters.value = { ...filters.value, ...newFilters }
+      pagination.value.currentPage = 1
+      page = 1
     } else {
-        pagination.value.currentPage = page
+      pagination.value.currentPage = page
     }
     try {
-        const params = {
-            page: pagination.value.currentPage,
-            size: pagination.value.itemsPerPage,
-            ...filters.value
-        }
-        Object.keys(params).forEach(key => (params[key] == null || params[key] === '') && delete params[key])
-        const response = await api.get('/job-logs/', { params })
-        if (response.data && Array.isArray(response.data.items)) {
-            logs.value = response.data.items
-            pagination.value.totalItems = response.data.total_items
-            pagination.value.totalPages = response.data.total_pages
-            pagination.value.currentPage = response.data.current_page
-            pagination.value.itemsPerPage = response.data.page_size
-        } else {
-            logs.value = []
-            resetPagination()
-            error.value = 'Received invalid data format from server.'
-        }
-    } catch (err) {
-        error.value = err.response?.data?.detail || 'Failed to fetch job logs'
+      const params = {
+        page: pagination.value.currentPage,
+        size: pagination.value.itemsPerPage,
+        ...filters.value
+      }
+      // Convert device_names array to comma-separated string for API
+      if (params.device_names && Array.isArray(params.device_names)) {
+        params.device_names = params.device_names.join(',')
+      }
+      Object.keys(params).forEach(key => (params[key] == null || params[key] === '' || (Array.isArray(params[key]) && params[key].length === 0)) && delete params[key])
+      const response = await api.get('/job-logs/', { params })
+      if (response.data && Array.isArray(response.data.items)) {
+        logs.value = response.data.items
+        pagination.value.totalItems = response.data.total
+        pagination.value.totalPages = response.data.pages
+        pagination.value.currentPage = response.data.page
+        pagination.value.itemsPerPage = response.data.size
+      } else {
         logs.value = []
         resetPagination()
+        error.value = 'Received invalid data format from server.'
+      }
+    } catch (err) {
+      error.value = err.response?.data?.detail || 'Failed to fetch job logs'
+      logs.value = []
+      resetPagination()
     } finally {
       isLoading.value = false
     }
@@ -64,10 +110,20 @@ export const useJobLogStore = defineStore('job_logs', () => {
     logs.value = []
     isLoading.value = false
     error.value = null
-    filters.value = { job_id: null, device_id: null, level: null }
+    filters.value = {
+      search: '',
+      job_name: null,
+      device_names: [],
+      job_type: null,
+      level: null
+    }
     resetPagination()
     pagination.value.itemsPerPage = 20
   }
 
-  return { logs, isLoading, error, filters, pagination, totalPages, fetchLogs, $reset }
+  return {
+    logs, isLoading, error, filters, pagination, totalPages, fetchLogs, $reset,
+    jobNames, deviceNames, jobNamesLoading, deviceNamesLoading, jobNamesError, deviceNamesError,
+    fetchJobNames, fetchDeviceNames
+  }
 }) 

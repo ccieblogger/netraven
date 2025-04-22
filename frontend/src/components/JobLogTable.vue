@@ -9,8 +9,9 @@
         <thead>
           <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
             <th class="py-3 px-6 text-left">Timestamp</th>
-            <th class="py-3 px-6 text-left">Job ID</th>
-            <th class="py-3 px-6 text-left">Device ID</th>
+            <th class="py-3 px-6 text-left">Job Name</th>
+            <th class="py-3 px-6 text-left">Device Name</th>
+            <th class="py-3 px-6 text-left">Job Type</th>
             <th class="py-3 px-6 text-left">Level</th>
             <th class="py-3 px-6 text-left">Message</th>
           </tr>
@@ -18,8 +19,15 @@
         <tbody class="text-gray-600 text-sm font-light">
           <tr v-for="log in logs" :key="log.id + 'job'" class="border-b border-gray-200 hover:bg-gray-100">
             <td class="py-3 px-6 text-left text-xs whitespace-nowrap">{{ formatDateTime(log.timestamp) }}</td>
-            <td class="py-3 px-6 text-left">{{ log.job_id }}</td>
-            <td class="py-3 px-6 text-left">{{ log.device_id || '-' }}</td>
+            <td class="py-3 px-6 text-left">
+              <router-link v-if="log.job_id && log.job_name" :to="`/jobs/${log.job_id}`" class="text-blue-600 hover:underline">{{ log.job_name }}</router-link>
+              <span v-else>{{ log.job_name || '-' }}</span>
+            </td>
+            <td class="py-3 px-6 text-left">
+              <router-link v-if="log.device_id && log.device_name" :to="`/devices/${log.device_id}`" class="text-blue-600 hover:underline">{{ log.device_name }}</router-link>
+              <span v-else>{{ log.device_name || '-' }}</span>
+            </td>
+            <td class="py-3 px-6 text-left">{{ log.job_type || '-' }}</td>
             <td class="py-3 px-6 text-left">
               <span :class="logLevelClass(log.level)" class="py-1 px-3 rounded-full text-xs">{{ log.level }}</span>
             </td>

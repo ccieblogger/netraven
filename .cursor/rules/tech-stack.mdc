@@ -3,184 +3,236 @@ description:
 globs: 
 alwaysApply: true
 ---
-# NetRaven Technology Stack Reference
+## NetRaven Architecture
 
-## System Architecture Overview
+### Executive Summary
+
+This document outlines the complete architecture for NetRaven, a network device configuration backup system designed for deployment in customer environments. NetRaven retrieves and stores device configurations for auditing, historical tracking, and operational assurance. The system prioritizes simplicity, testability, and maintainability, while still supporting targeted concurrency for tasks like device polling.
+
+### System Overview
+
+#### System Diagram (ASCII)
 ```
                         ┌────────────────────┐
-                        │     Frontend UI    │
-                        │   (Vue / REST)     │
+                        │     Frontend UI     │
+                        │    (Vue 3 + REST)   │
                         └────────▲───────────┘
                                  │ REST API
+                                 ▼
+                        ┌────────────────────┐
+                        │    API Service      │
+                        │     (FastAPI)       │
+                        └────────▲───────────┘
                                  │
-                        ┌────────┴───────────┐
-                        │     API Service    │
-                        │     (FastAPI)      │
-                        └───────▲────────────┘
-                                │
              ┌──────────────────┼────────────────────┐
-             │                  │                    │do
+             │                  │                    │
       Device │          Job CRUD│           User/Auth│
      Records │                  ▼                    ▼
-         ┌───┴─────┐     ┌──────────────┐      ┌──────────────┐
-         │ Devices │     │  Jobs Table  │      │  Users/Roles │
-         └───┬─────┘     └──────┬───────┘      └──────┬───────┘
-             │                  │                     │
-             │                  ▼                     │
-             │        ┌───────────────┐               │
-             │        │   Scheduler   │◄───────┐      │
-             │        │   (RQ Only)   │        │      │
-             │        └──────┬────────┘        │      │
-             │               │                 │      │
-             ▼               ▼                 ▼      ▼
-      ┌────────────┐  ┌───────────────────┐  ┌──────────────┐
-      │ PostgreSQL │  │ RQ + RQ Scheduler │  │ JWT Security │
-      └────┬───────┘  └──────┬────────────┘  └──────────────┘
+         ┌───┴────┐     ┌──────────────┐      ┌──────────────┐
+         │Devices │     │   Jobs Table │      │   Users/Roles│
+         └───┬────┘     └──────┬───────┘      └────┬─────────┘
+             │                │                    │
+             ▼                ▼                    ▼
+      ┌────────────┐  ┌──────────────┐      ┌──────────────┐
+      │ PostgreSQL │  │  Redis Queue │      │ JWT Security │
+      └────┬───────┘  └──────┬───────┘      └──────────────┘
            │                 │
            ▼                 ▼
    ┌─────────────────────────────────┐
-   │     Device Communication        │
-   │        (device_comm)            │
-   └────────────┬────────────────────┘
-                │                 ▲
-                ▼                 │
-       ┌───────────────────┐      │
-       │  Netmiko (SSH/API)│      │ 
-       └────────┬──────────┘      │
-                │                 │
-                ▼                 │
-        ┌─────────────┐           │
-        │ Network Gear│           │
-        └─────────────┘           │
-                                  ▼
-        ┌──────────────────────────────────┐
-        │ Git Repo (configs & versioning)  │
-        └──────────────────────────────────┘
+   │        Job Scheduler            │
+   │    (RQ + RQ Scheduler)          │
+   └────────────┬───────────────────┘
+                ▼
+       ┌──────────────────────────────┐
+       │ Dedicated Worker Container   │
+       │ (RQ Worker, Python, Docker) │
+       └────────┬────────────────────┘
+                ▼
+       ┌───────────────────┐
+       │  Device Comm Job  │
+       │   (Netmiko-based) │
+       └────────┬──────────┘
+                ▼
+        ┌─────────────┐
+        │ Network Gear│
+        └─────────────┘
+                │
+                ▼
+        ┌───────────────────────────┐
+        │ Git Repo (Config Storage) │
+        └───────────────────────────┘
 ```
 
-## Core Technologies
 
-| Category | Technology | Version | Purpose |
-|----------|------------|---------|---------|
-| **Language** | Python | 3.10+ | Primary backend language |
-| **Database** | PostgreSQL | 14 | Primary data store for persistent application data |
-| **Cache/Queue** | Redis | 7 | Job queuing and scheduling |
-| **Version Control** | Git/GitPython | 3.1.43 | Configuration version storage |
+NetRaven supports:
 
-## Service Components
+1. Retrieval of running configuration and identifying information from network devices (primarily via SSH).
+2. Storing configuration snapshots in a Git repository for version control.
+3. Job scheduling for one-time or recurring configuration backups.
+4. REST API access for external integrations.
+5. Role-based web UI for inventory management and job monitoring.
 
-### API Service
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| FastAPI | 0.115+ | REST API framework |
-| Uvicorn | 0.34+ | ASGI server |
-| python-jose | 3.4+ | JWT token handling |
-| passlib | 1.7+ | Password hashing |
+The system is installed locally using Python-based services with PostgreSQL and Redis (required for RQ and RQ Scheduler). The directory structure and service boundaries support future containerization but do not require it.
 
-**Responsibilities**: 
-- User authentication via JWT
-- Expose endpoints for device/job/user management
-- Serve API documentation
+### Core Architectural Principles
 
-### Device Communication Service
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Netmiko | 4.3+ | Network device SSH/API access |
-| ThreadPoolExecutor | - | Parallel device access |
-| GitPython | 3.1+ | Store configs in version control |
+- **Local Redis Required**: Redis is a core local dependency for job queuing and scheduling. All job execution flows rely on it via RQ and RQ Scheduler.
+- **Synchronous-First Design**: Synchronous services simplify development and debugging.
+- **Targeted Concurrency**: Uses threads only where concurrency offers clear benefits (e.g., connecting to multiple devices).
+- **Modular Design**: Isolated services for API, job scheduling, communication, and logging.
+- **Detailed Logging**: Per-device and per-job logs with redacted and raw entries.
+- **Secure by Default**: JWT authentication and role-based access controls.
 
-**Responsibilities**:
-- Connect to network devices
-- Execute commands and retrieve configurations
-- Handle connection retries and error categorization
-- Redact sensitive information from output
+### Core Services
 
-### Scheduler Service
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| RQ (Redis Queue) | 2.3+ | Job queuing system |
-| rq-scheduler | 0.14+ | Schedule recurring jobs |
-| Croniter | 6.0+ | Parse cron expressions |
+#### 1. API Service (FastAPI - Sync Mode)
 
-**Responsibilities**:
-- Schedule one-time and recurring jobs
-- Trigger device communication processes
-- Manage job retry logic
+- Exposes REST API endpoints for all system functions.
+- JWT-based authentication with role enforcement (admin/user).
+- CRUD for:
+  - Devices
+  - Device groups (tags)
+  - Jobs
+  - Users and roles
+- Status endpoints for job monitoring.
 
-### Database Layer
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| SQLAlchemy | 2.0+ | ORM for database access |
-| Alembic | 1.15+ | Database migrations |
-| psycopg2 | 2.9+ | PostgreSQL driver |
+#### 2. Device Communication Worker (now Dedicated Container)
 
-**Responsibilities**:
-- Store device information, job definitions, and results
-- Manage schema migrations
-- Provide data access layer for other services
+- Executes device jobs triggered by scheduler or on demand.
+- Runs as a dedicated Docker container (`worker` service) using RQ Worker.
+- Connects to network devices using **Netmiko**.
+- Retrieves `show running-config` and basic facts (hostname, serial number).
+- Uses `ThreadPoolExecutor` for concurrent device access (default: 5).
+- Reports logs and results to database.
+- Picks up jobs from the Redis queue and updates job status in the database.
 
-### Frontend Application
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Vue | 3.5+ | JavaScript framework |
-| Vite | 5.0+ | Build tool |
-| Pinia | 3.0+ | State management |
-| Vue Router | 4.5+ | Client-side routing |
-| Axios | 1.8+ | HTTP client |
-| TailwindCSS | 3.3+ | Utility-first CSS framework |
-| Headless UI | 1.7+ | Unstyled accessible components |
-| Chart.js | 4.4+ | Data visualization |
-| Diff2html | 3.4+ | Show configuration differences |
+#### 2a. System Jobs (e.g., Reachability)
+- System jobs are created automatically during system installation (e.g., reachability job).
+- System jobs are associated with a default tag and credentials.
+- System jobs are not user-deletable or editable.
+- The worker processes system jobs just like regular jobs, but with special handling for job type and status.
+- If no devices are associated with the job's tags, the job is marked as `COMPLETED_NO_DEVICES`.
 
-**Responsibilities**:
-- Provide user interface for all system functions
-- Visualize device data and job statuses
-- Display configuration diffs between job runs
+#### 3. Job Scheduler
 
-## Integration Points
+- Based on **RQ + RQ Scheduler**.
+- Queues and schedules jobs:
+  - One-time
+  - Recurring (daily, weekly, monthly)
+  - With start/end window support
+- Triggers device communication jobs in the background.
 
-### API to Frontend
-- REST API endpoints with JWT authentication
-- JSON response format for all data exchange
+#### 4. PostgreSQL Database
 
-### API to Scheduler
-- Database polling for scheduled jobs
-- RQ job enqueuing for immediate execution
+- Stores all persistent data:
+  - Devices, jobs, logs
+  - Credentials (encrypted)
+  - User accounts and roles
+  - System configuration
+- Managed with **SQLAlchemy (sync)** + **Alembic**.
 
-### Scheduler to Device Communication
-- Job parameters passed via Redis queue
-- Results stored in PostgreSQL database
+#### 5. Frontend UI (Vue 3 + Vite)
 
-### Device Communication to Network Devices
-- SSH/API connections via Netmiko
-- Configuration storage in Git repository
+- Built with Vue 3 using Vite, Pinia, and TailwindCSS for a responsive, component-based user experience.
+- Integrates via REST API.
+- Supports:
+  - Device inventory views
+  - Job creation and monitoring
+  - User settings and preferences
+  - Git-based configuration diff viewer
+  - Real-time job progress per device
+  - Log inspection
 
-## Development Environment
+#### Logging & Log Endpoints
 
-### Requirements
-- Python 3.10+
-- Node.js (for frontend)
-- PostgreSQL 14
-- Redis 7
+NetRaven separates logging into two distinct types, each with its own API endpoint and UI page:
 
-### Containerization
-- Docker and Docker Compose for development and production environments
-- Nginx for production frontend hosting
+- **Job Logs** (`/job-logs/`): Logs related to job execution events, such as job progress, errors, and status changes. These logs are filterable by job ID, device ID, and log level. Exposed via a dedicated FastAPI endpoint and a dedicated UI page/tab.
+- **Connection Logs** (`/connection-logs/`): Logs capturing raw output and metadata from device connection attempts (e.g., SSH/API sessions). These are filterable by job ID and device ID. Exposed via a separate FastAPI endpoint and UI page/tab.
 
-### Package Management
-- Poetry for Python dependencies
-- npm for frontend dependencies
+This separation improves clarity, maintainability, and user experience by allowing users to focus on the type of log relevant to their task. Each log type has its own schema, filters, and pagination, and the frontend navigation provides direct access to both log types.
 
-### Configuration
-- Environment variables for sensitive configuration
-- YAML files for structured configuration
-- Local configuration overrides for development
+### Device Communication
 
-## System Architecture Highlights
+- Primary protocol: **SSH via Netmiko**
+- Vendor extensibility via Netmiko platform mapping
+- Device grouping (tags) determines credential selection
+- Detailed logs include:
+  - Start/end time
+  - Auth failures
+  - Unreachable device errors
+  - Output with sensitive line redaction
 
-- **Synchronous-First Design**: Simpler debugging and development workflow
-- **Targeted Concurrency**: Threaded execution only where necessary
-- **Git-Based Versioning**: Simple, reliable config storage with built-in version history
-- **Role-Based Security**: JWT-based authentication with role enforcement
-- **Modular Design**: Isolated services with clear responsibilities
-- **Structured Logging**: Comprehensive logging with sensitive data redaction 
+### Authentication & Authorization
+
+- JWT-based access for both API and UI users
+- Admin and user roles
+- Users can be assigned visibility to specific device groups
+
+### Configuration Management
+
+- Hierarchical loading:
+  1. Environment variables
+  2. Admin-set values from DB
+  3. YAML files in `/netraven/config/`
+- All components read configuration via a common loader
+
+### Git Integration
+
+NetRaven uses a local Git repository as the versioned storage backend for device configuration files. This approach offers simplicity, traceability, and built-in change tracking with minimal infrastructure overhead.
+
+- Each configuration snapshot is saved as a text file and committed to a local Git repository.
+- Commit messages include structured metadata such as job ID, device hostname, and timestamp.
+- Git provides built-in versioning, rollback, and readable diffs to show changes between snapshots.
+- The Git repository is stored in a dedicated project folder (e.g., `/data/git-repo/`) and initialized on first use.
+- GitPython is used to interface with the repository programmatically.
+
+This design avoids the need for an external version control system while ensuring historical tracking and auditability of all config changes. It also complements the relational database, which stores job metadata and connection logs.
+
+### Deployment
+
+#### Required Services:
+- **PostgreSQL 14**: For all persistent storage
+- **Redis 7**: Required for RQ job queuing and RQ Scheduler
+
+These are installed locally via setup scripts. Containerization is optional and not used by default.
+
+
+NetRaven uses a monorepo structure and is designed for local installation using Python with [Poetry](mdc:https:/python-poetry.org) for dependency management. All services share a unified environment and can be run individually using developer scripts.
+
+- PostgreSQL 14 and Redis 7 are installed locally using scripts provided in the `/setup/` directory. Containerization is not required and not used by default
+- Developer runner scripts for DB schema creation, job execution, and job debugging live in `/setup/`
+- Each service lives under the `netraven/` namespace and is importable as `netraven.api`, `netraven.worker`, etc.
+- The root `pyproject.toml` file governs dependencies across the system
+
+```
+/netraven/
+├── api/          # FastAPI service
+├── worker/       # Device command execution logic
+├── scheduler/    # RQ-based job scheduler
+├── db/           # SQLAlchemy models and session mgmt
+├── config/       # YAML and env-based config
+├── git/          # Git commit logic
+├── frontend/     # React app (built separately)
+├── setup/        # Developer runners and bootstrap scripts
+├── tests/        # Tests organized by feature
+├── pyproject.toml
+└── poetry.lock
+```
+
+### Testing Strategy
+
+- **Unit Tests**: Business logic, validation, utilities
+- **Integration Tests**: DB transactions, API/worker behavior
+- **E2E Tests**: Simulate full workflows from API → device → Git → UI
+- Test database with Alembic-migrated schemas
+- Threaded jobs tested for isolation, timing, logging
+
+---
+
+#### Job Lifecycle & Orchestration (Updated)
+- Jobs are created via the API or automatically (system jobs).
+- Jobs are enqueued in Redis and picked up by the dedicated worker container.
+- The worker updates job status (`QUEUED` → `RUNNING` → `COMPLETED`/`FAILED`/`COMPLETED_NO_DEVICES`).
+- Job logs and connection logs are written to the database for UI consumption.
+- System jobs are protected from deletion and have special status handling in the UI and backend.

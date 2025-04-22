@@ -15,6 +15,7 @@ import Tags from '../pages/Tags.vue'; // Import the Tags component
 import Credentials from '../pages/Credentials.vue'; // Import the Credentials component
 import ConnectionLogs from '../pages/Logs.vue';
 import JobLogs from '../pages/JobLogs.vue';
+import DeviceDetail from '../pages/DeviceDetail.vue';
 
 // Placeholder components for routes to work initially
 // const PlaceholderComponent = { template: '<div>Placeholder Page</div>' }; // No longer needed
@@ -41,6 +42,12 @@ const routes = [
     name: 'Devices',
     component: Devices, // Use actual Devices component
     meta: { requiresAuth: true, roles: ['admin', 'user'] } 
+  },
+  {
+    path: '/devices/:id',
+    name: 'DeviceDetail',
+    component: DeviceDetail,
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
   },
   {
     path: '/tags',

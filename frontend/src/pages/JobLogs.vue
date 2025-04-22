@@ -6,8 +6,8 @@
       title="Job Log Filters"
       :filter-fields="filterFields"
       :initial-filters="currentFilters"
-      @apply-filters="applyFilters"
-      @reset-filters="resetFilters"
+      @filter="applyFilters"
+      @reset="resetFilters"
     />
     <!-- Loading/Error Indicators -->
     <div v-if="jobLogStore.isLoading && logs.length === 0" class="text-center py-4">Loading Job Logs...</div>
@@ -23,37 +23,14 @@
       </span>
     </div>
     <!-- Logs Table -->
-    <div v-if="logs.length > 0" class="bg-white shadow-md rounded my-6" :class="{ 'opacity-50': jobLogStore.isLoading }">
-      <table class="min-w-max w-full table-auto">
-        <thead>
-          <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
-            <th class="py-3 px-6 text-left">Timestamp</th>
-            <th class="py-3 px-6 text-left">Job ID</th>
-            <th class="py-3 px-6 text-left">Device ID</th>
-            <th class="py-3 px-6 text-left">Level</th>
-            <th class="py-3 px-6 text-left">Message</th>
-          </tr>
-        </thead>
-        <tbody class="text-gray-600 text-sm font-light">
-          <tr v-for="log in logs" :key="log.id + 'job'" class="border-b border-gray-200 hover:bg-gray-100">
-            <td class="py-3 px-6 text-left text-xs whitespace-nowrap">{{ formatDateTime(log.timestamp) }}</td>
-            <td class="py-3 px-6 text-left">{{ log.job_id }}</td>
-            <td class="py-3 px-6 text-left">{{ log.device_id || '-' }}</td>
-            <td class="py-3 px-6 text-left">
-              <span :class="logLevelClass(log.level)" class="py-1 px-3 rounded-full text-xs">{{ log.level }}</span>
-            </td>
-            <td class="py-3 px-6 text-left">{{ log.message }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <!-- Pagination Controls -->
-      <PaginationControls
-        v-if="totalPages > 1"
-        :current-page="jobLogStore.pagination.currentPage"
-        :total-pages="totalPages"
-        @change-page="handlePageChange"
-      />
-    </div>
+    <JobLogTable :logs="logs" :is-loading="jobLogStore.isLoading" :error="jobLogStore.error" />
+    <!-- Pagination Controls -->
+    <PaginationControls
+      v-if="totalPages > 1"
+      :current-page="jobLogStore.pagination.currentPage"
+      :total-pages="totalPages"
+      @change-page="handlePageChange"
+    />
     <!-- No Logs Message -->
     <div v-if="!jobLogStore.isLoading && logs.length === 0 && !jobLogStore.error" class="text-center text-gray-500 py-6">
       No job logs found matching the criteria.
@@ -67,6 +44,8 @@ import { useJobLogStore } from '../store/job_log'
 import { useRoute, useRouter } from 'vue-router'
 import PaginationControls from '../components/PaginationControls.vue'
 import ResourceFilter from '../components/ResourceFilter.vue'
+import { jobTypeRegistry } from '../jobTypeRegistry'
+import JobLogTable from '../components/JobLogTable.vue'
 
 const jobLogStore = useJobLogStore()
 const logs = computed(() => jobLogStore.logs)
@@ -74,22 +53,47 @@ const totalPages = computed(() => jobLogStore.totalPages)
 const route = useRoute()
 const router = useRouter()
 
+// Prepare job type options from registry
+const jobTypeOptions = Object.entries(jobTypeRegistry).map(([key, value]) => ({
+  value: key,
+  label: value.label
+}))
+
 // Filter fields configuration
 const filterFields = [
   {
-    id: 'job_id',
-    label: 'Job ID',
-    type: 'number',
-    placeholder: 'Filter by Job ID'
+    name: 'search',
+    label: 'Search',
+    type: 'text',
+    placeholder: 'Search logs...'
   },
   {
-    id: 'device_id',
-    label: 'Device ID',
-    type: 'number',
-    placeholder: 'Filter by Device ID'
+    name: 'job_name',
+    label: 'Job Name',
+    type: 'select',
+    placeholder: 'Select job name',
+    options: computed(() => jobLogStore.jobNames.map(n => ({ value: n, label: n }))),
+    loading: computed(() => jobLogStore.jobNamesLoading),
+    async: true
   },
   {
-    id: 'level',
+    name: 'device_names',
+    label: 'Device(s)',
+    type: 'multiselect',
+    placeholder: 'Select device(s)',
+    options: computed(() => jobLogStore.deviceNames.map(n => ({ value: n, label: n }))),
+    loading: computed(() => jobLogStore.deviceNamesLoading),
+    async: true
+  },
+  {
+    name: 'job_type',
+    label: 'Job Type',
+    type: 'select',
+    placeholder: 'Select job type',
+    options: jobTypeOptions
+  },
+  {
+    name: 'level',
     label: 'Level',
     type: 'select',
     placeholder: 'Select level',
@@ -105,15 +109,17 @@ const filterFields = [
 ]
 
 const currentFilters = reactive({
-  job_id: route.query.job_id ? parseInt(route.query.job_id) : null,
-  device_id: route.query.device_id ? parseInt(route.query.device_id) : null,
-  level: route.query.level || null
+  search: '',
+  job_name: null,
+  device_names: [],
+  job_type: null,
+  level: null
 })
 
 function updateRouteQuery() {
   const query = { ...route.query }
   Object.keys(currentFilters).forEach(key => {
-    if (currentFilters[key] != null && currentFilters[key] !== '') {
+    if (currentFilters[key] != null && currentFilters[key] !== '' && (!Array.isArray(currentFilters[key]) || currentFilters[key].length > 0)) {
       query[key] = currentFilters[key]
     } else {
       delete query[key]
@@ -127,7 +133,11 @@ function updateRouteQuery() {
   router.replace({ query })
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await Promise.all([
+    jobLogStore.fetchJobNames(),
+    jobLogStore.fetchDeviceNames()
+  ])
   const initialPage = route.query.page ? parseInt(route.query.page) : 1
   jobLogStore.fetchLogs(initialPage, currentFilters)
 })
@@ -140,7 +150,11 @@ function applyFilters(filters) {
 
 function resetFilters() {
   Object.keys(currentFilters).forEach(key => {
-    currentFilters[key] = null
+    if (Array.isArray(currentFilters[key])) {
+      currentFilters[key] = []
+    } else {
+      currentFilters[key] = null
+    }
   })
   jobLogStore.fetchLogs(1, currentFilters)
   updateRouteQuery()
