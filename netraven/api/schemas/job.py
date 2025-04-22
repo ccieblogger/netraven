@@ -7,7 +7,7 @@ and response payloads for job endpoints.
 """
 
 from datetime import datetime
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict
 from pydantic import Field, field_validator, model_validator, root_validator
 import re
 from croniter import croniter
@@ -299,7 +299,7 @@ class ScheduledJobSummary(BaseSchemaWithId):
     cron_string: str | None = None
     scheduled_for: datetime | None = None
     next_run: datetime | None = None  # Calculated next run time
-    tags: list[Tag] = []
+    tags: List[Tag] = []
     is_enabled: bool
     is_system_job: bool
 
@@ -312,8 +312,8 @@ class RecentJobExecution(BaseSchemaWithId):
     run_time: datetime
     duration: float | None = None  # Duration in seconds
     status: str
-    devices: list[dict] = []  # [{id, name}]
-    tags: list[Tag] = []
+    devices: List[Dict] = []  # [{id, name}]
+    tags: List[Tag] = []
     is_system_job: bool
 
 class JobTypeSummary(BaseSchema):
@@ -349,5 +349,5 @@ class JobDashboardStatus(BaseSchema):
     redis_uptime: int | None = None  # seconds
     redis_memory: int | None = None  # bytes
     redis_last_heartbeat: datetime | None = None
-    rq_queues: list[RQQueueStatus] = []
-    workers: list[WorkerStatus] = []
+    rq_queues: List[RQQueueStatus] = []
+    workers: List[WorkerStatus] = []
