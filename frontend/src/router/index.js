@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/auth'; // Import Pinia store for auth che
 import Login from '../pages/Login.vue';
 import Dashboard from '../pages/Dashboard.vue'; // Use the consolidated dashboard component
 import Devices from '../pages/Devices.vue';
-import Jobs from '../pages/Jobs.vue';
+import JobsDashboard from '../pages/JobsDashboard.vue';
 import Logs from '../pages/Logs.vue';
 import Users from '../pages/Users.vue';
 import Unauthorized from '../pages/Unauthorized.vue';
@@ -64,7 +64,7 @@ const routes = [
   {
     path: '/jobs',
     name: 'Jobs',
-    component: Jobs, // Use actual Jobs component
+    component: JobsDashboard, // Use new dashboard as default
     meta: { requiresAuth: true, roles: ['admin', 'user'] } 
   },
   {
