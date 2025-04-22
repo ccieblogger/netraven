@@ -25,7 +25,7 @@ from netraven.api.schemas.log import JobLog as JobLogSchema
 from netraven.api.schemas.job import (
     ScheduledJobSummary, RecentJobExecution, JobTypeSummary, JobDashboardStatus, RQQueueStatus, WorkerStatus
 )
-from netraven.api.schemas.tag import Tag
+from netraven.api.schemas.tag import Tag as TagSchema
 
 # Potentially move to utils?
 from .devices import get_tags_by_ids # Reuse tag helper from device router for now
@@ -157,6 +157,186 @@ def list_jobs(
         "size": size,
         "pages": pages
     }
+
+@router.get("/scheduled", response_model=List[ScheduledJobSummary])
+def get_scheduled_jobs(db: Session = Depends(get_db_session)):
+    """Return all enabled jobs with a schedule (interval/cron/onetime), including next run time."""
+    jobs = db.query(models.Job).options(selectinload(models.Job.tags)).filter(models.Job.is_enabled == True).all()
+    result = []
+    now = datetime.utcnow()
+    for job in jobs:
+        # Only include jobs with a schedule
+        if not job.schedule_type:
+            continue
+        # Calculate next_run
+        next_run = None
+        if job.schedule_type == "interval" and job.started_at:
+            next_run = job.started_at + timedelta(seconds=job.interval_seconds or 0)
+        elif job.schedule_type == "cron" and job.cron_string:
+            try:
+                base = job.started_at or now
+                next_run = croniter(job.cron_string, base).get_next(datetime)
+            except Exception:
+                next_run = None
+        elif job.schedule_type == "onetime" and job.scheduled_for:
+            next_run = job.scheduled_for if (not job.completed_at or job.completed_at < job.scheduled_for) else None
+        # Defensive: ensure all required fields are present and not None
+        result.append(ScheduledJobSummary(
+            id=job.id,
+            name=job.name or "",
+            job_type=job.job_type or "",
+            description=job.description,
+            schedule_type=job.schedule_type or None,
+            interval_seconds=job.interval_seconds if job.interval_seconds is not None else None,
+            cron_string=job.cron_string or None,
+            scheduled_for=job.scheduled_for or None,
+            next_run=next_run,
+            tags=job.tags or [],
+            is_enabled=job.is_enabled if job.is_enabled is not None else True,
+            is_system_job=job.is_system_job if job.is_system_job is not None else False
+        ))
+    return result
+
+@router.get("/recent", response_model=List[RecentJobExecution])
+def get_recent_jobs(db: Session = Depends(get_db_session), limit: int = 20):
+    """Return recent job executions (completed jobs, sorted by run time desc, with duration and device info)."""
+    jobs = db.query(models.Job).options(selectinload(models.Job.tags)).filter(models.Job.completed_at != None).order_by(models.Job.completed_at.desc()).limit(limit).all()
+    result = []
+    for job in jobs:
+        # Duration
+        duration = None
+        if job.started_at and job.completed_at:
+            duration = (job.completed_at - job.started_at).total_seconds()
+        # Devices (from tags or device_id)
+        devices = []
+        if job.device_id:
+            dev = db.query(Device).filter(Device.id == job.device_id).first()
+            if dev:
+                devices.append({"id": dev.id, "name": dev.hostname})
+        else:
+            # Devices from tags
+            for tag in job.tags or []:
+                for dev in getattr(tag, "devices", []) or []:
+                    devices.append({"id": dev.id, "name": dev.hostname})
+        # Remove duplicates
+        seen = set()
+        unique_devices = []
+        for d in devices:
+            if d["id"] not in seen:
+                unique_devices.append(d)
+                seen.add(d["id"])
+        # Defensive: ensure all required fields are present and not None
+        result.append(RecentJobExecution(
+            id=job.id,
+            name=job.name or "",
+            job_type=job.job_type or "",
+            run_time=job.completed_at or job.started_at or datetime.utcnow(),
+            duration=duration,
+            status=job.status or "",
+            devices=unique_devices if unique_devices is not None else [],
+            tags=job.tags or [],
+            is_system_job=job.is_system_job if job.is_system_job is not None else False
+        ))
+    return result
+
+@router.get("/job-types", response_model=List[JobTypeSummary])
+def get_job_types(db: Session = Depends(get_db_session)):
+    """Return list of available job types, their labels, descriptions, icons, and last-used timestamp."""
+    # Use a static registry (could be loaded from config or code)
+    job_type_registry = {
+        "reachability": {
+            "label": "Check Reachability",
+            "description": "Test device reachability via ping and port checks.",
+            "icon": "NetworkCheckIcon"
+        },
+        "backup": {
+            "label": "Device Backup",
+            "description": "Backup device running configuration.",
+            "icon": "BackupIcon"
+        }
+        # Add more job types as needed
+    }
+    # Find last-used timestamp for each job type
+    last_used_map = {}
+    jobs = db.query(models.Job).all()
+    for job in jobs:
+        jt = job.job_type
+        ts = job.completed_at or job.started_at or job.scheduled_for
+        if jt and ts:
+            if jt not in last_used_map or (last_used_map[jt] and ts > last_used_map[jt]):
+                last_used_map[jt] = ts
+    result = []
+    for jt, meta in job_type_registry.items():
+        result.append(JobTypeSummary(
+            job_type=jt,
+            label=meta["label"],
+            description=meta.get("description"),
+            icon=meta.get("icon"),
+            last_used=last_used_map.get(jt)
+        ))
+    return result
+
+@router.get("/status", response_model=JobDashboardStatus)
+def get_jobs_status():
+    """Return Redis, RQ, and worker status for dashboard cards."""
+    # Try to use the same redis/rq connection as job runner
+    from rq import Queue, Worker
+    from redis import Redis
+    import os
+    from netraven.config.loader import load_config
+    config = load_config()
+    redis_url = config.get('scheduler', {}).get('redis_url', 'redis://localhost:6379/0')
+    try:
+        redis_conn = Redis.from_url(redis_url)
+        info = redis_conn.info()
+        redis_uptime = info.get('uptime_in_seconds')
+        redis_memory = info.get('used_memory')
+        redis_last_heartbeat = None  # Not tracked unless using Redis Sentinel
+    except Exception as e:
+        logging.error(f"Failed to get Redis info: {e}")
+        redis_uptime = None
+        redis_memory = None
+        redis_last_heartbeat = None
+        info = {}
+        redis_conn = None
+    # RQ Queues
+    rq_queues = []
+    try:
+        if redis_conn:
+            for qname in ['default', 'high', 'low']:
+                q = Queue(qname, connection=redis_conn)
+                jobs = q.jobs
+                job_count = len(jobs)
+                oldest_job_ts = None
+                if jobs:
+                    oldest_job_ts = jobs[0].enqueued_at if hasattr(jobs[0], 'enqueued_at') else None
+                rq_queues.append(RQQueueStatus(
+                    name=qname,
+                    job_count=job_count,
+                    oldest_job_ts=oldest_job_ts
+                ))
+    except Exception as e:
+        logging.error(f"Failed to get RQ queue info: {e}")
+    # Workers
+    workers = []
+    try:
+        if redis_conn:
+            for w in Worker.all(connection=redis_conn):
+                jobs_in_progress = len(w.get_current_job_ids()) if hasattr(w, 'get_current_job_ids') else 0
+                workers.append(WorkerStatus(
+                    id=w.name,
+                    status=w.state if hasattr(w, 'state') else 'unknown',
+                    jobs_in_progress=jobs_in_progress
+                ))
+    except Exception as e:
+        logging.error(f"Failed to get worker info: {e}")
+    return JobDashboardStatus(
+        redis_uptime=redis_uptime,
+        redis_memory=redis_memory,
+        redis_last_heartbeat=redis_last_heartbeat,
+        rq_queues=rq_queues,
+        workers=workers
+    )
 
 @router.get("/{job_id}", response_model=schemas.job.Job)
 def get_job(
@@ -372,184 +552,3 @@ def get_job_device_results(
             "log": JobLogSchema.model_validate(log).model_dump(),
         })
     return results
-
-# --- Jobs Dashboard Endpoints ---
-
-@router.get("/scheduled", response_model=List[ScheduledJobSummary])
-def get_scheduled_jobs(db: Session = Depends(get_db_session)):
-    """Return all enabled jobs with a schedule (interval/cron/onetime), including next run time."""
-    jobs = db.query(models.Job).options(selectinload(models.Job.tags)).filter(models.Job.is_enabled == True).all()
-    result = []
-    now = datetime.utcnow()
-    for job in jobs:
-        # Only include jobs with a schedule
-        if not job.schedule_type:
-            continue
-        # Calculate next_run
-        next_run = None
-        if job.schedule_type == "interval" and job.started_at:
-            next_run = job.started_at + timedelta(seconds=job.interval_seconds or 0)
-        elif job.schedule_type == "cron" and job.cron_string:
-            try:
-                base = job.started_at or now
-                next_run = croniter(job.cron_string, base).get_next(datetime)
-            except Exception:
-                next_run = None
-        elif job.schedule_type == "onetime" and job.scheduled_for:
-            next_run = job.scheduled_for if (not job.completed_at or job.completed_at < job.scheduled_for) else None
-        result.append(ScheduledJobSummary(
-            id=job.id,
-            name=job.name,
-            job_type=job.job_type,
-            description=job.description,
-            schedule_type=job.schedule_type,
-            interval_seconds=job.interval_seconds,
-            cron_string=job.cron_string,
-            scheduled_for=job.scheduled_for,
-            next_run=next_run,
-            tags=job.tags,
-            is_enabled=job.is_enabled,
-            is_system_job=job.is_system_job
-        ))
-    return result
-
-@router.get("/recent", response_model=List[RecentJobExecution])
-def get_recent_jobs(db: Session = Depends(get_db_session), limit: int = 20):
-    """Return recent job executions (completed jobs, sorted by run time desc, with duration and device info)."""
-    # Find jobs with completed_at not null, order by completed_at desc
-    jobs = db.query(models.Job).options(selectinload(models.Job.tags)).filter(models.Job.completed_at != None).order_by(models.Job.completed_at.desc()).limit(limit).all()
-    result = []
-    for job in jobs:
-        # Duration
-        duration = None
-        if job.started_at and job.completed_at:
-            duration = (job.completed_at - job.started_at).total_seconds()
-        # Devices (from tags or device_id)
-        devices = []
-        if job.device_id:
-            dev = db.query(Device).filter(Device.id == job.device_id).first()
-            if dev:
-                devices.append({"id": dev.id, "name": dev.hostname})
-        else:
-            # Devices from tags
-            for tag in job.tags:
-                for dev in tag.devices:
-                    devices.append({"id": dev.id, "name": dev.hostname})
-        # Remove duplicates
-        seen = set()
-        unique_devices = []
-        for d in devices:
-            if d["id"] not in seen:
-                unique_devices.append(d)
-                seen.add(d["id"])
-        result.append(RecentJobExecution(
-            id=job.id,
-            name=job.name,
-            job_type=job.job_type,
-            run_time=job.completed_at or job.started_at or datetime.utcnow(),
-            duration=duration,
-            status=job.status,
-            devices=unique_devices,
-            tags=job.tags,
-            is_system_job=job.is_system_job
-        ))
-    return result
-
-@router.get("/job-types", response_model=List[JobTypeSummary])
-def get_job_types(db: Session = Depends(get_db_session)):
-    """Return list of available job types, their labels, descriptions, icons, and last-used timestamp."""
-    # Use a static registry (could be loaded from config or code)
-    job_type_registry = {
-        "reachability": {
-            "label": "Check Reachability",
-            "description": "Test device reachability via ping and port checks.",
-            "icon": "NetworkCheckIcon"
-        },
-        "backup": {
-            "label": "Device Backup",
-            "description": "Backup device running configuration.",
-            "icon": "BackupIcon"
-        }
-        # Add more job types as needed
-    }
-    # Find last-used timestamp for each job type
-    last_used_map = {}
-    jobs = db.query(models.Job).all()
-    for job in jobs:
-        jt = job.job_type
-        ts = job.completed_at or job.started_at or job.scheduled_for
-        if jt and ts:
-            if jt not in last_used_map or (last_used_map[jt] and ts > last_used_map[jt]):
-                last_used_map[jt] = ts
-    result = []
-    for jt, meta in job_type_registry.items():
-        result.append(JobTypeSummary(
-            job_type=jt,
-            label=meta["label"],
-            description=meta.get("description"),
-            icon=meta.get("icon"),
-            last_used=last_used_map.get(jt)
-        ))
-    return result
-
-@router.get("/status", response_model=JobDashboardStatus)
-def get_jobs_status():
-    """Return Redis, RQ, and worker status for dashboard cards."""
-    # Try to use the same redis/rq connection as job runner
-    from rq import Queue, Worker
-    from redis import Redis
-    import os
-    from netraven.config.loader import load_config
-    config = load_config()
-    redis_url = config.get('scheduler', {}).get('redis_url', 'redis://localhost:6379/0')
-    try:
-        redis_conn = Redis.from_url(redis_url)
-        info = redis_conn.info()
-        redis_uptime = info.get('uptime_in_seconds')
-        redis_memory = info.get('used_memory')
-        redis_last_heartbeat = None  # Not tracked unless using Redis Sentinel
-    except Exception as e:
-        logging.error(f"Failed to get Redis info: {e}")
-        redis_uptime = None
-        redis_memory = None
-        redis_last_heartbeat = None
-        info = {}
-        redis_conn = None
-    # RQ Queues
-    rq_queues = []
-    try:
-        if redis_conn:
-            for qname in ['default', 'high', 'low']:
-                q = Queue(qname, connection=redis_conn)
-                jobs = q.jobs
-                job_count = len(jobs)
-                oldest_job_ts = None
-                if jobs:
-                    oldest_job_ts = jobs[0].enqueued_at if hasattr(jobs[0], 'enqueued_at') else None
-                rq_queues.append(RQQueueStatus(
-                    name=qname,
-                    job_count=job_count,
-                    oldest_job_ts=oldest_job_ts
-                ))
-    except Exception as e:
-        logging.error(f"Failed to get RQ queue info: {e}")
-    # Workers
-    workers = []
-    try:
-        if redis_conn:
-            for w in Worker.all(connection=redis_conn):
-                jobs_in_progress = len(w.get_current_job_ids()) if hasattr(w, 'get_current_job_ids') else 0
-                workers.append(WorkerStatus(
-                    id=w.name,
-                    status=w.state if hasattr(w, 'state') else 'unknown',
-                    jobs_in_progress=jobs_in_progress
-                ))
-    except Exception as e:
-        logging.error(f"Failed to get worker info: {e}")
-    return JobDashboardStatus(
-        redis_uptime=redis_uptime,
-        redis_memory=redis_memory,
-        redis_last_heartbeat=redis_last_heartbeat,
-        rq_queues=rq_queues,
-        workers=workers
-    )

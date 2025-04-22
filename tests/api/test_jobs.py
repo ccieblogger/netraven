@@ -424,6 +424,8 @@ class TestJobsAPI(BaseAPITest):
         db_session.add_all([job1, job2, job3])
         db_session.commit()
         response = client.get("/jobs/scheduled", headers=admin_headers)
+        if response.status_code != 200:
+            print("RESPONSE BODY:", response.text)
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -468,6 +470,8 @@ class TestJobsAPI(BaseAPITest):
         db_session.add_all([job1, job2])
         db_session.commit()
         response = client.get("/jobs/recent", headers=admin_headers)
+        if response.status_code != 200:
+            print("RESPONSE BODY:", response.text)
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
