@@ -268,10 +268,7 @@ class Job(JobBase, BaseSchemaWithId):
         description="Timestamp when the job completed running",
         example="2025-04-09T02:01:35Z"
     )
-    tags: List[Tag] = Field(
-        default=[],
-        description="List of tags associated with the job"
-    )
+    tags: List[Tag] = Field(default_factory=list, description="List of tags associated with the job")
     device_id: Optional[int] = Field(
         None,
         description="ID of the single device targeted by this job (if any)"
@@ -299,7 +296,7 @@ class ScheduledJobSummary(BaseSchemaWithId):
     cron_string: str | None = None
     scheduled_for: datetime | None = None
     next_run: datetime | None = None  # Calculated next run time
-    tags: List[Tag] = []
+    tags: List[Tag] = Field(default_factory=list)
     is_enabled: bool
     is_system_job: bool
 
@@ -312,8 +309,8 @@ class RecentJobExecution(BaseSchemaWithId):
     run_time: datetime
     duration: float | None = None  # Duration in seconds
     status: str
-    devices: List[Dict] = []  # [{id, name}]
-    tags: List[Tag] = []
+    devices: List[Dict] = Field(default_factory=list)  # [{id, name}]
+    tags: List[Tag] = Field(default_factory=list)
     is_system_job: bool
 
 class JobTypeSummary(BaseSchema):
@@ -349,5 +346,5 @@ class JobDashboardStatus(BaseSchema):
     redis_uptime: int | None = None  # seconds
     redis_memory: int | None = None  # bytes
     redis_last_heartbeat: datetime | None = None
-    rq_queues: List[RQQueueStatus] = []
-    workers: List[WorkerStatus] = []
+    rq_queues: List[RQQueueStatus] = Field(default_factory=list)
+    workers: List[WorkerStatus] = Field(default_factory=list)
