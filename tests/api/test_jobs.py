@@ -385,4 +385,162 @@ class TestJobsAPI(BaseAPITest):
         assert "items" in data
         for job in data["items"]:
             assert "job_type" in job
-            assert job["job_type"] in ["reachability", "backup"] 
+            assert job["job_type"] in ["reachability", "backup"]
+
+    def test_get_scheduled_jobs(self, client: TestClient, admin_headers: dict, db_session: Session, test_tag):
+        """Test /jobs/scheduled returns enabled jobs with schedule and next_run."""
+        # Create jobs with different schedule types
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        job1 = models.Job(
+            name="scheduled-interval",
+            schedule_type="interval",
+            interval_seconds=3600,
+            is_enabled=True,
+            status="pending",
+            started_at=now,
+            job_type="backup",
+            tags=[test_tag]
+        )
+        job2 = models.Job(
+            name="scheduled-cron",
+            schedule_type="cron",
+            cron_string="0 2 * * *",
+            is_enabled=True,
+            status="pending",
+            started_at=now,
+            job_type="reachability",
+            tags=[test_tag]
+        )
+        job3 = models.Job(
+            name="scheduled-onetime",
+            schedule_type="onetime",
+            scheduled_for=now + timedelta(days=1),
+            is_enabled=True,
+            status="pending",
+            job_type="backup",
+            tags=[test_tag]
+        )
+        db_session.add_all([job1, job2, job3])
+        db_session.commit()
+        response = client.get("/jobs/scheduled", headers=admin_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert any(j["name"] == "scheduled-interval" for j in data)
+        assert any(j["name"] == "scheduled-cron" for j in data)
+        assert any(j["name"] == "scheduled-onetime" for j in data)
+        for job in data:
+            assert "next_run" in job
+            assert job["is_enabled"] is True
+
+    def test_get_recent_jobs(self, client: TestClient, admin_headers: dict, db_session: Session, test_tag):
+        """Test /jobs/recent returns recent completed jobs with duration and device info."""
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        # Create a device
+        from netraven.db.models.device import Device
+        device = Device(hostname="recent-device", ip_address="10.0.0.10", device_type="cisco_ios")
+        db_session.add(device)
+        db_session.commit()
+        # Create completed jobs
+        job1 = models.Job(
+            name="recent-job-1",
+            schedule_type="onetime",
+            is_enabled=True,
+            status="completed",
+            started_at=now - timedelta(minutes=10),
+            completed_at=now - timedelta(minutes=5),
+            job_type="backup",
+            device_id=device.id,
+            tags=[test_tag]
+        )
+        job2 = models.Job(
+            name="recent-job-2",
+            schedule_type="onetime",
+            is_enabled=True,
+            status="completed",
+            started_at=now - timedelta(hours=2),
+            completed_at=now - timedelta(hours=1, minutes=50),
+            job_type="reachability",
+            tags=[test_tag]
+        )
+        db_session.add_all([job1, job2])
+        db_session.commit()
+        response = client.get("/jobs/recent", headers=admin_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert any(j["name"] == "recent-job-1" for j in data)
+        assert any(j["name"] == "recent-job-2" for j in data)
+        for job in data:
+            assert "duration" in job
+            assert "devices" in job
+            assert isinstance(job["devices"], list)
+
+    def test_get_job_types(self, client: TestClient, admin_headers: dict, db_session: Session):
+        """Test /jobs/job-types returns job type registry with last_used timestamps."""
+        # Create jobs of different types
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        job1 = models.Job(
+            name="type-job-1",
+            schedule_type="onetime",
+            is_enabled=True,
+            status="completed",
+            started_at=now - timedelta(days=1),
+            completed_at=now - timedelta(days=1, minutes=5),
+            job_type="backup"
+        )
+        job2 = models.Job(
+            name="type-job-2",
+            schedule_type="onetime",
+            is_enabled=True,
+            status="completed",
+            started_at=now - timedelta(days=2),
+            completed_at=now - timedelta(days=2, minutes=5),
+            job_type="reachability"
+        )
+        db_session.add_all([job1, job2])
+        db_session.commit()
+        response = client.get("/jobs/job-types", headers=admin_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        types = {j["job_type"] for j in data}
+        assert "backup" in types
+        assert "reachability" in types
+        for jt in data:
+            assert "label" in jt
+            assert "icon" in jt
+            # last_used may be null if no jobs of that type
+
+    def test_get_jobs_status(self, client: TestClient, admin_headers: dict, monkeypatch):
+        """Test /jobs/status returns Redis, RQ, and worker status (mocked)."""
+        # Patch Redis and RQ
+        class DummyQueue:
+            def __init__(self, name):
+                self.name = name
+                self.jobs = []
+        class DummyWorker:
+            def __init__(self, name):
+                self.name = name
+                self.state = "busy"
+                self._job_ids = ["job1", "job2"]
+            def get_current_job_ids(self):
+                return self._job_ids
+        class DummyRedis:
+            def info(self):
+                return {"uptime_in_seconds": 12345, "used_memory": 987654321}
+        monkeypatch.setattr("rq.Queue", lambda name, connection=None: DummyQueue(name))
+        monkeypatch.setattr("rq.Worker.all", lambda connection=None: [DummyWorker("worker1")])
+        monkeypatch.setattr("redis.Redis.from_url", lambda url: DummyRedis())
+        response = client.get("/jobs/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert "redis_uptime" in data
+        assert "redis_memory" in data
+        assert "rq_queues" in data
+        assert "workers" in data
+        assert isinstance(data["rq_queues"], list)
+        assert isinstance(data["workers"], list) 

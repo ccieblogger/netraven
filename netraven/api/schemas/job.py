@@ -14,6 +14,7 @@ from croniter import croniter
 
 from .base import BaseSchema, BaseSchemaWithId, create_paginated_response
 from .tag import Tag # Import Tag schema for relationships
+from .device import Device  # For device info in recent jobs
 
 # Define valid schedule types
 ScheduleTypes = Literal["interval", "cron", "onetime"]
@@ -283,3 +284,70 @@ class Job(JobBase, BaseSchemaWithId):
 
 # Paginated response model
 PaginatedJobResponse = create_paginated_response(Job)
+
+# --- NetRaven Job Dashboard Schemas ---
+
+class ScheduledJobSummary(BaseSchemaWithId):
+    """Summary schema for scheduled jobs (for dashboard/table view).
+    Includes schedule, next run, and targeting info.
+    """
+    name: str
+    job_type: str
+    description: str | None = None
+    schedule_type: str | None = None
+    interval_seconds: int | None = None
+    cron_string: str | None = None
+    scheduled_for: datetime | None = None
+    next_run: datetime | None = None  # Calculated next run time
+    tags: list[Tag] = []
+    is_enabled: bool
+    is_system_job: bool
+
+class RecentJobExecution(BaseSchemaWithId):
+    """Summary schema for recent job executions (for dashboard/table view).
+    Includes run time, duration, status, and device info.
+    """
+    name: str
+    job_type: str
+    run_time: datetime
+    duration: float | None = None  # Duration in seconds
+    status: str
+    devices: list[dict] = []  # [{id, name}]
+    tags: list[Tag] = []
+    is_system_job: bool
+
+class JobTypeSummary(BaseSchema):
+    """Schema for job type registry entries (for dashboard card view).
+    Includes label, description, icon, and last-used timestamp.
+    """
+    job_type: str
+    label: str
+    description: str | None = None
+    icon: str | None = None
+    last_used: datetime | None = None
+
+class RQQueueStatus(BaseSchema):
+    """Schema for RQ queue status (for jobs/status card).
+    Includes queue name, job count, and oldest job timestamp.
+    """
+    name: str
+    job_count: int
+    oldest_job_ts: datetime | None = None
+
+class WorkerStatus(BaseSchema):
+    """Schema for worker status (for jobs/status card).
+    Includes worker id, status, and jobs in progress.
+    """
+    id: str
+    status: str
+    jobs_in_progress: int
+
+class JobDashboardStatus(BaseSchema):
+    """Schema for overall jobs dashboard status (for jobs/status endpoint).
+    Includes Redis, RQ, and worker info.
+    """
+    redis_uptime: int | None = None  # seconds
+    redis_memory: int | None = None  # bytes
+    redis_last_heartbeat: datetime | None = None
+    rq_queues: list[RQQueueStatus] = []
+    workers: list[WorkerStatus] = []
