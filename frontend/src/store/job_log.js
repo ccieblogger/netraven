@@ -46,7 +46,7 @@ export const useJobLogStore = defineStore('job_logs', () => {
     deviceNamesLoading.value = true
     deviceNamesError.value = null
     try {
-      const response = await api.get('/devices')
+      const response = await api.get('/devices/')
       console.log('Device fetch response:', response.data)
       const items = response.data.items || response.data || []
       deviceNames.value = items.map(d => d.hostname)
@@ -74,9 +74,15 @@ export const useJobLogStore = defineStore('job_logs', () => {
         size: pagination.value.itemsPerPage,
         ...filters.value
       }
-      // Convert device_names array to comma-separated string for API
-      if (params.device_names && Array.isArray(params.device_names)) {
-        params.device_names = params.device_names.join(',')
+      // Convert device_names to comma-separated string for API if it's an array
+      if (params.device_names) {
+        if (Array.isArray(params.device_names)) {
+          params.device_names = params.device_names.join(',');
+        }
+        // If it's an empty string or array, remove the param
+        if (params.device_names === '' || params.device_names.length === 0) {
+          delete params.device_names;
+        }
       }
       Object.keys(params).forEach(key => (params[key] == null || params[key] === '' || (Array.isArray(params[key]) && params[key].length === 0)) && delete params[key])
       const response = await api.get('/job-logs/', { params })

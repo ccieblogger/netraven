@@ -18,3 +18,7 @@ TOKEN=$(curl -s -X POST http://localhost:8000/auth/token \
 # Use the token to query the endpoint
 curl -s http://localhost:8000/jobs/status \
   -H "Authorization: Bearer $TOKEN" | jq . 
+
+# Use the token to query job-logs endpoint
+curl -X GET "http://localhost:8000/job-logs/" \
+  -H "Authorization: Bearer $TOKEN" | jq . 

@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.16, pytest-8.3.5, pluggy-1.5.0
+rootdir: /app
+configfile: pyproject.toml
+plugins: anyio-4.9.0, mock-3.14.0, timeout-2.3.1
+collected 6 items
+
+tests/api/test_job_logs.py ......                                        [100%]
+
+=============================== warnings summary ===============================
+../usr/local/lib/python3.10/site-packages/pydantic/fields.py:1076: 66 warnings
+  /usr/local/lib/python3.10/site-packages/pydantic/fields.py:1076: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 6 passed, 66 warnings in 2.82s ========================

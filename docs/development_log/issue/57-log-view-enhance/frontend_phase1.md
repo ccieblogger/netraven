@@ -23,3 +23,14 @@
 
 Updated the job log table to display enriched fields (job_name, device_name, job_type) and make job/device names clickable for navigation.
 Integrated the new JobLogTable component into the main page. 
+
+---
+
+## Final Resolution (2025-04-23)
+- Enhancement #57 completed. Device filter now uses a single-select dropdown for scalability.
+- Filter logic updated to handle device_names as string or array, ensuring correct API parameter formatting.
+- All filters (device, job name, job type, etc.) now trigger backend queries and update the logs table as expected.
+- Confirmed backend returns real DB data (no mock data).
+- All changes and investigation steps logged in the GitHub issue and here.
+
+--- 

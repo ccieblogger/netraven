@@ -28,3 +28,13 @@
 - Await frontend phase after backend is complete.
 
 --- 
+
+## Final Resolution (2025-04-23)
+- Enhancement #57 completed. All backend and frontend issues resolved.
+- Device filter now uses a single-select dropdown for scalability.
+- API call for devices updated to `/devices/` (trailing slash) for backend compatibility.
+- Filter logic improved to handle device_names as string or array.
+- Confirmed `/job-logs/` endpoint performs real DB queries (no mock data).
+- All changes and investigation steps logged in the GitHub issue and here.
+
+--- 

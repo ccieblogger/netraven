@@ -78,9 +78,9 @@ const filterFields = [
   },
   {
     name: 'device_names',
-    label: 'Device(s)',
-    type: 'multiselect',
-    placeholder: 'Select device(s)',
+    label: 'Device',
+    type: 'select',
+    placeholder: 'Select device',
     options: computed(() => jobLogStore.deviceNames.map(n => ({ value: n, label: n }))),
     loading: computed(() => jobLogStore.deviceNamesLoading),
     async: true
