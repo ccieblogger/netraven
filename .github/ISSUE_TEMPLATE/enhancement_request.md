@@ -31,6 +31,7 @@ Describe your suggested change and how it would work.
 - Backend is FastAPI, routers are mounted at root (no /api prefix).
 - DB is postgresql
 - environment contol script is ./setup/manage_netraven.sh
+- pytests are run via container. ex. docker exec -it netraven-api-dev bash -c "cd /app && PYTHONPATH=/app poetry run pytest tests/api/"
 
 📝 see document /docs/source_of_truth/tech_stack_reference.md
 
