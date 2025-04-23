@@ -267,6 +267,8 @@ def handle_device(
             )
             if commit_hash:
                 print(f"[DEBUG executor] Successful commit for device_id={device_id}, credential_id={getattr(cred, 'id', None)}. Returning from handle_device.")
+                # Log device-level job log for successful backup
+                log_utils.save_job_log(device_id, job_id, "Backup completed successfully.", success=True, db=db)
                 try:
                     if db is not None and hasattr(cred, 'id') and cred.id is not None:
                         record_credential_attempt(db, device_id, cred.id, job_id, success=True, error=None)
