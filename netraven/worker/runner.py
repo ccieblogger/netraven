@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from netraven.config.loader import load_config
 from netraven.services.device_credential_resolver import resolve_device_credentials_batch
+from netraven.worker import log_utils as _log_utils
 
 # Setup basic logging for the runner
 # TODO: Integrate with structlog if used elsewhere
@@ -243,6 +244,8 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         update_job_status(job_id, JobStatus.RUNNING, db_to_use, start_time=start_time)
         if session_managed:
              db_to_use.commit() # Commit status update only if session is managed here
+        # Log job started
+        _log_utils.save_job_log(None, job_id, "Job started.", success=True, db=db_to_use)
 
         # 0. Load Configuration
         config = load_config()
@@ -271,8 +274,9 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
 
         if not devices_to_process:
             final_status = JobStatus.COMPLETED_NO_DEVICES
-            # Not necessarily a failure, just nothing to do
             log.warning(f"[Job: {job_id}] No devices found for this job. Final Status: {final_status}")
+            # Log job completed (no devices)
+            _log_utils.save_job_log(None, job_id, "Job completed: No devices found for this job.", success=True, db=db_to_use)
         else:
             # 1.5 Resolve credentials for devices
             try:
@@ -310,6 +314,8 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
                         final_status = JobStatus.FAILED_DISPATCHER_ERROR
                         job_failed = True
                         log.error(f"[Job: {job_id}] Dispatcher returned incorrect number of results ({len(results)} vs {device_count}). Final Status: {final_status}")
+                        # Log job failed (dispatcher error)
+                        _log_utils.save_job_log(None, job_id, "Job failed: Dispatcher error.", success=False, db=db_to_use)
                     else:
                         success_count = sum(1 for r in results if r.get("success"))
                         failure_count = device_count - success_count
@@ -317,12 +323,18 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
 
                         if failure_count == 0:
                             final_status = JobStatus.COMPLETED_SUCCESS
+                            # Log job completed (all success)
+                            _log_utils.save_job_log(None, job_id, "Job completed successfully.", success=True, db=db_to_use)
                         elif success_count > 0:
                             final_status = JobStatus.COMPLETED_PARTIAL_FAILURE
                             job_failed = True # Mark job as failed overall if any device failed
+                            # Log job completed (partial failure)
+                            _log_utils.save_job_log(None, job_id, "Job completed with partial failure.", success=False, db=db_to_use)
                         else: # All failed
                             final_status = JobStatus.COMPLETED_FAILURE
                             job_failed = True
+                            # Log job failed (all devices failed)
+                            _log_utils.save_job_log(None, job_id, "Job failed: All devices failed.", success=False, db=db_to_use)
                     
                     log.info(f"[Job: {job_id}] Tasks finished. Final Status: {final_status}")
                     
@@ -333,6 +345,8 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
                 job_failed = True
                 error_msg_for_log = f"Failed to resolve credentials: {cred_e}"
                 log_runner_error(job_id, error_msg_for_log, db_to_use, error_type="CREDENTIAL")
+                # Log job failed (credential resolution)
+                _log_utils.save_job_log(None, job_id, f"Job failed: Credential resolution error: {cred_e}", success=False, db=db_to_use)
 
     except Exception as e:
         # Generic job execution error
@@ -341,6 +355,8 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         job_failed = True
         error_msg = f"Unexpected error in job execution: {str(e)}"
         log_runner_error(job_id, error_msg, db_to_use)
+        # Log job failed (unexpected error)
+        _log_utils.save_job_log(None, job_id, f"Job failed: Unexpected error: {e}", success=False, db=db_to_use)
     finally:
         # Always update job status, even if an exception occurred
         end_time = time.time()
