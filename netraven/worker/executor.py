@@ -22,6 +22,10 @@ Key components used by the executor:
 - Redactor: Removes sensitive information from outputs
 - Git writer: Commits configurations to version control
 - Error handler: Classifies exceptions for appropriate handling
+
+NOTE FOR DEVELOPERS: When adding a new job type, ensure you follow the device-level logging pattern:
+- After the main device operation, always call log_utils.save_job_log with a clear message and success flag.
+- This ensures all job types are auditable and visible in the job log API/UI.
 """
 
 import time
@@ -70,6 +74,13 @@ def backup_device_handler(device, job_id, config, db):
     return _legacy_backup_logic(device, job_id, config, db)
 
 def reachability_handler(device, job_id, config, db):
+    """
+    Handler for reachability jobs. Performs ICMP and TCP checks.
+    Maintains the device-level logging pattern: always log a job log entry for success or failure.
+    When adding new job types, follow this pattern:
+      - After the main device operation, call log_utils.save_job_log with a clear message and success flag.
+      - Use INFO for success, ERROR for failure.
+    """
     device_ip = getattr(device, 'ip_address', None)
     result = {
         "device_id": getattr(device, 'id', None),
@@ -105,6 +116,19 @@ def reachability_handler(device, job_id, config, db):
         result["tcp_22"].get("success") or
         result["tcp_443"].get("success")
     )
+    # --- Device-level job log for reachability ---
+    device_id = result["device_id"]
+    if result["success"]:
+        log_utils.save_job_log(device_id, job_id, "Reachability check completed successfully.", success=True, db=db)
+    else:
+        error_msgs = []
+        if not result["icmp_ping"].get("success"):
+            error_msgs.append(f"ICMP: {result['icmp_ping'].get('error','failed')}")
+        for port in [22, 443]:
+            if not result[f"tcp_{port}"].get("success"):
+                error_msgs.append(f"TCP {port}: {result[f'tcp_{port}'].get('error','failed')}")
+        msg = "Reachability check failed: " + "; ".join(error_msgs)
+        log_utils.save_job_log(device_id, job_id, msg, success=False, db=db)
     return result
 
 # --- Registry mapping job_type to handler ---
