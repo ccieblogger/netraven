@@ -4,10 +4,10 @@
       <div>
         <h2 class="text-lg uppercase font-semibold text-text-secondary">Redis Status</h2>
         <div class="mt-2">
-          <div class="text-text-primary font-bold">{{ upText }}</div>
-          <div class="text-xs text-text-secondary">{{ uptimeText }}</div>
-          <div class="text-xs text-text-secondary">{{ memoryText }}</div>
-          <div class="text-xs text-text-secondary">{{ heartbeatText }}</div>
+          <div class="text-base text-text-primary font-bold">{{ upText }}</div>
+          <div class="text-base text-text-primary font-semibold">{{ uptimeText }}</div>
+          <div class="text-base text-text-primary font-semibold">{{ memoryText }}</div>
+          <div class="text-base text-text-primary font-semibold">{{ heartbeatText }}</div>
         </div>
       </div>
       <div class="flex items-center justify-center h-10 w-10 rounded-md bg-red-600">

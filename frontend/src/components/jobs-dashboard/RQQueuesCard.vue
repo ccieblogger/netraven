@@ -3,15 +3,18 @@
     <div class="p-4 flex justify-between items-start">
       <div>
         <h2 class="text-lg uppercase font-semibold text-text-secondary">RQ Queues</h2>
-        <div class="mt-2">
-          <div class="flex justify-between text-xs text-text-secondary mb-1">
-            <span>Total jobs</span><span class="font-bold text-text-primary">{{ totalJobs }}</span>
+        <div class="mt-2 space-y-1">
+          <div class="flex justify-between items-center">
+            <span class="text-sm text-text-secondary">Total jobs</span>
+            <span class="text-base text-text-primary font-bold">{{ totalJobs }}</span>
           </div>
-          <div class="flex justify-between text-xs text-text-secondary mb-1">
-            <span>Low queue</span><span class="font-bold text-text-primary">{{ lowQueue }}</span>
+          <div class="flex justify-between items-center">
+            <span class="text-sm text-text-secondary">Low queue</span>
+            <span class="text-base text-text-primary font-bold">{{ lowQueue }}</span>
           </div>
-          <div class="flex justify-between text-xs text-text-secondary">
-            <span>High queue</span><span class="font-bold text-text-primary">{{ highQueue }}</span>
+          <div class="flex justify-between items-center">
+            <span class="text-sm text-text-secondary">High queue</span>
+            <span class="text-base text-text-primary font-bold">{{ highQueue }}</span>
           </div>
         </div>
       </div>

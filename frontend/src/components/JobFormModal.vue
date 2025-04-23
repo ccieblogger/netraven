@@ -24,6 +24,20 @@
           help-text="Describe the purpose of this job"
         />
 
+        <!-- Job Type -->
+        <FormField
+          id="jobType"
+          v-model="form.job_type"
+          label="Job Type"
+          type="select"
+          required
+          :error="validationErrors.job_type"
+        >
+          <option value="">Select job type</option>
+          <option value="backup">Backup</option>
+          <option value="reachability">Reachability</option>
+        </FormField>
+
         <!-- Target Type Toggle -->
         <div class="flex items-center space-x-4">
           <label class="flex items-center">
@@ -190,6 +204,7 @@ const form = ref({
     tag_ids: [], // Array of selected tag IDs
     device_id: '', // Single device ID
     is_enabled: true,
+    job_type: '',
     schedule_type: 'interval', // Default schedule type
     interval_seconds: 3600, // Default interval: 1 hour
     cron_string: '',
@@ -332,10 +347,10 @@ async function submitForm() {
     // Prepare payload, ensuring nulls for non-applicable schedule fields
     const payload = {
       ...form.value,
-      // Set irrelevant schedule fields to null based on schedule_type
+      scheduled_for: form.value.schedule_type === 'onetime' ? new Date(form.value.run_at).toISOString() : null,
+      run_at: undefined, // Remove run_at from payload
       interval_seconds: form.value.schedule_type === 'interval' ? form.value.interval_seconds : null,
       cron_string: form.value.schedule_type === 'cron' ? form.value.cron_string : null,
-      run_at: form.value.schedule_type === 'onetime' ? new Date(form.value.run_at).toISOString() : null,
     };
     
     // Remove id if it's null (for create operation)

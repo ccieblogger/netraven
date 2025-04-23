@@ -4,8 +4,8 @@
       <div>
         <h2 class="text-lg uppercase font-semibold text-text-secondary">Worker Status</h2>
         <div class="mt-2">
-          <div class="text-text-primary font-bold">{{ workerStatus }}</div>
-          <div class="text-xs text-text-secondary">Jobs in proc <span class="font-bold text-text-primary">{{ jobsInProc }}</span></div>
+          <div class="text-base text-text-primary font-bold">{{ workerStatus }}</div>
+          <div class="text-sm text-text-secondary">Jobs in proc <span class="text-base text-text-primary font-bold">{{ jobsInProc }}</span></div>
         </div>
       </div>
       <div class="flex items-center justify-center h-10 w-10 rounded-md bg-green-600">

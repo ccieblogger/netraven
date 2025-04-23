@@ -7,6 +7,7 @@ from netraven.db.session import engine
 from redis import Redis
 from rq import Worker
 from rq_scheduler import Scheduler
+from datetime import datetime, timezone
 
 # Import routers
 from .routers import devices, jobs, users, auth_router, tags, credentials, backups, job_logs, connection_logs  # Import the new connection_logs router
@@ -113,6 +114,7 @@ def system_status(request: Request):
         "redis": check_redis(redis_url),
         "worker": check_worker(redis_url),
         "scheduler": check_scheduler(redis_url),
+        "system_time": datetime.now(timezone.utc).isoformat()
     }
     _system_status_cache["result"] = status
     _system_status_cache["timestamp"] = now
