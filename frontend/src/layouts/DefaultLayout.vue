@@ -81,6 +81,7 @@
           <p class="text-sm text-text-secondary">Network Configuration Management System</p>
         </div>
         <div class="flex items-center space-x-4">
+          <SystemClock />
           <button class="p-1 text-text-secondary rounded-full hover:text-text-primary focus:outline-none">
             <BellIcon class="w-6 h-6" />
           </button>
@@ -91,6 +92,14 @@
       <main class="flex-1 overflow-y-auto bg-content p-6">
         <slot></slot>
       </main>
+      <footer class="w-full flex items-center justify-between bg-sidebar border-t border-divider px-6 py-2 text-xs text-text-secondary">
+        <div>
+          <span v-if="systemUtcTime">System UTC Time: {{ systemUtcTime }}</span>
+        </div>
+        <div>
+          <a href="/docs" target="_blank" class="hover:underline text-primary">API Docs</a>
+        </div>
+      </footer>
     </div>
   </div>
 </template>
@@ -100,8 +109,12 @@ import { useAuthStore } from '../store/auth';
 import { BellIcon } from '@heroicons/vue/24/outline';
 import ThemeSwitcher from '../components/ui/ThemeSwitcher.vue';
 import NotificationToast from '../components/NotificationToast.vue';
+import SystemClock from '../components/ui/SystemClock.vue'
+import { ref, onMounted } from 'vue'
+import api from '../services/api'
 
 const authStore = useAuthStore();
+const systemUtcTime = ref('');
 
 const navigation = [
   { 
@@ -194,6 +207,17 @@ const navigation = [
     } 
   }
 ];
+
+onMounted(async () => {
+  try {
+    const res = await api.get('/system/status');
+    if (res.data && res.data.system_time) {
+      systemUtcTime.value = res.data.system_time.replace('T', ' ').replace(/\..*$/, ' UTC');
+    }
+  } catch (e) {
+    systemUtcTime.value = '';
+  }
+});
 </script>
 
 <style>
