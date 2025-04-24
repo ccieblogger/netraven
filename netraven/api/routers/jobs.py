@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_
 from datetime import datetime, timedelta
 from croniter import croniter
-import logging
+from netraven.utils.unified_logger import get_unified_logger
 
 from netraven.api import schemas
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role
@@ -35,6 +35,8 @@ router = APIRouter(
     tags=["Jobs"],
     dependencies=[Depends(get_current_active_user)]
 )
+
+logger = get_unified_logger()
 
 @router.post("/", response_model=schemas.job.Job, status_code=status.HTTP_201_CREATED)
 def create_job(
@@ -293,7 +295,7 @@ def get_jobs_status():
         redis_memory = info.get('used_memory')
         redis_last_heartbeat = None  # Not tracked unless using Redis Sentinel
     except Exception as e:
-        logging.error(f"Failed to get Redis info: {e}")
+        logger.log(f"Failed to get Redis info: {e}", level="ERROR", destinations=["stdout"], source="jobs_router")
         redis_uptime = None
         redis_memory = None
         redis_last_heartbeat = None
@@ -316,7 +318,7 @@ def get_jobs_status():
                     oldest_job_ts=oldest_job_ts
                 ))
     except Exception as e:
-        logging.error(f"Failed to get RQ queue info: {e}")
+        logger.log(f"Failed to get RQ queue info: {e}", level="ERROR", destinations=["stdout"], source="jobs_router")
     # Workers
     workers = []
     try:
@@ -329,7 +331,7 @@ def get_jobs_status():
                     jobs_in_progress=jobs_in_progress
                 ))
     except Exception as e:
-        logging.error(f"Failed to get worker info: {e}")
+        logger.log(f"Failed to get worker info: {e}", level="ERROR", destinations=["stdout"], source="jobs_router")
     return JobDashboardStatus(
         redis_uptime=redis_uptime,
         redis_memory=redis_memory,
