@@ -27,7 +27,6 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, and_, func
-import logging
 
 from netraven.api import schemas # Import schemas module
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role # Import dependencies

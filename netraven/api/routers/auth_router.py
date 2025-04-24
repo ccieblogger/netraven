@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from sqlalchemy.orm import Session
-import logging
 
 from netraven.api import auth, schemas
 from netraven.db.models import User  # Import User model from the correct location

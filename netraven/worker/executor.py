@@ -31,7 +31,6 @@ NOTE FOR DEVELOPERS: When adding a new job type, ensure you follow the device-le
 import time
 from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
-import logging
 import threading, os
 from types import SimpleNamespace
 import subprocess

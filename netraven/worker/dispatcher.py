@@ -29,7 +29,6 @@ from typing import List, Dict, Any, Optional
 import time
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
-import logging
 from sqlalchemy.orm import Session
 
 from netraven.worker.executor import handle_device

@@ -9,7 +9,6 @@ This script creates:
 
 import sys
 import os
-import logging
 from pathlib import Path
 from netraven.utils.unified_logger import get_unified_logger
 

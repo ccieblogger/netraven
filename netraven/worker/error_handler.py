@@ -22,7 +22,6 @@ error handling and reporting across all device operations.
 
 from enum import Enum, auto
 from typing import Dict, Any, Optional, Tuple, List
-import logging
 import time
 from netmiko.exceptions import (
     NetmikoTimeoutException,
