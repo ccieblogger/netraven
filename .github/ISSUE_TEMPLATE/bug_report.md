@@ -39,13 +39,12 @@ If applicable, add screenshots or error logs to help explain the issue.
 
 ## 🤖 AI Assistant Rules:
 
-- Always start by doing a thorough analsysis of the projects codebase and technology stack
-- Conduct thorough analysis and research to understand issue and determine root cause.
-- Then create an implemenation plan to fix the root cause. If necessary break the work up into indivual work streams.
-- Always make sure when you are considering or making coding changes you are following the projects coding princples.
-- Update the original Github issue regularly with comments using the github tool.
-- Always provide the what and why of what you are doing so that other developers can follow along as you go.
-
+- Always start by doing a thorough analysis of the project's codebase and technology stack
+- Conduct thorough analysis and research to understand the best method to introduce the enhancement or the issues root cause that aligns with the projects coding principles.
+- Depending on the effort, consider breaking the work up into individual work streams if appropriate.
+- Always make sure when you are considering or making coding changes you are following the projects coding principles.
+- Update the original GitHub enhancement or issue regularly with comments using the GitHub tool.
+- Always provide what and why of what you are doing so that other developers can follow along as you go.
 ---
 
 ## log details:

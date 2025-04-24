@@ -44,12 +44,11 @@ Include any screenshots, related issues, or external resources to help illustrat
 
 ## 🤖 AI Assistant Rules:
 
-- Always start by doing a thorough analsysis of the projects codebase and technology stack
-- Conduct thorough analysis and research to understand issue best method to introduce the enhancement that aligns with the projects coding principles.
-- Depending on the effort need consider breaking the work up into indivual work streams.
-- Always make sure when you are considering or making coding changes you are following the projects coding princples.
-- Update the original Github enhancement regularly with comments using the github tool.
-- Always provide the what and why of what you are doing so that other developers can follow along as you go.
+- Always start by doing a thorough analysis of the project's codebase and technology stack
+- Conduct thorough analysis and research to understand the best method to introduce the enhancement or the issues root cause that aligns with the projects coding principles.
+- Depending on the effort, consider breaking the work up into individual work streams if appropriate.
+- Always make sure when you are considering or making coding changes you are following the projects coding principles.
+- Update the original GitHub enhancement or issue regularly with comments using the GitHub tool.
+- Always provide what and why of what you are doing so that other developers can follow along as you go.
 
 ---
-
