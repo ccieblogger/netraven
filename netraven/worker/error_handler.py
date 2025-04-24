@@ -31,6 +31,7 @@ from netmiko.exceptions import (
     ConnectionException,
 )
 from netraven.utils.unified_logger import get_unified_logger
+import logging
 
 # Configure logging
 logger = get_unified_logger()
