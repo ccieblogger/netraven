@@ -136,6 +136,15 @@ NetRaven now supports containerized deployment using Docker and Docker Compose f
   - Development: `.env.dev` file and `dev.yaml` configuration
   - Production: `.env.prod` file and `prod.yaml` configuration
 
+### Redis Logging (Zero-Config)
+- Redis logging is enabled by default for all containers in the development and production environments.
+- No manual configuration is required.
+- Logs are published to the `netraven-logs` channel on the internal Redis container (`redis:6379`).
+- To observe logs in real time, you can run:
+  ```bash
+  docker exec -it netraven-redis redis-cli SUBSCRIBE netraven-logs
+  ```
+
 ### Testing Strategy
 - **Unit Tests**: Business logic, validation, utilities
 - **Integration Tests**: DB transactions, API/worker behavior

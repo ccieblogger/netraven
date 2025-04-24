@@ -36,6 +36,13 @@ logging:
   # Default logging level for the application
   # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
   level: DEBUG
+  redis:
+    enabled: true
+    host: redis
+    port: 6379
+    db: 0
+    password: null
+    channel_prefix: netraven-logs
 
 # API Service specific settings (placeholders)
 api:
