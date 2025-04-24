@@ -28,8 +28,9 @@ import logging
 import threading
 from enum import Enum
 from typing import Dict, Any, Optional, List
+from netraven.utils.unified_logger import get_unified_logger
 
-logger = logging.getLogger(__name__)
+logger = get_unified_logger()
 
 class CircuitState(Enum):
     """States for the circuit breaker state machine.
@@ -156,7 +157,7 @@ class CircuitBreaker:
                 
                 # If we've reached the threshold, close the circuit
                 if circuit["success_count"] >= self.half_open_success_threshold:
-                    logger.info(f"Circuit for device {device_id} transitioning from HALF_OPEN to CLOSED")
+                    logger.log(f"Circuit for device {device_id} transitioning from HALF_OPEN to CLOSED", level="INFO", destinations=["stdout"], source="circuit_breaker", device_id=device_id)
                     circuit["state"] = CircuitState.CLOSED
                     circuit["failure_count"] = 0
                     circuit["success_count"] = 0
@@ -187,18 +188,20 @@ class CircuitBreaker:
             # In closed state, check if we need to open the circuit
             if circuit["state"] == CircuitState.CLOSED:
                 if circuit["failure_count"] >= self.failure_threshold:
-                    logger.warning(
+                    logger.log(
                         f"Circuit for device {device_id} transitioning from CLOSED to OPEN "
-                        f"after {circuit['failure_count']} consecutive failures"
+                        f"after {circuit['failure_count']} consecutive failures",
+                        level="WARNING", destinations=["stdout"], source="circuit_breaker", device_id=device_id
                     )
                     circuit["state"] = CircuitState.OPEN
                     circuit["last_state_change"] = current_time
             
             # In half-open state, any failure sends us back to open
             elif circuit["state"] == CircuitState.HALF_OPEN:
-                logger.warning(
+                logger.log(
                     f"Circuit for device {device_id} transitioning from HALF_OPEN to OPEN "
-                    f"after test connection failure"
+                    f"after test connection failure",
+                    level="WARNING", destinations=["stdout"], source="circuit_breaker", device_id=device_id
                 )
                 circuit["state"] = CircuitState.OPEN
                 circuit["success_count"] = 0
@@ -236,19 +239,21 @@ class CircuitBreaker:
                 time_since_last_change = current_time - circuit["last_state_change"]
                 
                 if time_since_last_change >= self.reset_timeout:
-                    logger.info(
+                    logger.log(
                         f"Circuit for device {device_id} transitioning from OPEN to HALF_OPEN "
-                        f"after {time_since_last_change:.1f}s cooldown"
+                        f"after {time_since_last_change:.1f}s cooldown",
+                        level="INFO", destinations=["stdout"], source="circuit_breaker", device_id=device_id
                     )
                     circuit["state"] = CircuitState.HALF_OPEN
                     circuit["success_count"] = 0
                     circuit["last_state_change"] = current_time
                     return True
                 else:
-                    logger.debug(
+                    logger.log(
                         f"Circuit for device {device_id} is OPEN. "
                         f"Blocking connection attempt. "
-                        f"Will try again in {self.reset_timeout - time_since_last_change:.1f}s"
+                        f"Will try again in {self.reset_timeout - time_since_last_change:.1f}s",
+                        level="DEBUG", destinations=["stdout"], source="circuit_breaker", device_id=device_id
                     )
                     return False
                     
