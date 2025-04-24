@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-import structlog
 from rq_scheduler import Scheduler
 from sqlalchemy.orm import Session
 from netraven.utils.unified_logger import get_unified_logger

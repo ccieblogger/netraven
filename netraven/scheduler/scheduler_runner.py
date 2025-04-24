@@ -1,5 +1,4 @@
 import time
-import structlog
 from redis import Redis
 from rq_scheduler import Scheduler
 

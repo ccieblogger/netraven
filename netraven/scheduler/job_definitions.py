@@ -1,11 +1,11 @@
-import structlog
+from netraven.utils.unified_logger import get_unified_logger
 
 # Import the actual worker job execution function
 # This path assumes the worker structure exists as per SOT
 # Adjust if the actual implementation differs
 from netraven.worker.runner import run_job 
 
-log = structlog.get_logger()
+logger = get_unified_logger()
 
 def run_device_job(job_id: int):
     """The function that RQ will execute. 
@@ -16,11 +16,30 @@ def run_device_job(job_id: int):
         job_id: The ID of the job to execute.
     """
     try:
-        log.info("Executing scheduled job via worker", job_id=job_id)
+        logger.log(
+            "Executing scheduled job via worker",
+            level="INFO",
+            destinations=["stdout"],
+            job_id=job_id,
+            source="job_definitions"
+        )
         # Call the main function from the worker service
         run_job(job_id)
-        log.info("Worker job execution finished", job_id=job_id)
+        logger.log(
+            "Worker job execution finished",
+            level="INFO",
+            destinations=["stdout"],
+            job_id=job_id,
+            source="job_definitions"
+        )
     except Exception as e:
         # Log the error and re-raise so RQ knows the job failed
-        log.error("Worker job execution failed", job_id=job_id, error=str(e), exc_info=True)
+        logger.log(
+            f"Worker job execution failed: {e}",
+            level="ERROR",
+            destinations=["stdout"],
+            job_id=job_id,
+            source="job_definitions",
+            extra={"error": str(e)},
+        )
         raise # Re-raise the exception for RQ's failure handling
