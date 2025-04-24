@@ -96,6 +96,7 @@ def save_job_log(device_id: Optional[int], job_id: int, message: str, success: b
         Exception: If using an external session and an error occurs. In this case,
                   the caller is responsible for handling the rollback.
     """
+    log.info(f"[DEBUG] save_job_log called: device_id={device_id}, job_id={job_id}, message={message}, success={success}, db_provided={db is not None}")
     session_managed = False
     if db is None:
         db = next(get_db()) # Get a database session if not provided
@@ -121,11 +122,14 @@ def save_job_log(device_id: Optional[int], job_id: int, message: str, success: b
         if session_managed and not db.in_transaction():
             try:
                 db.commit()
+                log.info(f"[DEBUG] save_job_log committed new log entry for job_id={job_id}, device_id={device_id}")
             except Exception as commit_error:
-                log.error(f"Error committing job log: {commit_error}")
+                log.error(f"[DEBUG] Error committing job log: {commit_error}")
                 db.rollback()
+        else:
+            log.info(f"[DEBUG] save_job_log added entry to session (not committed here)")
     except Exception as e:
-        log.error(f"Error saving job log for job {job_id}, device {device_id}: {e}")
+        log.error(f"[DEBUG] Error saving job log for job {job_id}, device {device_id}: {e}")
         if session_managed:
             db.rollback()
         else:
@@ -133,3 +137,4 @@ def save_job_log(device_id: Optional[int], job_id: int, message: str, success: b
     finally:
         if session_managed:
             db.close()
+            log.info(f"[DEBUG] save_job_log closed managed session for job_id={job_id}, device_id={device_id}")
