@@ -17,14 +17,14 @@ import os
 import datetime
 import traceback
 import json
-from netraven.config.loader import load_config
+from netraven.config.logger_config import get_logger_config
 
 # Redis and DB log utils
 try:
     from redis import Redis
 except ImportError:
     Redis = None
-from netraven.worker.log_utils import save_job_log, save_connection_log
+from netraven.db.log_utils import save_job_log, save_connection_log
 
 class UnifiedLogger:
     """
@@ -213,13 +213,13 @@ _unified_logger_instance = None
 
 def get_unified_logger() -> UnifiedLogger:
     """
-    Returns a singleton instance of UnifiedLogger, initialized with config from the loader.
+    Returns a singleton instance of UnifiedLogger, initialized with config from the logger_config module.
     Usage: from netraven.utils.unified_logger import get_unified_logger
            logger = get_unified_logger()
     """
     global _unified_logger_instance
     if _unified_logger_instance is None:
-        config = load_config().get('logging', {})
+        config = get_logger_config()
         _unified_logger_instance = UnifiedLogger(config)
     return _unified_logger_instance
 

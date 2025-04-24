@@ -21,10 +21,10 @@ across different vendor implementations and device models.
 """
 
 import re
-import logging
 from typing import Dict, Any, Optional, List, Tuple, Callable
+from netraven.utils.unified_logger import get_unified_logger
 
-logger = logging.getLogger(__name__)
+logger = get_unified_logger()
 
 # Mapping of device types to command variations
 COMMAND_VARIATIONS = {
@@ -313,7 +313,7 @@ def get_device_commands(device_type: str) -> Dict[str, str]:
     if device_type in COMMAND_VARIATIONS:
         return COMMAND_VARIATIONS[device_type]
     else:
-        logger.warning(f"Unknown device type: {device_type}, using default commands")
+        logger.log(f"Unknown device type: {device_type}, using default commands", level="WARNING", destinations=["stdout"], source="device_capabilities")
         return COMMAND_VARIATIONS["default"]
 
 def get_command(device_type: str, command_type: str) -> str:
@@ -344,13 +344,13 @@ def get_command(device_type: str, command_type: str) -> str:
     if command_type in commands:
         return commands[command_type]
     else:
-        logger.warning(f"Unknown command type: {command_type} for device: {device_type}")
+        logger.log(f"Unknown command type: {command_type} for device: {device_type}", level="WARNING", destinations=["stdout"], source="device_capabilities")
         # See if it exists in the default commands
         if command_type in COMMAND_VARIATIONS["default"]:
             return COMMAND_VARIATIONS["default"][command_type]
         else:
             # Last resort, just return the command type as-is
-            logger.error(f"No default found for command type: {command_type}")
+            logger.log(f"No default found for command type: {command_type}", level="ERROR", destinations=["stdout"], source="device_capabilities")
             return command_type
 
 def get_command_timeout(device_type: str, command_type: str) -> int:
@@ -389,9 +389,10 @@ def get_command_timeout(device_type: str, command_type: str) -> int:
         return COMMAND_TIMING["default"][command_type]
     
     # Last resort
-    logger.warning(
+    logger.log(
         f"No timeout defined for {device_type}/{command_type}, "
-        f"using default: {default_timeout}s"
+        f"using default: {default_timeout}s",
+        level="WARNING", destinations=["stdout"], source="device_capabilities"
     )
     return default_timeout
 
@@ -429,7 +430,7 @@ def parse_device_capabilities(device_type: str, version_output: str) -> Dict[str
     if device_type in CAPABILITY_PATTERNS:
         patterns = CAPABILITY_PATTERNS[device_type]
     else:
-        logger.warning(f"No capability patterns defined for {device_type}, using limited detection")
+        logger.log(f"No capability patterns defined for {device_type}, using limited detection", level="WARNING", destinations=["stdout"], source="device_capabilities")
         patterns = {}
     
     # Apply each pattern and extract capabilities
@@ -439,7 +440,7 @@ def parse_device_capabilities(device_type: str, version_output: str) -> Dict[str
             result[capability] = match.group(1)
         else:
             result[capability] = ""
-            logger.debug(f"Could not detect {capability} for {device_type}")
+            logger.log(f"[Job: {job_id}] Could not parse {capability} from output for {device_name}", level="WARNING", destinations=["stdout"], source="device_capabilities", job_id=job_id)
     
     return result
 
@@ -469,7 +470,7 @@ def get_static_capabilities(device_type: str) -> Dict[str, bool]:
     if device_type in DEVICE_CAPABILITIES:
         return DEVICE_CAPABILITIES[device_type]
     else:
-        logger.warning(f"No capability flags defined for {device_type}, using defaults")
+        logger.log(f"No capability flags defined for {device_type}, using defaults", level="WARNING", destinations=["stdout"], source="device_capabilities")
         return DEVICE_CAPABILITIES["default"]
 
 def get_command_sequence(device_type: str) -> List[Tuple[str, str]]:
@@ -690,7 +691,7 @@ def execute_capability_detection(
         version_cmd = get_command(device_type, "show_version")
         
         # Run the command
-        logger.info(f"[Job: {job_id}] Detecting capabilities for {device_name} using '{version_cmd}'")
+        logger.log(f"[Job: {job_id}] Detecting capabilities for {device_name} using '{version_cmd}'", level="INFO", destinations=["stdout"], source="device_capabilities", job_id=job_id)
         version_output = run_command_func(device, job_id, command=version_cmd)
         
         if version_output:
@@ -700,17 +701,17 @@ def execute_capability_detection(
             # Update capabilities with dynamic information
             capabilities.update(dynamic_caps)
             
-            logger.info(
-                f"[Job: {job_id}] Detected capabilities for {device_name}: "
-                f"Model={dynamic_caps.get('model', 'Unknown')}, "
-                f"Version={dynamic_caps.get('version', 'Unknown')}"
+            logger.log(
+                f"[Job: {job_id}] Capability detection result for {device_name}: {capabilities}",
+                level="INFO", destinations=["stdout"], source="device_capabilities", job_id=job_id
             )
         else:
-            logger.warning(f"[Job: {job_id}] Empty output from version command for {device_name}")
+            logger.log(f"[Job: {job_id}] Empty output from version command for {device_name}", level="WARNING", destinations=["stdout"], source="device_capabilities", job_id=job_id)
             
     except Exception as e:
-        logger.warning(
-            f"[Job: {job_id}] Error detecting capabilities for {device_name}: {str(e)}"
+        logger.log(
+            f"[Job: {job_id}] Capability detection failed for {device_name}: {e}",
+            level="WARNING", destinations=["stdout"], source="device_capabilities", job_id=job_id
         )
         # Continue with static capabilities only
     

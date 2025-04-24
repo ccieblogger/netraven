@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import structlog
 from rq_scheduler import Scheduler
 from sqlalchemy.orm import Session
+from netraven.utils.unified_logger import get_unified_logger
 
 # Database imports - adjust paths if necessary
 from netraven.db.session import get_db
@@ -11,9 +12,6 @@ from netraven.db.models import Job # Assuming Job model exists as defined
 from netraven.scheduler.job_definitions import run_device_job
 from netraven.worker.runner import run_job as run_worker_job # Use correct worker function import
 
-log = structlog.get_logger()
-
-# Function to generate a predictable RQ job ID from our DB Job ID
 def generate_rq_job_id(db_job_id: int) -> str:
     return f"netraven_db_job_{db_job_id}"
 
@@ -25,19 +23,35 @@ def sync_jobs_from_db(scheduler: Scheduler):
     Args:
         scheduler: The RQ Scheduler instance.
     """
-    log.debug("Starting job synchronization from database...")
+    logger = get_unified_logger()
+    logger.log(
+        "Starting job synchronization from database...",
+        level="DEBUG",
+        destinations=["stdout"],
+        source="scheduler_job_registration",
+    )
     db: Session | None = None
     try:
         db = next(get_db())
         jobs_to_schedule = db.query(Job).filter(Job.is_enabled == True).all()
-        log.info(f"Found {len(jobs_to_schedule)} enabled jobs in DB.")
+        logger.log(
+            f"Found {len(jobs_to_schedule)} enabled jobs in DB.",
+            level="INFO",
+            destinations=["stdout"],
+            source="scheduler_job_registration",
+        )
 
         # Get existing scheduled jobs from RQ Scheduler to compare
         # Note: scheduler.get_jobs() returns RQ Job instances
         scheduled_rq_jobs = scheduler.get_jobs()
         # Create a set of the predictable RQ job IDs that are currently scheduled
         existing_rq_job_ids = {job.id for job in scheduled_rq_jobs}
-        log.debug(f"{len(existing_rq_job_ids)} jobs currently in RQ-Scheduler.")
+        logger.log(
+            f"{len(existing_rq_job_ids)} jobs currently in RQ-Scheduler.",
+            level="DEBUG",
+            destinations=["stdout"],
+            source="scheduler_job_registration",
+        )
 
         scheduled_count = 0
         skipped_count = 0
@@ -52,14 +66,24 @@ def sync_jobs_from_db(scheduler: Scheduler):
                 # TODO: Optional - Check if schedule parameters (interval, cron) changed?
                 # If params changed, we might need to cancel the old one and reschedule.
                 # For now, just skip if the ID exists.
-                log.debug("Job already scheduled in RQ-Scheduler, skipping.", **job_log_details)
+                logger.log(
+                    f"Job already scheduled in RQ-Scheduler, skipping. {job_log_details}",
+                    level="DEBUG",
+                    destinations=["stdout"],
+                    source="scheduler_job_registration",
+                )
                 skipped_count += 1
                 continue
 
             # --- Schedule based on type --- 
             try:
                 if not db_job.is_enabled:
-                    log.debug("Job is disabled, skipping.", **job_log_details)
+                    logger.log(
+                        f"Job is disabled, skipping. {job_log_details}",
+                        level="DEBUG",
+                        destinations=["stdout"],
+                        source="scheduler_job_registration",
+                    )
                     skipped_count += 1
                     continue
                 
@@ -74,7 +98,13 @@ def sync_jobs_from_db(scheduler: Scheduler):
                         description=f"NetRaven Job {db_job.id} ({db_job.name}) - Interval",
                         meta={'db_job_id': db_job.id, 'schedule_type': 'interval'}
                     )
-                    log.info("Scheduled interval job.", interval=f"{db_job.interval_seconds}s", **job_log_details)
+                    logger.log(
+                        f"Scheduled interval job '{db_job.name}' (interval: {db_job.interval_seconds}s)",
+                        level="INFO",
+                        destinations=["stdout", "db"],
+                        job_id=db_job.id,
+                        source="scheduler_job_registration",
+                    )
                     scheduled_count += 1
                 
                 elif db_job.schedule_type == 'cron' and db_job.cron_string:
@@ -87,7 +117,13 @@ def sync_jobs_from_db(scheduler: Scheduler):
                         description=f"NetRaven Job {db_job.id} ({db_job.name}) - Cron",
                         meta={'db_job_id': db_job.id, 'schedule_type': 'cron'}
                     )
-                    log.info("Scheduled cron job.", cron=db_job.cron_string, **job_log_details)
+                    logger.log(
+                        f"Scheduled cron job '{db_job.name}' (cron: {db_job.cron_string})",
+                        level="INFO",
+                        destinations=["stdout", "db"],
+                        job_id=db_job.id,
+                        source="scheduler_job_registration",
+                    )
                     scheduled_count += 1
 
                 elif db_job.schedule_type == 'onetime' and db_job.scheduled_for:
@@ -102,34 +138,64 @@ def sync_jobs_from_db(scheduler: Scheduler):
                             description=f"NetRaven Job {db_job.id} ({db_job.name}) - Onetime",
                             meta={'db_job_id': db_job.id, 'schedule_type': 'onetime'}
                         )
-                        log.info("Scheduled one-time job.", run_at=run_time, **job_log_details)
+                        logger.log(
+                            f"Scheduled one-time job '{db_job.name}' for {run_time}",
+                            level="INFO",
+                            destinations=["stdout", "db"],
+                            job_id=db_job.id,
+                            source="scheduler_job_registration",
+                        )
                         scheduled_count += 1
                     else:
-                        log.warning("One-time job scheduled in the past, skipping.", run_at=run_time, **job_log_details)
+                        logger.log(
+                            f"One-time job '{db_job.name}' scheduled in the past for {run_time}, skipping",
+                            level="WARNING",
+                            destinations=["stdout", "db"],
+                            job_id=db_job.id,
+                            source="scheduler_job_registration",
+                        )
                         skipped_count += 1
                 else:
                     # Skip if no valid schedule type or parameters are set
-                    log.warning("Job has no valid schedule type/params, skipping.", 
-                                schedule_type=db_job.schedule_type, 
-                                interval=db_job.interval_seconds,
-                                cron=db_job.cron_string,
-                                run_at=db_job.scheduled_for,
-                                **job_log_details)
+                    logger.log(
+                        f"Job '{db_job.name}' has no valid schedule type/params, skipping",
+                        level="WARNING",
+                        destinations=["stdout", "db"],
+                        job_id=db_job.id,
+                        source="scheduler_job_registration",
+                    )
                     skipped_count += 1
             
             except Exception as schedule_e:
-                log.error("Failed to schedule job", error=str(schedule_e), exc_info=True, **job_log_details)
+                logger.log(
+                    f"Failed to schedule job '{db_job.name}': {schedule_e}",
+                    level="ERROR",
+                    destinations=["stdout", "db"],
+                    job_id=db_job.id,
+                    source="scheduler_job_registration",
+                )
                 error_count += 1
 
-        log.info("Finished job synchronization.", 
-                 total_enabled=len(jobs_to_schedule), 
-                 newly_scheduled=scheduled_count, 
-                 already_exist_skipped=skipped_count,
-                 errors=error_count)
+        logger.log(
+            f"Finished job synchronization. Total enabled: {len(jobs_to_schedule)}, newly scheduled: {scheduled_count}, skipped: {skipped_count}, errors: {error_count}",
+            level="INFO",
+            destinations=["stdout", "db"],
+            source="scheduler_job_registration",
+        )
 
     except Exception as e:
-        log.error("Error during database query or setup", error=str(e), exc_info=True)
+        logger.log(
+            f"Error during database query or setup: {e}",
+            level="ERROR",
+            destinations=["stdout"],
+            source="scheduler_job_registration",
+        )
     finally:
         if db:
             db.close()
-            log.debug("Database session closed.")
+            logger.log(
+                "Database session closed.",
+                level="DEBUG",
+                destinations=["stdout"],
+                source="scheduler_job_registration",
+            )

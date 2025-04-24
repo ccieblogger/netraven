@@ -1,10 +1,7 @@
 import os
 import yaml
-import structlog
 from pathlib import Path
 from typing import Dict, Any
-
-log = structlog.get_logger()
 
 # Define the base directory for configuration files relative to this loader file
 # Assumes loader.py is in netraven/config/
@@ -65,7 +62,7 @@ def load_config(env: str = None, config_dir: Path = ENV_DIR) -> Dict[str, Any]:
     """
     if env is None:
         env = os.getenv("NETRAVEN_ENV", "dev").lower()
-        log.debug(f"Environment not specified, using NETRAVEN_ENV or default: {env}")
+        print(f"Environment not specified, using NETRAVEN_ENV or default: {env}")
     else:
         env = env.lower()
 
@@ -81,9 +78,9 @@ def load_config(env: str = None, config_dir: Path = ENV_DIR) -> Dict[str, Any]:
                 base_config = yaml.safe_load(f)
                 if base_config:
                     config = merge_dicts(base_config, config)
-                log.debug(f"Loaded base configuration from {base_config_path}")
+                print(f"Loaded base configuration from {base_config_path}")
         except Exception as e:
-            log.error(f"Failed to load base config {base_config_path}", error=str(e))
+            print(f"Failed to load base config {base_config_path}: {e}")
 
     # 2. Load environment-specific configuration and merge
     if env_config_path.exists():
@@ -92,20 +89,20 @@ def load_config(env: str = None, config_dir: Path = ENV_DIR) -> Dict[str, Any]:
                 env_config = yaml.safe_load(f)
                 if env_config:
                     config = merge_dicts(env_config, config)
-                log.debug(f"Loaded environment configuration from {env_config_path}")
+                print(f"Loaded environment configuration from {env_config_path}")
         except Exception as e:
-            log.error(f"Failed to load environment config {env_config_path}", error=str(e))
+            print(f"Failed to load environment config {env_config_path}: {e}")
     else:
-        log.warning(f"Environment config file not found: {env_config_path}")
+        print(f"Environment config file not found: {env_config_path}")
 
     # 3. Load environment variable overrides and merge
     env_overrides = get_env_overrides()
     if env_overrides:
         config = merge_dicts(env_overrides, config)
-        log.debug("Applied environment variable overrides", overrides=env_overrides)
+        print(f"Applied environment variable overrides: {env_overrides}")
 
     if not config:
-        log.warning("Configuration result is empty. Check config files and environment.")
+        print("Configuration result is empty. Check config files and environment.")
 
     return config
 

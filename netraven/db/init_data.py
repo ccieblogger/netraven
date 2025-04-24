@@ -11,10 +11,10 @@ import sys
 import os
 import logging
 from pathlib import Path
+from netraven.utils.unified_logger import get_unified_logger
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = get_unified_logger()
 
 # Import project modules
 try:
@@ -30,7 +30,12 @@ try:
     from netraven.api.auth import get_password_hash
     from netraven.db.models.job import Job
 except ImportError as e:
-    logger.error(f"Failed to import required modules: {e}")
+    logger.log(
+        f"Failed to import required modules: {e}",
+        level="ERROR",
+        destinations=["stdout"],
+        source="db_init_data",
+    )
     sys.exit(1)
 
 # Default data constants
@@ -66,8 +71,8 @@ def get_custom_db():
         # First try the standard session
         yield from get_db()
     except Exception as e:
-        logger.warning(f"Standard DB session failed: {e}")
-        logger.info("Trying to connect using localhost instead...")
+        logger.log(f"Standard DB session failed: {e}", level="WARNING", destinations=["stdout"], source="db_init_data")
+        logger.log("Trying to connect using localhost instead...", level="INFO", destinations=["stdout"], source="db_init_data")
         
         # Create a custom session with localhost connection
         db_url = "postgresql+psycopg2://netraven:netraven@localhost:5432/netraven"
@@ -85,7 +90,12 @@ def create_admin_user(db):
     existing_admin = db.query(User).filter(User.username == DEFAULT_ADMIN["username"]).first()
     
     if existing_admin:
-        logger.info(f"Admin user '{DEFAULT_ADMIN['username']}' already exists with ID: {existing_admin.id}")
+        logger.log(
+            f"Admin user '{DEFAULT_ADMIN['username']}' already exists with ID: {existing_admin.id}",
+            level="INFO",
+            destinations=["stdout"],
+            source="db_init_data",
+        )
         return existing_admin
     
     hashed_password = get_password_hash(DEFAULT_ADMIN["password"])
@@ -101,7 +111,12 @@ def create_admin_user(db):
     db.add(new_admin)
     db.commit()
     db.refresh(new_admin)
-    logger.info(f"Admin user '{DEFAULT_ADMIN['username']}' created with ID: {new_admin.id}")
+    logger.log(
+        f"Admin user '{DEFAULT_ADMIN['username']}' created with ID: {new_admin.id}",
+        level="INFO",
+        destinations=["stdout"],
+        source="db_init_data",
+    )
     
     return new_admin
 
@@ -113,7 +128,12 @@ def create_default_tags(db):
         existing_tag = db.query(Tag).filter(Tag.name == tag_data["name"]).first()
         
         if existing_tag:
-            logger.info(f"Tag '{tag_data['name']}' already exists with ID: {existing_tag.id}")
+            logger.log(
+                f"Tag '{tag_data['name']}' already exists with ID: {existing_tag.id}",
+                level="INFO",
+                destinations=["stdout"],
+                source="db_init_data",
+            )
             created_tags.append(existing_tag)
             continue
         
@@ -125,7 +145,12 @@ def create_default_tags(db):
         db.add(new_tag)
         db.commit()
         db.refresh(new_tag)
-        logger.info(f"Tag '{tag_data['name']}' created with ID: {new_tag.id}")
+        logger.log(
+            f"Tag '{tag_data['name']}' created with ID: {new_tag.id}",
+            level="INFO",
+            destinations=["stdout"],
+            source="db_init_data",
+        )
         created_tags.append(new_tag)
     
     return created_tags
@@ -142,7 +167,12 @@ def create_default_credentials(db):
             result = db.execute(stmt, {"username": cred_data["username"]}).first()
             
             if result:
-                logger.info(f"Credential with username '{cred_data['username']}' already exists with ID: {result[0]}")
+                logger.log(
+                    f"Credential with username '{cred_data['username']}' already exists with ID: {result[0]}",
+                    level="INFO",
+                    destinations=["stdout"],
+                    source="db_init_data",
+                )
                 # Skip to next credential
                 continue
                 
@@ -165,11 +195,21 @@ def create_default_credentials(db):
             db.add(new_cred)
             db.commit()
             db.refresh(new_cred)
-            logger.info(f"System credential '{cred_data['username']}' created with ID: {new_cred.id}")
+            logger.log(
+                f"System credential '{cred_data['username']}' created with ID: {new_cred.id}",
+                level="INFO",
+                destinations=["stdout"],
+                source="db_init_data",
+            )
             created_credentials.append(new_cred)
             
         except Exception as e:
-            logger.error(f"Error creating credential: {e}")
+            logger.log(
+                f"Error creating credential: {e}",
+                level="ERROR",
+                destinations=["stdout"],
+                source="db_init_data",
+            )
             # Continue with other credentials
             db.rollback()
     
@@ -182,7 +222,12 @@ def associate_default_tag_with_devices(db):
         default_tag = db.query(Tag).filter(Tag.name == "default").first()
         
         if not default_tag:
-            logger.warning("Default tag not found, cannot associate with devices")
+            logger.log(
+                "Default tag not found, cannot associate with devices",
+                level="WARNING",
+                destinations=["stdout"],
+                source="db_init_data",
+            )
             return
         
         # Find devices without the default tag
@@ -193,18 +238,38 @@ def associate_default_tag_with_devices(db):
         )
         
         if not devices_without_tag:
-            logger.info("All existing devices already have the default tag")
+            logger.log(
+                "All existing devices already have the default tag",
+                level="INFO",
+                destinations=["stdout"],
+                source="db_init_data",
+            )
             return
         
         # Associate the default tag with devices
         for device in devices_without_tag:
             device.tags.append(default_tag)
-            logger.info(f"Associated default tag with device: {device.hostname}")
+            logger.log(
+                f"Associated default tag with device: {device.hostname}",
+                level="INFO",
+                destinations=["stdout"],
+                source="db_init_data",
+            )
         
         db.commit()
-        logger.info(f"Default tag associated with {len(devices_without_tag)} device(s)")
+        logger.log(
+            f"Default tag associated with {len(devices_without_tag)} device(s)",
+            level="INFO",
+            destinations=["stdout"],
+            source="db_init_data",
+        )
     except Exception as e:
-        logger.error(f"Error associating default tag with devices: {e}")
+        logger.log(
+            f"Error associating default tag with devices: {e}",
+            level="ERROR",
+            destinations=["stdout"],
+            source="db_init_data",
+        )
 
 def associate_default_credential_with_default_tag(db):
     """Associate the default credential with the default tag."""
@@ -212,27 +277,52 @@ def associate_default_credential_with_default_tag(db):
         # Get the default tag
         default_tag = db.query(Tag).filter(Tag.name == "default").first()
         if not default_tag:
-            logger.warning("Default tag not found, cannot associate with credential")
+            logger.log(
+                "Default tag not found, cannot associate with credential",
+                level="WARNING",
+                destinations=["stdout"],
+                source="db_init_data",
+            )
             return
         
         # Get the default credential
         default_cred = db.query(Credential).filter(Credential.username == "admin").first()
         if not default_cred:
-            logger.warning("Default credential not found, cannot associate with tag")
+            logger.log(
+                "Default credential not found, cannot associate with tag",
+                level="WARNING",
+                destinations=["stdout"],
+                source="db_init_data",
+            )
             return
         
         # Check if the association already exists
         if default_tag in default_cred.tags:
-            logger.info("Default credential is already associated with default tag")
+            logger.log(
+                "Default credential is already associated with default tag",
+                level="INFO",
+                destinations=["stdout"],
+                source="db_init_data",
+            )
             return
         
         # Associate the default tag with the default credential
         default_cred.tags.append(default_tag)
         db.commit()
         
-        logger.info(f"Successfully associated default credential (ID: {default_cred.id}) with default tag (ID: {default_tag.id})")
+        logger.log(
+            f"Successfully associated default credential (ID: {default_cred.id}) with default tag (ID: {default_tag.id})",
+            level="INFO",
+            destinations=["stdout"],
+            source="db_init_data",
+        )
     except Exception as e:
-        logger.error(f"Error associating default credential with default tag: {e}")
+        logger.log(
+            f"Error associating default credential with default tag: {e}",
+            level="ERROR",
+            destinations=["stdout"],
+            source="db_init_data",
+        )
         db.rollback()
 
 def create_system_reachability_job(db):
@@ -240,12 +330,22 @@ def create_system_reachability_job(db):
     # Check for existing job
     job = db.query(Job).filter(Job.name == "system-reachability", Job.is_system_job == True).first()
     if job:
-        logger.info(f"System reachability job already exists with ID: {job.id}")
+        logger.log(
+            f"System reachability job already exists with ID: {job.id}",
+            level="INFO",
+            destinations=["stdout"],
+            source="db_init_data",
+        )
         return job
     # Get default tag
     default_tag = db.query(Tag).filter(Tag.name == "default").first()
     if not default_tag:
-        logger.warning("Default tag not found, cannot create system reachability job")
+        logger.log(
+            "Default tag not found, cannot create system reachability job",
+            level="WARNING",
+            destinations=["stdout"],
+            source="db_init_data",
+        )
         return None
     # Create the job
     job = Job(
@@ -259,7 +359,12 @@ def create_system_reachability_job(db):
     db.add(job)
     db.commit()
     db.refresh(job)
-    logger.info(f"System reachability job created with ID: {job.id}")
+    logger.log(
+        f"System reachability job created with ID: {job.id}",
+        level="INFO",
+        destinations=["stdout"],
+        source="db_init_data",
+    )
     return job
 
 def init_database():
@@ -268,12 +373,12 @@ def init_database():
         # Try standard DB session first, then local connection if that fails
         try:
             db = next(get_db())
-            logger.info("Connected to database using standard session")
+            logger.log("Connected to database using standard session", level="INFO", destinations=["stdout"], source="db_init_data")
         except Exception as e:
-            logger.warning(f"Standard DB session failed: {e}")
-            logger.info("Trying to connect using localhost instead...")
+            logger.log(f"Standard DB session failed: {e}", level="WARNING", destinations=["stdout"], source="db_init_data")
+            logger.log("Trying to connect using localhost instead...", level="INFO", destinations=["stdout"], source="db_init_data")
             db = next(get_custom_db())
-            logger.info("Connected to database using localhost")
+            logger.log("Connected to database using localhost", level="INFO", destinations=["stdout"], source="db_init_data")
         
         # Create default admin user
         create_admin_user(db)
@@ -293,10 +398,10 @@ def init_database():
         # Create system reachability job
         create_system_reachability_job(db)
         
-        logger.info("Database initialization completed successfully")
+        logger.log("Database initialization completed successfully", level="INFO", destinations=["stdout"], source="db_init_data")
         return 0
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
+        logger.log(f"Database initialization failed: {e}", level="ERROR", destinations=["stdout"], source="db_init_data")
         return 1
 
 if __name__ == "__main__":

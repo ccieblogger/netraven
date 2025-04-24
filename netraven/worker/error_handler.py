@@ -31,9 +31,10 @@ from netmiko.exceptions import (
     ReadTimeout,
     ConnectionException,
 )
+from netraven.utils.unified_logger import get_unified_logger
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = get_unified_logger()
 
 class ErrorCategory(Enum):
     """Classification for device connection and operation errors.
@@ -211,19 +212,23 @@ class ErrorInfo:
         Args:
             logger_instance: Optional logger to use instead of the module logger
         """
-        logger_to_use = logger_instance or logger
-        
+        # Use UnifiedLogger for error logging
         log_data = self.to_dict()
-        # Remove 'message' key to avoid conflict with LogRecord
-        if 'message' in log_data:
-            log_data['error_message'] = log_data.pop('message')
-            
         msg = f"{log_data['category']}: {self.message}"
-        
         if self.is_retriable:
             msg += f" (Retry {self.retry_count+1}/{self.max_retries})"
-            
-        logger_to_use.log(self.log_level, msg, extra=log_data)
+        # Extract job_id/device_id if present in context
+        job_id = log_data.get('context', {}).get('job_id')
+        device_id = log_data.get('context', {}).get('device_id')
+        logger.log(
+            msg,
+            level=logging.getLevelName(self.log_level),
+            destinations=["stdout", "db"],
+            job_id=job_id,
+            device_id=device_id,
+            source="error_handler",
+            extra=log_data,
+        )
 
 
 def classify_exception(

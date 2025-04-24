@@ -16,9 +16,10 @@ import logging
 from netraven.api import auth, schemas
 from netraven.db.models import User  # Import User model from the correct location
 from netraven.api.dependencies import get_db_session # Import DB dependency
+from netraven.utils.unified_logger import get_unified_logger
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = get_unified_logger()
 
 router = APIRouter(
     prefix="/auth",
@@ -43,19 +44,49 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
     """
     user = db.query(User).filter(User.username == username).first()
     if not user:
-        logger.warning(f"Authentication failed: User not found: {username}")
+        logger.log(
+            f"Authentication failed: User not found: {username}",
+            level="WARNING",
+            destinations=["stdout"],
+            source="auth_router",
+        )
         return None
     
     # Debug password verification
-    logger.info(f"Attempting password verification for user: {username}")
-    logger.debug(f"Password provided length: {len(password)}")
-    logger.debug(f"Stored hash: {user.hashed_password[:10]}...")
+    logger.log(
+        f"Attempting password verification for user: {username}",
+        level="INFO",
+        destinations=["stdout"],
+        source="auth_router",
+    )
+    logger.log(
+        f"Password provided length: {len(password)}",
+        level="DEBUG",
+        destinations=["stdout"],
+        source="auth_router",
+    )
+    logger.log(
+        f"Stored hash: {user.hashed_password[:10]}...",
+        level="DEBUG",
+        destinations=["stdout"],
+        source="auth_router",
+    )
     
     if not auth.verify_password(password, user.hashed_password):
-        logger.warning(f"Authentication failed: Invalid password for user: {username}")
+        logger.log(
+            f"Authentication failed: Invalid password for user: {username}",
+            level="WARNING",
+            destinations=["stdout"],
+            source="auth_router",
+        )
         return None
     
-    logger.info(f"Authentication successful for user: {username}")
+    logger.log(
+        f"Authentication successful for user: {username}",
+        level="INFO",
+        destinations=["stdout"],
+        source="auth_router",
+    )
     return user
 
 @router.post("/token", response_model=schemas.token.Token)
@@ -82,7 +113,12 @@ async def login_for_access_token(
         HTTPException (400): If the user account is inactive
     """
     # Debug incoming request
-    logger.info(f"Login attempt for user: {form_data.username}")
+    logger.log(
+        f"Login attempt for user: {form_data.username}",
+        level="INFO",
+        destinations=["stdout"],
+        source="auth_router",
+    )
     
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
@@ -94,7 +130,12 @@ async def login_for_access_token(
     
     # Check if user is active
     if not user.is_active:
-        logger.warning(f"Login attempt for inactive user: {form_data.username}")
+        logger.log(
+            f"Login attempt for inactive user: {form_data.username}",
+            level="WARNING",
+            destinations=["stdout"],
+            source="auth_router",
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="Inactive user"
@@ -105,5 +146,10 @@ async def login_for_access_token(
         data={"sub": user.username, "role": user.role}, # Include role in token
         expires_delta=access_token_expires
     )
-    logger.info(f"Token generated successfully for user: {form_data.username}")
+    logger.log(
+        f"Token generated successfully for user: {form_data.username}",
+        level="INFO",
+        destinations=["stdout"],
+        source="auth_router",
+    )
     return {"access_token": access_token, "token_type": "bearer"}

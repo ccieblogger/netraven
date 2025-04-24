@@ -34,10 +34,7 @@ from sqlalchemy.orm import Session
 
 from netraven.worker.executor import handle_device
 from netraven.worker.error_handler import ErrorCategory, ErrorInfo, classify_exception
-
-# Setup basic logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-log = logging.getLogger(__name__)
+from netraven.utils.unified_logger import get_unified_logger
 
 # Default thread pool size if not specified in config
 DEFAULT_THREAD_POOL_SIZE = 5
@@ -109,14 +106,33 @@ def dispatch_tasks(
         if 'retry_backoff' in config['worker']:
             retry_config['retry_delay'] = config['worker']['retry_backoff']
 
-    log.info(f"[Job: {job_id}] Starting task dispatcher with thread pool size: {thread_pool_size}")
+    logger = get_unified_logger()
+    logger.log(
+        f"Job '{job_id}' started: dispatching tasks to devices",
+        level="INFO",
+        destinations=["stdout", "db"],
+        job_id=job_id,
+        source="dispatcher",
+    )
     
     device_count = len(devices) if devices else 0
     if device_count == 0:
-        log.warning(f"[Job: {job_id}] No devices to process.")
+        logger.log(
+            f"No devices to process for job '{job_id}'",
+            level="WARNING",
+            destinations=["stdout", "db"],
+            job_id=job_id,
+            source="dispatcher",
+        )
         return []
     
-    log.info(f"[Job: {job_id}] Will process {device_count} devices")
+    logger.log(
+        f"Job '{job_id}' will process {device_count} devices",
+        level="INFO",
+        destinations=["stdout", "db"],
+        job_id=job_id,
+        source="dispatcher",
+    )
     
     # Results container
     results: List[Dict[str, Any]] = []
@@ -131,7 +147,14 @@ def dispatch_tasks(
             device_id = getattr(device, 'id', 0)
             device_name = getattr(device, 'hostname', f"Device_{device_id}")
             print(f"[DEBUG dispatcher] Submitting device_id={device_id} device_name={device_name} job_id={job_id}")
-            log.info(f"[Job: {job_id}] Submitting task for device: {device_name}")
+            logger.log(
+                f"Submitting task for device '{device_name}' in job '{job_id}'",
+                level="INFO",
+                destinations=["stdout", "db"],
+                job_id=job_id,
+                device_id=device_id,
+                source="dispatcher",
+            )
             
             # Submit the task to the executor, capturing the Future
             future = executor.submit(
@@ -167,11 +190,25 @@ def dispatch_tasks(
                 
                 # Get the result - may raise exception if the task failed
                 result = future.result()
-                log.info(f"[Job: {job_id}] Task completed for device: {device_name}")
+                logger.log(
+                    f"Task completed for device '{device_name}' in job '{job_id}'",
+                    level="INFO",
+                    destinations=["stdout", "db"],
+                    job_id=job_id,
+                    device_id=device_id,
+                    source="dispatcher",
+                )
                 results.append(result)
             except Exception as e:
                 # This handles errors from the future/thread itself, not from the device task
-                log.error(f"[Job: {job_id}] Thread error processing device: {e}")
+                logger.log(
+                    f"Thread error processing device '{device_name}' in job '{job_id}': {e}",
+                    level="ERROR",
+                    destinations=["stdout", "db"],
+                    job_id=job_id,
+                    device_id=device_id,
+                    source="dispatcher",
+                )
                 
                 # Attempt to get device info if available
                 device_id = 0
@@ -200,7 +237,13 @@ def dispatch_tasks(
                 
                 results.append(failure_result)
     
-    log.info(f"[Job: {job_id}] All device tasks completed. Success rate: {sum(1 for r in results if r.get('success', False))}/{len(results)}")
+    logger.log(
+        f"All device tasks completed for job '{job_id}'. Success rate: {sum(1 for r in results if r.get('success', False))}/{len(results)}",
+        level="INFO",
+        destinations=["stdout", "db"],
+        job_id=job_id,
+        source="dispatcher",
+    )
     
     return results
 
@@ -330,9 +373,13 @@ def task_with_retry(
             # Calculate backoff time
             backoff_time = error_info.next_retry_delay()
             print(f"[DEBUG dispatcher] Scheduling retry for device_id={device_id} device_name={device_name} job_id={job_id} attempt={retry_count}/{max_retries} in {backoff_time}s")
-            log.info(
-                f"[Job: {job_id}] Retrying device {device_name} in {backoff_time}s "
-                f"(attempt {retry_count}/{max_retries})"
+            logger.log(
+                f"Retrying device '{device_name}' in {backoff_time}s (attempt {retry_count}/{max_retries})",
+                level="INFO",
+                destinations=["stdout", "db"],
+                job_id=job_id,
+                device_id=device_id,
+                source="dispatcher",
             )
             
             # Wait before retry
@@ -379,9 +426,13 @@ def task_with_retry(
                 
                 # If the new error is not retriable, break the loop
                 if not error_info.is_retriable:
-                    log.warning(
-                        f"[Job: {job_id}] Encountered non-retriable error during retry "
-                        f"for device {device_name}: {error_info.message}"
+                    logger.log(
+                        f"Encountered non-retriable error during retry for device '{device_name}': {error_info.message}",
+                        level="WARNING",
+                        destinations=["stdout", "db"],
+                        job_id=job_id,
+                        device_id=device_id,
+                        source="dispatcher",
                     )
                     break
     

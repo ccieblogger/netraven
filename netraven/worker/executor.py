@@ -60,8 +60,11 @@ from git import GitCommandError
 from netraven.services.device_credential import get_matching_credentials_for_device
 from netraven.services.credential_metrics import record_credential_attempt
 
+# Import unified logger
+from netraven.utils.unified_logger import get_unified_logger
+
 # Configure logging
-log = logging.getLogger(__name__)
+logger = get_unified_logger()
 
 # Default values if not found in config
 DEFAULT_GIT_REPO_PATH = "/data/git-repo/" # As per SOT example
@@ -81,7 +84,14 @@ def reachability_handler(device, job_id, config, db):
       - After the main device operation, call log_utils.save_job_log with a clear message and success flag.
       - Use INFO for success, ERROR for failure.
     """
-    log.info(f"[DEBUG] Entered reachability_handler for job_id={job_id}, device_id={getattr(device, 'id', None)}")
+    logger.log(
+        f"Entered reachability_handler for job_id={job_id}, device_id={getattr(device, 'id', None)}",
+        level="INFO",
+        destinations=["stdout"],
+        job_id=job_id,
+        device_id=getattr(device, 'id', None),
+        source="executor",
+    )
     device_ip = getattr(device, 'ip_address', None)
     result = {
         "device_id": getattr(device, 'id', None),
@@ -121,9 +131,23 @@ def reachability_handler(device, job_id, config, db):
     device_id = result["device_id"]
     try:
         if result["success"]:
-            log.info(f"[DEBUG] About to call save_job_log (success) for job_id={job_id}, device_id={device_id}")
+            logger.log(
+                f"About to call save_job_log (success) for job_id={job_id}, device_id={device_id}",
+                level="INFO",
+                destinations=["stdout"],
+                job_id=job_id,
+                device_id=device_id,
+                source="executor",
+            )
             log_utils.save_job_log(device_id, job_id, "Reachability check completed successfully.", success=True, db=db)
-            log.info(f"[DEBUG] save_job_log (success) completed for job_id={job_id}, device_id={device_id}")
+            logger.log(
+                f"save_job_log (success) completed for job_id={job_id}, device_id={device_id}",
+                level="INFO",
+                destinations=["stdout"],
+                job_id=job_id,
+                device_id=device_id,
+                source="executor",
+            )
         else:
             error_msgs = []
             if not result["icmp_ping"].get("success"):
@@ -132,11 +156,32 @@ def reachability_handler(device, job_id, config, db):
                 if not result[f"tcp_{port}"].get("success"):
                     error_msgs.append(f"TCP {port}: {result[f'tcp_{port}'].get('error','failed')}")
             msg = "Reachability check failed: " + "; ".join(error_msgs)
-            log.info(f"[DEBUG] About to call save_job_log (failure) for job_id={job_id}, device_id={device_id}")
+            logger.log(
+                f"About to call save_job_log (failure) for job_id={job_id}, device_id={device_id}",
+                level="INFO",
+                destinations=["stdout"],
+                job_id=job_id,
+                device_id=device_id,
+                source="executor",
+            )
             log_utils.save_job_log(device_id, job_id, msg, success=False, db=db)
-            log.info(f"[DEBUG] save_job_log (failure) completed for job_id={job_id}, device_id={device_id}")
+            logger.log(
+                f"save_job_log (failure) completed for job_id={job_id}, device_id={device_id}",
+                level="INFO",
+                destinations=["stdout"],
+                job_id=job_id,
+                device_id=device_id,
+                source="executor",
+            )
     except Exception as log_exc:
-        log.error(f"[DEBUG] Exception in save_job_log for job_id={job_id}, device_id={device_id}: {log_exc}")
+        logger.log(
+            f"Exception in save_job_log for job_id={job_id}, device_id={device_id}: {log_exc}",
+            level="ERROR",
+            destinations=["stdout"],
+            job_id=job_id,
+            device_id=device_id,
+            source="executor",
+        )
     return result
 
 # --- Registry mapping job_type to handler ---
@@ -160,10 +205,28 @@ def handle_device(
 ) -> Dict[str, Any]:
     """Dispatch to the correct job handler based on job type using JOB_TYPE_HANDLERS."""
     job_type = get_job_type_for_job(job_id, db)
-    log.info(f"[DEBUG] handle_device called for job_id={job_id}, resolved job_type={job_type}")
+    logger.log(
+        f"handle_device called for job_id={job_id}, resolved job_type={job_type}",
+        level="INFO",
+        destinations=["stdout"],
+        job_id=job_id,
+        source="executor",
+    )
     handler = JOB_TYPE_HANDLERS.get(job_type)
     if handler is None:
-        log.error(f"No handler registered for job type: {job_type}")
+        logger.log(
+            f"No handler registered for job type: {job_type}",
+            level="ERROR",
+            destinations=["stdout"],
+            job_id=job_id,
+            source="executor",
+        )
         raise ValueError(f"No handler registered for job type: {job_type}")
-    log.info(f"Dispatching job_id={job_id} (type={job_type}) to handler: {handler.__name__}")
+    logger.log(
+        f"Dispatching job_id={job_id} (type={job_type}) to handler: {handler.__name__}",
+        level="INFO",
+        destinations=["stdout"],
+        job_id=job_id,
+        source="executor",
+    )
     return handler(device, job_id, config, db)
