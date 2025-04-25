@@ -34,6 +34,7 @@ from netraven.db import models # Import DB models
 from netraven.services.device_credential import get_matching_credentials_for_device
 from netraven.db.models import JobLog, Job
 from netraven.utils.unified_logger import get_unified_logger
+from netraven.utils.log_level_utils import log_level_to_status
 
 # Constants
 DEFAULT_TAG_NAME = "default"
@@ -273,7 +274,7 @@ def list_devices(
         # Add reachability status fields
         log = latest_log_map.get(device.id)
         if log:
-            device_dict["last_reachability_status"] = log.status if hasattr(log, "status") else ("success" if log.success else "failure")
+            device_dict["last_reachability_status"] = log.status if hasattr(log, "status") else log_level_to_status(getattr(log, "level", None))
             device_dict["last_reachability_timestamp"] = log.timestamp
         else:
             device_dict["last_reachability_status"] = "never_checked"

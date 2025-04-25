@@ -22,7 +22,7 @@ def test_reachability_handler_logs_success(fake_device):
     # Patch subprocess and socket to simulate success
     with patch("subprocess.run") as mock_run, \
          patch("socket.create_connection") as mock_socket, \
-         patch("netraven.worker.log_utils.save_job_log") as mock_save_log:
+         patch("netraven.db.log_utils.save_job_log") as mock_save_log:
         # Simulate ping success
         mock_run.return_value.returncode = 0
         # Simulate TCP success (no exception)
@@ -39,7 +39,7 @@ def test_reachability_handler_logs_failure(fake_device):
     # Patch subprocess and socket to simulate failure
     with patch("subprocess.run") as mock_run, \
          patch("socket.create_connection", side_effect=Exception("TCP fail")), \
-         patch("netraven.worker.log_utils.save_job_log") as mock_save_log:
+         patch("netraven.db.log_utils.save_job_log") as mock_save_log:
         # Simulate ping failure
         mock_run.return_value.returncode = 1
         mock_run.return_value.stderr = "Ping failed"

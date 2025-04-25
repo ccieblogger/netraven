@@ -39,7 +39,7 @@ import socket
 # Import worker components
 from netraven.worker.backends import netmiko_driver
 from netraven.worker import redactor
-from netraven.worker import log_utils
+from netraven.db import log_utils
 from netraven.worker import git_writer
 from netraven.worker.error_handler import ErrorCategory, ErrorInfo, classify_exception, format_error_for_db
 from netraven.worker.circuit_breaker import get_circuit_breaker, CircuitState

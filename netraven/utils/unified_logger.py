@@ -52,6 +52,7 @@ class UnifiedLogger:
         self.redis_config = None
         self.db_enabled = False
         self.redis_client = None
+        print(f"[UnifiedLogger DEBUG] Logger initialized with config: {self.config}")
         self._init_destinations()
 
     def _init_destinations(self):
@@ -202,7 +203,7 @@ class UnifiedLogger:
             print(f"[LOGGER ERROR] Failed to publish log to Redis: {e}")
 
     def _log_to_db(self, record: dict, is_connection_log: bool = False):
-        """Log to DB using save_job_log/save_connection_log."""
+        print(f"[UnifiedLogger DEBUG] _log_to_db called with record: {record}")
         try:
             if is_connection_log:
                 # Save as connection log
@@ -212,11 +213,18 @@ class UnifiedLogger:
                         job_id=record["job_id"],
                         log_data=record["message"]
                     )
+                else:
+                    print(f"[UnifiedLogger WARNING] Connection log missing required fields: {record}")
             else:
                 # Save as job log
+                if not record.get("job_id"):
+                    print(f"[UnifiedLogger WARNING] Job log missing job_id: {record}")
+                if not record.get("message"):
+                    print(f"[UnifiedLogger WARNING] Job log missing message: {record}")
                 if record.get("job_id") and record.get("message"):
                     # Assume success if level is not ERROR/CRITICAL
                     success = record["level"] not in ("ERROR", "CRITICAL")
+                    print(f"[UnifiedLogger DEBUG] Calling save_job_log with device_id={record.get('device_id')}, job_id={record['job_id']}, message={record['message']}, success={success}")
                     save_job_log(
                         device_id=record.get("device_id"),
                         job_id=record["job_id"],

@@ -11,7 +11,6 @@ from netraven.worker import runner
 from netraven.db.models import Job, Device, JobLog, ConnectionLog, LogLevel, Tag # Import Tag
 from sqlalchemy.orm import Session
 from netraven.config.loader import load_config # Import the actual loader
-from netraven.worker import log_utils  # Add this import
 from netraven.db import models
 
 # Import Exceptions for mocking
@@ -121,8 +120,8 @@ def test_run_job_success_multiple_devices(
     test_job = create_test_job_with_tags(job_name="backup-multiple-success", tags=[tag1])
     
     # Patch log_utils directly to prevent automatic log creation
-    with patch('netraven.worker.log_utils.save_connection_log'):
-        with patch('netraven.worker.log_utils.save_job_log'):
+    with patch('netraven.db.log_utils.save_connection_log'):
+        with patch('netraven.db.log_utils.save_job_log'):
             
             # --- Mocks using lambdas for deterministic device mapping ---
             # Mock run_command: Return specific config based on device hostname
@@ -289,8 +288,8 @@ def test_run_job_partial_failure_multiple_devices(
     error_msg = "Connection timed out"
     
     # Patch log_utils directly to prevent automatic log creation
-    with patch('netraven.worker.log_utils.save_connection_log'):
-        with patch('netraven.worker.log_utils.save_job_log'):
+    with patch('netraven.db.log_utils.save_connection_log'):
+        with patch('netraven.db.log_utils.save_job_log'):
             # Configure the side effects to simulate a retry pattern for the failing device
             retry_count = 0
             def run_command_side_effect(device, job_id, command=None, config=None):
@@ -439,8 +438,8 @@ def test_run_job_total_failure_multiple_devices(
     error_msg2 = "Network unreachable"
     
     # Patch log_utils directly to prevent automatic log creation
-    with patch('netraven.worker.log_utils.save_connection_log'):
-        with patch('netraven.worker.log_utils.save_job_log'):
+    with patch('netraven.db.log_utils.save_connection_log'):
+        with patch('netraven.db.log_utils.save_job_log'):
             
             # Configure the run_command side effect to simulate different failure types
             def run_command_side_effect(device, job_id, command=None, config=None):
@@ -618,8 +617,8 @@ def test_credential_retry_and_metrics(
     mocker.patch("netraven.worker.backends.paramiko_driver.run_command", side_effect=run_command_side_effect)
 
     # Patch save_connection_log and save_job_log to prevent real logging
-    with patch('netraven.worker.log_utils.save_connection_log'), \
-         patch('netraven.worker.log_utils.save_job_log'):
+    with patch('netraven.db.log_utils.save_connection_log'), \
+         patch('netraven.db.log_utils.save_job_log'):
         # --- Run ---
         import threading, os
         print(f"[DEBUG TEST] Before runner.run_job pid={os.getpid()} thread={threading.current_thread().name}")
@@ -696,8 +695,8 @@ def test_run_job_single_device(
     db_session.flush()
 
     # Patch log_utils directly to prevent automatic log creation
-    with patch('netraven.worker.log_utils.save_connection_log'):
-        with patch('netraven.worker.log_utils.save_job_log'):
+    with patch('netraven.db.log_utils.save_connection_log'):
+        with patch('netraven.db.log_utils.save_job_log'):
             # Mock run_command: Return a specific config for this device
             mock_run_command = mocker.patch(
                 "netraven.worker.backends.netmiko_driver.run_command",

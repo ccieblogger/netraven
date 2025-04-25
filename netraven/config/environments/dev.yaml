@@ -43,6 +43,11 @@ logging:
     db: 0
     password: null
     channel_prefix: netraven-logs
+  db:
+    enabled: true
+  stdout:
+    enabled: true
+    level: DEBUG
 
 # API Service specific settings (placeholders)
 api:
