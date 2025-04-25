@@ -25,7 +25,7 @@ try:
     from redis import Redis
 except ImportError:
     Redis = None
-from netraven.db.log_utils import save_job_log, save_connection_log
+from netraven.db.log_utils import save_log
 
 class UnifiedLogger:
     """
@@ -205,32 +205,21 @@ class UnifiedLogger:
     def _log_to_db(self, record: dict, is_connection_log: bool = False):
         print(f"[UnifiedLogger DEBUG] _log_to_db called with record: {record}")
         try:
-            if is_connection_log:
-                # Save as connection log
-                if record.get("device_id") and record.get("job_id") and record.get("message"):
-                    save_connection_log(
-                        device_id=record["device_id"],
-                        job_id=record["job_id"],
-                        log_data=record["message"]
-                    )
-                else:
-                    print(f"[UnifiedLogger WARNING] Connection log missing required fields: {record}")
-            else:
-                # Save as job log
-                if not record.get("job_id"):
-                    print(f"[UnifiedLogger WARNING] Job log missing job_id: {record}")
-                if not record.get("message"):
-                    print(f"[UnifiedLogger WARNING] Job log missing message: {record}")
-                if record.get("job_id") and record.get("message"):
-                    # Assume success if level is not ERROR/CRITICAL
-                    success = record["level"] not in ("ERROR", "CRITICAL")
-                    print(f"[UnifiedLogger DEBUG] Calling save_job_log with device_id={record.get('device_id')}, job_id={record['job_id']}, message={record['message']}, success={success}")
-                    save_job_log(
-                        device_id=record.get("device_id"),
-                        job_id=record["job_id"],
-                        message=record["message"],
-                        success=success
-                    )
+            # Determine log_type
+            log_type = record.get("log_type")
+            if not log_type:
+                log_type = "connection" if is_connection_log else "job"
+            # Use save_log for all DB log events
+            save_log(
+                message=record.get("message"),
+                log_type=log_type,
+                level=record.get("level", "INFO"),
+                job_id=record.get("job_id"),
+                device_id=record.get("device_id"),
+                job_type_id=record.get("job_type_id"),
+                source=record.get("source"),
+                meta=record.get("extra")
+            )
         except Exception as e:
             print(f"[LOGGER ERROR] Failed to save log to DB: {e}")
 
