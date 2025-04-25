@@ -145,12 +145,49 @@ The system is installed locally using Python-based services with PostgreSQL and 
 
 #### Logging & Log Endpoints
 
-NetRaven separates logging into two distinct types, each with its own API endpoint and UI page:
+NetRaven's unified logging system provides a single, extensible, and high-performance log table in PostgreSQL to store all log events (job, connection, session, system, etc.) with rich metadata and robust filtering support. This system is designed for auditability, operational insight, and future extensibility.
 
-- **Job Logs** (`/job-logs/`): Logs related to job execution events, such as job progress, errors, and status changes. These logs are filterable by job ID, device ID, and log level. Exposed via a dedicated FastAPI endpoint and a dedicated UI page/tab.
-- **Connection Logs** (`/connection-logs/`): Logs capturing raw output and metadata from device connection attempts (e.g., SSH/API sessions). These are filterable by job ID and device ID. Exposed via a separate FastAPI endpoint and UI page/tab.
+## 2. Log Table Schema
 
-This separation improves clarity, maintainability, and user experience by allowing users to focus on the type of log relevant to their task. Each log type has its own schema, filters, and pagination, and the frontend navigation provides direct access to both log types.
+**Table:** `logs`
+
+| Column      | Type                | Description                                      |
+|-------------|---------------------|--------------------------------------------------|
+| id          | SERIAL PRIMARY KEY  | Unique log entry ID                              |
+| timestamp   | TIMESTAMPTZ        | Log event time (UTC, indexed)                    |
+| log_type    | VARCHAR(32)        | Log type: 'job', 'connection', 'session', etc.   |
+| level       | VARCHAR(16)        | Log level: 'info', 'warning', 'error', 'debug'   |
+| job_id      | INTEGER (nullable) | FK to jobs.id (optional, indexed)                |
+| device_id   | INTEGER (nullable) | FK to devices.id (optional, indexed)             |
+| source      | VARCHAR(64)        | Module/service name (e.g., 'worker.executor')    |
+| message     | TEXT               | Log message                                      |
+| meta        | JSONB (nullable)   | Arbitrary extra fields (structured metadata)      |
+
+**Indexes:**
+- `idx_logs_job_id` on `job_id`
+- `idx_logs_device_id` on `device_id`
+- `idx_logs_log_type` on `log_type`
+- `idx_logs_level` on `level`
+- `idx_logs_timestamp` on `timestamp`
+
+**Notes:**
+- No `user_id` or `job_type_id` fields in the current schema.
+- Designed for future partitioning by date or log_type if needed.
+
+---
+
+## 3. API Endpoints (Built)
+
+- `GET /logs/` — List logs with filters (job_id, device_id, log_type, level, source, time range, pagination)
+- `GET /logs/{log_id}` — Retrieve a single log entry by ID
+- `GET /logs/types` — List available log types
+- `GET /logs/levels` — List available log levels
+- `GET /logs/stats` — Get log statistics (total, by type, by level, last log time)
+
+**Filtering Parameters:**
+- `job_id`, `device_id`, `log_type`, `level`, `source`, `start_time`, `end_time`, `page`, `size`
+
+---
 
 ### Device Communication
 

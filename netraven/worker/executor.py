@@ -131,21 +131,22 @@ def reachability_handler(device, job_id, config, db):
     try:
         if result["success"]:
             logger.log(
-                f"About to call save_job_log (success) for job_id={job_id}, device_id={device_id}",
+                "Reachability check completed successfully.",
                 level="INFO",
                 destinations=["stdout", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="executor",
+                log_type="job"
             )
-            log_utils.save_job_log(device_id, job_id, "Reachability check completed successfully.", success=True, db=db)
             logger.log(
-                f"save_job_log (success) completed for job_id={job_id}, device_id={device_id}",
+                "save_job_log (success) completed for job_id={job_id}, device_id={device_id}",
                 level="INFO",
                 destinations=["stdout", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="executor",
+                log_type="job"
             )
         else:
             error_msgs = []
@@ -156,30 +157,32 @@ def reachability_handler(device, job_id, config, db):
                     error_msgs.append(f"TCP {port}: {result[f'tcp_{port}'].get('error','failed')}")
             msg = "Reachability check failed: " + "; ".join(error_msgs)
             logger.log(
-                f"About to call save_job_log (failure) for job_id={job_id}, device_id={device_id}",
-                level="INFO",
+                msg,
+                level="WARNING",
                 destinations=["stdout", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="executor",
+                log_type="job"
             )
-            log_utils.save_job_log(device_id, job_id, msg, success=False, db=db)
             logger.log(
-                f"save_job_log (failure) completed for job_id={job_id}, device_id={device_id}",
+                "save_job_log (failure) completed for job_id={job_id}, device_id={device_id}",
                 level="INFO",
                 destinations=["stdout", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="executor",
+                log_type="job"
             )
     except Exception as log_exc:
         logger.log(
-            f"Exception in save_job_log for job_id={job_id}, device_id={device_id}: {log_exc}",
+            f"Exception in reachability logging for job_id={job_id}, device_id={device_id}: {log_exc}",
             level="ERROR",
             destinations=["stdout", "db"],
             job_id=job_id,
             device_id=device_id,
             source="executor",
+            log_type="job"
         )
     return result
 

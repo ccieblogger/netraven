@@ -216,7 +216,6 @@ class UnifiedLogger:
                 level=record.get("level", "INFO"),
                 job_id=record.get("job_id"),
                 device_id=record.get("device_id"),
-                job_type_id=record.get("job_type_id"),
                 source=record.get("source"),
                 meta=record.get("extra")
             )

@@ -243,7 +243,14 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         if session_managed:
              db_to_use.commit() # Commit status update only if session is managed here
         # Log job started
-        log_utils.save_job_log(None, job_id, "Job started.", success=True, db=db_to_use)
+        logger.log(
+            "Job started.",
+            level="INFO",
+            destinations=["stdout", "db"],
+            job_id=job_id,
+            source="runner",
+            log_type="job"
+        )
 
         # 0. Load Configuration
         config = load_config()
@@ -274,7 +281,14 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
             final_status = JobStatus.COMPLETED_NO_DEVICES
             logger.log(f"[Job: {job_id}] No devices found for this job. Final Status: {final_status}", level="WARNING", destinations=["stdout", "db"], source="runner", job_id=job_id)
             # Log job completed (no devices)
-            log_utils.save_job_log(None, job_id, "Job completed: No devices found for this job.", success=True, db=db_to_use)
+            logger.log(
+                "Job completed: No devices found for this job.",
+                level="INFO",
+                destinations=["stdout", "db"],
+                job_id=job_id,
+                source="runner",
+                log_type="job"
+            )
         else:
             # 1.5 Resolve credentials for devices
             try:
@@ -313,7 +327,14 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
                         job_failed = True
                         logger.log(f"[Job: {job_id}] Dispatcher returned incorrect number of results ({len(results)} vs {device_count}). Final Status: {final_status}", level="ERROR", destinations=["stdout", "db"], source="runner", job_id=job_id)
                         # Log job failed (dispatcher error)
-                        log_utils.save_job_log(None, job_id, "Job failed: Dispatcher error.", success=False, db=db_to_use)
+                        logger.log(
+                            "Job failed: Dispatcher error.",
+                            level="ERROR",
+                            destinations=["stdout", "db"],
+                            job_id=job_id,
+                            source="runner",
+                            log_type="job"
+                        )
                     else:
                         success_count = sum(1 for r in results if r.get("success"))
                         failure_count = device_count - success_count
@@ -322,17 +343,38 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
                         if failure_count == 0:
                             final_status = JobStatus.COMPLETED_SUCCESS
                             # Log job completed (all success)
-                            log_utils.save_job_log(None, job_id, "Job completed successfully.", success=True, db=db_to_use)
+                            logger.log(
+                                "Job completed successfully.",
+                                level="INFO",
+                                destinations=["stdout", "db"],
+                                job_id=job_id,
+                                source="runner",
+                                log_type="job"
+                            )
                         elif success_count > 0:
                             final_status = JobStatus.COMPLETED_PARTIAL_FAILURE
                             job_failed = True # Mark job as failed overall if any device failed
                             # Log job completed (partial failure)
-                            log_utils.save_job_log(None, job_id, "Job completed with partial failure.", success=False, db=db_to_use)
+                            logger.log(
+                                "Job completed with partial failure.",
+                                level="WARNING",
+                                destinations=["stdout", "db"],
+                                job_id=job_id,
+                                source="runner",
+                                log_type="job"
+                            )
                         else: # All failed
                             final_status = JobStatus.COMPLETED_FAILURE
                             job_failed = True
                             # Log job failed (all devices failed)
-                            log_utils.save_job_log(None, job_id, "Job failed: All devices failed.", success=False, db=db_to_use)
+                            logger.log(
+                                "Job failed: All devices failed.",
+                                level="ERROR",
+                                destinations=["stdout", "db"],
+                                job_id=job_id,
+                                source="runner",
+                                log_type="job"
+                            )
                     
                     logger.log(f"[Job: {job_id}] Tasks finished. Final Status: {final_status}", level="INFO", destinations=["stdout", "db"], source="runner", job_id=job_id)
                     
@@ -344,7 +386,14 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
                 error_msg_for_log = f"Failed to resolve credentials: {cred_e}"
                 log_runner_error(job_id, error_msg_for_log, db_to_use, error_type="CREDENTIAL")
                 # Log job failed (credential resolution)
-                log_utils.save_job_log(None, job_id, f"Job failed: Credential resolution error: {cred_e}", success=False, db=db_to_use)
+                logger.log(
+                    f"Job failed: Credential resolution error: {cred_e}",
+                    level="ERROR",
+                    destinations=["stdout", "db"],
+                    job_id=job_id,
+                    source="runner",
+                    log_type="job"
+                )
 
     except Exception as e:
         # Generic job execution error
@@ -354,7 +403,14 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         error_msg = f"Unexpected error in job execution: {str(e)}"
         log_runner_error(job_id, error_msg, db_to_use)
         # Log job failed (unexpected error)
-        log_utils.save_job_log(None, job_id, f"Job failed: Unexpected error: {e}", success=False, db=db_to_use)
+        logger.log(
+            f"Job failed: Unexpected error: {e}",
+            level="ERROR",
+            destinations=["stdout", "db"],
+            job_id=job_id,
+            source="runner",
+            log_type="job"
+        )
     finally:
         # Always update job status, even if an exception occurred
         end_time = time.time()

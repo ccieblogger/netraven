@@ -1,5 +1,13 @@
 # NetRaven Unified Logging System Specification
 
+## Current Status (April 2025)
+- The unified logging system is fully implemented and in production use.
+- All backend log writing and API endpoints use the unified log table schema (see below).
+- Legacy log models (`JobLog`, `ConnectionLog`) and fields (`user_id`, `job_type_id`) have been removed from the codebase and database.
+- All log calls use the new logger interface with correct metadata.
+- All tests (unit, integration, API) are updated and passing.
+- Pydantic v2 migration and warning cleanup are planned as future enhancements, but do not affect current functionality.
+
 ## Overview
 NetRaven's unified logging system provides a single, extensible, and high-performance log table in PostgreSQL to store all log events (job, connection, session, system, etc.) with rich metadata and robust filtering support. This system is designed for auditability, operational insight, and future extensibility.
 

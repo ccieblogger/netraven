@@ -18,7 +18,6 @@ class LogEntry(BaseSchemaWithId):
     level: str
     job_id: Optional[int] = None
     device_id: Optional[int] = None
-    job_type_id: Optional[int] = None
     source: Optional[str] = None
     message: str
     meta: Optional[Dict[str, Any]] = None

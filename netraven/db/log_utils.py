@@ -9,7 +9,6 @@ def save_log(
     level: str = "INFO",
     job_id: Optional[int] = None,
     device_id: Optional[int] = None,
-    job_type_id: Optional[int] = None,
     source: Optional[str] = None,
     meta: Optional[Dict[str, Any]] = None,
     db: Optional[Session] = None
@@ -28,7 +27,6 @@ def save_log(
             level=level,
             job_id=job_id,
             device_id=device_id,
-            job_type_id=job_type_id,
             source=source,
             meta=meta
         )

@@ -88,10 +88,18 @@ def test_redis_logging(redis_log_config):
         assert mock_redis.publish.called
 
 def test_db_logging(db_log_config):
-    with mock.patch('netraven.utils.unified_logger.save_job_log') as mock_save_job_log:
+    with mock.patch('netraven.utils.unified_logger.save_log') as mock_save_log:
         logger = UnifiedLogger(db_log_config)
-        logger.log('db log test', level='INFO', job_id=1)
-        assert mock_save_job_log.called
+        logger.log('db log test', level='INFO', job_id=1, device_id=2, source='test', extra={'foo': 'bar'}, log_type='job')
+        mock_save_log.assert_called_once()
+        args, kwargs = mock_save_log.call_args
+        assert kwargs['message'] == 'db log test'
+        assert kwargs['log_type'] == 'job'
+        assert kwargs['level'] == 'INFO'
+        assert kwargs['job_id'] == 1
+        assert kwargs['device_id'] == 2
+        assert kwargs['source'] == 'test'
+        assert kwargs['meta'] == {'foo': 'bar'}
 
 def test_error_handling(file_log_config):
     # Simulate file logger error
