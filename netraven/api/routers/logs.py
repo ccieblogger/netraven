@@ -14,20 +14,41 @@ router = APIRouter(
     dependencies=[Depends(get_current_active_user)]
 )
 
+@router.get("/types", response_model=List[LogTypeMeta])
+def get_log_types():
+    # Static for now; could be dynamic if log types are extended
+    return [
+        LogTypeMeta(log_type=lt.value, description=lt.name.title()) for lt in LogType
+    ]
+
+@router.get("/levels", response_model=List[LogLevelMeta])
+def get_log_levels():
+    # Static for now; could be dynamic if log levels are extended
+    return [
+        LogLevelMeta(level=ll.value, description=ll.name.title()) for ll in LogLevel
+    ]
+
+@router.get("/stats", response_model=LogStats)
+def get_log_stats(db: Session = Depends(get_db_session)):
+    total = db.query(func.count(Log.id)).scalar() or 0
+    by_type = {row[0]: row[1] for row in db.query(Log.log_type, func.count(Log.id)).group_by(Log.log_type).all()}
+    by_level = {row[0]: row[1] for row in db.query(Log.level, func.count(Log.id)).group_by(Log.level).all()}
+    last_log_time = db.query(func.max(Log.timestamp)).scalar()
+    return LogStats(total=total, by_type=by_type, by_level=by_level, last_log_time=last_log_time)
+
 @router.get("/", response_model=PaginatedLogResponse)
 def list_logs(
     log_type: Optional[str] = Query(None),
     level: Optional[str] = Query(None),
     job_id: Optional[int] = Query(None),
     device_id: Optional[int] = Query(None),
-    job_type_id: Optional[int] = Query(None),
     source: Optional[str] = Query(None),
     start_time: Optional[datetime] = Query(None),
     end_time: Optional[datetime] = Query(None),
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    order: str = Query("desc", regex="^(asc|desc)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db_session)
 ):
     query = db.query(Log)
@@ -39,8 +60,6 @@ def list_logs(
         query = query.filter(Log.job_id == job_id)
     if device_id:
         query = query.filter(Log.device_id == device_id)
-    if job_type_id:
-        query = query.filter(Log.job_type_id == job_type_id)
     if source:
         query = query.filter(Log.source == source)
     if start_time:
@@ -68,28 +87,6 @@ def get_log(log_id: int, db: Session = Depends(get_db_session)):
     if not log:
         raise HTTPException(status_code=404, detail="Log entry not found")
     return log
-
-@router.get("/types", response_model=List[LogTypeMeta])
-def get_log_types():
-    # Static for now; could be dynamic if log types are extended
-    return [
-        LogTypeMeta(log_type=lt.value, description=lt.name.title()) for lt in LogType
-    ]
-
-@router.get("/levels", response_model=List[LogLevelMeta])
-def get_log_levels():
-    # Static for now; could be dynamic if log levels are extended
-    return [
-        LogLevelMeta(level=ll.value, description=ll.name.title()) for ll in LogLevel
-    ]
-
-@router.get("/stats", response_model=LogStats)
-def get_log_stats(db: Session = Depends(get_db_session)):
-    total = db.query(func.count(Log.id)).scalar() or 0
-    by_type = {row[0]: row[1] for row in db.query(Log.log_type, func.count(Log.id)).group_by(Log.log_type).all()}
-    by_level = {row[0]: row[1] for row in db.query(Log.level, func.count(Log.id)).group_by(Log.level).all()}
-    last_log_time = db.query(func.max(Log.timestamp)).scalar()
-    return LogStats(total=total, by_type=by_type, by_level=by_level, last_log_time=last_log_time)
 
 @router.get("/stream")
 def stream_logs():

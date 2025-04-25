@@ -27,7 +27,6 @@ class Log(Base):
     level = Column(String(16), nullable=False, index=True)
     job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=True, index=True)
     device_id = Column(Integer, ForeignKey("devices.id", ondelete="CASCADE"), nullable=True, index=True)
-    job_type_id = Column(Integer, ForeignKey("job_type.id"), nullable=True, index=True)
     source = Column(String(64), nullable=True)
     message = Column(Text, nullable=False)
     meta = Column(JSONB, nullable=True)
@@ -42,5 +41,4 @@ class Log(Base):
         Index("idx_logs_log_type", "log_type"),
         Index("idx_logs_level", "level"),
         Index("idx_logs_timestamp", "timestamp"),
-        Index("idx_logs_job_type_id", "job_type_id"),
     ) 

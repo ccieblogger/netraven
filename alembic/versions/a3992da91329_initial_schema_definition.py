@@ -128,7 +128,6 @@ def upgrade() -> None:
         sa.Column('level', sa.String(length=16), nullable=False),
         sa.Column('job_id', sa.Integer(), sa.ForeignKey('jobs.id', ondelete='CASCADE'), nullable=True),
         sa.Column('device_id', sa.Integer(), sa.ForeignKey('devices.id', ondelete='CASCADE'), nullable=True),
-        sa.Column('job_type_id', sa.Integer(), sa.ForeignKey('job_type.id'), nullable=True),
         sa.Column('source', sa.String(length=64), nullable=True),
         sa.Column('message', sa.Text(), nullable=False),
         sa.Column('meta', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
@@ -138,7 +137,6 @@ def upgrade() -> None:
     op.create_index('idx_logs_log_type', 'logs', ['log_type'])
     op.create_index('idx_logs_level', 'logs', ['level'])
     op.create_index('idx_logs_timestamp', 'logs', ['timestamp'])
-    op.create_index('idx_logs_job_type_id', 'logs', ['job_type_id'])
     op.create_table('users',
         sa.Column('id', sa.Integer(), primary_key=True),
         sa.Column('username', sa.String(), nullable=False, unique=True),
@@ -160,7 +158,6 @@ def downgrade() -> None:
     op.drop_index('idx_logs_log_type', table_name='logs')
     op.drop_index('idx_logs_level', table_name='logs')
     op.drop_index('idx_logs_timestamp', table_name='logs')
-    op.drop_index('idx_logs_job_type_id', table_name='logs')
     op.drop_table('logs')
     op.drop_table('job_tags')
     op.drop_index(op.f('ix_jobs_status'), table_name='jobs')

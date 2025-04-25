@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from typing import Dict, List, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from netraven.api.main import app
 from netraven.db import models
@@ -13,10 +13,22 @@ class TestLogsAPI(BaseAPITest):
 
     @pytest.fixture
     def create_test_logs(self, db_session: Session):
-        """Fixture to create test log entries."""
+        """Fixture to create test log entries. Ensures job/device exist if IDs are provided."""
         def _create_logs(count=5, job_id=None, device_id=None, base_timestamp=None, log_type="job", level=None, source="test_source"):
             if base_timestamp is None:
                 base_timestamp = datetime.now()
+            # Ensure referenced job/device exist if IDs are provided
+            if job_id is not None:
+                job = db_session.query(models.Job).filter_by(id=job_id).first()
+                if not job:
+                    job = models.Job(id=job_id, name=f"TestJob{job_id}", job_type="test", status="completed")
+                    db_session.add(job)
+            if device_id is not None:
+                device = db_session.query(models.Device).filter_by(id=device_id).first()
+                if not device:
+                    device = models.Device(id=device_id, hostname=f"test-device-{device_id}", ip_address=f"10.0.0.{device_id}", device_type="test-type")
+                    db_session.add(device)
+            db_session.commit()
             logs = []
             for i in range(count):
                 log = models.Log(
@@ -99,16 +111,26 @@ class TestLogsAPI(BaseAPITest):
             assert log["source"] == specific_source
 
     def test_get_logs_date_range(self, client: TestClient, admin_headers: Dict, create_test_logs):
-        base_time = datetime.now()
+        base_time = datetime.now(timezone.utc)
         day_ago_logs = create_test_logs(count=2, base_timestamp=base_time - timedelta(days=1))
         week_ago_logs = create_test_logs(count=2, base_timestamp=base_time - timedelta(days=7))
         month_ago_logs = create_test_logs(count=2, base_timestamp=base_time - timedelta(days=30))
-        start_time = (base_time - timedelta(days=10)).isoformat()
-        end_time = (base_time - timedelta(hours=12)).isoformat()
-        response = client.get(f"/logs/?start_time={start_time}&end_time={end_time}", headers=admin_headers)
+        # Use astimezone(timezone.utc).isoformat() to guarantee correct format
+        start_time = (base_time - timedelta(days=10)).astimezone(timezone.utc).isoformat()
+        end_time = (base_time - timedelta(hours=12)).astimezone(timezone.utc).isoformat()
+        response = client.get(
+            "/logs/",
+            headers=admin_headers,
+            params={
+                "start_time": start_time,
+                "end_time": end_time,
+            }
+        )
         self.assert_pagination_response(response)
         for log in response.json()["items"]:
-            log_time = datetime.fromisoformat(log["timestamp"])
+            ts = log["timestamp"].replace("Z", "+00:00") if log["timestamp"].endswith("Z") else log["timestamp"]
+            log_time = datetime.fromisoformat(ts)
+            # Ensure log_time is also timezone-aware for comparison
             assert (base_time - timedelta(days=10)) <= log_time <= (base_time - timedelta(hours=12))
 
     def test_get_single_log(self, client: TestClient, admin_headers: Dict, create_test_logs):
