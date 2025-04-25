@@ -107,7 +107,7 @@ def run_command(
         if 'command_timeout' in config['worker']:
             command_timeout = config['worker']['command_timeout']
     
-    log.info(f"[Job: {job_id}] Connecting to device {device_name} ({device_ip}) with {conn_timeout}s timeout")
+    log.info(f"[Job: {job_id}] Connecting to device {device_name} ({device_ip}) with {conn_timeout}s timeout", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
     
     # Build connection details
     connection_details = {
@@ -125,11 +125,11 @@ def run_command(
     
     try:
         # Attempt to establish connection
-        log.debug(f"[Job: {job_id}] Opening connection to {device_name}")
+        log.debug(f"[Job: {job_id}] Opening connection to {device_name}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
         connection = ConnectHandler(**connection_details)
         
         # Execute command with timeout
-        log.debug(f"[Job: {job_id}] Executing '{command}' on {device_name}")
+        log.debug(f"[Job: {job_id}] Executing '{command}' on {device_name}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
         output = connection.send_command(
             command, 
             read_timeout=command_timeout
@@ -141,20 +141,20 @@ def run_command(
         
         # Log success
         elapsed = time.time() - start_time
-        log.info(f"[Job: {job_id}] Successfully executed command on {device_name} in {elapsed:.2f}s")
+        log.info(f"[Job: {job_id}] Successfully executed command on {device_name} in {elapsed:.2f}s", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
         
         return output
         
     except (NetmikoTimeoutException, NetmikoAuthenticationException) as e:
         # These specific exceptions are caught and handled upstream
         elapsed = time.time() - start_time
-        log.warning(f"[Job: {job_id}] {type(e).__name__} connecting to {device_name} after {elapsed:.2f}s: {e}")
+        log.warning(f"[Job: {job_id}] {type(e).__name__} connecting to {device_name} after {elapsed:.2f}s: {e}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
         raise
         
     except Exception as e:
         # Catch broader exceptions during connection or command execution
         elapsed = time.time() - start_time
-        log.error(f"[Job: {job_id}] Error connecting to {device_name} or running command '{command}' after {elapsed:.2f}s: {e}")
+        log.error(f"[Job: {job_id}] Error connecting to {device_name} or running command '{command}' after {elapsed:.2f}s: {e}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
         raise
         
     finally:
@@ -162,9 +162,9 @@ def run_command(
         if connection:
             try:
                 connection.disconnect()
-                log.debug(f"[Job: {job_id}] Disconnected from {device_name}")
+                log.debug(f"[Job: {job_id}] Disconnected from {device_name}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
             except Exception as e:
-                log.warning(f"[Job: {job_id}] Error during disconnect from {device_name}: {e}")
+                log.warning(f"[Job: {job_id}] Error during disconnect from {device_name}: {e}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
 
 # Example Usage (requires a mock device object)
 # class MockDevice:

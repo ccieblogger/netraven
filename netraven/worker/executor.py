@@ -86,7 +86,7 @@ def reachability_handler(device, job_id, config, db):
     logger.log(
         f"Entered reachability_handler for job_id={job_id}, device_id={getattr(device, 'id', None)}",
         level="INFO",
-        destinations=["stdout"],
+        destinations=["stdout", "db"],
         job_id=job_id,
         device_id=getattr(device, 'id', None),
         source="executor",
@@ -133,7 +133,7 @@ def reachability_handler(device, job_id, config, db):
             logger.log(
                 f"About to call save_job_log (success) for job_id={job_id}, device_id={device_id}",
                 level="INFO",
-                destinations=["stdout"],
+                destinations=["stdout", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="executor",
@@ -142,7 +142,7 @@ def reachability_handler(device, job_id, config, db):
             logger.log(
                 f"save_job_log (success) completed for job_id={job_id}, device_id={device_id}",
                 level="INFO",
-                destinations=["stdout"],
+                destinations=["stdout", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="executor",
@@ -158,7 +158,7 @@ def reachability_handler(device, job_id, config, db):
             logger.log(
                 f"About to call save_job_log (failure) for job_id={job_id}, device_id={device_id}",
                 level="INFO",
-                destinations=["stdout"],
+                destinations=["stdout", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="executor",
@@ -167,7 +167,7 @@ def reachability_handler(device, job_id, config, db):
             logger.log(
                 f"save_job_log (failure) completed for job_id={job_id}, device_id={device_id}",
                 level="INFO",
-                destinations=["stdout"],
+                destinations=["stdout", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="executor",
@@ -176,7 +176,7 @@ def reachability_handler(device, job_id, config, db):
         logger.log(
             f"Exception in save_job_log for job_id={job_id}, device_id={device_id}: {log_exc}",
             level="ERROR",
-            destinations=["stdout"],
+            destinations=["stdout", "db"],
             job_id=job_id,
             device_id=device_id,
             source="executor",
@@ -207,7 +207,7 @@ def handle_device(
     logger.log(
         f"handle_device called for job_id={job_id}, resolved job_type={job_type}",
         level="INFO",
-        destinations=["stdout"],
+        destinations=["stdout", "db"],
         job_id=job_id,
         source="executor",
     )
@@ -216,7 +216,7 @@ def handle_device(
         logger.log(
             f"No handler registered for job type: {job_type}",
             level="ERROR",
-            destinations=["stdout"],
+            destinations=["stdout", "db"],
             job_id=job_id,
             source="executor",
         )
@@ -224,7 +224,7 @@ def handle_device(
     logger.log(
         f"Dispatching job_id={job_id} (type={job_type}) to handler: {handler.__name__}",
         level="INFO",
-        destinations=["stdout"],
+        destinations=["stdout", "db"],
         job_id=job_id,
         source="executor",
     )
