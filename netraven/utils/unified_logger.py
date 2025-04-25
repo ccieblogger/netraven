@@ -18,6 +18,7 @@ import datetime
 import traceback
 import json
 from netraven.config.logger_config import get_logger_config
+import sys
 
 # Redis and DB log utils
 try:
@@ -30,6 +31,20 @@ class UnifiedLogger:
     """
     Unified logger for NetRaven supporting multiple destinations per log event.
     """
+    class StdoutFormatter(logging.Formatter):
+        def format(self, record):
+            # Extract extra fields if present
+            level = getattr(record, 'levelname', 'INFO')
+            timestamp = self.formatTime(record, self.datefmt) if hasattr(self, 'datefmt') else datetime.datetime.utcnow().isoformat() + 'Z'
+            # Try to get 'source' from record or fallback to '-'
+            source = getattr(record, 'source', None)
+            if not source and hasattr(record, 'args') and isinstance(record.args, dict):
+                source = record.args.get('source', '-')
+            if not source:
+                source = '-'
+            msg = record.getMessage()
+            return f"[UnifiedLogger][{level}][{timestamp}][{source}] {msg}"
+
     def __init__(self, config: dict):
         self.config = config
         self.file_logger = None
@@ -74,10 +89,10 @@ class UnifiedLogger:
         stdout_cfg = logging_config.get('stdout', {})
         if stdout_cfg.get('enabled', False):
             stdout_level = getattr(logging, stdout_cfg.get('level', 'INFO').upper(), logging.INFO)
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
+            handler = logging.StreamHandler(sys.stdout)
             handler.setLevel(stdout_level)
+            # Use custom formatter
+            handler.setFormatter(self.StdoutFormatter())
             self.stdout_logger = logging.getLogger('netraven.stdout')
             self.stdout_logger.setLevel(stdout_level)
             self.stdout_logger.addHandler(handler)
@@ -172,7 +187,9 @@ class UnifiedLogger:
         """Log to stdout (human-readable)."""
         msg = record["message"]
         level = getattr(logging, record["level"].upper(), logging.INFO)
-        self.stdout_logger.log(level, msg)
+        # Pass 'source' as extra for the formatter
+        extra = {"source": record.get("source", "-")}
+        self.stdout_logger.log(level, msg, extra=extra)
 
     def _log_to_redis(self, record: dict):
         """Log to Redis (real-time streaming)."""

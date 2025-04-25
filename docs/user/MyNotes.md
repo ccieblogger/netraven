@@ -22,3 +22,9 @@ curl -s http://localhost:8000/jobs/status \
 # Use the token to query job-logs endpoint
 curl -X GET "http://localhost:8000/job-logs/" \
   -H "Authorization: Bearer $TOKEN" | jq . 
+
+# Grepping container logs
+docker logs netraven-worker-dev 2>&1 | grep UnifiedLogger
+
+# Grepping container logs with tail
+docker logs -f netraven-worker-dev 2>&1 | grep UnifiedLogger
