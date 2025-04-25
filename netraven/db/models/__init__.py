@@ -14,10 +14,11 @@ definitions that establish the connections between different entities.
 # Import all models for easier access
 from netraven.db.models.device import Device
 from netraven.db.models.job import Job
-from netraven.db.models.job_log import JobLog, LogLevel
+from netraven.db.models.log import Log, LogType, LogLevel
 from netraven.db.models.job_status import JobStatus
 from netraven.db.models.tag import Tag, device_tag_association, credential_tag_association, job_tags_association
-from netraven.db.models.connection_log import ConnectionLog
+#from netraven.db.models.job_log import JobLog, LogLevel  # Deprecated
+#from netraven.db.models.connection_log import ConnectionLog  # Deprecated
 from netraven.db.models.device_config import DeviceConfiguration
 from netraven.db.models.credential import Credential
 from netraven.db.models.system_setting import SystemSetting
@@ -27,14 +28,15 @@ from netraven.db.models.user import User
 __all__ = [
     "Device", 
     "Job",
-    "JobLog",
+    "Log",
+    "LogType",
     "LogLevel",
     "JobStatus",
     "Tag",
     "device_tag_association",
     "credential_tag_association",
     "job_tags_association",
-    "ConnectionLog",
+    # "JobLog",  # Deprecated
     "DeviceConfiguration",
     "Credential",
     "SystemSetting",
