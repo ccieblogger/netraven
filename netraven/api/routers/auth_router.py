@@ -111,44 +111,47 @@ async def login_for_access_token(
         HTTPException (401): If authentication fails (incorrect username/password)
         HTTPException (400): If the user account is inactive
     """
-    # Debug incoming request
-    logger.log(
-        f"Login attempt for user: {form_data.username}",
-        level="INFO",
-        destinations=["stdout"],
-        source="auth_router",
-    )
-    
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # Check if user is active
-    if not user.is_active:
+    print(f"DEBUG: /auth/token called with username={form_data.username}")
+    try:
+        # Debug incoming request
         logger.log(
-            f"Login attempt for inactive user: {form_data.username}",
-            level="WARNING",
+            f"Login attempt for user: {form_data.username}",
+            level="INFO",
             destinations=["stdout"],
             source="auth_router",
         )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Inactive user"
+        user = authenticate_user(db, form_data.username, form_data.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        # Check if user is active
+        if not user.is_active:
+            logger.log(
+                f"Login attempt for inactive user: {form_data.username}",
+                level="WARNING",
+                destinations=["stdout"],
+                source="auth_router",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Inactive user"
+            )
+        access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = auth.create_access_token(
+            data={"sub": user.username, "role": user.role}, # Include role in token
+            expires_delta=access_token_expires
         )
-
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = auth.create_access_token(
-        data={"sub": user.username, "role": user.role}, # Include role in token
-        expires_delta=access_token_expires
-    )
-    logger.log(
-        f"Token generated successfully for user: {form_data.username}",
-        level="INFO",
-        destinations=["stdout"],
-        source="auth_router",
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+        logger.log(
+            f"Token generated successfully for user: {form_data.username}",
+            level="INFO",
+            destinations=["stdout"],
+            source="auth_router",
+        )
+        return {"access_token": access_token, "token_type": "bearer"}
+    except Exception as e:
+        print(f"ERROR in /auth/token: {e}")
+        import traceback; traceback.print_exc()
+        raise

@@ -20,6 +20,11 @@ Implement filtering of logs by `job_type` via the `/logs/` API endpoint, as requ
 - Implementation of job_type filtering is beginning.
 - Will update the API endpoint, schema, and tests as described in the plan.
 
+## Completion Update (2024-06-08)
+- The job_type filter for the /logs/ API endpoint is implemented, tested, and committed.
+- All log API tests, including the new job_type filter, are passing in the containerized environment.
+- Unrelated test failures (users, tags, device credentials, etc.) are out of scope for this issue and should be addressed separately.
+
 ## Next Steps
 1. Update the API endpoint and query logic to support filtering by `job_type`.
 2. Update the API schema and OpenAPI docs.

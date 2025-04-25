@@ -7,6 +7,12 @@ from netraven.api.dependencies import get_db_session, get_current_active_user
 from netraven.db.models import Log, LogType, LogLevel
 from datetime import datetime
 import math
+import asyncio
+import json
+from fastapi import Response
+from sse_starlette.sse import EventSourceResponse
+import aioredis
+from netraven.config.loader import load_config
 
 router = APIRouter(
     prefix="/logs",
@@ -88,14 +94,63 @@ def list_logs(
         "pages": pages
     }
 
+@router.get("/stream")
+async def stream_logs(
+    job_id: Optional[int] = Query(None, description="Filter streamed logs by job_id"),
+    device_id: Optional[int] = Query(None, description="Filter streamed logs by device_id")
+):
+    """
+    Stream real-time log events as Server-Sent Events (SSE).
+    Optionally filter by job_id and/or device_id.
+    Sends a keep-alive comment every 15 seconds to prevent idle timeouts.
+    """
+    config = load_config()
+    redis_cfg = config.get('logging', {}).get('redis', {})
+    redis_host = redis_cfg.get('host', 'redis')
+    redis_port = redis_cfg.get('port', 6379)
+    redis_db = redis_cfg.get('db', 0)
+    redis_channel = redis_cfg.get('channel_prefix', 'netraven-logs')
+
+    async def event_generator():
+        redis = await aioredis.create_redis_pool((redis_host, redis_port), db=redis_db)
+        try:
+            res = await redis.subscribe(redis_channel)
+            ch = res[0]
+            last_event = asyncio.get_event_loop().time()
+            while True:
+                # Wait for a message or timeout for keepalive
+                try:
+                    if await asyncio.wait_for(ch.wait_message(), timeout=15):
+                        msg = await ch.get(encoding='utf-8')
+                        try:
+                            log_event = json.loads(msg)
+                        except Exception:
+                            continue
+                        # Filtering
+                        if job_id is not None and log_event.get('job_id') != job_id:
+                            continue
+                        if device_id is not None and log_event.get('device_id') != device_id:
+                            continue
+                        yield {
+                            "event": "log",
+                            "data": json.dumps(log_event)
+                        }
+                        last_event = asyncio.get_event_loop().time()
+                    else:
+                        # Timeout expired, send keepalive
+                        yield {"data": ": keepalive"}
+                except asyncio.TimeoutError:
+                    # Timeout expired, send keepalive
+                    yield {"data": ": keepalive"}
+        finally:
+            redis.close()
+            await redis.wait_closed()
+
+    return EventSourceResponse(event_generator())
+
 @router.get("/{log_id}", response_model=LogEntry)
 def get_log(log_id: int, db: Session = Depends(get_db_session)):
     log = db.query(Log).filter(Log.id == log_id).first()
     if not log:
         raise HTTPException(status_code=404, detail="Log entry not found")
-    return log
-
-@router.get("/stream")
-def stream_logs():
-    # Stub for SSE/WebSocket real-time log streaming
-    return {"detail": "Real-time log streaming not yet implemented."} 
+    return log 

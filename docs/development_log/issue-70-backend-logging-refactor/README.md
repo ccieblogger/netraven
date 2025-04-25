@@ -22,6 +22,13 @@ This log tracks the refactor of all backend logging to use the unified log table
 - Confirmed all logger tests use the new interface and do not reference removed fields.
 - (Pending) Update developer and API documentation for new logging usage and schema.
 
+### Phase 4: Real-Time Log Streaming & Nginx SSE Proxy
+- Implemented `/logs/stream` SSE endpoint in FastAPI with 15s keep-alive heartbeat.
+- Updated Nginx config to add a dedicated `location /api/logs/stream` block with all required SSE proxy settings (buffering off, X-Accel-Buffering, etc.).
+- Fixed proxy path so `/api/logs/stream` is mapped to `/logs/stream` on the backend.
+- Verified streaming works through Nginx with correct headers and persistent connection.
+- Noted that trailing slash requests (`/api/logs/stream/`) result in a 307 redirect (expected FastAPI behavior).
+
 ---
 
 ## Insights & Notes
@@ -32,6 +39,8 @@ This log tracks the refactor of all backend logging to use the unified log table
 
 ---
 
-## Next Steps
-- Complete documentation updates for developers and API consumers.
-- Monitor for any edge cases or missed legacy references during further testing. 
+## Next Steps (as of 2025-04-25)
+- Integrate frontend or consumer to display real-time logs.
+- Monitor for edge cases (proxy disconnects, client reconnects).
+- Finalize developer/API documentation for SSE usage and Nginx requirements.
+- (Optional) Add tests for SSE endpoint and Nginx proxy behavior. 
