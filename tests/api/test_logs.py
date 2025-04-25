@@ -161,4 +161,32 @@ class TestLogsAPI(BaseAPITest):
         assert "total" in data
         assert "by_type" in data
         assert "by_level" in data
-        assert "last_log_time" in data 
+        assert "last_log_time" in data
+
+    def test_get_logs_by_job_type(self, client: TestClient, admin_headers: Dict, create_test_logs, db_session: Session):
+        # Create jobs and logs with different job_types
+        job_type_a = "backup"
+        job_type_b = "reachability"
+        # Create jobs with specific job_types
+        job_a = db_session.query(models.Job).filter_by(id=1001).first()
+        if not job_a:
+            job_a = models.Job(id=1001, name="JobA", job_type=job_type_a, status="completed")
+            db_session.add(job_a)
+        job_b = db_session.query(models.Job).filter_by(id=1002).first()
+        if not job_b:
+            job_b = models.Job(id=1002, name="JobB", job_type=job_type_b, status="completed")
+            db_session.add(job_b)
+        db_session.commit()
+        # Create logs for each job
+        logs_a = create_test_logs(count=2, job_id=1001)
+        logs_b = create_test_logs(count=3, job_id=1002)
+        # Query logs by job_type=backup
+        response = client.get("/logs/?job_type=backup", headers=admin_headers)
+        self.assert_pagination_response(response)
+        data = response.json()
+        assert all(log["job_id"] == 1001 for log in data["items"])
+        # Query logs by job_type=reachability
+        response = client.get("/logs/?job_type=reachability", headers=admin_headers)
+        self.assert_pagination_response(response)
+        data = response.json()
+        assert all(log["job_id"] == 1002 for log in data["items"]) 

@@ -46,12 +46,19 @@ def list_logs(
     start_time: Optional[datetime] = Query(None),
     end_time: Optional[datetime] = Query(None),
     search: Optional[str] = Query(None),
+    job_type: Optional[str] = Query(None, description="Filter logs by the job_type of the related Job (e.g., backup, reachability, etc.)"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     order: str = Query("desc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db_session)
 ):
+    """
+    List logs with flexible filters, including job_type (from related Job).
+    """
     query = db.query(Log)
+    if job_type:
+        from netraven.db.models.job import Job
+        query = query.join(Job, Log.job_id == Job.id).filter(Job.job_type == job_type)
     if log_type:
         query = query.filter(Log.log_type == log_type)
     if level:
