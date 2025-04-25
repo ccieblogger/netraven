@@ -22,7 +22,7 @@ class Device(Base):
         last_seen: Timestamp of last successful connection to the device
         tags: Related Tag objects via many-to-many relationship
         configurations: Related DeviceConfiguration objects
-        connection_logs: Related ConnectionLog objects
+        # connection_logs: Related ConnectionLog objects
     """
     __tablename__ = "devices"
 
@@ -42,7 +42,7 @@ class Device(Base):
     )
 
     configurations = relationship("DeviceConfiguration", back_populates="device", cascade="all, delete-orphan")
-    connection_logs = relationship("ConnectionLog", back_populates="device", cascade="all, delete-orphan")
+    # connection_logs = relationship("ConnectionLog", back_populates="device", cascade="all, delete-orphan")
     
     # This comment is a placeholder for future credential relationship
     # credentials = relationship("Credential", back_populates="devices") 

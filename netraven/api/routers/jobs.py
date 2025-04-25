@@ -20,8 +20,7 @@ from netraven.utils.unified_logger import get_unified_logger
 from netraven.api import schemas
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role
 from netraven.db import models
-from netraven.db.models import JobLog, Device
-from netraven.api.schemas.log import JobLog as JobLogSchema
+from netraven.db.models import Job, Device, Log
 from netraven.api.schemas.job import (
     ScheduledJobSummary, RecentJobExecution, JobTypeSummary, JobDashboardStatus, RQQueueStatus, WorkerStatus
 )
@@ -540,9 +539,9 @@ def get_job_device_results(
     """Return per-device job results for a given job."""
     # Query all job logs for this job that are associated with a device
     logs = (
-        db.query(JobLog, Device)
-        .join(Device, JobLog.device_id == Device.id)
-        .filter(JobLog.job_id == job_id)
+        db.query(Log, Device)
+        .join(Device, Log.device_id == Device.id)
+        .filter(Log.job_id == job_id, Log.log_type == "job")
         .all()
     )
     results = []
@@ -551,6 +550,6 @@ def get_job_device_results(
             "device_id": device.id,
             "device_name": device.hostname,
             "device_ip": device.ip_address,
-            "log": JobLogSchema.model_validate(log).model_dump(),
+            "log": log.model_dump(),
         })
     return results

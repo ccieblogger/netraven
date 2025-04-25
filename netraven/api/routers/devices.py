@@ -32,7 +32,7 @@ from netraven.api import schemas # Import schemas module
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role # Import dependencies
 from netraven.db import models # Import DB models
 from netraven.services.device_credential import get_matching_credentials_for_device
-from netraven.db.models import JobLog, Job
+from netraven.db.models import Job, Log
 from netraven.utils.unified_logger import get_unified_logger
 from netraven.utils.log_level_utils import log_level_to_status
 
@@ -241,18 +241,18 @@ def list_devices(
     # Subquery to get latest reachability job log per device
     subq = (
         db.query(
-            JobLog.device_id,
-            func.max(JobLog.timestamp).label("max_ts")
+            Log.device_id,
+            func.max(Log.timestamp).label("max_ts")
         )
-        .join(Job, JobLog.job_id == Job.id)
-        .filter(Job.job_type == "reachability", JobLog.device_id.in_(device_ids))
-        .group_by(JobLog.device_id)
+        .join(Job, Log.job_id == Job.id)
+        .filter(Job.job_type == "reachability", Log.device_id.in_(device_ids), Log.log_type == "job")
+        .group_by(Log.device_id)
         .subquery()
     )
     # Join to get the full log row
     latest_logs = (
-        db.query(JobLog)
-        .join(subq, (JobLog.device_id == subq.c.device_id) & (JobLog.timestamp == subq.c.max_ts))
+        db.query(Log)
+        .join(subq, (Log.device_id == subq.c.device_id) & (Log.timestamp == subq.c.max_ts))
         .all()
     )
     # Map device_id -> log

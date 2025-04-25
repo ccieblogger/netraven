@@ -50,8 +50,7 @@ class Job(Base):
     cron_string = Column(String)
     device_id = Column(Integer, ForeignKey("devices.id", ondelete="SET NULL"), nullable=True)
 
-    logs = relationship("JobLog", back_populates="job", cascade="all, delete-orphan")
-    connection_logs = relationship("ConnectionLog", back_populates="job", cascade="all, delete-orphan")
+    # logs and connection_logs relationships removed; use unified Log model
     tags = relationship(
         "Tag",
         secondary=job_tags_association,

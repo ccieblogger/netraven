@@ -5,11 +5,10 @@ from netraven.db.models.device import Device
 from netraven.db.models.tag import Tag
 from netraven.db.models.credential import Credential
 from netraven.db.models.job import Job
-from netraven.db.models.job_log import JobLog, LogLevel
-from netraven.db.models.connection_log import ConnectionLog
 from netraven.db.models.device_config import DeviceConfiguration
 from netraven.config.loader import load_config
 from git import Repo
+from netraven.db.models import Log
 
 # Environment guard: Only run in dev
 if os.environ.get("NETRAVEN_ENV", "dev") != "dev":
@@ -52,13 +51,13 @@ def seed():
     db.commit()
 
     # --- Job Logs ---
-    log1 = JobLog(job_id=job1.id, device_id=device1.id, message="Backup completed successfully.", level=LogLevel.INFO)
-    log2 = JobLog(job_id=job2.id, device_id=device2.id, message="Authentication failed.", level=LogLevel.ERROR)
+    log1 = Log(job_id=job1.id, device_id=device1.id, message="Backup completed successfully.", level="INFO", log_type="job")
+    log2 = Log(job_id=job2.id, device_id=device2.id, message="Authentication failed.", level="ERROR", log_type="job")
     db.add_all([log1, log2])
     db.commit()
 
     # --- Connection Logs ---
-    conn_log1 = ConnectionLog(job_id=job1.id, device_id=device1.id, log="show running-config output...", timestamp=datetime.utcnow())
+    conn_log1 = Log(job_id=job1.id, device_id=device1.id, message="show running-config output...", level="INFO", log_type="connection", timestamp=datetime.utcnow())
     db.add(conn_log1)
     db.commit()
 

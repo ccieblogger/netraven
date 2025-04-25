@@ -15,7 +15,7 @@ import time
 from netraven.worker import dispatcher
 # Assume these imports will work once the db module is built
 from netraven.db.session import get_db
-from netraven.db.models import Job, Device, JobLog, Tag
+from netraven.db.models import Job, Device, Log, Tag
 from netraven.db.models.job_status import JobStatus
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -131,7 +131,7 @@ def update_job_status(job_id: int, status: str, db: Session, start_time: float =
 def log_runner_error(job_id: int, message: str, db: Session, error_type: str = "GENERAL"):
     """Logs a critical runner error to the job log in the database.
     
-    This function creates a JobLog entry with CRITICAL level for job-level errors
+    This function creates a Log entry with CRITICAL level for job-level errors
     that occur during runner execution. It provides a structured way to record
     significant failures that affect the entire job rather than specific devices.
     
@@ -144,22 +144,20 @@ def log_runner_error(job_id: int, message: str, db: Session, error_type: str = "
     Notes:
         - Sets device_id to None to indicate a job-level error
         - Does not commit the session - this is left to the caller
-        - Uses the LogLevel.CRITICAL enum value from JobLog
+        - Uses the LogLevel.CRITICAL value from Log
     """
     try:
-        from netraven.db.models.job_log import LogLevel, JobLog 
-        
         # Set appropriate log level based on error type
-        log_level = LogLevel.CRITICAL
+        log_level = "CRITICAL"
         if error_type == "CREDENTIAL":
-            log_level = LogLevel.ERROR
-            
-        entry = JobLog(
+            log_level = "ERROR"
+        entry = Log(
             job_id=job_id,
             device_id=None, # Explicitly set device_id to None for job-level errors
             message=message,
             level=log_level,
-            data={"error_type": error_type}  # Store error type in the data field
+            log_type="job",
+            meta={"error_type": error_type}
         )
         db.add(entry)
         # db.commit() # REMOVED - handled by caller or session context
