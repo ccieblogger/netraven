@@ -2,6 +2,16 @@
   <div class="container mx-auto p-4">
     <h1 class="text-2xl font-semibold mb-4">Manage Jobs</h1>
 
+    <!-- Jobs Filter Bar -->
+    <ResourceFilter
+      title="Filter Jobs"
+      :filterFields="filterFields"
+      :initialFilters="filters"
+      @filter="applyFilters"
+      @reset="resetFilters"
+      class="mb-4"
+    />
+
     <!-- Add Job Button -->
     <div class="mb-4 text-right">
       <button @click="openCreateJobModal" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
@@ -27,42 +37,37 @@
         <thead>
           <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
             <th class="py-3 px-6 text-left">ID</th>
-            <th class="py-3 px-6 text-left">Name</th>
-            <th class="py-3 px-6 text-left">Description</th>
-            <th class="py-3 px-6 text-center">Enabled</th>
-            <th class="py-3 px-6 text-left">Schedule</th>
-            <th class="py-3 px-6 text-left">Tags</th>
-             <th class="py-3 px-6 text-left">Last Status</th>
+            <th class="py-3 px-6 text-left">Type</th>
+            <th class="py-3 px-6 text-left">Devices</th>
+            <th class="py-3 px-6 text-left">Status</th>
+            <th class="py-3 px-6 text-left">Duration</th>
             <th class="py-3 px-6 text-center">Actions</th>
           </tr>
         </thead>
         <tbody class="text-gray-600 text-sm font-light">
           <tr v-for="job in jobs" :key="job.id" class="border-b border-gray-200 hover:bg-gray-100">
             <td class="py-3 px-6 text-left whitespace-nowrap">{{ job.id }}</td>
-            <td class="py-3 px-6 text-left">{{ job.name }}</td>
-            <td class="py-3 px-6 text-left">{{ job.description || '-' }}</td>
-            <td class="py-3 px-6 text-center">
-               <span :class="job.is_enabled ? 'bg-green-200 text-green-600' : 'bg-gray-200 text-gray-600'" class="py-1 px-3 rounded-full text-xs">
-                {{ job.is_enabled ? 'Yes' : 'No' }}
-               </span>
-            </td>
-            <td class="py-3 px-6 text-left text-xs">
-                <div v-if="job.schedule_type === 'interval'">Interval: {{ job.interval_seconds }}s</div>
-                <div v-else-if="job.schedule_type === 'cron'">Cron: {{ job.cron_string }}</div>
-                <div v-else-if="job.schedule_type === 'onetime'">Once @ {{ formatDateTime(job.scheduled_for) }}</div>
-                <div v-else>-</div>
-            </td>
+            <td class="py-3 px-6 text-left">{{ job.job_type || '-' }}</td>
+            <td class="py-3 px-6 text-left">{{ job.devices ? job.devices.length : (job.device_count || '-') }}</td>
             <td class="py-3 px-6 text-left">
-               <span v-for="tag in job.tags" :key="tag.id" class="bg-blue-100 text-blue-600 py-1 px-3 rounded-full text-xs mr-1">
-                 {{ tag.name }}
-               </span>
-               <span v-if="!job.tags || job.tags.length === 0">-</span>
+              <span v-if="job.status === 'success'" class="inline-flex items-center text-green-600">
+                <svg class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                Success
+              </span>
+              <span v-else-if="job.status === 'failed'" class="inline-flex items-center text-red-600">
+                <svg class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                Failed
+              </span>
+              <span v-else-if="job.status === 'running' || job.status === 'queued'" class="inline-flex items-center text-yellow-600">
+                <svg class="h-5 w-5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" /><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" /></svg>
+                {{ job.status.charAt(0).toUpperCase() + job.status.slice(1) }}
+              </span>
+              <span v-else class="inline-flex items-center text-gray-500">
+                <svg class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" /></svg>
+                {{ job.status || '-' }}
+              </span>
             </td>
-             <td class="py-3 px-6 text-left">
-                <span class="py-1 px-3 rounded-full text-xs bg-gray-200 text-gray-600">
-                   N/A
-                </span>
-            </td>
+            <td class="py-3 px-6 text-left">{{ formatDuration(job.duration_secs || job.duration) }}</td>
             <td class="py-3 px-6 text-center">
               <div class="flex item-center justify-center">
                  <button @click="runJobNow(job)" title="Run Job Now" class="w-4 mr-2 transform hover:text-green-500 hover:scale-110">
@@ -134,16 +139,68 @@ import { useRouter } from 'vue-router'
 import JobFormModal from '../components/JobFormModal.vue'
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue'
 import { PencilIcon, TrashIcon, PlayIcon } from '@heroicons/vue/24/outline'
+import ResourceFilter from '../components/ResourceFilter.vue'
 
 const jobStore = useJobStore()
 const router = useRouter()
-const jobs = computed(() => jobStore.jobs)
+const jobs = computed(() => {
+  // Apply filters to jobStore.jobs
+  let filtered = jobStore.jobs
+  if (!filtered) return []
+  // Type filter
+  if (filters.value.type) {
+    filtered = filtered.filter(j => j.job_type === filters.value.type)
+  }
+  // Status filter
+  if (filters.value.status) {
+    filtered = filtered.filter(j => (j.status || j.last_status) === filters.value.status)
+  }
+  // Date filter (scheduled_for or started_at)
+  if (filters.value.date) {
+    const dateStr = filters.value.date
+    filtered = filtered.filter(j => {
+      const dt = j.scheduled_for || j.started_at
+      if (!dt) return false
+      return dt.startsWith(dateStr)
+    })
+  }
+  // Search filter (name, description, id)
+  if (filters.value.search) {
+    const q = filters.value.search.toLowerCase()
+    filtered = filtered.filter(j =>
+      (j.name && j.name.toLowerCase().includes(q)) ||
+      (j.description && j.description.toLowerCase().includes(q)) ||
+      (String(j.id).includes(q))
+    )
+  }
+  return filtered
+})
 
 // Modal States
 const isFormModalOpen = ref(false)
 const selectedJob = ref(null) // null for create, job object for edit
 const isDeleteModalOpen = ref(false)
 const jobToDelete = ref(null)
+
+// Filter state
+const filters = ref({ type: '', status: '', date: '', search: '' })
+const filterFields = [
+  { name: 'type', label: 'Type', type: 'select', options: [
+    { value: '', label: 'All Types' },
+    { value: 'device_backup', label: 'Device Backup' },
+    { value: 'reachability', label: 'Reachability' },
+    // Add more job types as needed
+  ] },
+  { name: 'status', label: 'Status', type: 'select', options: [
+    { value: '', label: 'All Statuses' },
+    { value: 'success', label: 'Success' },
+    { value: 'failed', label: 'Failed' },
+    { value: 'running', label: 'Running' },
+    { value: 'queued', label: 'Queued' },
+  ] },
+  { name: 'date', label: 'Date', type: 'date' },
+  { name: 'search', label: 'Search', type: 'text', placeholder: 'Search jobs...' },
+]
 
 onMounted(() => {
     // Fetch jobs only if the list is empty initially
@@ -173,6 +230,14 @@ const runStatusClass = computed(() => {
     default: return '';
   }
 });
+
+// Add a helper for duration formatting
+function formatDuration(seconds) {
+  if (!seconds) return '-';
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return m > 0 ? `${m} min${m > 1 ? 's' : ''} ${s}s` : `${s}s`
+}
 
 // --- Action Handlers ---
 
@@ -253,6 +318,15 @@ async function runJobNow(job) {
        console.error("Failed to run job:", error);
      }
    }
+}
+
+function applyFilters(newFilters) {
+  filters.value = { ...filters.value, ...newFilters }
+  // Filtering logic will be implemented in the next step
+}
+function resetFilters() {
+  filters.value = { type: '', status: '', date: '', search: '' }
+  // Filtering logic will be implemented in the next step
 }
 
 </script>

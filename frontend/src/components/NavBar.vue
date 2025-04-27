@@ -9,19 +9,38 @@
           </div>
           <div class="hidden sm:ml-6 sm:flex sm:items-center">
             <div class="flex space-x-4">
-              <router-link
-                v-for="item in navigationItems"
-                :key="item.name"
-                :to="item.href"
-                :class="[
-                  $route.path === item.href
-                    ? 'bg-blue-900 text-white'
-                    : 'text-gray-300 hover:bg-blue-900 hover:text-white',
-                  'px-3 py-2 rounded-md text-sm font-medium'
-                ]"
-              >
-                {{ item.name }}
-              </router-link>
+              <template v-for="item in navigationItems" :key="item.name">
+                <div v-if="item.children" class="relative group">
+                  <span class="text-gray-300 px-3 py-2 rounded-md text-sm font-medium cursor-default group-hover:text-white">{{ item.name }}</span>
+                  <div class="ml-4 flex flex-col">
+                    <router-link
+                      v-for="child in item.children"
+                      :key="child.name"
+                      :to="child.href"
+                      :class="[
+                        $route.path === child.href
+                          ? 'bg-blue-900 text-white'
+                          : 'text-gray-300 hover:bg-blue-900 hover:text-white',
+                        'px-3 py-2 rounded-md text-sm font-medium mt-1'
+                      ]"
+                    >
+                      {{ child.name }}
+                    </router-link>
+                  </div>
+                </div>
+                <router-link
+                  v-else
+                  :to="item.href"
+                  :class="[
+                    $route.path === item.href
+                      ? 'bg-blue-900 text-white'
+                      : 'text-gray-300 hover:bg-blue-900 hover:text-white',
+                    'px-3 py-2 rounded-md text-sm font-medium'
+                  ]"
+                >
+                  {{ item.name }}
+                </router-link>
+              </template>
             </div>
           </div>
         </div>
@@ -195,11 +214,20 @@ const isMobileMenuOpen = ref(false);
 
 const navigationItems = [
   { name: 'Dashboard', href: '/' },
+  {
+    name: 'Jobs',
+    children: [
+      { name: 'List', href: '/jobs' },
+      { name: 'Dashboard', href: '/jobs-dashboard' },
+    ]
+  },
   { name: 'Devices', href: '/devices' },
-  { name: 'Jobs', href: '/jobs' },
-  { name: 'Templates', href: '/templates' },
+  { name: 'Tags', href: '/tags' },
   { name: 'Credentials', href: '/credentials' },
+  { name: 'Backups', href: '/backups' },
+  { name: 'Users', href: '/users' },
   { name: 'Logs', href: '/logs' },
+  { name: 'System Status', href: '/system-status' },
 ];
 
 function toggleProfileMenu() {

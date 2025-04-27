@@ -16,6 +16,7 @@ import Credentials from '../pages/Credentials.vue'; // Import the Credentials co
 import ConnectionLogs from '../pages/Logs.vue';
 import JobLogs from '../pages/JobLogs.vue';
 import DeviceDetail from '../pages/DeviceDetail.vue';
+import Jobs from '../pages/Jobs.vue';
 
 // Placeholder components for routes to work initially
 // const PlaceholderComponent = { template: '<div>Placeholder Page</div>' }; // No longer needed
@@ -64,8 +65,14 @@ const routes = [
   {
     path: '/jobs',
     name: 'Jobs',
-    component: JobsDashboard, // Use new dashboard as default
+    component: Jobs, // Use jobs list as default
     meta: { requiresAuth: true, roles: ['admin', 'user'] } 
+  },
+  {
+    path: '/jobs-dashboard',
+    name: 'JobsDashboard',
+    component: JobsDashboard,
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
   },
   {
     path: '/jobs/:id',

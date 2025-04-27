@@ -16,24 +16,42 @@
 
       <!-- Navigation -->
       <nav class="flex-1 px-2 py-4 space-y-1">
-        <router-link 
-          v-for="item in navigation" 
-          :key="item.name"
-          :to="item.path" 
-          class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out"
-          :class="[
-            $route.path.startsWith(item.path) 
-              ? 'text-text-primary bg-card border-l-4 border-primary pl-2' 
-              : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
-          ]"
-        >
-          <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0 mr-3" 
-               :class="{ 
-                 'text-text-secondary': !$route.path.startsWith(item.path),
-                 'text-primary': $route.path.startsWith(item.path)
-               }"></div>
-          <span class="truncate">{{ item.name }}</span>
-        </router-link>
+        <template v-for="item in navigation" :key="item.name">
+          <div v-if="item.children">
+            <div class="flex items-center px-3 py-2 text-sm font-medium text-text-secondary cursor-default">
+              <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0 mr-3"></div>
+              <span class="truncate">{{ item.name }}</span>
+            </div>
+            <div class="ml-8 flex flex-col">
+              <router-link
+                v-for="child in item.children"
+                :key="child.name"
+                :to="child.path"
+                class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out mt-1"
+                :class="[
+                  $route.path.startsWith(child.path)
+                    ? 'text-text-primary bg-card border-l-4 border-primary pl-2'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
+                ]"
+              >
+                <span class="truncate">{{ child.name }}</span>
+              </router-link>
+            </div>
+          </div>
+          <router-link
+            v-else
+            :to="item.path"
+            class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out"
+            :class="[
+              $route.path.startsWith(item.path)
+                ? 'text-text-primary bg-card border-l-4 border-primary pl-2'
+                : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
+            ]"
+          >
+            <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0 mr-3"></div>
+            <span class="truncate">{{ item.name }}</span>
+          </router-link>
+        </template>
       </nav>
 
       <!-- User account -->
@@ -136,10 +154,13 @@ const navigation = [
   },
   {
     name: 'Jobs',
-    path: '/jobs',
     icon: {
       template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" /></svg>`
-    }
+    },
+    children: [
+      { name: 'List', path: '/jobs' },
+      { name: 'Dashboard', path: '/jobs-dashboard' }
+    ]
   },
   {
     name: 'Devices',
