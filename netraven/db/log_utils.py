@@ -10,16 +10,12 @@ def save_log(
     job_id: Optional[int] = None,
     device_id: Optional[int] = None,
     source: Optional[str] = None,
-    meta: Optional[Dict[str, Any]] = None,
-    db: Optional[Session] = None
+    meta: Optional[Dict[str, Any]] = None
 ) -> None:
     """
-    Save a log entry to the unified logs table.
+    Save a log entry to the unified logs table. Always uses its own session.
     """
-    session_managed = False
-    if db is None:
-        db = next(get_db())
-        session_managed = True
+    db = next(get_db())
     try:
         entry = Log(
             message=message,
@@ -31,16 +27,9 @@ def save_log(
             meta=meta
         )
         db.add(entry)
-        if session_managed and not db.in_transaction():
-            try:
-                db.commit()
-            except Exception as commit_error:
-                db.rollback()
+        db.commit()
     except Exception as e:
-        if session_managed:
-            db.rollback()
-        else:
-            raise
+        db.rollback()
+        raise
     finally:
-        if session_managed:
-            db.close() 
+        db.close() 
