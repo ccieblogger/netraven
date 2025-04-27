@@ -49,14 +49,12 @@
             <td class="py-2 px-3 whitespace-nowrap">{{ job.job_type || '-' }}</td>
             <td class="py-2 px-3 whitespace-nowrap">{{ job.devices ? job.devices.length : (job.device_count || '-') }}</td>
             <td class="py-2 px-3 whitespace-nowrap text-center align-middle">
-              <div class="flex items-center justify-center h-6 w-full">
-                <StatusPopover>
-                  <component :is="getStatusIcon(job.status).icon" :class="'h-6 w-6 ' + getStatusIcon(job.status).color" />
-                  <template #popover>
-                    ID: {{ job.id }}: {{ getStatusIcon(job.status).label }}
-                  </template>
-                </StatusPopover>
-              </div>
+              <StatusPopover>
+                <component :is="getStatusIcon(job.status).icon" :class="'h-6 w-6 ' + getStatusIcon(job.status).color" />
+                <template #popover>
+                  ID: {{ job.id }}: {{ getStatusIcon(job.status).label }}
+                </template>
+              </StatusPopover>
             </td>
             <td class="py-2 px-3 whitespace-nowrap">{{ formatDuration(job.duration_secs || job.duration) }}</td>
             <td class="py-2 px-3 text-center whitespace-nowrap">
