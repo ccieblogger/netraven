@@ -11,6 +11,7 @@ RUN apt-get update && \
     libpq-dev \
     curl \
     git \
+    redis-tools \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -34,10 +35,14 @@ COPY . .
 # Make the entrypoint script executable
 RUN chmod +x /app/docker/api/entrypoint.sh
 
+# Copy the healthcheck script for the worker container
+COPY docker/api/worker_healthcheck.sh /app/worker_healthcheck.sh
+RUN chmod +x /app/worker_healthcheck.sh
+
 # Expose API port
 EXPOSE 8000
 
-# Define health check - install curl for healthcheck
+# Define health check for API only (worker healthcheck set in docker-compose)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 

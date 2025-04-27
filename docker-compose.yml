@@ -131,6 +131,13 @@ services:
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
       - NETRAVEN_SECURITY__ENCRYPTION_KEY=dev_encryption_key_replace_in_production
       - NETRAVEN_SECURITY__ENCRYPTION_SALT=dev_encryption_salt_replace_in_production
+    # Custom healthcheck: checks RQ worker process and Redis connectivity
+    healthcheck:
+      test: ["CMD", "/app/worker_healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   frontend-node-modules:
