@@ -257,11 +257,32 @@ Use **Pinia** store with modules:
 
 ---
 
+## 11. RQ Scheduler & Queue Visibility (Planned)
+
+### 11.1 API Endpoints
+- `GET /api/scheduler/jobs` — List all jobs currently scheduled in RQ Scheduler (job ID, description, next run, interval/cron, etc.)
+- `GET /api/queue/status` — Show queue length and details of jobs currently in the queue (job ID, enqueued time, type, etc.)
+
+### 11.2 UI/UX
+- New dashboard section: **Scheduled Jobs & Queue Status**
+- Table of scheduled jobs: columns for Job ID, Name, Type, Schedule (interval/cron), Next Run, Status
+- Table or card for queue status: number of jobs in queue, details for each (ID, type, enqueued time)
+- Status indicators for active, pending, stuck jobs
+- Manual controls: force re-schedule, re-run, remove job from queue (future)
+
+### 11.3 User Flow
+- User navigates to the new dashboard section
+- Sees all scheduled jobs and their next run time/status
+- Sees current queue length and jobs waiting to run
+- Can quickly diagnose if jobs are being scheduled, queued, or stuck
+
+---
+
 ## 12. Tech Stack & Libraries
 
 | Concern   | Choice                                   |
 | --------- | ---------------------------------------- |
-| Framework | **Vue 3 (Composition API)**              |
+| Framework | **Vue 3 (Composition API)**              |
 | Styling   | **TailwindCSS** + headlessui for dialogs |
 | Charts    | **Apache ECharts** (lazy‑loaded)         |
 | WebSocket | `@vueuse/core` `useWebSocket`            |
@@ -285,7 +306,7 @@ Instead of rebuilding from scratch, we can evolve the existing Vue application. 
 | Area                       | What to Share                              | Why It Matters                                            |
 | -------------------------- | ------------------------------------------ | --------------------------------------------------------- |
 | **Project Repo**           | Git URL or ZIP; highlight `src/` structure | Determines current component hierarchy & build tooling    |
-| **Vue & Library Versions** | `package.json`                             | Confirms compatibility (Vue 2 vs 3, Vuex vs Pinia, etc.)  |
+| **Vue & Library Versions** | `package.json`                             | Confirms compatibility (Vue 2 vs 3, Vuex vs Pinia, etc.)  |
 | **Router Map**             | `router/index.*`                           | Lets us align new routes with existing guards & auth flow |
 | **State Store Modules**    | Vuex/Pinia folder                          | Shows where job/log data is fetched & stored              |
 | **Auth Flow**              | Login view, token refresh logic            | Critical to preserve SSO/JWT/OAuth behaviour              |
@@ -301,9 +322,9 @@ Instead of rebuilding from scratch, we can evolve the existing Vue application. 
 3. **Feature Flags**: ship refactored pages behind toggle for staged rollout.
 4. **End‑to‑End Tests**: add Cypress workflows covering critical paths before changes.
 
-Provide the artifacts above (or representative snippets), and we’ll draft a detailed refactor plan plus code‑level examples.
+Provide the artifacts above (or representative snippets), and we'll draft a detailed refactor plan plus code‑level examples.
 
 ---
 
-© 2025 NetRaven – Internal Design Document
+© 2025 NetRaven – Internal Design Document
 

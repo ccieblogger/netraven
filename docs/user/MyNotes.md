@@ -25,6 +25,9 @@ curl -X GET "http://localhost:8000/job-logs/" \
 
 # Use the token to query log stream
    curl -H "Authorization: Bearer $TOKEN" http://localhost/api/logs/stream
+   curl -i -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/logs/stream?job_id=1
+
+# Use the token to get log stream
 
 # Grepping container logs
 docker logs netraven-worker-dev 2>&1 | grep UnifiedLogger
