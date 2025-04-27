@@ -6,8 +6,8 @@
       </h3>
       
       <!-- Filter form -->
-      <div class="mt-4 flex flex-row flex-wrap items-center gap-2">
-        <div v-for="field in filterFields" :key="field.name" class="flex flex-col min-w-[160px]">
+      <div class="mt-4 flex flex-row flex-wrap items-center justify-evenly gap-6 w-full">
+        <div v-for="field in filterFields" :key="field.name" class="flex flex-col flex-1 min-w-[160px] max-w-xs">
           <label :for="field.name" class="block text-sm font-medium text-text-primary">
             {{ field.label }}
           </label>

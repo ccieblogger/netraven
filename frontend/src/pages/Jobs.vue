@@ -320,19 +320,3 @@ function resetFilters() {
 }
 
 </script>
-
-<style scoped>
-/* Make the date picker calendar icon white for dark mode */
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1) brightness(2);
-}
-input[type="date"]::-ms-input-placeholder {
-  color: #fff;
-}
-input[type="date"]::-moz-placeholder {
-  color: #fff;
-}
-input[type="date"]::placeholder {
-  color: #fff;
-}
-</style>
