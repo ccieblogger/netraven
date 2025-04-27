@@ -49,17 +49,8 @@
             <td class="py-2 px-3 whitespace-nowrap">{{ job.job_type || '-' }}</td>
             <td class="py-2 px-3 whitespace-nowrap">{{ job.devices ? job.devices.length : (job.device_count || '-') }}</td>
             <td class="py-2 px-3 whitespace-nowrap text-center align-middle">
-              <span v-if="job.status === 'success' || job.status === 'completed'" aria-label="Success" class="flex items-center justify-center h-6 w-6 mx-auto">
-                <svg class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2l4-4" /></svg>
-              </span>
-              <span v-else-if="job.status === 'failed' || job.status === 'error'" aria-label="Failed" class="flex items-center justify-center h-6 w-6 mx-auto">
-                <svg class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-              </span>
-              <span v-else-if="job.status === 'running' || job.status === 'pending' || job.status === 'queued'" aria-label="Running" class="flex items-center justify-center h-6 w-6 mx-auto">
-                <svg class="h-6 w-6 text-yellow-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" /><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" /></svg>
-              </span>
-              <span v-else aria-label="Unknown" class="flex items-center justify-center h-6 w-6 mx-auto">
-                <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" /></svg>
+              <span v-if="getStatusIcon(job.status)" :aria-label="getStatusIcon(job.status).label" :title="getStatusIcon(job.status).label" class="flex items-center justify-center h-6 w-6 mx-auto">
+                <component :is="getStatusIcon(job.status).icon" :class="'h-6 w-6 ' + getStatusIcon(job.status).color" />
               </span>
             </td>
             <td class="py-2 px-3 whitespace-nowrap">{{ formatDuration(job.duration_secs || job.duration) }}</td>
@@ -114,6 +105,17 @@ import JobFormModal from '../components/JobFormModal.vue'
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue'
 import { PencilIcon, TrashIcon, PlayIcon } from '@heroicons/vue/24/outline'
 import ResourceFilter from '../components/ResourceFilter.vue'
+// Import solid Heroicons for status
+import { 
+  CheckCircleIcon, 
+  ExclamationCircleIcon, 
+  XCircleIcon, 
+  ArrowPathIcon, 
+  ClockIcon, 
+  QueueListIcon, 
+  MinusCircleIcon, 
+  QuestionMarkCircleIcon 
+} from '@heroicons/vue/24/solid'
 
 const jobStore = useJobStore()
 const router = useRouter()
@@ -220,6 +222,71 @@ function statusBadgeClass(status) {
     case 'running':
     case 'queued': return 'bg-yellow-100 text-yellow-800';
     default: return 'bg-gray-100 text-gray-800';
+  }
+}
+
+// --- Helper Functions ---
+function getStatusIcon(status) {
+  // Map job.status to icon, color, label, and animation
+  switch (status) {
+    case 'completed_success':
+    case 'success':
+    case 'completed':
+      return {
+        icon: CheckCircleIcon,
+        color: 'text-green-400',
+        label: 'Completed (Success)'
+      }
+    case 'completed_failed':
+      return {
+        icon: ExclamationCircleIcon,
+        color: 'text-yellow-400',
+        label: 'Completed (Task Failed)'
+      }
+    case 'failed_error':
+    case 'failed':
+    case 'error':
+      return {
+        icon: XCircleIcon,
+        color: 'text-red-400',
+        label: 'Job Failed (Error)'
+      }
+    case 'running':
+      return {
+        icon: ArrowPathIcon,
+        color: 'text-yellow-400 animate-spin',
+        label: 'Running'
+      }
+    case 'pending':
+      return {
+        icon: ClockIcon,
+        color: 'text-yellow-300',
+        label: 'Pending'
+      }
+    case 'queued':
+      return {
+        icon: QueueListIcon,
+        color: 'text-blue-400',
+        label: 'Queued'
+      }
+    case 'cancelled':
+      return {
+        icon: MinusCircleIcon,
+        color: 'text-gray-400',
+        label: 'Cancelled'
+      }
+    case 'no_devices':
+      return {
+        icon: ExclamationCircleIcon,
+        color: 'text-gray-400',
+        label: 'No Devices'
+      }
+    default:
+      return {
+        icon: QuestionMarkCircleIcon,
+        color: 'text-gray-400',
+        label: 'Unknown'
+      }
   }
 }
 
