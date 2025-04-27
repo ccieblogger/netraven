@@ -60,6 +60,62 @@ NetRaven provides a robust REST API for querying and filtering logs stored in th
   - `device_id` (int, optional)
 - **Response:** Server-Sent Events (SSE) stream of log events and keep-alive heartbeats
 
+### 7. Scheduler & Queue Monitoring Endpoints (2025-04)
+
+NetRaven provides dedicated endpoints for real-time visibility into scheduled jobs and the RQ job queue:
+
+- **GET /scheduler/jobs**
+  - Lists all jobs currently scheduled in RQ Scheduler.
+  - Returns: List of jobs with fields: id, name, job_type, description, schedule_type, interval_seconds, cron_string, scheduled_for, next_run, repeat, args, meta, tags, is_enabled, is_system_job.
+  - Example:
+    ```json
+    [
+      {
+        "id": 1,
+        "name": "Backup Core Routers Daily",
+        "job_type": "interval",
+        "description": "Nightly backup job",
+        "schedule_type": "interval",
+        "interval_seconds": 86400,
+        "cron_string": null,
+        "scheduled_for": null,
+        "next_run": "2025-04-28T02:00:00Z",
+        "repeat": null,
+        "args": [1],
+        "meta": {"db_job_id": 1, "schedule_type": "interval"},
+        "tags": [],
+        "is_enabled": true,
+        "is_system_job": false
+      }
+    ]
+    ```
+
+- **GET /scheduler/queue/status**
+  - Returns the status of each RQ queue (default, high, low), including job count, oldest job timestamp, and per-job details.
+  - Returns: List of queues with fields: name, job_count, oldest_job_ts, jobs (list of job_id, enqueued_at, func_name, args, meta).
+  - Example:
+    ```json
+    [
+      {
+        "name": "default",
+        "job_count": 2,
+        "oldest_job_ts": "2025-04-27T22:00:00Z",
+        "jobs": [
+          {
+            "job_id": "rq-job-1",
+            "enqueued_at": "2025-04-27T22:00:00Z",
+            "func_name": "run_job",
+            "args": [1],
+            "meta": {"db_job_id": 1}
+          }
+        ]
+      }
+    ]
+    ```
+
+- **Authentication**: Both endpoints require JWT authentication. Unauthenticated requests receive 401/403.
+- **Purpose**: These endpoints are used by the UI for job/queue dashboard monitoring and operational insight.
+
 ---
 
 ## Usage Examples

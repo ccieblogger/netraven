@@ -7,7 +7,7 @@ and response payloads for job endpoints.
 """
 
 from datetime import datetime
-from typing import Optional, List, Literal, Dict
+from typing import Optional, List, Literal, Dict, Any
 from pydantic import Field, field_validator, model_validator, root_validator
 import re
 from croniter import croniter
@@ -284,9 +284,26 @@ PaginatedJobResponse = create_paginated_response(Job)
 
 # --- NetRaven Job Dashboard Schemas ---
 
+class QueueJobDetail(BaseSchema):
+    """Schema for a job in the RQ queue (for /queue/status endpoint)."""
+    job_id: str
+    enqueued_at: Optional[datetime] = None
+    func_name: Optional[str] = None
+    args: Optional[List[Any]] = None
+    meta: Optional[Dict[str, Any]] = None
+
+class RQQueueStatus(BaseSchema):
+    """Schema for RQ queue status (for jobs/status card and /queue/status endpoint).
+    Includes queue name, job count, oldest job timestamp, and job details.
+    """
+    name: str
+    job_count: int
+    oldest_job_ts: datetime | None = None
+    jobs: List[QueueJobDetail] = Field(default_factory=list)
+
 class ScheduledJobSummary(BaseSchemaWithId):
     """Summary schema for scheduled jobs (for dashboard/table view).
-    Includes schedule, next run, and targeting info.
+    Includes schedule, next run, targeting info, and scheduler meta.
     """
     name: str
     job_type: str
@@ -296,6 +313,9 @@ class ScheduledJobSummary(BaseSchemaWithId):
     cron_string: str | None = None
     scheduled_for: datetime | None = None
     next_run: datetime | None = None  # Calculated next run time
+    repeat: Optional[int] = None
+    args: Optional[List[Any]] = None
+    meta: Optional[Dict[str, Any]] = None
     tags: List[Tag] = Field(default_factory=list)
     is_enabled: bool
     is_system_job: bool
@@ -322,14 +342,6 @@ class JobTypeSummary(BaseSchema):
     description: str | None = None
     icon: str | None = None
     last_used: datetime | None = None
-
-class RQQueueStatus(BaseSchema):
-    """Schema for RQ queue status (for jobs/status card).
-    Includes queue name, job count, and oldest job timestamp.
-    """
-    name: str
-    job_count: int
-    oldest_job_ts: datetime | None = None
 
 class WorkerStatus(BaseSchema):
     """Schema for worker status (for jobs/status card).

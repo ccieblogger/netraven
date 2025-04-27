@@ -159,7 +159,7 @@ All developer and production workflows must use the provided Docker Compose setu
 - **Alembic is used only for the initial schema setup** (single migration file, no legacy migrations).
 
 #### 5. Frontend UI
-- Directory: `/frontend/` (Vue 3 + Vite + Pinia + TailwindCSS)
+- Directory: `/frontend/` (Vue 3 + Vite + Pinia + TailwindCSS)
 - Integrates via REST API
 - For UI component and workflow details, see [`/docs/source_of_truth/frontend_sot.md`](../source_of_truth/frontend_sot.md)
 
@@ -250,5 +250,60 @@ NetRaven uses a local Git repository as the versioned storage backend for device
 - The worker updates job status (`QUEUED` → `RUNNING` → `COMPLETED`/`FAILED`/`COMPLETED_NO_DEVICES`).
 - Job logs and connection logs are written to the database for UI consumption, differentiated by `log_type`.
 - System jobs are protected from deletion and have special status handling in the UI and backend.
+
+---
+
+### Scheduler & Queue API Endpoints (2025-04)
+
+NetRaven now exposes dedicated API endpoints for real-time visibility into scheduled jobs and the RQ job queue, supporting the UI's job dashboard and operational monitoring features.
+
+- **GET /scheduler/jobs**: Lists all jobs currently scheduled in RQ Scheduler, including job ID, description, schedule type, interval/cron, next run, and metadata. Example response:
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Backup Core Routers Daily",
+    "job_type": "interval",
+    "description": "Nightly backup job",
+    "schedule_type": "interval",
+    "interval_seconds": 86400,
+    "cron_string": null,
+    "scheduled_for": null,
+    "next_run": "2025-04-28T02:00:00Z",
+    "repeat": null,
+    "args": [1],
+    "meta": {"db_job_id": 1, "schedule_type": "interval"},
+    "tags": [],
+    "is_enabled": true,
+    "is_system_job": false
+  }
+]
+```
+
+- **GET /scheduler/queue/status**: Returns the status of each RQ queue (default, high, low), including job count, oldest job timestamp, and per-job details (job_id, enqueued_at, func_name, args, meta). Example response:
+
+```json
+[
+  {
+    "name": "default",
+    "job_count": 2,
+    "oldest_job_ts": "2025-04-27T22:00:00Z",
+    "jobs": [
+      {
+        "job_id": "rq-job-1",
+        "enqueued_at": "2025-04-27T22:00:00Z",
+        "func_name": "run_job",
+        "args": [1],
+        "meta": {"db_job_id": 1}
+      }
+    ]
+  }
+]
+```
+
+- **Authentication**: Both endpoints require JWT authentication and enforce role-based access. Unauthenticated requests receive 401/403.
+
+- **Intended Usage**: These endpoints power the UI's scheduled jobs and queue status dashboard, enabling real-time and on-demand monitoring for NetOps and admin users.
 
 ---
