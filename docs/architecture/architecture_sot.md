@@ -130,6 +130,7 @@ All developer and production workflows must use the provided Docker Compose setu
 #### 2. Device Communication Worker (Dedicated Container)
 - Executes device jobs triggered by scheduler or on demand.
 - Runs as a dedicated container using RQ Worker.
+- **Healthcheck:** Uses a process-based healthcheck script that verifies the RQ worker process is running and Redis is reachable. The container is marked healthy only when both are true. (Previous HTTP healthcheck was removed for the worker container.)
 - Connects to network devices using **Netmiko** (and Paramiko for extensibility).
 - Retrieves `show running-config` and basic facts (hostname, serial number).
 - Uses `ThreadPoolExecutor` for concurrent device access (default: 5).
