@@ -41,3 +41,25 @@
 .card-shadow {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
+
+/* Force native date input calendar icon to white for dark backgrounds */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(2) !important;
+}
+input[type="date"]::-webkit-input-placeholder {
+  color: var(--color-text) !important;
+}
+input[type="date"]::-moz-placeholder {
+  color: var(--color-text) !important;
+}
+input[type="date"]:-ms-input-placeholder {
+  color: var(--color-text) !important;
+}
+input[type="date"]::placeholder {
+  color: var(--color-text) !important;
+}
+
+/* For Firefox */
+input[type="date"]::-moz-calendar-picker-indicator {
+  filter: invert(1) brightness(2) !important;
+}

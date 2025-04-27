@@ -6,9 +6,9 @@
       </h3>
       
       <!-- Filter form -->
-      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div v-for="field in filterFields" :key="field.name" class="col-span-1">
-          <label :for="field.name" class="block text-sm font-medium text-gray-700">
+      <div class="mt-4 flex flex-row flex-wrap items-center gap-2">
+        <div v-for="field in filterFields" :key="field.name" class="flex flex-col min-w-[160px]">
+          <label :for="field.name" class="block text-sm font-medium text-text-primary">
             {{ field.label }}
           </label>
           
@@ -19,7 +19,7 @@
             v-model="filterValues[field.name]"
             type="text"
             :placeholder="field.placeholder || ''"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 border-2 border-red-500"
           />
           
           <!-- Number input -->
@@ -32,7 +32,7 @@
             :max="field.max"
             :step="field.step || 1"
             :placeholder="field.placeholder || ''"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 border-2 border-red-500"
           />
           
           <!-- Select input -->
@@ -41,7 +41,7 @@
             <select
               :id="field.name"
               v-model="filterValues[field.name]"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10"
             >
               <option value="">{{ field.placeholder || 'Select an option' }}</option>
               <option 
@@ -60,7 +60,7 @@
             :id="field.name"
             v-model="filterValues[field.name]"
             type="date"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 border-2 border-red-500"
           />
           
           <!-- Checkbox input -->
