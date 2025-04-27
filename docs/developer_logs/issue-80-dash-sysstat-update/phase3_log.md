@@ -1,0 +1,1 @@
+[Phase 3]\n- Refactored Dashboard.vue to use KpiCard for KPIs and StatusBadge for system/service health.\n- Integrated JobsTable for recent jobs.\n- Layout now matches wireframes and spec for dashboard.\n- Next: Test dashboard for real-time updates, visual consistency, and responsiveness.

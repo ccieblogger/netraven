@@ -1,0 +1,1 @@
+[Phase 2]\n- Refactored MetricCard.vue to KpiCard.vue and moved to components/ui/.\n- Implemented StatusBadge.vue in components/ui/ for system/service health indicators.\n- Next: Refactor Dashboard.vue to use these components and update system status logic.
