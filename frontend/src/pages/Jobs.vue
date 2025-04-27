@@ -48,24 +48,18 @@
             <td class="py-2 px-3 whitespace-nowrap">{{ job.id }}</td>
             <td class="py-2 px-3 whitespace-nowrap">{{ job.job_type || '-' }}</td>
             <td class="py-2 px-3 whitespace-nowrap">{{ job.devices ? job.devices.length : (job.device_count || '-') }}</td>
-            <td class="py-2 px-3 whitespace-nowrap">
-              <span :class="statusBadgeClass(job.status)" class="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full font-bold text-sm align-middle">
-                <span v-if="job.status === 'success'">
-                  <svg class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                  <span>Success</span>
-                </span>
-                <span v-else-if="job.status === 'failed'">
-                  <svg class="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                  <span>Failed</span>
-                </span>
-                <span v-else-if="job.status === 'running' || job.status === 'queued'">
-                  <svg class="h-4 w-4 text-yellow-300 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" /><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" /></svg>
-                  <span>{{ job.status.charAt(0).toUpperCase() + job.status.slice(1) }}</span>
-                </span>
-                <span v-else>
-                  <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" /></svg>
-                  <span>{{ job.status || '-' }}</span>
-                </span>
+            <td class="py-2 px-3 whitespace-nowrap text-center align-middle">
+              <span v-if="job.status === 'success' || job.status === 'completed'" aria-label="Success" class="flex items-center justify-center h-6 w-6 mx-auto">
+                <svg class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2l4-4" /></svg>
+              </span>
+              <span v-else-if="job.status === 'failed' || job.status === 'error'" aria-label="Failed" class="flex items-center justify-center h-6 w-6 mx-auto">
+                <svg class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </span>
+              <span v-else-if="job.status === 'running' || job.status === 'pending' || job.status === 'queued'" aria-label="Running" class="flex items-center justify-center h-6 w-6 mx-auto">
+                <svg class="h-6 w-6 text-yellow-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" /><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" /></svg>
+              </span>
+              <span v-else aria-label="Unknown" class="flex items-center justify-center h-6 w-6 mx-auto">
+                <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" /></svg>
               </span>
             </td>
             <td class="py-2 px-3 whitespace-nowrap">{{ formatDuration(job.duration_secs || job.duration) }}</td>
