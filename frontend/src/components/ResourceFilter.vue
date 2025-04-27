@@ -61,7 +61,7 @@
             :input-class="'mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10'"
             :calendar-class="'bg-card text-text-primary'"
             :day-class="'text-text-primary'"
-            :wrapper-class="'w-full'"
+            :wrapper-class="'w-full v3dp__input_wrapper'"
             :clearable="true"
             :format="'yyyy-MM-dd'"
             :placeholder="field.placeholder || 'Select date'"
@@ -289,4 +289,24 @@ function getLoading(field) {
   if (field.loading && typeof field.loading.value !== 'undefined') return field.loading.value;
   return !!field.loading;
 }
-</script> 
+</script>
+
+<style>
+/* Fix vue3-datepicker clear button alignment and input height */
+.v3dp__input_wrapper {
+  display: flex;
+  align-items: center;
+  height: 2.5rem; /* h-10 */
+}
+.v3dp__input_wrapper input {
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+}
+.v3dp__clear_icon {
+  position: absolute;
+  right: 2.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+}
+</style> 
