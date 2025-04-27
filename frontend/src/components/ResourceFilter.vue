@@ -6,7 +6,7 @@
       </h3>
       
       <!-- Filter form -->
-      <div class="mt-4 flex flex-row flex-wrap items-center justify-evenly gap-6 w-full">
+      <div class="mt-4 flex flex-row flex-wrap items-center justify-evenly gap-12 w-full">
         <div v-for="field in filterFields" :key="field.name" class="flex flex-col flex-1 min-w-[160px] max-w-xs">
           <label :for="field.name" class="block text-sm font-medium text-text-primary">
             {{ field.label }}
@@ -19,7 +19,7 @@
             v-model="filterValues[field.name]"
             type="text"
             :placeholder="field.placeholder || ''"
-            :class="['mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10', field.name === 'search' ? 'border-2 border-red-500' : '']"
+            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10"
           />
           
           <!-- Number input -->
@@ -54,13 +54,17 @@
             </select>
           </div>
           
-          <!-- Date input -->
-          <input 
+          <!-- Datepicker input -->
+          <Datepicker
             v-else-if="field.type === 'date'"
-            :id="field.name"
             v-model="filterValues[field.name]"
-            type="date"
-            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10"
+            :input-class="'mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10'"
+            :calendar-class="'bg-card text-text-primary'"
+            :day-class="'text-text-primary'"
+            :wrapper-class="'w-full'"
+            :clearable="true"
+            :format="'yyyy-MM-dd'"
+            :placeholder="field.placeholder || 'Select date'"
           />
           
           <!-- Checkbox input -->
@@ -120,11 +124,11 @@
       </div>
       
       <!-- Action buttons -->
-      <div class="mt-5 flex justify-end">
+      <div class="mt-8 flex flex-row justify-center gap-4 w-full">
         <button
           type="button"
           @click="resetFilters"
-          class="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 mr-3"
+          class="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         >
           Reset
         </button>
@@ -142,6 +146,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue';
+import Datepicker from 'vue3-datepicker';
 
 const props = defineProps({
   title: {
