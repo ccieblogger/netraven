@@ -11,7 +11,7 @@ import asyncio
 import json
 from fastapi import Response
 from sse_starlette.sse import EventSourceResponse
-import aioredis
+import redis.asyncio as redis
 from netraven.config.loader import load_config
 
 router = APIRouter(
@@ -112,21 +112,19 @@ async def stream_logs(
     redis_channel = redis_cfg.get('channel_prefix', 'netraven-logs')
 
     async def event_generator():
-        redis = await aioredis.create_redis_pool((redis_host, redis_port), db=redis_db)
+        redis_url = f"redis://{redis_host}:{redis_port}/{redis_db}"
+        redis_conn = await redis.from_url(redis_url)
+        pubsub = redis_conn.pubsub()
+        await pubsub.subscribe(redis_channel)
         try:
-            res = await redis.subscribe(redis_channel)
-            ch = res[0]
-            last_event = asyncio.get_event_loop().time()
             while True:
-                # Wait for a message or timeout for keepalive
                 try:
-                    if await asyncio.wait_for(ch.wait_message(), timeout=15):
-                        msg = await ch.get(encoding='utf-8')
+                    message = await asyncio.wait_for(pubsub.get_message(ignore_subscribe_messages=True, timeout=15), timeout=15)
+                    if message and message['type'] == 'message':
                         try:
-                            log_event = json.loads(msg)
+                            log_event = json.loads(message['data'])
                         except Exception:
                             continue
-                        # Filtering
                         if job_id is not None and log_event.get('job_id') != job_id:
                             continue
                         if device_id is not None and log_event.get('device_id') != device_id:
@@ -135,16 +133,14 @@ async def stream_logs(
                             "event": "log",
                             "data": json.dumps(log_event)
                         }
-                        last_event = asyncio.get_event_loop().time()
                     else:
-                        # Timeout expired, send keepalive
                         yield {"data": ": keepalive"}
                 except asyncio.TimeoutError:
-                    # Timeout expired, send keepalive
                     yield {"data": ": keepalive"}
         finally:
-            redis.close()
-            await redis.wait_closed()
+            await pubsub.unsubscribe(redis_channel)
+            await pubsub.close()
+            await redis_conn.close()
 
     return EventSourceResponse(event_generator())
 
