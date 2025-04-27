@@ -42,9 +42,12 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
 
-/* Force native date input calendar icon to white for dark backgrounds */
+/* Aggressive override: Use a white SVG as the calendar icon for date inputs */
 input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1) brightness(2) !important;
+  background: url('data:image/svg+xml;utf8,<svg fill="white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 10h2v2H7v-2zm4 0h2v2h-2v-2zm4 0h2v2h-2v-2z"/><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zm0-13H5V6h14v1z"/></svg>') no-repeat center center;
+  filter: none !important;
+  color: white !important;
+  opacity: 1 !important;
 }
 input[type="date"]::-webkit-input-placeholder {
   color: var(--color-text) !important;
@@ -61,5 +64,8 @@ input[type="date"]::placeholder {
 
 /* For Firefox */
 input[type="date"]::-moz-calendar-picker-indicator {
-  filter: invert(1) brightness(2) !important;
+  background: url('data:image/svg+xml;utf8,<svg fill="white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 10h2v2H7v-2zm4 0h2v2h-2v-2zm4 0h2v2h-2v-2z"/><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zm0-13H5V6h14v1z"/></svg>') no-repeat center center;
+  filter: none !important;
+  color: white !important;
+  opacity: 1 !important;
 }

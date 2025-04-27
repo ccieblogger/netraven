@@ -1,27 +1,26 @@
 <template>
-  <div class="container mx-auto p-4">
-    <h1 class="text-2xl font-semibold mb-4">Manage Jobs</h1>
+  <div class="w-full bg-content text-text-primary p-4">
+    <h1 class="text-2xl font-semibold mb-4 text-text-primary">Manage Jobs</h1>
 
-    <!-- Jobs Filter Bar -->
-    <ResourceFilter
-      title="Filter Jobs"
-      :filterFields="filterFields"
-      :initialFilters="filters"
-      @filter="applyFilters"
-      @reset="resetFilters"
-      class="mb-4"
-    />
-
-    <!-- Add Job Button -->
-    <div class="mb-4 text-right">
-      <button @click="openCreateJobModal" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+    <!-- Jobs Filter Bar (Theme-Aligned, Single Search, Flex Aligned) -->
+    <div class="flex flex-row flex-wrap items-center gap-2 mb-2 px-2 bg-card rounded-card border border-divider shadow-md justify-center mx-auto">
+      <ResourceFilter
+        title=""
+        :filterFields="[...filterFields, { name: 'search', label: 'Search', type: 'text', placeholder: 'Search jobs...' }]"
+        :initialFilters="filters"
+        @filter="applyFilters"
+        @reset="resetFilters"
+        class="flex flex-row gap-2 items-center min-w-0 mb-0"
+        style="background:none; box-shadow:none; border:none; padding:0;"
+      />
+      <button @click="openCreateJobModal" class="bg-primary hover:bg-primary-dark text-white font-bold py-1 px-3 rounded whitespace-nowrap ml-2 text-sm h-10 flex items-center">
         + Add Job
       </button>
     </div>
 
     <!-- Loading/Error Indicators -->
     <div v-if="jobStore.isLoading && jobs.length === 0" class="text-center py-4">Loading Jobs...</div>
-    <div v-if="jobStore.error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+    <div v-if="jobStore.error" class="bg-error/10 border border-error text-error px-4 py-3 rounded relative mb-4" role="alert">
        Error loading jobs: {{ jobStore.error }}
     </div>
     <!-- Job Run Status Indicator -->
@@ -31,76 +30,57 @@
        <span v-if="jobStore.runStatus.status === 'failed'">Failed to trigger job {{ jobStore.runStatus.jobId }}: {{ jobStore.runStatus.error }}</span>
     </div>
 
-    <!-- Jobs Table -->
-     <div v-if="jobs.length > 0" class="bg-white shadow-md rounded my-6" :class="{ 'opacity-50': jobStore.isLoading }">
-      <table class="min-w-max w-full table-auto">
+    <!-- Jobs Table (Theme-Aligned, Improved Contrast & Status) -->
+    <div v-if="jobs.length > 0" class="bg-card shadow-md rounded-card mb-4 overflow-x-auto border border-divider">
+      <table class="min-w-max w-full table-auto text-sm">
         <thead>
-          <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
-            <th class="py-3 px-6 text-left">ID</th>
-            <th class="py-3 px-6 text-left">Type</th>
-            <th class="py-3 px-6 text-left">Devices</th>
-            <th class="py-3 px-6 text-left">Status</th>
-            <th class="py-3 px-6 text-left">Duration</th>
-            <th class="py-3 px-6 text-center">Actions</th>
+          <tr class="bg-content text-text-secondary uppercase text-xs leading-tight">
+            <th class="py-2 px-3 text-left">ID</th>
+            <th class="py-2 px-3 text-left">Type</th>
+            <th class="py-2 px-3 text-left">Devices</th>
+            <th class="py-2 px-3 text-left">Status</th>
+            <th class="py-2 px-3 text-left">Duration</th>
+            <th class="py-2 px-3 text-center">Action</th>
           </tr>
         </thead>
-        <tbody class="text-gray-600 text-sm font-light">
-          <tr v-for="job in jobs" :key="job.id" class="border-b border-gray-200 hover:bg-gray-100">
-            <td class="py-3 px-6 text-left whitespace-nowrap">{{ job.id }}</td>
-            <td class="py-3 px-6 text-left">{{ job.job_type || '-' }}</td>
-            <td class="py-3 px-6 text-left">{{ job.devices ? job.devices.length : (job.device_count || '-') }}</td>
-            <td class="py-3 px-6 text-left">
-              <span v-if="job.status === 'success'" class="inline-flex items-center text-green-600">
-                <svg class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                Success
-              </span>
-              <span v-else-if="job.status === 'failed'" class="inline-flex items-center text-red-600">
-                <svg class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                Failed
-              </span>
-              <span v-else-if="job.status === 'running' || job.status === 'queued'" class="inline-flex items-center text-yellow-600">
-                <svg class="h-5 w-5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" /><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" /></svg>
-                {{ job.status.charAt(0).toUpperCase() + job.status.slice(1) }}
-              </span>
-              <span v-else class="inline-flex items-center text-gray-500">
-                <svg class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" /></svg>
-                {{ job.status || '-' }}
+        <tbody class="text-text-primary">
+          <tr v-for="job in jobs" :key="job.id" class="border-b border-divider hover:bg-content/50">
+            <td class="py-2 px-3 whitespace-nowrap">{{ job.id }}</td>
+            <td class="py-2 px-3 whitespace-nowrap">{{ job.job_type || '-' }}</td>
+            <td class="py-2 px-3 whitespace-nowrap">{{ job.devices ? job.devices.length : (job.device_count || '-') }}</td>
+            <td class="py-2 px-3 whitespace-nowrap">
+              <span :class="statusBadgeClass(job.status)" class="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full font-bold text-sm align-middle">
+                <span v-if="job.status === 'success'">
+                  <svg class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                  <span>Success</span>
+                </span>
+                <span v-else-if="job.status === 'failed'">
+                  <svg class="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                  <span>Failed</span>
+                </span>
+                <span v-else-if="job.status === 'running' || job.status === 'queued'">
+                  <svg class="h-4 w-4 text-yellow-300 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" /><path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round" /></svg>
+                  <span>{{ job.status.charAt(0).toUpperCase() + job.status.slice(1) }}</span>
+                </span>
+                <span v-else>
+                  <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" /></svg>
+                  <span>{{ job.status || '-' }}</span>
+                </span>
               </span>
             </td>
-            <td class="py-3 px-6 text-left">{{ formatDuration(job.duration_secs || job.duration) }}</td>
-            <td class="py-3 px-6 text-center">
-              <div class="flex item-center justify-center">
-                 <button @click="runJobNow(job)" title="Run Job Now" class="w-4 mr-2 transform hover:text-green-500 hover:scale-110">
-                    <PlayIcon class="h-4 w-4" />
-                 </button>
-                 <router-link 
-                   :to="`/jobs/${job.id}`" 
-                   title="Monitor Job"
-                   class="w-4 mr-2 transform hover:text-blue-500 hover:scale-110"
-                 >
-                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                   </svg>
-                 </router-link>
-                 <button 
-                    @click="openEditJobModal(job)" 
-                    title="Edit Job" 
-                    class="w-4 mr-2 transform hover:text-purple-500 hover:scale-110"
-                    :disabled="job.is_system_job"
-                    :class="job.is_system_job ? 'opacity-40 cursor-not-allowed' : ''"
-                 >
-                    <PencilIcon class="h-4 w-4" />
-                 </button>
-                 <button 
-                    @click="openDeleteJobModal(job)" 
-                    title="Delete Job" 
-                    class="w-4 mr-2 transform hover:text-red-500 hover:scale-110"
-                    :disabled="job.is_system_job"
-                    :class="job.is_system_job ? 'opacity-40 cursor-not-allowed' : ''"
-                 >
-                    <TrashIcon class="h-4 w-4" />
-                 </button>
-              </div>
+            <td class="py-2 px-3 whitespace-nowrap">{{ formatDuration(job.duration_secs || job.duration) }}</td>
+            <td class="py-2 px-3 text-center whitespace-nowrap">
+              <router-link 
+                :to="`/jobs/${job.id}`" 
+                title="Monitor Job"
+                class="inline-flex items-center justify-center bg-primary/10 hover:bg-primary/20 text-primary font-semibold px-2 py-0.5 rounded-full transition-colors text-xs"
+                aria-label="Monitor Job"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Monitor
+              </router-link>
             </td>
           </tr>
         </tbody>
@@ -199,7 +179,6 @@ const filterFields = [
     { value: 'queued', label: 'Queued' },
   ] },
   { name: 'date', label: 'Date', type: 'date' },
-  { name: 'search', label: 'Search', type: 'text', placeholder: 'Search jobs...' },
 ]
 
 onMounted(() => {
@@ -237,6 +216,17 @@ function formatDuration(seconds) {
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return m > 0 ? `${m} min${m > 1 ? 's' : ''} ${s}s` : `${s}s`
+}
+
+// Add statusBadgeClass helper
+function statusBadgeClass(status) {
+  switch (status) {
+    case 'success': return 'bg-green-100 text-green-800';
+    case 'failed': return 'bg-red-100 text-red-800';
+    case 'running':
+    case 'queued': return 'bg-yellow-100 text-yellow-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
 }
 
 // --- Action Handlers ---
@@ -332,5 +322,17 @@ function resetFilters() {
 </script>
 
 <style scoped>
-/* Add any page-specific styles */
+/* Make the date picker calendar icon white for dark mode */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(2);
+}
+input[type="date"]::-ms-input-placeholder {
+  color: #fff;
+}
+input[type="date"]::-moz-placeholder {
+  color: #fff;
+}
+input[type="date"]::placeholder {
+  color: #fff;
+}
 </style>

@@ -19,7 +19,7 @@
             v-model="filterValues[field.name]"
             type="text"
             :placeholder="field.placeholder || ''"
-            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 border-2 border-red-500"
+            :class="['mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10', field.name === 'search' ? 'border-2 border-red-500' : '']"
           />
           
           <!-- Number input -->
@@ -32,7 +32,7 @@
             :max="field.max"
             :step="field.step || 1"
             :placeholder="field.placeholder || ''"
-            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 border-2 border-red-500"
+            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10"
           />
           
           <!-- Select input -->
@@ -60,7 +60,7 @@
             :id="field.name"
             v-model="filterValues[field.name]"
             type="date"
-            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 border-2 border-red-500"
+            class="mt-1 block w-full rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10"
           />
           
           <!-- Checkbox input -->
