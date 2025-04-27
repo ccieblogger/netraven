@@ -58,7 +58,6 @@ This document outlines the complete architecture for NetRaven, a network device 
         └───────────────────────────┘
 ```
 
-
 NetRaven supports:
 
 1. Retrieval of running configuration and identifying information from network devices (primarily via SSH).
@@ -67,39 +66,76 @@ NetRaven supports:
 4. REST API access for external integrations.
 5. Role-based web UI for inventory management and job monitoring.
 
-The system is installed locally using Python-based services with PostgreSQL and Redis (required for RQ and RQ Scheduler). The directory structure and service boundaries support future containerization but do not require it.
+---
+
+### **Containerized Deployment Model (Critical)**
+
+**NetRaven is designed and supported exclusively as a Docker Compose environment.**  
+All services must be run as containers. Local, bare-metal, or non-containerized operation is not supported.
+
+#### **Required Containers (as defined in `docker-compose.yml`):**
+- **nginx**: Reverse proxy for API and frontend (dev/prod)
+- **frontend**: Vue 3 + Vite + Pinia UI
+- **api**: FastAPI backend (REST API)
+- **worker**: RQ Worker for device communication jobs
+- **postgres**: PostgreSQL 14 database
+- **redis**: Redis 7 for job queue and log streaming
+- **scheduler**: (if separate) RQ Scheduler for job orchestration
+
+All developer and production workflows must use the provided Docker Compose setup.  
+**Do not attempt to run any service outside of Docker.**
+
+---
+
+### Directory Layout (as of this release)
+
+```
+/ (project root)
+├── netraven/      # All backend Python code (api, worker, scheduler, db, config, services, utils)
+├── frontend/      # Vue 3 + Vite + Pinia frontend app
+├── setup/         # Bootstrap and developer scripts
+├── tests/         # Unit, integration, and E2E tests
+├── docker/        # Dockerfiles and container configs (api, nginx, postgres, etc.)
+├── alembic/       # Alembic migration environment (single initial migration only)
+├── docker-compose.yml
+├── docker-compose.prod.yml
+├── pyproject.toml
+├── poetry.lock
+└── ...
+```
+
+---
 
 ### Core Architectural Principles
 
-- **Local Redis Required**: Redis is a core local dependency for job queuing and scheduling. All job execution flows rely on it via RQ and RQ Scheduler.
+- **Container-First**: All services run as containers, orchestrated by Docker Compose.
+- **Local Redis Required**: Redis is a core local dependency for job queuing, scheduling, and log streaming.
 - **Synchronous-First Design**: Synchronous services simplify development and debugging.
 - **Targeted Concurrency**: Uses threads only where concurrency offers clear benefits (e.g., connecting to multiple devices).
 - **Modular Design**: Isolated services for API, job scheduling, communication, and logging.
-- **Detailed Logging**: Per-device and per-job logs with redacted and raw entries.
+- **Detailed Logging**: Unified log model with per-device and per-job logs, supporting both redacted and raw entries.
 - **Secure by Default**: JWT authentication and role-based access controls.
+
+---
 
 ### Core Services
 
 #### 1. API Service (FastAPI - Sync Mode)
-
 - Exposes REST API endpoints for all system functions.
 - JWT-based authentication with role enforcement (admin/user).
-- CRUD for:
-  - Devices
-  - Device groups (tags)
-  - Jobs
-  - Users and roles
+- CRUD for devices, device groups (tags), jobs, users, and roles.
 - Status endpoints for job monitoring.
+- Log endpoints for querying and streaming logs (see Logging section).
 
-#### 2. Device Communication Worker (now Dedicated Container)
-
+#### 2. Device Communication Worker (Dedicated Container)
 - Executes device jobs triggered by scheduler or on demand.
-- Runs as a dedicated Docker container (`worker` service) using RQ Worker.
-- Connects to network devices using **Netmiko**.
+- Runs as a dedicated container using RQ Worker.
+- Connects to network devices using **Netmiko** (and Paramiko for extensibility).
 - Retrieves `show running-config` and basic facts (hostname, serial number).
 - Uses `ThreadPoolExecutor` for concurrent device access (default: 5).
 - Reports logs and results to database.
 - Picks up jobs from the Redis queue and updates job status in the database.
+- Git-based configuration storage is implemented in `netraven/worker/git_writer.py`.
 
 #### 2a. System Jobs (e.g., Reachability)
 - System jobs are created automatically during system installation (e.g., reachability job).
@@ -109,47 +145,54 @@ The system is installed locally using Python-based services with PostgreSQL and 
 - If no devices are associated with the job's tags, the job is marked as `COMPLETED_NO_DEVICES`.
 
 #### 3. Job Scheduler
-
 - Based on **RQ + RQ Scheduler**.
-- Queues and schedules jobs:
-  - One-time
-  - Recurring (daily, weekly, monthly)
-  - With start/end window support
+- Queues and schedules jobs (one-time, recurring, with start/end window support).
 - Triggers device communication jobs in the background.
 
 #### 4. PostgreSQL Database
-
 - Stores all persistent data:
   - Devices, jobs, logs
   - Credentials (encrypted)
   - User accounts and roles
   - System configuration
-- Managed with **SQLAlchemy (sync)** + **Alembic**.
+- Managed with **SQLAlchemy (sync)**.
+- **Alembic is used only for the initial schema setup** (single migration file, no legacy migrations).
 
-#### 5. Frontend UI (Vue 3 + Vite)
+#### 5. Frontend UI
+- Directory: `/frontend/` (Vue 3 + Vite + Pinia + TailwindCSS)
+- Integrates via REST API
+- For UI component and workflow details, see [`/docs/source_of_truth/frontend_sot.md`](../source_of_truth/frontend_sot.md)
 
-- Built with Vue 3 using Vite, Pinia, and TailwindCSS for a responsive, component-based user experience.
-- Integrates via REST API.
-- Supports:
-  - Device inventory views
-  - Job creation and monitoring
-  - User settings and preferences
-  - Git-based configuration diff viewer
-  - Real-time job progress per device
-  - Log inspection
+#### 6. Configuration Loader
+- Module: `netraven/config/loader.py`
+- Loads configuration in order:
+  1. Environment variables
+  2. Database values
+  3. YAML files in `/netraven/config/`
+- Exposes uniform API for all components
 
-#### Logging & Log Endpoints
+#### 7. Service & Utilities
+- `netraven/services/`: domain-level services (credential resolution, job dispatch, health checks)
+- `netraven/utils/`: shared utilities (logging helpers, redaction, retry logic, validation)
 
-NetRaven separates logging into two distinct types, each with its own API endpoint and UI page:
+---
 
-- **Job Logs** (`/job-logs/`): Logs related to job execution events, such as job progress, errors, and status changes. These logs are filterable by job ID, device ID, and log level. Exposed via a dedicated FastAPI endpoint and a dedicated UI page/tab.
-- **Connection Logs** (`/connection-logs/`): Logs capturing raw output and metadata from device connection attempts (e.g., SSH/API sessions). These are filterable by job ID and device ID. Exposed via a separate FastAPI endpoint and UI page/tab.
+### Logging & Log Endpoints
 
-This separation improves clarity, maintainability, and user experience by allowing users to focus on the type of log relevant to their task. Each log type has its own schema, filters, and pagination, and the frontend navigation provides direct access to both log types.
+NetRaven uses a **unified log model** for all log events (job, connection, session, system, etc.), with a `log_type` field to distinguish log categories. All logs are stored in a single `logs` table and exposed via a unified set of API endpoints:
+
+- `GET /logs/` — List logs with flexible filters (job_id, device_id, log_type, level, source, time range, pagination)
+- `GET /logs/{log_id}` — Retrieve a single log entry by ID
+- `GET /logs/types` — List available log types
+- `GET /logs/levels` — List available log levels
+- `GET /logs/stats` — Get log statistics (total, by type, by level, last log time)
+- `GET /logs/stream` — Stream real-time log events via Server-Sent Events (SSE) using Redis pub/sub
+
+---
 
 ### Device Communication
 
-- Primary protocol: **SSH via Netmiko**
+- Primary protocol: **SSH via Netmiko** (with Paramiko as a backend option)
 - Vendor extensibility via Netmiko platform mapping
 - Device grouping (tags) determines credential selection
 - Detailed logs include:
@@ -158,11 +201,15 @@ This separation improves clarity, maintainability, and user experience by allowi
   - Unreachable device errors
   - Output with sensitive line redaction
 
+---
+
 ### Authentication & Authorization
 
 - JWT-based access for both API and UI users
 - Admin and user roles
 - Users can be assigned visibility to specific device groups
+
+---
 
 ### Configuration Management
 
@@ -171,6 +218,8 @@ This separation improves clarity, maintainability, and user experience by allowi
   2. Admin-set values from DB
   3. YAML files in `/netraven/config/`
 - All components read configuration via a common loader
+
+---
 
 ### Git Integration
 
@@ -181,39 +230,9 @@ NetRaven uses a local Git repository as the versioned storage backend for device
 - Git provides built-in versioning, rollback, and readable diffs to show changes between snapshots.
 - The Git repository is stored in a dedicated project folder (e.g., `/data/git-repo/`) and initialized on first use.
 - GitPython is used to interface with the repository programmatically.
+- Git logic is implemented in `netraven/worker/git_writer.py`.
 
-This design avoids the need for an external version control system while ensuring historical tracking and auditability of all config changes. It also complements the relational database, which stores job metadata and connection logs.
-
-### Deployment
-
-#### Required Services:
-- **PostgreSQL 14**: For all persistent storage
-- **Redis 7**: Required for RQ job queuing and RQ Scheduler
-
-These are installed locally via setup scripts. Containerization is optional and not used by default.
-
-
-NetRaven uses a monorepo structure and is designed for local installation using Python with [Poetry](https://python-poetry.org/) for dependency management. All services share a unified environment and can be run individually using developer scripts.
-
-- PostgreSQL 14 and Redis 7 are installed locally using scripts provided in the `/setup/` directory. Containerization is not required and not used by default
-- Developer runner scripts for DB schema creation, job execution, and job debugging live in `/setup/`
-- Each service lives under the `netraven/` namespace and is importable as `netraven.api`, `netraven.worker`, etc.
-- The root `pyproject.toml` file governs dependencies across the system
-
-```
-/netraven/
-├── api/          # FastAPI service
-├── worker/       # Device command execution logic
-├── scheduler/    # RQ-based job scheduler
-├── db/           # SQLAlchemy models and session mgmt
-├── config/       # YAML and env-based config
-├── git/          # Git commit logic
-├── frontend/     # React app (built separately)
-├── setup/        # Developer runners and bootstrap scripts
-├── tests/        # Tests organized by feature
-├── pyproject.toml
-└── poetry.lock
-```
+---
 
 ### Testing Strategy
 
@@ -229,5 +248,7 @@ NetRaven uses a monorepo structure and is designed for local installation using 
 - Jobs are created via the API or automatically (system jobs).
 - Jobs are enqueued in Redis and picked up by the dedicated worker container.
 - The worker updates job status (`QUEUED` → `RUNNING` → `COMPLETED`/`FAILED`/`COMPLETED_NO_DEVICES`).
-- Job logs and connection logs are written to the database for UI consumption.
+- Job logs and connection logs are written to the database for UI consumption, differentiated by `log_type`.
 - System jobs are protected from deletion and have special status handling in the UI and backend.
+
+---
