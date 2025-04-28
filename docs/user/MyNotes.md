@@ -34,3 +34,9 @@ docker logs netraven-worker-dev 2>&1 | grep UnifiedLogger
 
 # Grepping container logs with tail
 docker logs -f netraven-worker-dev 2>&1 | grep UnifiedLogger
+
+
+# Worker container commands
+rq info --url redis://redis:6379/0
+
+docker exec netraven-worker-dev rq info --url redis://redis:6379/0

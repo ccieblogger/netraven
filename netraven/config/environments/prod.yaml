@@ -35,7 +35,7 @@ worker:
 logging:
   # Default logging level for the application
   # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
-  level: INFO
+  level: DEBUG
   redis:
     enabled: true
     host: redis
@@ -43,6 +43,11 @@ logging:
     db: 0
     password: null
     channel_prefix: netraven-logs
+  db:
+    enabled: true
+  stdout:
+    enabled: true
+    level: INFO
 
 # API Service specific settings
 api:

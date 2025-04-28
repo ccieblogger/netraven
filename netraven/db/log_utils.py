@@ -29,6 +29,7 @@ def save_log(
         db.add(entry)
         db.commit()
     except Exception as e:
+        print(f"[LOGGER EXCEPTION] {e}")
         db.rollback()
         raise
     finally:
