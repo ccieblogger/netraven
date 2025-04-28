@@ -13,6 +13,7 @@ RUN apt-get update && \
     git \
     redis-tools \
     procps \
+    iputils-ping \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
