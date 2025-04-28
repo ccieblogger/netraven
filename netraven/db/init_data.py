@@ -327,7 +327,10 @@ def associate_default_credential_with_default_tag(db):
 def create_system_reachability_job(db):
     """Create the system reachability job if it doesn't exist, associated with the default tag."""
     # Check for existing job
-    job = db.query(Job).filter(Job.name == "system-reachability", Job.is_system_job == True).first()
+    job = db.query(Job).filter(Job.name == "system-reachability", 
+                               Job.is_system_job == True, 
+                               Job.schedule_type == 'interval', 
+                               Job.interval_seconds == 3600).first()
     if job:
         logger.log(
             f"System reachability job already exists with ID: {job.id}",
@@ -352,6 +355,8 @@ def create_system_reachability_job(db):
         description="System job: checks device reachability via ICMP and TCP.",
         job_type="reachability",
         is_enabled=True,
+        schedule_type="interval",
+        interval_seconds=3600,
         is_system_job=True,
         tags=[default_tag]
     )
