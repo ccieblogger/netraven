@@ -28,6 +28,11 @@ def get_logger_config():
     env_dest = os.getenv("NETRAVEN_LOG_DESTINATIONS")
     if env_dest:
         config["destinations"] = [d.strip() for d in env_dest.split(",")]
+    env_file_path = os.getenv("NETRAVEN_LOGGING__FILE__PATH")
+    if env_file_path:
+        if "file" not in config:
+            config["file"] = {}
+        config["file"]["path"] = env_file_path
     # Fallback defaults
     if "level" not in config:
         config["level"] = "INFO"

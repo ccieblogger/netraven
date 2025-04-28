@@ -223,7 +223,7 @@ class ErrorInfo:
         logger.log(
             msg,
             level=logging.getLevelName(self.log_level),
-            destinations=["stdout", "db"],
+            destinations=["stdout", "file", "db"],
             job_id=job_id,
             device_id=device_id,
             source="error_handler",

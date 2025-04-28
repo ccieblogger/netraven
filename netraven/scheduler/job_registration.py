@@ -26,7 +26,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
     logger.log(
         "Starting job synchronization from database...",
         level="DEBUG",
-        destinations=["stdout"],
+        destinations=["stdout", "file"],
         source="scheduler_job_registration",
     )
     db: Session | None = None
@@ -36,7 +36,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
         logger.log(
             f"Found {len(jobs_to_schedule)} enabled jobs in DB.",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="scheduler_job_registration",
         )
 
@@ -48,7 +48,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
         logger.log(
             f"{len(existing_rq_job_ids)} jobs currently in RQ-Scheduler.",
             level="DEBUG",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="scheduler_job_registration",
         )
 
@@ -68,7 +68,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                 logger.log(
                     f"Job already scheduled in RQ-Scheduler, skipping. {job_log_details}",
                     level="DEBUG",
-                    destinations=["stdout"],
+                    destinations=["stdout", "file"],
                     source="scheduler_job_registration",
                 )
                 skipped_count += 1
@@ -80,7 +80,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                     logger.log(
                         f"Job is disabled, skipping. {job_log_details}",
                         level="DEBUG",
-                        destinations=["stdout"],
+                        destinations=["stdout", "file"],
                         source="scheduler_job_registration",
                     )
                     skipped_count += 1
@@ -100,7 +100,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                     logger.log(
                         f"Scheduled interval job '{db_job.name}' (interval: {db_job.interval_seconds}s)",
                         level="INFO",
-                        destinations=["stdout", "db"],
+                        destinations=["stdout", "file", "db"],
                         job_id=db_job.id,
                         source="scheduler_job_registration",
                     )
@@ -119,7 +119,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                     logger.log(
                         f"Scheduled cron job '{db_job.name}' (cron: {db_job.cron_string})",
                         level="INFO",
-                        destinations=["stdout", "db"],
+                        destinations=["stdout", "file", "db"],
                         job_id=db_job.id,
                         source="scheduler_job_registration",
                     )
@@ -140,7 +140,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                         logger.log(
                             f"Scheduled one-time job '{db_job.name}' for {run_time}",
                             level="INFO",
-                            destinations=["stdout", "db"],
+                            destinations=["stdout", "file", "db"],
                             job_id=db_job.id,
                             source="scheduler_job_registration",
                         )
@@ -149,7 +149,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                         logger.log(
                             f"One-time job '{db_job.name}' scheduled in the past for {run_time}, skipping",
                             level="WARNING",
-                            destinations=["stdout", "db"],
+                            destinations=["stdout", "file", "db"],
                             job_id=db_job.id,
                             source="scheduler_job_registration",
                         )
@@ -159,7 +159,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                     logger.log(
                         f"Job '{db_job.name}' has no valid schedule type/params, skipping",
                         level="WARNING",
-                        destinations=["stdout", "db"],
+                        destinations=["stdout", "file", "db"],
                         job_id=db_job.id,
                         source="scheduler_job_registration",
                     )
@@ -169,7 +169,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                 logger.log(
                     f"Failed to schedule job '{db_job.name}': {schedule_e}",
                     level="ERROR",
-                    destinations=["stdout", "db"],
+                    destinations=["stdout", "file", "db"],
                     job_id=db_job.id,
                     source="scheduler_job_registration",
                 )
@@ -178,7 +178,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
         logger.log(
             f"Finished job synchronization. Total enabled: {len(jobs_to_schedule)}, newly scheduled: {scheduled_count}, skipped: {skipped_count}, errors: {error_count}",
             level="INFO",
-            destinations=["stdout", "db"],
+            destinations=["stdout", "file", "db"],
             source="scheduler_job_registration",
         )
 
@@ -186,7 +186,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
         logger.log(
             f"Error during database query or setup: {e}",
             level="ERROR",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="scheduler_job_registration",
         )
     finally:
@@ -195,6 +195,6 @@ def sync_jobs_from_db(scheduler: Scheduler):
             logger.log(
                 "Database session closed.",
                 level="DEBUG",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="scheduler_job_registration",
             )

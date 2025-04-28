@@ -23,6 +23,10 @@ curl -s http://localhost:8000/jobs/status \
 curl -X GET "http://localhost:8000/job-logs/" \
   -H "Authorization: Bearer $TOKEN" | jq . 
 
+# LIst Jobs
+  curl -X GET "http://localhost:8000/jobs/" \
+    -H "Authorization: Bearer $TOKEN" | jq .
+
 # Use the token to query log stream
    curl -H "Authorization: Bearer $TOKEN" http://localhost/api/logs/stream
    curl -i -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/logs/stream?job_id=1

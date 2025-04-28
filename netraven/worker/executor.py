@@ -86,10 +86,10 @@ def reachability_handler(device, job_id, config, db):
     logger.log(
         f"Entered reachability_handler for job_id={job_id}, device_id={getattr(device, 'id', None)}",
         level="INFO",
-        destinations=["stdout", "db"],
+        destinations=["stdout", "file", "db"],
         job_id=job_id,
         device_id=getattr(device, 'id', None),
-        source="executor",
+        source="worker_executor",
     )
     device_ip = getattr(device, 'ip_address', None)
     result = {
@@ -133,19 +133,19 @@ def reachability_handler(device, job_id, config, db):
             logger.log(
                 "Reachability check completed successfully.",
                 level="INFO",
-                destinations=["stdout", "db"],
+                destinations=["stdout", "file", "db"],
                 job_id=job_id,
                 device_id=device_id,
-                source="executor",
+                source="worker_executor",
                 log_type="job"
             )
             logger.log(
                 "save_job_log (success) completed for job_id={job_id}, device_id={device_id}",
                 level="INFO",
-                destinations=["stdout", "db"],
+                destinations=["stdout", "file", "db"],
                 job_id=job_id,
                 device_id=device_id,
-                source="executor",
+                source="worker_executor",
                 log_type="job"
             )
         else:
@@ -159,29 +159,29 @@ def reachability_handler(device, job_id, config, db):
             logger.log(
                 msg,
                 level="WARNING",
-                destinations=["stdout", "db"],
+                destinations=["stdout", "file", "db"],
                 job_id=job_id,
                 device_id=device_id,
-                source="executor",
+                source="worker_executor",
                 log_type="job"
             )
             logger.log(
                 "save_job_log (failure) completed for job_id={job_id}, device_id={device_id}",
                 level="INFO",
-                destinations=["stdout", "db"],
+                destinations=["stdout", "file", "db"],
                 job_id=job_id,
                 device_id=device_id,
-                source="executor",
+                source="worker_executor",
                 log_type="job"
             )
     except Exception as log_exc:
         logger.log(
             f"Exception in reachability logging for job_id={job_id}, device_id={device_id}: {log_exc}",
             level="ERROR",
-            destinations=["stdout", "db"],
+            destinations=["stdout", "file", "db"],
             job_id=job_id,
             device_id=device_id,
-            source="executor",
+            source="worker_executor",
             log_type="job"
         )
     return result
@@ -210,25 +210,25 @@ def handle_device(
     logger.log(
         f"handle_device called for job_id={job_id}, resolved job_type={job_type}",
         level="INFO",
-        destinations=["stdout", "db"],
+        destinations=["stdout", "file", "db"],
         job_id=job_id,
-        source="executor",
+        source="worker_executor",
     )
     handler = JOB_TYPE_HANDLERS.get(job_type)
     if handler is None:
         logger.log(
             f"No handler registered for job type: {job_type}",
             level="ERROR",
-            destinations=["stdout", "db"],
+            destinations=["stdout", "file", "db"],
             job_id=job_id,
-            source="executor",
+            source="worker_executor",
         )
         raise ValueError(f"No handler registered for job type: {job_type}")
     logger.log(
         f"Dispatching job_id={job_id} (type={job_type}) to handler: {handler.__name__}",
         level="INFO",
-        destinations=["stdout", "db"],
+        destinations=["stdout", "file", "db"],
         job_id=job_id,
-        source="executor",
+        source="worker_executor",
     )
     return handler(device, job_id, config, db)

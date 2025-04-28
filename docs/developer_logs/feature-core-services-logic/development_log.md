@@ -266,4 +266,49 @@
 
 **Outcome:** All 4 tests in `tests/worker/test_runner_integration.py` now pass successfully.
 
---- 
+---
+
+## [2025-04-28] Containerized Worker & Scheduler Logging (Dev & Prod)
+
+### Summary
+- Added `worker` and `scheduler` services to both `docker-compose.yml` (dev) and `docker-compose.prod.yml` (prod).
+- Each service now has its own log file path override via `NETRAVEN_LOGGING__FILE__PATH` environment variable:
+  - Worker: `/data/logs/worker/worker.log`
+  - Scheduler: `/data/logs/scheduler/scheduler.log`
+- Host log directories are mounted for persistent log access.
+- Healthchecks added for both services:
+  - Worker: checks RQ worker process
+  - Scheduler: checks scheduler runner process
+
+### Rationale
+- Ensures all core services (API, worker, scheduler) have persistent, accessible file logs in both dev and prod.
+- Enables easier debugging, monitoring, and log collection.
+- Healthchecks improve container orchestration and reliability.
+
+### Verification Steps
+1. Build and start services:
+   ```bash
+   docker-compose up -d worker scheduler
+   docker-compose -f docker-compose.prod.yml up -d worker scheduler
+   ```
+2. Check logs on host:
+   ```bash
+   ls -l ./host-logs/netraven/worker
+   ls -l ./host-logs/netraven/scheduler
+   ```
+3. Check container health:
+   ```bash
+   docker ps
+   # STATUS should show (healthy) for both worker and scheduler
+   ```
+4. Check logs in containers:
+   ```bash
+   docker logs netraven-worker-dev
+   docker logs netraven-scheduler-dev
+   docker logs netraven-worker-prod
+   docker logs netraven-scheduler-prod
+   ```
+
+### Notes
+- All log file paths are now consistent and configurable via environment variables.
+- No need for per-service config files; a single config with env overrides is used. 

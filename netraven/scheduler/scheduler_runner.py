@@ -23,7 +23,7 @@ if __name__ == "__main__":
     logger.log(
         f"Starting NetRaven Scheduler",
         level="INFO",
-        destinations=["stdout"],
+        destinations=["stdout", "file"],
         source="scheduler_runner",
         extra={"redis_url": redis_url, "poll_interval": polling_interval},
     )
@@ -34,7 +34,7 @@ if __name__ == "__main__":
         logger.log(
             "Successfully connected to Redis.",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="scheduler_runner",
         )
         scheduler = Scheduler(connection=redis_conn)
@@ -42,7 +42,7 @@ if __name__ == "__main__":
         logger.log(
             f"Failed to connect to Redis or initialize scheduler: {e}",
             level="ERROR",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="scheduler_runner",
             extra={"redis_url": redis_url},
         )
@@ -52,7 +52,7 @@ if __name__ == "__main__":
         logger.log(
             "Scheduler polling for jobs...",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="scheduler_runner",
         )
         try:
@@ -61,21 +61,21 @@ if __name__ == "__main__":
             logger.log(
                 "Job sync process completed.",
                 level="DEBUG",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="scheduler_runner",
             )
         except Exception as e:
             logger.log(
                 f"Error during job synchronization: {e}",
                 level="ERROR",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="scheduler_runner",
             )
 
         logger.log(
             f"Scheduler sleeping for {polling_interval} seconds.",
             level="DEBUG",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="scheduler_runner",
         )
         time.sleep(polling_interval)

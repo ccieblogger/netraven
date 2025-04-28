@@ -96,6 +96,54 @@ services:
           cpus: '0.5'
           memory: 256M
 
+  worker:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile.prod
+    container_name: netraven-worker-prod
+    entrypoint: ["/app/docker/api/entrypoint.sh", "worker"]
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - NETRAVEN_ENV=prod
+      - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
+      - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
+      - NETRAVEN_LOGGING__FILE__PATH=/data/logs/worker/worker.log
+    volumes:
+      - ./host-logs/netraven/worker:/data/logs/worker
+    healthcheck:
+      test: ["CMD", "/app/worker_healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile.prod
+    container_name: netraven-scheduler-prod
+    entrypoint: ["/app/docker/api/entrypoint.sh", "scheduler"]
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - NETRAVEN_ENV=prod
+      - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
+      - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
+      - NETRAVEN_LOGGING__FILE__PATH=/data/logs/scheduler/scheduler.log
+    volumes:
+      - ./host-logs/netraven/scheduler:/data/logs/scheduler
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "netraven.scheduler.scheduler_runner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
 volumes:
   postgres-data-prod:
   redis-data-prod:

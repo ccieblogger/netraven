@@ -77,4 +77,17 @@ This log will be updated as development progresses on this feature branch.
 - Updated logging config schema and documentation to support `host`, `port`, `db`, and `password` for Redis.
 - UnifiedLogger now initializes the Redis client using these config options, defaulting `host` to `redis` for Docker Compose container-to-container communication.
 - Example config and environment variable overrides are provided in the reference architecture.
-- To verify: ensure all containers use `host: redis` and that logs are published to the correct Redis channel. Use `redis-cli` in the container to `SUBSCRIBE netraven-logs` and observe log messages. 
+- To verify: ensure all containers use `host: redis` and that logs are published to the correct Redis channel. Use `redis-cli` in the container to `SUBSCRIBE netraven-logs` and observe log messages.
+
+---
+
+## Update: Per-Service File Logging via Environment Variable (2025-04-28)
+- Patched `get_logger_config()` in `netraven/config/logger_config.py` to support the `NETRAVEN_LOGGING__FILE__PATH` environment variable.
+- This allows each service (API, worker, scheduler) to write logs to its own file, as configured in Docker Compose.
+- Verified that log files are now created and written to in both the container and host directories for worker and scheduler.
+- This resolves the previous issue where all services wrote to the API log file by default.
+- Example log file paths:
+  - Worker: `/data/logs/worker/worker.log` (container), `./host-logs/netraven/worker/worker.log` (host)
+  - Scheduler: `/data/logs/scheduler/scheduler.log` (container), `./host-logs/netraven/scheduler/scheduler.log` (host)
+  - API: `/data/logs/api/api.log` (container), `./host-logs/netraven/api/api.log` (host)
+- Next: Monitor for log rotation and aggregation needs as deployment scales. 

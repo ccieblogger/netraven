@@ -92,7 +92,7 @@ def create_admin_user(db):
         logger.log(
             f"Admin user '{DEFAULT_ADMIN['username']}' already exists with ID: {existing_admin.id}",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="db_init_data",
         )
         return existing_admin
@@ -113,7 +113,7 @@ def create_admin_user(db):
     logger.log(
         f"Admin user '{DEFAULT_ADMIN['username']}' created with ID: {new_admin.id}",
         level="INFO",
-        destinations=["stdout"],
+        destinations=["stdout", "file"],
         source="db_init_data",
     )
     
@@ -130,7 +130,7 @@ def create_default_tags(db):
             logger.log(
                 f"Tag '{tag_data['name']}' already exists with ID: {existing_tag.id}",
                 level="INFO",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="db_init_data",
             )
             created_tags.append(existing_tag)
@@ -147,7 +147,7 @@ def create_default_tags(db):
         logger.log(
             f"Tag '{tag_data['name']}' created with ID: {new_tag.id}",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="db_init_data",
         )
         created_tags.append(new_tag)
@@ -169,7 +169,7 @@ def create_default_credentials(db):
                 logger.log(
                     f"Credential with username '{cred_data['username']}' already exists with ID: {result[0]}",
                     level="INFO",
-                    destinations=["stdout"],
+                    destinations=["stdout", "file"],
                     source="db_init_data",
                 )
                 # Skip to next credential
@@ -197,7 +197,7 @@ def create_default_credentials(db):
             logger.log(
                 f"System credential '{cred_data['username']}' created with ID: {new_cred.id}",
                 level="INFO",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="db_init_data",
             )
             created_credentials.append(new_cred)
@@ -206,7 +206,7 @@ def create_default_credentials(db):
             logger.log(
                 f"Error creating credential: {e}",
                 level="ERROR",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="db_init_data",
             )
             # Continue with other credentials
@@ -224,7 +224,7 @@ def associate_default_tag_with_devices(db):
             logger.log(
                 "Default tag not found, cannot associate with devices",
                 level="WARNING",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="db_init_data",
             )
             return
@@ -240,7 +240,7 @@ def associate_default_tag_with_devices(db):
             logger.log(
                 "All existing devices already have the default tag",
                 level="INFO",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="db_init_data",
             )
             return
@@ -251,7 +251,7 @@ def associate_default_tag_with_devices(db):
             logger.log(
                 f"Associated default tag with device: {device.hostname}",
                 level="INFO",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="db_init_data",
             )
         
@@ -259,14 +259,14 @@ def associate_default_tag_with_devices(db):
         logger.log(
             f"Default tag associated with {len(devices_without_tag)} device(s)",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="db_init_data",
         )
     except Exception as e:
         logger.log(
             f"Error associating default tag with devices: {e}",
             level="ERROR",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="db_init_data",
         )
 
@@ -279,7 +279,7 @@ def associate_default_credential_with_default_tag(db):
             logger.log(
                 "Default tag not found, cannot associate with credential",
                 level="WARNING",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="db_init_data",
             )
             return
@@ -290,7 +290,7 @@ def associate_default_credential_with_default_tag(db):
             logger.log(
                 "Default credential not found, cannot associate with tag",
                 level="WARNING",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="db_init_data",
             )
             return
@@ -300,7 +300,7 @@ def associate_default_credential_with_default_tag(db):
             logger.log(
                 "Default credential is already associated with default tag",
                 level="INFO",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="db_init_data",
             )
             return
@@ -312,14 +312,14 @@ def associate_default_credential_with_default_tag(db):
         logger.log(
             f"Successfully associated default credential (ID: {default_cred.id}) with default tag (ID: {default_tag.id})",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="db_init_data",
         )
     except Exception as e:
         logger.log(
             f"Error associating default credential with default tag: {e}",
             level="ERROR",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="db_init_data",
         )
         db.rollback()
@@ -332,7 +332,7 @@ def create_system_reachability_job(db):
         logger.log(
             f"System reachability job already exists with ID: {job.id}",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="db_init_data",
         )
         return job
@@ -342,7 +342,7 @@ def create_system_reachability_job(db):
         logger.log(
             "Default tag not found, cannot create system reachability job",
             level="WARNING",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="db_init_data",
         )
         return None
@@ -361,7 +361,7 @@ def create_system_reachability_job(db):
     logger.log(
         f"System reachability job created with ID: {job.id}",
         level="INFO",
-        destinations=["stdout"],
+        destinations=["stdout", "file"],
         source="db_init_data",
     )
     return job

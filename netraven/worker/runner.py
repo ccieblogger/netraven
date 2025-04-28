@@ -162,7 +162,13 @@ def log_runner_error(job_id: int, message: str, db: Session, error_type: str = "
         db.add(entry)
         # db.commit() # REMOVED - handled by caller or session context
     except Exception as log_e:
-        logger.log(f"[Job: {job_id}] CRITICAL: Failed to save runner error to job log: {log_e}", level="ERROR", destinations=["stdout", "db"], source="runner", job_id=job_id)
+        logger.log(
+            f"[Job: {job_id}] CRITICAL: Failed to save runner error to job log: {log_e}",
+            level="ERROR",
+            destinations=["stdout", "file", "db"],
+            source="runner",
+            job_id=job_id
+        )
 
 def record_credential_resolution_metrics(
     job_id: int,

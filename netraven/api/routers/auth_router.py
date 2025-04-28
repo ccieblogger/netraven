@@ -46,7 +46,7 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
         logger.log(
             f"Authentication failed: User not found: {username}",
             level="WARNING",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="auth_router",
         )
         return None
@@ -55,19 +55,19 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
     logger.log(
         f"Attempting password verification for user: {username}",
         level="INFO",
-        destinations=["stdout"],
+        destinations=["stdout", "file"],
         source="auth_router",
     )
     logger.log(
         f"Password provided length: {len(password)}",
         level="DEBUG",
-        destinations=["stdout"],
+        destinations=["stdout", "file"],
         source="auth_router",
     )
     logger.log(
         f"Stored hash: {user.hashed_password[:10]}...",
         level="DEBUG",
-        destinations=["stdout"],
+        destinations=["stdout", "file"],
         source="auth_router",
     )
     
@@ -75,7 +75,7 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
         logger.log(
             f"Authentication failed: Invalid password for user: {username}",
             level="WARNING",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="auth_router",
         )
         return None
@@ -83,7 +83,7 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
     logger.log(
         f"Authentication successful for user: {username}",
         level="INFO",
-        destinations=["stdout"],
+        destinations=["stdout", "file"],
         source="auth_router",
     )
     return user
@@ -117,7 +117,7 @@ async def login_for_access_token(
         logger.log(
             f"Login attempt for user: {form_data.username}",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="auth_router",
         )
         user = authenticate_user(db, form_data.username, form_data.password)
@@ -132,7 +132,7 @@ async def login_for_access_token(
             logger.log(
                 f"Login attempt for inactive user: {form_data.username}",
                 level="WARNING",
-                destinations=["stdout"],
+                destinations=["stdout", "file"],
                 source="auth_router",
             )
             raise HTTPException(
@@ -147,7 +147,7 @@ async def login_for_access_token(
         logger.log(
             f"Token generated successfully for user: {form_data.username}",
             level="INFO",
-            destinations=["stdout"],
+            destinations=["stdout", "file"],
             source="auth_router",
         )
         return {"access_token": access_token, "token_type": "bearer"}

@@ -25,6 +25,10 @@ if [ "$1" = "worker" ]; then
   shift
   echo "Starting RQ worker..."
   exec poetry run rq worker --url redis://redis:6379/0 "$@"
+elif [ "$1" = "scheduler" ]; then
+  shift
+  echo "Starting Scheduler..."
+  exec poetry run python -m netraven.scheduler.scheduler_runner "$@"
 else
   echo "Starting API server..."
   exec poetry run uvicorn netraven.api.main:app --host 0.0.0.0 --port 8000 ${API_ARGS:-"--reload"}

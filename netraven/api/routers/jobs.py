@@ -475,10 +475,9 @@ try:
     redis_conn = Redis.from_url(redis_url)
     rq_queue = Queue(connection=redis_conn)
     redis_conn.ping() # Check connection
-    print("Successfully connected to Redis for RQ.")
+    logger.log("Successfully connected to Redis for RQ.", level="INFO", destinations=["stdout", "file"], source="jobs_router")
 except Exception as e:
-    print(f"ERROR: Could not connect to Redis at {redis_url} for RQ. Job trigger endpoint will fail.")
-    print(f"Error details: {e}")
+    logger.log(f"ERROR: Could not connect to Redis at {redis_url} for RQ. Job trigger endpoint will fail.", level="ERROR", destinations=["stdout", "file"], source="jobs_router")
     # Set queue to None or handle differently so endpoint fails gracefully
     rq_queue = None 
 
