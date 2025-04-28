@@ -48,6 +48,18 @@ logging:
   stdout:
     enabled: true
     level: DEBUG
+  file:
+    enabled: true
+    # The path will be interpreted relative to the container, so each service will use its own config or override as needed
+    # For api container:
+    path: /data/logs/api/api.log
+    # For worker container, override to /data/logs/worker/worker.log via env or config if needed
+    level: INFO
+    format: json
+    rotation:
+      when: midnight
+      interval: 1
+      backupCount: 7
 
 # API Service specific settings (placeholders)
 api:

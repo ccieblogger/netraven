@@ -61,6 +61,8 @@ services:
     volumes:
       # Mount source code for live updates
       - .:/app
+      # Mount host log directory for file-based logging
+      - ./host-logs/netraven/api:/data/logs/api
     env_file:
       - .env.dev
     environment:
@@ -138,6 +140,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    # Mount host log directory for file-based logging
+    volumes:
+      - ./host-logs/netraven/worker:/data/logs/worker
 
 volumes:
   frontend-node-modules:
