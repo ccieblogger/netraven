@@ -54,7 +54,7 @@ logging:
     # For api container:
     path: /data/logs/api/api.log
     # For worker container, override to /data/logs/worker/worker.log via env or config if needed
-    level: INFO
+    level: DEBUG
     format: json
     rotation:
       when: midnight

@@ -24,9 +24,13 @@ import logging
 import time
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
+from netraven.utils.unified_logger import get_unified_logger
 
 # Configure logging
 log = logging.getLogger(__name__)
+
+# Configure logging
+logger = get_unified_logger()
 
 # Define standard command to run
 COMMAND_SHOW_RUN = "show running-config"
@@ -89,6 +93,14 @@ def run_command(
         identifying slow network devices or commands.
     """
     print(f"[DEBUG netmiko_driver] REAL run_command CALLED: device={getattr(device, 'hostname', None)}, username={getattr(device, 'username', None)}, job_id={job_id}")
+    logger.log(
+        f"Netmiko runner initialized for job_id={job_id}, device_name={getattr(device, 'hostname', None)}",
+        level="INFO",
+        destinations=["stdout", "file", "db"],
+        job_id=job_id,
+        device_id=getattr(device, 'id', None),
+        source="netmiko_driver",
+    )
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
     device_ip = getattr(device, 'ip_address', 'Unknown')

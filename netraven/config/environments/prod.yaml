@@ -47,7 +47,7 @@ logging:
     enabled: true
   stdout:
     enabled: true
-    level: INFO
+    level: DEBUG
   file:
     enabled: true
     # The path will be interpreted relative to the container, so each service will use its own config or override as needed

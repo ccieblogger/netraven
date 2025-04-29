@@ -123,7 +123,7 @@ services:
       context: .
       dockerfile: docker/api/Dockerfile.dev
     container_name: netraven-worker-dev
-    entrypoint: ["/app/docker/api/entrypoint.sh", "worker"]
+    entrypoint: ["/app/docker/worker/entrypoint.sh"]
     depends_on:
       - redis
       - postgres
@@ -150,7 +150,7 @@ services:
       context: .
       dockerfile: docker/api/Dockerfile.dev
     container_name: netraven-scheduler-dev
-    entrypoint: ["/app/docker/api/entrypoint.sh", "scheduler"]
+    entrypoint: ["/app/docker/scheduler/entrypoint.sh"]
     depends_on:
       - redis
       - postgres

@@ -34,8 +34,10 @@ RUN poetry install --no-interaction --no-ansi --no-root --with dev
 # Copy the rest of the application code
 COPY . .
 
-# Make the entrypoint script executable
-RUN chmod +x /app/docker/api/entrypoint.sh
+# Make the entrypoint scripts executable
+RUN chmod +x /app/docker/api/entrypoint.sh \
+    && chmod +x /app/docker/worker/entrypoint.sh \
+    && chmod +x /app/docker/scheduler/entrypoint.sh
 
 # Copy the healthcheck script for the worker container
 COPY docker/api/worker_healthcheck.sh /app/worker_healthcheck.sh
@@ -48,5 +50,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Use the entrypoint script
+# Default entrypoint is for API. Override in docker-compose for worker/scheduler.
 ENTRYPOINT ["/app/docker/api/entrypoint.sh"] 
