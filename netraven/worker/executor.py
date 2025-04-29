@@ -104,7 +104,7 @@ def reachability_handler(device, job_id, config, db):
     # ICMP Ping
     try:
         logger.log(
-            f"Executing ping with IP Addresss {device_ip} for hostname={getattr(device, 'hostname', None)}, device_id={getattr(device, 'id', None)}",
+            f"Attempting to ping device at {device_ip} hostname={getattr(device, 'hostname', None)}, device_id={getattr(device, 'id', None)}",
             level="INFO",
             destinations=["stdout", "file", "db"],
             job_id=job_id,
