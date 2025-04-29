@@ -93,7 +93,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                         args=[db_job.id],
                         interval=db_job.interval_seconds,
                         repeat=None, # None means repeat indefinitely
-                        job_id=rq_job_id, 
+                        id=rq_job_id, 
                         description=f"NetRaven Job {db_job.id} ({db_job.name}) - Interval",
                         meta={'db_job_id': db_job.id, 'schedule_type': 'interval'}
                     )

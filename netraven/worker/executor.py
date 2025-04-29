@@ -103,6 +103,14 @@ def reachability_handler(device, job_id, config, db):
     }
     # ICMP Ping
     try:
+        logger.log(
+            f"Executing ping with IP Addresss {device_ip} for hostname={getattr(device, 'hostname', None)}, device_id={getattr(device, 'id', None)}",
+            level="INFO",
+            destinations=["stdout", "file", "db"],
+            job_id=job_id,
+            device_id=getattr(device, 'id', None),
+            source="worker_executor",
+        )
         ping_cmd = ["ping", "-c", "1", "-W", "2", device_ip]
         ping_proc = subprocess.run(ping_cmd, capture_output=True, text=True)
         if ping_proc.returncode == 0:
