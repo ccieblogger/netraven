@@ -147,6 +147,7 @@ All developer and production workflows must use the provided Docker Compose setu
 
 #### 3. Job Scheduler
 - Based on **RQ + RQ Scheduler**.
+- **Implemented in**: `netraven/scheduler/scheduler_runner.py` (main scheduler process) and `netraven/scheduler/job_registration.py` (job sync and registration logic).
 - Queues and schedules jobs (one-time, recurring, with start/end window support).
 - Triggers device communication jobs in the background.
 

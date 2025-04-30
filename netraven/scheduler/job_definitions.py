@@ -19,7 +19,7 @@ def run_device_job(job_id: int):
         logger.log(
             "Executing scheduled job via worker",
             level="INFO",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             job_id=job_id,
             source="job_definitions"
         )
@@ -28,7 +28,7 @@ def run_device_job(job_id: int):
         logger.log(
             "Worker job execution finished",
             level="INFO",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             job_id=job_id,
             source="job_definitions"
         )
@@ -37,7 +37,7 @@ def run_device_job(job_id: int):
         logger.log(
             f"Worker job execution failed: {e}",
             level="ERROR",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             job_id=job_id,
             source="job_definitions",
             extra={"error": str(e)},

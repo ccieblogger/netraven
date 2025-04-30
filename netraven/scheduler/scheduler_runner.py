@@ -1,4 +1,5 @@
 import time
+import logging
 from redis import Redis
 from rq_scheduler import Scheduler
 
@@ -7,8 +8,28 @@ from netraven.config.loader import load_config
 from netraven.scheduler.job_registration import sync_jobs_from_db
 from netraven.utils.unified_logger import get_unified_logger
 
-# No longer need the placeholder function
-# def get_scheduler_config(): ...
+class UnifiedLoggerHandler(logging.Handler):
+    def emit(self, record):
+        logger = get_unified_logger()
+        msg = record.getMessage()
+        level = record.levelname
+        logger.log(
+            msg,
+            level="DEBUG",
+            destinations=["stdout", "file", "db"],
+            source=record.name  # e.g., 'rq_scheduler.scheduler'
+        )
+
+unified_handler = UnifiedLoggerHandler()
+unified_handler.setLevel(logging.DEBUG)  # Or DEBUG if you want more detail
+
+# Attach to RQ and RQ Scheduler loggers
+logging.getLogger('rq_scheduler').addHandler(unified_handler)
+logging.getLogger('rq_scheduler.scheduler').addHandler(unified_handler)
+logging.getLogger('rq_scheduler').setLevel(logging.DEBUG)
+logging.getLogger('rq').addHandler(unified_handler)
+logging.getLogger('rq').setLevel(logging.DEBUG)
+logging.getLogger('rq').propagate = False
 
 if __name__ == "__main__":
     # Load configuration using the central loader
@@ -23,7 +44,7 @@ if __name__ == "__main__":
     logger.log(
         f"Starting NetRaven Scheduler",
         level="INFO",
-        destinations=["stdout", "file"],
+        destinations=["stdout", "file", "db"],
         source="scheduler_runner",
         extra={"redis_url": redis_url, "poll_interval": polling_interval},
     )
@@ -34,7 +55,7 @@ if __name__ == "__main__":
         logger.log(
             "Successfully connected to Redis.",
             level="INFO",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             source="scheduler_runner",
         )
         scheduler = Scheduler(connection=redis_conn)
@@ -42,7 +63,7 @@ if __name__ == "__main__":
         logger.log(
             f"Failed to connect to Redis or initialize scheduler: {e}",
             level="ERROR",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             source="scheduler_runner",
             extra={"redis_url": redis_url},
         )
@@ -51,8 +72,8 @@ if __name__ == "__main__":
     while True:
         logger.log(
             "Scheduler polling for jobs...",
-            level="INFO",
-            destinations=["stdout", "file"],
+            level="DEBUG",
+            destinations=["stdout", "file", "db"],
             source="scheduler_runner",
         )
         try:
@@ -61,21 +82,21 @@ if __name__ == "__main__":
             logger.log(
                 "Job sync process completed.",
                 level="DEBUG",
-                destinations=["stdout", "file"],
+                destinations=["stdout", "file", "db"],
                 source="scheduler_runner",
             )
         except Exception as e:
             logger.log(
                 f"Error during job synchronization: {e}",
                 level="ERROR",
-                destinations=["stdout", "file"],
+                destinations=["stdout", "file", "db"],
                 source="scheduler_runner",
             )
 
         logger.log(
             f"Scheduler sleeping for {polling_interval} seconds.",
             level="DEBUG",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             source="scheduler_runner",
         )
         time.sleep(polling_interval)

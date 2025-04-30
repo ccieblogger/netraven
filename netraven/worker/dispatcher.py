@@ -109,7 +109,7 @@ def dispatch_tasks(
     logger.log(
         f"Job '{job_id}' started: dispatching tasks to devices",
         level="INFO",
-        destinations=["stdout", "db"],
+        destinations=["stdout", "file", "db"],
         job_id=job_id,
         source="dispatcher",
     )
@@ -119,7 +119,7 @@ def dispatch_tasks(
         logger.log(
             f"No devices to process for job '{job_id}'",
             level="WARNING",
-            destinations=["stdout", "db"],
+            destinations=["stdout", "file", "db"],
             job_id=job_id,
             source="dispatcher",
         )
@@ -128,7 +128,7 @@ def dispatch_tasks(
     logger.log(
         f"Job '{job_id}' will process {device_count} devices",
         level="INFO",
-        destinations=["stdout", "db"],
+        destinations=["stdout", "file", "db"],
         job_id=job_id,
         source="dispatcher",
     )
@@ -149,7 +149,7 @@ def dispatch_tasks(
             logger.log(
                 f"Submitting task for device '{device_name}' in job '{job_id}'",
                 level="INFO",
-                destinations=["stdout", "db"],
+                destinations=["stdout", "file", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="dispatcher",
@@ -192,7 +192,7 @@ def dispatch_tasks(
                 logger.log(
                     f"Task completed for device '{device_name}' in job '{job_id}'",
                     level="INFO",
-                    destinations=["stdout", "db"],
+                    destinations=["stdout", "file", "db"],
                     job_id=job_id,
                     device_id=device_id,
                     source="dispatcher",
@@ -203,7 +203,7 @@ def dispatch_tasks(
                 logger.log(
                     f"Thread error processing device '{device_name}' in job '{job_id}': {e}",
                     level="ERROR",
-                    destinations=["stdout", "db"],
+                    destinations=["stdout", "file", "db"],
                     job_id=job_id,
                     device_id=device_id,
                     source="dispatcher",
@@ -239,7 +239,7 @@ def dispatch_tasks(
     logger.log(
         f"All device tasks completed for job '{job_id}'. Success rate: {sum(1 for r in results if r.get('success', False))}/{len(results)}",
         level="INFO",
-        destinations=["stdout", "db"],
+        destinations=["stdout", "file", "db"],
         job_id=job_id,
         source="dispatcher",
     )
@@ -375,7 +375,7 @@ def task_with_retry(
             logger.log(
                 f"Retrying device '{device_name}' in {backoff_time}s (attempt {retry_count}/{max_retries})",
                 level="INFO",
-                destinations=["stdout", "db"],
+                destinations=["stdout", "file", "db"],
                 job_id=job_id,
                 device_id=device_id,
                 source="dispatcher",
@@ -428,7 +428,7 @@ def task_with_retry(
                     logger.log(
                         f"Encountered non-retriable error during retry for device '{device_name}': {error_info.message}",
                         level="WARNING",
-                        destinations=["stdout", "db"],
+                        destinations=["stdout", "file", "db"],
                         job_id=job_id,
                         device_id=device_id,
                         source="dispatcher",

@@ -26,7 +26,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
     logger.log(
         "Starting job synchronization from database...",
         level="DEBUG",
-        destinations=["stdout", "file"],
+        destinations=["stdout", "file", "db"],
         source="scheduler_job_registration",
     )
     db: Session | None = None
@@ -36,7 +36,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
         logger.log(
             f"Found {len(jobs_to_schedule)} enabled jobs in DB.",
             level="INFO",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             source="scheduler_job_registration",
         )
 
@@ -48,7 +48,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
         logger.log(
             f"{len(existing_rq_job_ids)} jobs currently in RQ-Scheduler.",
             level="DEBUG",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             source="scheduler_job_registration",
         )
 
@@ -68,7 +68,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                 logger.log(
                     f"Job already scheduled in RQ-Scheduler, skipping. {job_log_details}",
                     level="DEBUG",
-                    destinations=["stdout", "file"],
+                    destinations=["stdout", "file", "db"],
                     source="scheduler_job_registration",
                 )
                 skipped_count += 1
@@ -80,7 +80,7 @@ def sync_jobs_from_db(scheduler: Scheduler):
                     logger.log(
                         f"Job is disabled, skipping. {job_log_details}",
                         level="DEBUG",
-                        destinations=["stdout", "file"],
+                        destinations=["stdout", "file", "db"],
                         source="scheduler_job_registration",
                     )
                     skipped_count += 1

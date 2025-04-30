@@ -23,8 +23,12 @@ curl -s http://localhost:8000/jobs/status \
 curl -X GET "http://localhost:8000/job-logs/" \
   -H "Authorization: Bearer $TOKEN" | jq . 
 
-# LIst Jobs
+# List Jobs in DB
   curl -X GET "http://localhost:8000/jobs/" \
+    -H "Authorization: Bearer $TOKEN" | jq .
+
+# Redis Queue status
+  curl -X GET "http://localhost:8000/scheduler/queue/status" \
     -H "Authorization: Bearer $TOKEN" | jq .
 
 # Use the token to query log stream

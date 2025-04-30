@@ -294,7 +294,7 @@ def get_jobs_status():
         redis_memory = info.get('used_memory')
         redis_last_heartbeat = None  # Not tracked unless using Redis Sentinel
     except Exception as e:
-        logger.log(f"Failed to get Redis info: {e}", level="ERROR", destinations=["stdout"], source="jobs_router")
+        logger.log(f"Failed to get Redis info: {e}", level="ERROR", destinations=["stdout", "file", "db"], source="jobs_router")
         redis_uptime = None
         redis_memory = None
         redis_last_heartbeat = None
@@ -317,7 +317,7 @@ def get_jobs_status():
                     oldest_job_ts=oldest_job_ts
                 ))
     except Exception as e:
-        logger.log(f"Failed to get RQ queue info: {e}", level="ERROR", destinations=["stdout"], source="jobs_router")
+        logger.log(f"Failed to get RQ queue info: {e}", level="ERROR", destinations=["stdout", "file", "db"], source="jobs_router")
     # Workers
     workers = []
     try:
@@ -330,7 +330,7 @@ def get_jobs_status():
                     jobs_in_progress=jobs_in_progress
                 ))
     except Exception as e:
-        logger.log(f"Failed to get worker info: {e}", level="ERROR", destinations=["stdout"], source="jobs_router")
+        logger.log(f"Failed to get worker info: {e}", level="ERROR", destinations=["stdout", "file", "db"], source="jobs_router")
     return JobDashboardStatus(
         redis_uptime=redis_uptime,
         redis_memory=redis_memory,
@@ -475,9 +475,9 @@ try:
     redis_conn = Redis.from_url(redis_url)
     rq_queue = Queue(connection=redis_conn)
     redis_conn.ping() # Check connection
-    logger.log("Successfully connected to Redis for RQ.", level="INFO", destinations=["stdout", "file"], source="jobs_router")
+    logger.log("Successfully connected to Redis for RQ.", level="INFO", destinations=["stdout", "file", "db"], source="jobs_router")
 except Exception as e:
-    logger.log(f"ERROR: Could not connect to Redis at {redis_url} for RQ. Job trigger endpoint will fail.", level="ERROR", destinations=["stdout", "file"], source="jobs_router")
+    logger.log(f"ERROR: Could not connect to Redis at {redis_url} for RQ. Job trigger endpoint will fail.", level="ERROR", destinations=["stdout", "file", "db"], source="jobs_router")
     # Set queue to None or handle differently so endpoint fails gracefully
     rq_queue = None 
 

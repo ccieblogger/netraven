@@ -105,7 +105,7 @@ def create_device(
         logger.log(
             f"Device creation failed: {msg} (request: {request.url if request else 'N/A'})",
             level="WARNING",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             source="devices_router",
         )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
@@ -134,7 +134,7 @@ def create_device(
             logger.log(
                 f"Device creation failed: {e.detail} (request: {request.url if request else 'N/A'})",
                 level="ERROR",
-                destinations=["stdout", "file"],
+                destinations=["stdout", "file", "db"],
                 source="devices_router",
             )
             raise
@@ -142,6 +142,12 @@ def create_device(
 
     db.add(db_device)
     db.commit()
+    logger.log(
+        f"Device created successful [{db_device.hostname}] ...",
+        level="INFO",
+        destinations=["stdout", "file", "db"],
+        source="devices_router",
+    )
     db.refresh(db_device)
 
     # --- Ensure at least one credential is associated ---
@@ -153,7 +159,7 @@ def create_device(
             logger.log(
                 f"Device creation failed: {msg} (request: {request.url if request else 'N/A'})",
                 level="ERROR",
-                destinations=["stdout", "file"],
+                destinations=["stdout", "file", "db"],
                 source="devices_router",
             )
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
@@ -167,7 +173,7 @@ def create_device(
             logger.log(
                 f"Device creation failed: {msg} (request: {request.url if request else 'N/A'})",
                 level="ERROR",
-                destinations=["stdout", "file"],
+                destinations=["stdout", "file", "db"],
                 source="devices_router",
             )
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
@@ -352,7 +358,7 @@ def update_device(
         logger.log(
             f"Device update failed: {msg} (request: {request.url if request else 'N/A'})",
             level="WARNING",
-            destinations=["stdout", "file"],
+            destinations=["stdout", "file", "db"],
             source="devices_router",
         )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg)
@@ -367,7 +373,7 @@ def update_device(
             logger.log(
                 f"Device update failed: {msg} (request: {request.url if request else 'N/A'})",
                 level="WARNING",
-                destinations=["stdout", "file"],
+                destinations=["stdout", "file", "db"],
                 source="devices_router",
             )
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
@@ -378,7 +384,7 @@ def update_device(
             logger.log(
                 f"Device update failed: {msg} (request: {request.url if request else 'N/A'})",
                 level="WARNING",
-                destinations=["stdout", "file"],
+                destinations=["stdout", "file", "db"],
                 source="devices_router",
             )
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
@@ -400,7 +406,7 @@ def update_device(
             logger.log(
                 f"Device update failed: {msg} (request: {request.url if request else 'N/A'})",
                 level="ERROR",
-                destinations=["stdout", "file"],
+                destinations=["stdout", "file", "db"],
                 source="devices_router",
             )
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
@@ -416,7 +422,7 @@ def update_device(
                 logger.log(
                     f"Device update failed: {e.detail} (request: {request.url if request else 'N/A'})",
                     level="ERROR",
-                    destinations=["stdout", "file"],
+                    destinations=["stdout", "file", "db"],
                     source="devices_router",
                 )
                 raise

@@ -156,7 +156,7 @@ class CircuitBreaker:
                 
                 # If we've reached the threshold, close the circuit
                 if circuit["success_count"] >= self.half_open_success_threshold:
-                    logger.log(f"Circuit for device {device_id} transitioning from HALF_OPEN to CLOSED", level="INFO", destinations=["stdout", "file"], source="circuit_breaker", device_id=device_id)
+                    logger.log(f"Circuit for device {device_id} transitioning from HALF_OPEN to CLOSED", level="INFO", destinations=["stdout", "file", "db"], source="circuit_breaker", device_id=device_id)
                     circuit["state"] = CircuitState.CLOSED
                     circuit["failure_count"] = 0
                     circuit["success_count"] = 0
@@ -190,7 +190,7 @@ class CircuitBreaker:
                     logger.log(
                         f"Circuit for device {device_id} transitioning from CLOSED to OPEN "
                         f"after {circuit['failure_count']} consecutive failures",
-                        level="WARNING", destinations=["stdout", "file"], source="circuit_breaker", device_id=device_id
+                        level="WARNING", destinations=["stdout", "file", "db"], source="circuit_breaker", device_id=device_id
                     )
                     circuit["state"] = CircuitState.OPEN
                     circuit["last_state_change"] = current_time
@@ -200,7 +200,7 @@ class CircuitBreaker:
                 logger.log(
                     f"Circuit for device {device_id} transitioning from HALF_OPEN to OPEN "
                     f"after test connection failure",
-                    level="WARNING", destinations=["stdout", "file"], source="circuit_breaker", device_id=device_id
+                    level="WARNING", destinations=["stdout", "file", "db"], source="circuit_breaker", device_id=device_id
                 )
                 circuit["state"] = CircuitState.OPEN
                 circuit["success_count"] = 0
@@ -241,7 +241,7 @@ class CircuitBreaker:
                     logger.log(
                         f"Circuit for device {device_id} transitioning from OPEN to HALF_OPEN "
                         f"after {time_since_last_change:.1f}s cooldown",
-                        level="INFO", destinations=["stdout", "file"], source="circuit_breaker", device_id=device_id
+                        level="INFO", destinations=["stdout", "file", "db"], source="circuit_breaker", device_id=device_id
                     )
                     circuit["state"] = CircuitState.HALF_OPEN
                     circuit["success_count"] = 0
@@ -252,7 +252,7 @@ class CircuitBreaker:
                         f"Circuit for device {device_id} is OPEN. "
                         f"Blocking connection attempt. "
                         f"Will try again in {self.reset_timeout - time_since_last_change:.1f}s",
-                        level="DEBUG", destinations=["stdout", "file"], source="circuit_breaker", device_id=device_id
+                        level="DEBUG", destinations=["stdout", "file", "db"], source="circuit_breaker", device_id=device_id
                     )
                     return False
                     

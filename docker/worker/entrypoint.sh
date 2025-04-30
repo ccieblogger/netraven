@@ -10,4 +10,5 @@ done
 echo "Postgres is up - continuing"
 
 echo "Starting RQ worker..."
-exec poetry run rq worker --url redis://redis:6379/0 
+# exec poetry run rq worker --url redis://redis:6379/0 
+exec poetry run python -m netraven.worker.worker_runner

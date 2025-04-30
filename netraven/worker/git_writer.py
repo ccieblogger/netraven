@@ -45,16 +45,16 @@ def commit_configuration_to_git(
     try:
         # Ensure the base repository directory exists
         if not os.path.exists(repo_path):
-            logger.log(f"Repo path {repo_path} does not exist. Creating...", level="INFO", destinations=["stdout", "file"], source="git_writer")
+            logger.log(f"Repo path {repo_path} does not exist. Creating...", level="INFO", destinations=["stdout", "file", "db"], source="git_writer")
             os.makedirs(repo_path)
-            logger.log(f"Initializing Git repository at {repo_path}...", level="INFO", destinations=["stdout", "file"], source="git_writer")
+            logger.log(f"Initializing Git repository at {repo_path}...", level="INFO", destinations=["stdout", "file", "db"], source="git_writer")
             repo = Repo.init(repo_path)
-            logger.log("Repository initialized.", level="INFO", destinations=["stdout", "file"], source="git_writer")
+            logger.log("Repository initialized.", level="INFO", destinations=["stdout", "file", "db"], source="git_writer")
         else:
             try:
                 repo = Repo(repo_path)
             except Exception as e:
-                logger.log(f"Error opening existing repository at {repo_path}: {e}. Attempting to initialize.", level="WARNING", destinations=["stdout", "file"], source="git_writer")
+                logger.log(f"Error opening existing repository at {repo_path}: {e}. Attempting to initialize.", level="WARNING", destinations=["stdout", "file", "db"], source="git_writer")
                 # Handle cases where the directory exists but isn't a valid repo
                 repo = Repo.init(repo_path)
 
@@ -62,7 +62,7 @@ def commit_configuration_to_git(
         # Using device_id as per SOT. Consider device hostname/IP for better readability.
         config_file_name = f"{device_id}_config.txt"
         config_file_path = os.path.join(repo.working_tree_dir, config_file_name)
-        logger.log(f"Writing configuration for device {device_id} to {config_file_path}", level="INFO", destinations=["stdout", "file"], source="git_writer")
+        logger.log(f"Writing configuration for device {device_id} to {config_file_path}", level="INFO", destinations=["stdout", "file", "db"], source="git_writer")
 
         # Write the configuration data to the file
         # Ensure the directory exists if repo path is nested deeper
@@ -71,24 +71,24 @@ def commit_configuration_to_git(
             config_file.write(config_data)
 
         # Stage the file
-        logger.log(f"Staging file: {config_file_name}", level="INFO", destinations=["stdout", "file"], source="git_writer")
+        logger.log(f"Staging file: {config_file_name}", level="INFO", destinations=["stdout", "file", "db"], source="git_writer")
         repo.index.add([config_file_path])
 
         # Create a commit message with metadata
         commit_message = f"Config backup for device {device_id} | Job ID: {job_id}"
-        logger.log(f"Committing with message: '{commit_message}'", level="INFO", destinations=["stdout", "file"], source="git_writer")
+        logger.log(f"Committing with message: '{commit_message}'", level="INFO", destinations=["stdout", "file", "db"], source="git_writer")
 
         # Commit the changes
         commit = repo.index.commit(commit_message)
-        logger.log(f"Commit successful. Hash: {commit.hexsha}", level="INFO", destinations=["stdout", "file"], source="git_writer")
+        logger.log(f"Commit successful. Hash: {commit.hexsha}", level="INFO", destinations=["stdout", "file", "db"], source="git_writer")
 
         return commit.hexsha
 
     except GitCommandError as git_err:
-        logger.log(f"Git command error occurred: {git_err}", level="ERROR", destinations=["stdout", "file"], source="git_writer")
+        logger.log(f"Git command error occurred: {git_err}", level="ERROR", destinations=["stdout", "file", "db"], source="git_writer")
         # Consider logging the error more formally
         return None
     except Exception as e:
-        logger.log(f"An unexpected error occurred during Git operation: {e}", level="ERROR", destinations=["stdout", "file"], source="git_writer")
+        logger.log(f"An unexpected error occurred during Git operation: {e}", level="ERROR", destinations=["stdout", "file", "db"], source="git_writer")
         # Consider logging the error more formally
         return None
