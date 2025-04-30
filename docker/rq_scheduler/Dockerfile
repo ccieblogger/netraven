@@ -34,22 +34,8 @@ RUN poetry install --no-interaction --no-ansi --no-root --with dev
 # Copy the rest of the application code
 COPY . .
 
-# Make the entrypoint scripts executable
-RUN chmod +x /app/docker/api/entrypoint.sh \
-    && chmod +x /app/docker/worker/entrypoint.sh \
-    && chmod +x /app/docker/scheduler/entrypoint.sh \
-    && chmod +x /app/docker/rq_scheduler/rq_scheduler_entrypoint.sh
+# Make the rq-scheduler entrypoint script executable
+RUN chmod +x /app/docker/rq_scheduler/rq_scheduler_entrypoint.sh
 
-# Copy the healthcheck script for the worker container
-COPY docker/api/worker_healthcheck.sh /app/worker_healthcheck.sh
-RUN chmod +x /app/worker_healthcheck.sh
-
-# Expose API port
-EXPOSE 8000
-
-# Define health check for API only (worker healthcheck set in docker-compose)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Default entrypoint is for API. Override in docker-compose for worker/scheduler.
-ENTRYPOINT ["/app/docker/api/entrypoint.sh"] 
+# Set the default entrypoint for rq-scheduler
+ENTRYPOINT ["/app/docker/rq_scheduler/rq_scheduler_entrypoint.sh"] 

@@ -168,6 +168,29 @@ services:
       retries: 3
       start_period: 30s
 
+  rq-scheduler:
+    build:
+      context: .
+      dockerfile: docker/rq_scheduler/Dockerfile  # Use your dedicated Dockerfile if available
+    container_name: netraven-rq-scheduler
+    entrypoint: ["/app/docker/rq_scheduler/rq_scheduler_entrypoint.sh"]
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - NETRAVEN_ENV=dev
+      - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
+      - NETRAVEN_LOGGING__FILE__PATH=/data/logs/rq_scheduler/rq_scheduler.log
+    volumes:
+      - ./host-logs/netraven/rq_scheduler:/data/logs/rq_scheduler
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "rq_scheduler_runner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 volumes:
   frontend-node-modules:
   redis-data:
