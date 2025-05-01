@@ -1,99 +1,121 @@
 <template>
-  <div class="nr-card bg-green-500/30 border border-divider rounded-lg p-0 px-6">
-    <!-- Filter/Search Bar (to be integrated) -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4 px-6 pt-6">
+  <!-- Device Table Card: aligns with filter/search section, uses production theme -->
+  <div>
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-6 pt-6 mb-2">
       <slot name="filters"></slot>
       <slot name="search"></slot>
     </div>
 
-    <BaseTable
-      :items="devices"
-      :columns="columns"
-      :loading="loading"
-      :itemKey="'id'"
-      @row-click="onRowClick"
-      table-class="bg-yellow-500/30 text-text-primary"
-      header-class="bg-yellow-500/30 text-text-secondary border-b border-divider"
-      row-class="bg-yellow-500/30 border-b border-divider hover:bg-content"
-      cell-class="text-text-primary px-4"
-    >
-      <template #cell(reachability)="{ item }">
-        <ServiceDot
-          :status="item.last_reachability_status === 'success' ? 'healthy' : item.last_reachability_status === 'failure' ? 'unhealthy' : 'unknown'"
-          :label="''"
-          :tooltip="reachabilityTooltip(item)"
-        />
-      </template>
-      <template #cell(tags)="{ value }">
-        <span v-for="tag in value" :key="tag.id" class="bg-blue-900/30 text-blue-200 py-1 px-3 rounded-full text-xs mr-1">
-          {{ tag.name }}
-        </span>
-      </template>
-      <template #cell(credentials)="{ item }">
-        <span v-if="item.matching_credentials_count > 0" class="text-blue-300 cursor-pointer hover:text-blue-100 underline">
-          {{ item.matching_credentials_count }} credential(s)
-        </span>
-        <span v-else class="text-red-400 font-semibold">No credentials found.</span>
-      </template>
-      <template #cell(primary_actions)="{ item }">
-        <div class="flex flex-row space-x-1">
-          <Button size="sm" variant="ghost" @click="$emit('edit', item)" aria-label="Edit Device" title="Edit Device">
-            <PencilIcon class="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="ghost" @click="$emit('delete', item)" aria-label="Delete Device" title="Delete Device">
-            <TrashIcon class="h-4 w-4" />
-          </Button>
-        </div>
-      </template>
-      <template #cell(secondary_actions)="{ item }">
-        <div class="flex flex-row space-x-1">
-          <Button size="sm" variant="ghost" @click="$emit('check-reachability', item)" :disabled="item.status === 'offline'" aria-label="Check Reachability" title="Check Reachability">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2l4-4m5 2a9 9 0 11-18 0a9 9 0 0118 0z" /></svg>
-          </Button>
-          <Button size="sm" variant="ghost" @click="$emit('credential-check', item)" aria-label="Credential Check" title="Credential Check">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 01-8 0m8 0V5a4 4 0 00-8 0v2m8 0a4 4 0 01-8 0m8 0v2a4 4 0 01-8 0V7" /></svg>
-          </Button>
-          <Button size="sm" variant="ghost" @click="$emit('view-configs', item)" aria-label="View Configs" title="View Configs">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m2 0a2 2 0 01-2 2H9a2 2 0 01-2-2m2-2h6m2 0a2 2 0 00-2-2H9a2 2 0 00-2 2" /></svg>
-          </Button>
-        </div>
-      </template>
-      <template #pagination>
-        <div class="bg-yellow-500/30 border-t border-divider px-6 pb-6 pt-2">
-          <slot name="pagination"></slot>
-        </div>
-      </template>
-    </BaseTable>
+    <!-- Table Section: accessible, responsive, themed -->
+    <div class="overflow-x-auto px-6 pb-6">
+      <DataTable
+        :value="devices"
+        :loading="loading"
+        dataKey="id"
+        :paginator="true"
+        :rows="pageSize"
+        :rowsPerPageOptions="[10, 20, 50]"
+        class="bg-card text-text-primary min-w-full"
+        tableStyle="min-width: 100%"
+        responsiveLayout="scroll"
+        :emptyMessage="emptyMessage"
+        :sortField="sortField"
+        :sortOrder="sortOrder"
+        @sort="onSort"
+        @rowClick="onRowClick"
+      >
+        <Column field="hostname" header="Hostname" sortable class="px-4" />
+        <Column field="ip_address" header="Host IP" sortable class="px-4" />
+        <Column field="serial" header="Serial" class="px-4" />
+        <Column header="Reachable" class="px-4">
+          <template #body="{ data }">
+            <ServiceDot
+              :status="data.last_reachability_status === 'success' ? 'healthy' : data.last_reachability_status === 'failure' ? 'unhealthy' : 'unknown'"
+              :label="''"
+              :tooltip="reachabilityTooltip(data)"
+            />
+          </template>
+        </Column>
+        <Column field="job_status" header="JobStat" class="px-4" />
+        <Column header="Tags" class="px-4">
+          <template #body="{ data }">
+            <span v-for="tag in data.tags" :key="tag.id" class="bg-blue-900/30 text-blue-200 py-1 px-3 rounded-full text-xs mr-1">
+              {{ tag.name }}
+            </span>
+          </template>
+        </Column>
+        <Column header="Credential" class="px-4">
+          <template #body="{ data }">
+            <span v-if="data.matching_credentials_count > 0" class="text-blue-300 cursor-pointer hover:text-blue-100 underline">
+              {{ data.matching_credentials_count }} credential(s)
+            </span>
+            <span v-else class="text-red-400 font-semibold">No credentials found.</span>
+          </template>
+        </Column>
+        <Column header="Actions" class="px-4">
+          <template #body="{ data }">
+            <div class="flex flex-row space-x-1">
+              <Button size="sm" variant="ghost" @click="$emit('edit', data)" aria-label="Edit Device" title="Edit Device" iconOnly>
+                <PencilIcon class="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="ghost" @click="$emit('delete', data)" aria-label="Delete Device" title="Delete Device" iconOnly>
+                <TrashIcon class="h-4 w-4" />
+              </Button>
+            </div>
+          </template>
+        </Column>
+        <Column header="Other" class="px-4">
+          <template #body="{ data }">
+            <div class="flex flex-row space-x-1">
+              <Button size="sm" variant="ghost" @click="$emit('check-reachability', data)" :disabled="data.status === 'offline'" aria-label="Check Reachability" title="Check Reachability" iconOnly>
+                <i class="pi pi-check-circle h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="ghost" @click="$emit('credential-check', data)" aria-label="Credential Check" title="Credential Check" iconOnly>
+                <i class="pi pi-key h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="ghost" @click="$emit('view-configs', data)" aria-label="View Configs" title="View Configs" iconOnly>
+                <i class="pi pi-eye h-4 w-4" />
+              </Button>
+            </div>
+          </template>
+        </Column>
+      </DataTable>
+    </div>
   </div>
 </template>
 
 <script setup>
-import BaseTable from './BaseTable.vue';
+// DeviceTable.vue: Device inventory table with best practices for theming, accessibility, and UX
+import { ref, computed } from 'vue';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
 import Button from './ui/Button.vue';
 import ServiceDot from './ui/ServiceDot.vue';
 import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline';
-import { computed } from 'vue';
 
+/**
+ * Props:
+ *  - devices: Array of device objects to display
+ *  - loading: Boolean, show loading state
+ *  - pageSize: Number, default page size
+ */
 const props = defineProps({
   devices: { type: Array, required: true },
   loading: { type: Boolean, default: false },
+  pageSize: { type: Number, default: 10 },
 });
 const emit = defineEmits(['edit', 'delete', 'check-reachability', 'credential-check', 'view-configs', 'row-click']);
 
-const columns = [
-  { key: 'hostname', label: 'Hostname', sortable: true },
-  { key: 'ip_address', label: 'Host IP', sortable: true },
-  { key: 'serial', label: 'Serial', sortable: false },
-  { key: 'reachability', label: 'Reachable', sortable: false },
-  { key: 'job_status', label: 'JobStat', sortable: false },
-  { key: 'tags', label: 'Tags', sortable: false },
-  { key: 'credentials', label: 'Credential', sortable: false },
-  { key: 'primary_actions', label: 'Actions', sortable: false },
-  { key: 'secondary_actions', label: 'Other', sortable: false },
-];
+const sortField = ref('hostname');
+const sortOrder = ref(1); // 1 = asc, -1 = desc
 
-function onRowClick(item) {
-  emit('row-click', item);
+function onSort(e) {
+  sortField.value = e.sortField;
+  sortOrder.value = e.sortOrder;
+}
+
+function onRowClick(e) {
+  emit('row-click', e.data);
 }
 
 function reachabilityTooltip(device) {
@@ -101,4 +123,6 @@ function reachabilityTooltip(device) {
   if (device.last_reachability_status === 'failure') return 'Unreachable';
   return 'Never Checked';
 }
+
+const emptyMessage = computed(() => props.loading ? 'Loading devices...' : 'No devices found');
 </script> 

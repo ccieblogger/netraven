@@ -41,7 +41,7 @@
     </NrCard>
 
     <!-- Device List Table Section -->
-    <NrCard title="Devices" subtitle="Inventory overview">
+    <NrCard title="Devices" subtitle="Inventory overview" :contentClass="'pt-1 px-6 pb-6'">
       <template #header>
         <div class="px-6 pt-6">
           <div class="mb-2">
