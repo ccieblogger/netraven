@@ -41,5 +41,8 @@ COPY docker/worker/entrypoint.sh /app/docker/worker/entrypoint.sh
 # Make the rq-scheduler entrypoint script executable
 RUN chmod +x /app/docker/worker/entrypoint.sh
 
+# Make health check script executable
+RUN chmod +x /app/worker_healthcheck.sh
+
 # Set the default entrypoint for rq-scheduler
 ENTRYPOINT ["/app/docker/worker/entrypoint.sh"] 

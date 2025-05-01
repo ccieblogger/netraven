@@ -116,3 +116,4 @@ frontend/.vite/
 
 # Cursor AI
 .cursor/
+node_modules
