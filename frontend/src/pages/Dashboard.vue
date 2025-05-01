@@ -4,7 +4,6 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <KpiCard label="Devices" :value="deviceStore.devices?.length ?? 0" icon="list" color="blue" />
       <KpiCard label="Jobs" :value="jobStore.jobs?.length ?? 0" icon="queue" color="primary" />
-      <KpiCard label="Backups" :value="backupStore.backups ?? 0" icon="memory" color="green" />
       <div class="nr-card border-l-4 border-l-gray-500 p-4 flex flex-col items-start">
         <h2 class="text-lg uppercase font-semibold text-text-secondary">SYSTEM STATUS</h2>
         <div class="mt-2 grid grid-cols-2 md:grid-cols-2 gap-2 w-full">
@@ -47,14 +46,14 @@
 import { onMounted, ref, computed, onUnmounted } from 'vue';
 import { useDeviceStore } from '../store/device';
 import { useJobStore } from '../store/job';
-import { useBackupStore } from '../store/backup';
+import { useAuthStore } from '../store/auth';
 import KpiCard from '../components/ui/KpiCard.vue';
 import StatusBadge from '../components/ui/StatusBadge.vue';
 import JobsTable from '../components/jobs-dashboard/JobsTable.vue';
 
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
-const backupStore = useBackupStore();
+const authStore = useAuthStore();
 
 // --- System Status Card State ---
 const services = ref([
@@ -83,10 +82,11 @@ function updateServicesStatus(statusObj) {
 }
 
 async function fetchSystemStatus(refresh = false) {
+  if (!authStore.isAuthenticated) return;
   isLoading.value = true;
   try {
     const url = `/api/system/status${refresh ? '?refresh=true' : ''}`;
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('authToken');
     const res = await fetch(url, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {}
     });
@@ -131,11 +131,12 @@ function stopPolling() {
 const recentLogs = ref([]);
 
 onMounted(() => {
-  fetchSystemStatus();
+  if (authStore.isAuthenticated) {
+    fetchSystemStatus();
+  }
   startPolling();
   deviceStore.fetchDevices();
   jobStore.fetchJobs();
-  backupStore.fetchBackups();
 
   // Simulate loading delay for recent activity
   setTimeout(() => {

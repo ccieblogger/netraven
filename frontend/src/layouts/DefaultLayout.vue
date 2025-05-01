@@ -1,132 +1,137 @@
 <template>
-  <div class="flex h-screen overflow-hidden">
-    <!-- Notification Toast -->
-    <NotificationToast />
-    
-    <!-- Sidebar -->
-    <aside class="h-screen w-sidebar flex-shrink-0 flex flex-col bg-sidebar border-r border-divider">
-      <!-- Sidebar header with logo -->
-      <div class="flex items-center px-4 py-4">
-        <router-link to="/" class="flex items-center space-x-2">
-          <span class="text-xl font-semibold">
-            <span class="text-primary">Net</span><span class="text-text-primary">Raven</span>
-          </span>
-        </router-link>
-      </div>
+  <div v-if="authStore.isAuthenticated">
+    <div class="flex h-screen overflow-hidden">
+      <!-- Notification Toast -->
+      <NotificationToast />
+      
+      <!-- Sidebar -->
+      <aside class="h-screen w-sidebar flex-shrink-0 flex flex-col bg-sidebar border-r border-divider">
+        <!-- Sidebar header with logo -->
+        <div class="flex items-center px-4 py-4">
+          <router-link to="/" class="flex items-center space-x-2">
+            <span class="text-xl font-semibold">
+              <span class="text-primary">Net</span><span class="text-text-primary">Raven</span>
+            </span>
+          </router-link>
+        </div>
 
-      <!-- Navigation -->
-      <nav class="flex-1 px-2 py-4 space-y-1">
-        <template v-for="item in navigation" :key="item.name">
-          <div v-if="item.children">
-            <div class="flex items-center px-3 py-2 text-sm font-medium text-text-secondary cursor-default">
+        <!-- Navigation -->
+        <nav class="flex-1 px-2 py-4 space-y-1">
+          <template v-for="item in navigation" :key="item.name">
+            <div v-if="item.children">
+              <div class="flex items-center px-3 py-2 text-sm font-medium text-text-secondary cursor-default">
+                <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0 mr-3"></div>
+                <span class="truncate">{{ item.name }}</span>
+              </div>
+              <div class="ml-8 flex flex-col">
+                <router-link
+                  v-for="child in item.children"
+                  :key="child.name"
+                  :to="child.path"
+                  class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out mt-1"
+                  :class="[
+                    $route.path.startsWith(child.path)
+                      ? 'text-text-primary bg-card border-l-4 border-primary pl-2'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
+                  ]"
+                >
+                  <span class="truncate">{{ child.name }}</span>
+                </router-link>
+              </div>
+            </div>
+            <router-link
+              v-else
+              :to="item.path"
+              class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out"
+              :class="[
+                $route.path.startsWith(item.path)
+                  ? 'text-text-primary bg-card border-l-4 border-primary pl-2'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
+              ]"
+            >
               <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0 mr-3"></div>
               <span class="truncate">{{ item.name }}</span>
+            </router-link>
+          </template>
+        </nav>
+
+        <!-- User account -->
+        <div class="p-4 mt-auto border-t border-divider">
+          <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+              <div class="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg">
+                A
+              </div>
             </div>
-            <div class="ml-8 flex flex-col">
-              <router-link
-                v-for="child in item.children"
-                :key="child.name"
-                :to="child.path"
-                class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out mt-1"
-                :class="[
-                  $route.path.startsWith(child.path)
-                    ? 'text-text-primary bg-card border-l-4 border-primary pl-2'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
-                ]"
-              >
-                <span class="truncate">{{ child.name }}</span>
-              </router-link>
+            <div>
+              <p class="text-sm font-medium text-text-primary">{{ authStore.user?.username || 'admin' }}</p>
             </div>
           </div>
-          <router-link
-            v-else
-            :to="item.path"
-            class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out"
-            :class="[
-              $route.path.startsWith(item.path)
-                ? 'text-text-primary bg-card border-l-4 border-primary pl-2'
-                : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
-            ]"
-          >
-            <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0 mr-3"></div>
-            <span class="truncate">{{ item.name }}</span>
-          </router-link>
-        </template>
-      </nav>
+          
+          <!-- Theme Switcher -->
+          <div class="mt-3 pb-3">
+            <ThemeSwitcher />
+          </div>
+          
+          <div class="mt-2">
+            <button 
+              @click="authStore.logout" 
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-text-primary rounded-md hover:bg-card group"
+            >
+              <svg class="h-5 w-5 text-text-secondary group-hover:text-text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              Logout
+            </button>
+          </div>
+        </div>
+      </aside>
 
-      <!-- User account -->
-      <div class="p-4 mt-auto border-t border-divider">
-        <div class="flex items-center gap-3">
-          <div class="flex-shrink-0">
-            <div class="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg">
-              A
-            </div>
+      <!-- Main content -->
+      <div class="flex flex-col flex-1 overflow-hidden">
+        <!-- Main content header (Topbar) -->
+        <header class="sticky top-0 z-10 flex items-center justify-between h-16 bg-sidebar border-b border-divider px-4">
+          <div class="flex items-center gap-4">
+            <!-- Breadcrumbs (if any) -->
+            <nav v-if="breadcrumbs.length" aria-label="Breadcrumb" class="flex items-center text-xs text-text-secondary">
+              <ol class="flex items-center space-x-2">
+                <li v-for="(crumb, idx) in breadcrumbs" :key="crumb.path" class="flex items-center">
+                  <router-link :to="crumb.path" class="hover:underline text-text-secondary" v-if="idx < breadcrumbs.length - 1">{{ crumb.label }}</router-link>
+                  <span v-else class="text-text-primary font-semibold">{{ crumb.label }}</span>
+                  <span v-if="idx < breadcrumbs.length - 1" class="mx-1">/</span>
+                </li>
+              </ol>
+            </nav>
+            <!-- Page Title -->
+            <h1 class="text-xl font-semibold text-text-primary">{{ pageTitle }}</h1>
+          </div>
+          <div class="flex items-center space-x-4">
+            <SystemClock />
+            <button class="p-1 text-text-secondary rounded-full hover:text-text-primary focus:outline-none">
+              <BellIcon class="w-6 h-6" />
+            </button>
+          </div>
+        </header>
+
+        <!-- Page content -->
+        <main class="flex-1 overflow-y-auto bg-content p-6">
+          <slot></slot>
+        </main>
+        <footer class="w-full flex items-center justify-between bg-sidebar border-t border-divider px-6 py-2 text-xs text-text-secondary">
+          <div>
+            <span v-if="systemUtcTime">System UTC Time: {{ systemUtcTime }}</span>
           </div>
           <div>
-            <p class="text-sm font-medium text-text-primary">{{ authStore.user?.username || 'admin' }}</p>
+            <a href="/docs" target="_blank" class="hover:underline text-primary">API Docs</a>
           </div>
-        </div>
-        
-        <!-- Theme Switcher -->
-        <div class="mt-3 pb-3">
-          <ThemeSwitcher />
-        </div>
-        
-        <div class="mt-2">
-          <button 
-            @click="authStore.logout" 
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-text-primary rounded-md hover:bg-card group"
-          >
-            <svg class="h-5 w-5 text-text-secondary group-hover:text-text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-            Logout
-          </button>
-        </div>
+        </footer>
       </div>
-    </aside>
-
-    <!-- Main content -->
-    <div class="flex flex-col flex-1 overflow-hidden">
-      <!-- Main content header (Topbar) -->
-      <header class="sticky top-0 z-10 flex items-center justify-between h-16 bg-sidebar border-b border-divider px-4">
-        <div class="flex items-center gap-4">
-          <!-- Breadcrumbs (if any) -->
-          <nav v-if="breadcrumbs.length" aria-label="Breadcrumb" class="flex items-center text-xs text-text-secondary">
-            <ol class="flex items-center space-x-2">
-              <li v-for="(crumb, idx) in breadcrumbs" :key="crumb.path" class="flex items-center">
-                <router-link :to="crumb.path" class="hover:underline text-text-secondary" v-if="idx < breadcrumbs.length - 1">{{ crumb.label }}</router-link>
-                <span v-else class="text-text-primary font-semibold">{{ crumb.label }}</span>
-                <span v-if="idx < breadcrumbs.length - 1" class="mx-1">/</span>
-              </li>
-            </ol>
-          </nav>
-          <!-- Page Title -->
-          <h1 class="text-xl font-semibold text-text-primary">{{ pageTitle }}</h1>
-        </div>
-        <div class="flex items-center space-x-4">
-          <SystemClock />
-          <button class="p-1 text-text-secondary rounded-full hover:text-text-primary focus:outline-none">
-            <BellIcon class="w-6 h-6" />
-          </button>
-        </div>
-      </header>
-
-      <!-- Page content -->
-      <main class="flex-1 overflow-y-auto bg-content p-6">
-        <slot></slot>
-      </main>
-      <footer class="w-full flex items-center justify-between bg-sidebar border-t border-divider px-6 py-2 text-xs text-text-secondary">
-        <div>
-          <span v-if="systemUtcTime">System UTC Time: {{ systemUtcTime }}</span>
-        </div>
-        <div>
-          <a href="/docs" target="_blank" class="hover:underline text-primary">API Docs</a>
-        </div>
-      </footer>
     </div>
+  </div>
+  <div v-else>
+    <router-view />
   </div>
 </template>
 
@@ -191,13 +196,6 @@ const navigation = [
     }
   },
   {
-    name: 'Backups',
-    path: '/backups',
-    icon: {
-      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /><polyline points="7 9 12 4 17 9" /><line x1="12" y1="4" x2="12" y2="16" /></svg>`
-    }
-  },
-  {
     name: 'Config Diff',
     path: '/config-diff',
     icon: {
@@ -210,24 +208,19 @@ const navigation = [
     icon: {
       template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 9h6v6H9z" /></svg>`
     }
-  },
-  {
-    name: 'System Status',
-    path: '/status',
-    icon: {
-      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>`
-    }
   }
 ];
 
 onMounted(async () => {
-  try {
-    const res = await api.get('/system/status');
-    if (res.data && res.data.system_time) {
-      systemUtcTime.value = res.data.system_time.replace('T', ' ').replace(/\..*$/, ' UTC');
+  if (authStore.isAuthenticated) {
+    try {
+      const res = await api.get('/system/status');
+      if (res.data && res.data.system_time) {
+        systemUtcTime.value = res.data.system_time.replace('T', ' ').replace(/\..*$/, ' UTC');
+      }
+    } catch (e) {
+      systemUtcTime.value = '';
     }
-  } catch (e) {
-    systemUtcTime.value = '';
   }
 });
 
@@ -239,10 +232,8 @@ const pageTitleMap = {
   '/tags': 'Tags',
   '/credentials': 'Credentials',
   '/users': 'Users',
-  '/backups': 'Backups',
   '/config-diff': 'Config Diff',
   '/logs': 'Logs',
-  '/status': 'System Status',
 };
 const pageTitle = computed(() => {
   // Try to match the start of the path for nested routes

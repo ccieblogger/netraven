@@ -8,6 +8,9 @@ services:
     container_name: netraven-frontend-dev
     ports:
       - "5173:5173"
+    depends_on:
+      api:
+        condition: service_healthy
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -98,6 +101,79 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    container_name: netraven-worker
+    entrypoint: ["/app/docker/worker/entrypoint.sh"]
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - NETRAVEN_ENV=prod
+      - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
+      - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
+      - NETRAVEN_SECURITY__ENCRYPTION_KEY=prod_encryption_key_replace_in_production
+      - NETRAVEN_SECURITY__ENCRYPTION_SALT=prod_encryption_salt_replace_in_production
+      - NETRAVEN_LOGGING__FILE__PATH=/data/logs/worker/worker.log
+    volumes:
+      - ./host-logs/netraven/worker:/data/logs/worker
+    healthcheck:
+      test: ["CMD", "/app/worker_healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/scheduler/Dockerfile
+    container_name: netraven-scheduler
+    entrypoint: ["/app/docker/scheduler/entrypoint.sh"]
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - NETRAVEN_ENV=prod
+      - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
+      - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
+      - NETRAVEN_LOGGING__FILE__PATH=/data/logs/scheduler/scheduler.log
+    volumes:
+      - ./host-logs/netraven/scheduler:/data/logs/scheduler
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "netraven.scheduler.scheduler_runner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  rq-scheduler:
+    build:
+      context: .
+      dockerfile: docker/rq_scheduler/Dockerfile
+    container_name: netraven-rq
+    entrypoint: ["/app/docker/rq_scheduler/entrypoint.sh"]
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      - NETRAVEN_ENV=prod
+      - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
+      - NETRAVEN_LOGGING__FILE__PATH=/data/logs/rq_scheduler/rq_scheduler.log
+    volumes:
+      - ./host-logs/netraven/rq_scheduler:/data/logs/rq_scheduler
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "rq_scheduler_runner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
 volumes:
