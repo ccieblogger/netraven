@@ -1,7 +1,7 @@
 <template>
-  <div>
+  <div class="nr-card bg-green-500/30 border border-divider rounded-lg p-0 px-6">
     <!-- Filter/Search Bar (to be integrated) -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4 px-6 pt-6">
       <slot name="filters"></slot>
       <slot name="search"></slot>
     </div>
@@ -12,8 +12,11 @@
       :loading="loading"
       :itemKey="'id'"
       @row-click="onRowClick"
+      table-class="bg-yellow-500/30 text-text-primary"
+      header-class="bg-yellow-500/30 text-text-secondary border-b border-divider"
+      row-class="bg-yellow-500/30 border-b border-divider hover:bg-content"
+      cell-class="text-text-primary px-4"
     >
-      <!-- Custom cell rendering for reachability -->
       <template #cell(reachability)="{ item }">
         <ServiceDot
           :status="item.last_reachability_status === 'success' ? 'healthy' : item.last_reachability_status === 'failure' ? 'unhealthy' : 'unknown'"
@@ -21,20 +24,17 @@
           :tooltip="reachabilityTooltip(item)"
         />
       </template>
-      <!-- Custom cell rendering for tags -->
       <template #cell(tags)="{ value }">
-        <span v-for="tag in value" :key="tag.id" class="bg-blue-100 text-blue-600 py-1 px-3 rounded-full text-xs mr-1">
+        <span v-for="tag in value" :key="tag.id" class="bg-blue-900/30 text-blue-200 py-1 px-3 rounded-full text-xs mr-1">
           {{ tag.name }}
         </span>
       </template>
-      <!-- Custom cell rendering for credentials -->
       <template #cell(credentials)="{ item }">
-        <span v-if="item.matching_credentials_count > 0" class="text-blue-600 cursor-pointer hover:text-blue-800 underline">
+        <span v-if="item.matching_credentials_count > 0" class="text-blue-300 cursor-pointer hover:text-blue-100 underline">
           {{ item.matching_credentials_count }} credential(s)
         </span>
-        <span v-else class="text-red-500 font-semibold">No credentials found.</span>
+        <span v-else class="text-red-400 font-semibold">No credentials found.</span>
       </template>
-      <!-- Custom cell rendering for primary actions -->
       <template #cell(primary_actions)="{ item }">
         <div class="flex flex-row space-x-1">
           <Button size="sm" variant="ghost" @click="$emit('edit', item)" aria-label="Edit Device" title="Edit Device">
@@ -45,7 +45,6 @@
           </Button>
         </div>
       </template>
-      <!-- Custom cell rendering for secondary actions -->
       <template #cell(secondary_actions)="{ item }">
         <div class="flex flex-row space-x-1">
           <Button size="sm" variant="ghost" @click="$emit('check-reachability', item)" :disabled="item.status === 'offline'" aria-label="Check Reachability" title="Check Reachability">
@@ -59,9 +58,12 @@
           </Button>
         </div>
       </template>
+      <template #pagination>
+        <div class="bg-yellow-500/30 border-t border-divider px-6 pb-6 pt-2">
+          <slot name="pagination"></slot>
+        </div>
+      </template>
     </BaseTable>
-    <!-- Pagination slot -->
-    <slot name="pagination"></slot>
   </div>
 </template>
 

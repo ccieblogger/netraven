@@ -43,20 +43,42 @@
     <!-- Device List Table Section -->
     <NrCard title="Devices" subtitle="Inventory overview">
       <template #header>
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 w-full">
-          <ResourceFilter
-            :filterFields="[{ name: 'tag', label: 'Tag', type: 'select', options: tagOptions }]"
-            :initialFilters="{ tag: selectedTag }"
-            @filter="handleFilterChange"
-          />
-          <input
-            type="text"
-            class="rounded-md border-divider bg-card text-text-primary shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3"
-            placeholder="Search hostname or IP..."
-            :value="searchQuery"
-            @input="handleSearchInput"
-            aria-label="Search devices"
-          />
+        <div class="px-6 pt-6">
+          <div class="mb-2">
+            <h2 class="text-lg font-semibold text-text-primary">Device Inventory</h2>
+            <p class="text-xs text-text-secondary">Filter and search your device inventory</p>
+          </div>
+          <form class="bg-card rounded-t-lg px-6 py-4 flex flex-row items-center gap-x-4 w-full" @submit.prevent="handleApplyFilters">
+            <label for="tag" class="sr-only">Tag</label>
+            <select
+              id="tag"
+              v-model="selectedTag"
+              class="h-10 w-48 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
+            >
+              <option value="">All Tags</option>
+              <option v-for="tag in tagOptions" :key="tag.value" :value="tag.value">{{ tag.label }}</option>
+            </select>
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="Search hostname or IP..."
+              class="h-10 w-64 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
+              aria-label="Search devices"
+            />
+            <button
+              type="button"
+              @click="handleResetFilters"
+              class="h-10 px-4 rounded-md border border-divider bg-content text-text-primary hover:bg-content/80 focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              Reset
+            </button>
+            <button
+              type="submit"
+              class="h-10 px-4 rounded-md bg-primary text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              Apply Filters
+            </button>
+          </form>
         </div>
       </template>
       <DeviceTable
@@ -348,6 +370,14 @@ function handlePageChange(page) {
 function handlePageSizeChange(size) {
   pageSize.value = size;
   currentPage.value = 1;
+}
+function handleApplyFilters() {
+  handleFilterChange({ tag: selectedTag });
+}
+function handleResetFilters() {
+  selectedTag.value = '';
+  searchQuery.value = '';
+  handleFilterChange({ tag: '' });
 }
 
 onMounted(() => {
