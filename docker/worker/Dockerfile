@@ -34,11 +34,12 @@ RUN poetry install --no-interaction --no-ansi --no-root --with dev
 # Copy the rest of the application code
 COPY . .
 
-# Make the entrypoint script executable
-RUN chmod +x /app/docker/rq_scheduler/entrypoint.sh
+# Copy the healthcheck script for the worker container
+COPY docker/worker/worker_healthcheck.sh /app/worker_healthcheck.sh
+COPY docker/worker/entrypoint.sh /app/docker/worker/entrypoint.sh
 
 # Make the rq-scheduler entrypoint script executable
-RUN chmod +x /app/docker/rq_scheduler/entrypoint.sh
+RUN chmod +x /app/docker/worker/entrypoint.sh
 
 # Set the default entrypoint for rq-scheduler
-ENTRYPOINT ["/app/docker/rq_scheduler/entrypoint.sh"] 
+ENTRYPOINT ["/app/docker/worker/entrypoint.sh"] 

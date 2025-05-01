@@ -1,76 +1,36 @@
 version: '3.8'
 
 services:
-  # Add Nginx as reverse proxy for development
-  nginx:
-    image: nginx:1.25
-    container_name: netraven-nginx-dev
-    ports:
-      # Expose Nginx on port 80 to the host
-      - "80:80"
-    volumes:
-      # Mount our custom configuration
-      - ./docker/nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf
-      - ./docker/nginx/security-headers.conf:/etc/nginx/conf.d/security-headers.conf
-    depends_on:
-      - frontend
-      - api
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
-    container_name: netraven-frontend-dev
+      dockerfile: Dockerfile
+    container_name: netraven-frontend
     ports:
-      - "5173:5173"
-    volumes:
-      # Mount source code for live updates
-      - ./frontend:/app
-      # Use a named volume for node_modules to avoid overwriting with host directory
-      - frontend-node-modules:/app/node_modules
-    environment:
-      - NODE_ENV=development
-      # Update API URL to work with Nginx
-      - VITE_API_URL=/api
-    # Simplify command since we've verified Node.js works in the Dockerfile
-    command: npm run dev
-    # Update healthcheck to use internal network
-    healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:5173 || exit 1
-      interval: 30s  # Increased from 10s to 30s
-      timeout: 10s   # Increased from 5s to 10s
-      retries: 5
-      start_period: 30s  # Give it 30s before starting health checks
-    # Ensure container restarts if it fails
+      - "80:80"
+      # Uncomment below if you have SSL configured in nginx.conf and certificates in place
+      # - "443:443"
+    depends_on:
+      - api
     restart: unless-stopped
 
   api:
     build:
       context: .
-      dockerfile: docker/api/Dockerfile.dev
-    container_name: netraven-api-dev
+      dockerfile: docker/api/Dockerfile
+    container_name: netraven-api
     ports:
       - "8000:8000"
     volumes:
-      # Mount source code for live updates
-      - .:/app
-      # Mount host log directory for file-based logging
       - ./host-logs/netraven/api:/data/logs/api
     env_file:
-      - .env.dev
+      - .env.prod
     environment:
-      - NETRAVEN_ENV=dev
+      - NETRAVEN_ENV=prod
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
-      - NETRAVEN_SECURITY__ENCRYPTION_KEY=dev_encryption_key_replace_in_production
-      - NETRAVEN_SECURITY__ENCRYPTION_SALT=dev_encryption_salt_replace_in_production
+      - NETRAVEN_SECURITY__ENCRYPTION_KEY=prod_encryption_key_replace_in_production
+      - NETRAVEN_SECURITY__ENCRYPTION_SALT=prod_encryption_salt_replace_in_production
     depends_on:
       postgres:
         condition: service_healthy
@@ -117,45 +77,45 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   worker:
     build:
       context: .
-      dockerfile: docker/api/Dockerfile.dev
-    container_name: netraven-worker-dev
+      dockerfile: docker/worker/Dockerfile
+    container_name: netraven-worker
     entrypoint: ["/app/docker/worker/entrypoint.sh"]
     depends_on:
       - redis
       - postgres
     environment:
-      - NETRAVEN_ENV=dev
+      - NETRAVEN_ENV=prod
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
-      - NETRAVEN_SECURITY__ENCRYPTION_KEY=dev_encryption_key_replace_in_production
-      - NETRAVEN_SECURITY__ENCRYPTION_SALT=dev_encryption_salt_replace_in_production
+      - NETRAVEN_SECURITY__ENCRYPTION_KEY=prod_encryption_key_replace_in_production
+      - NETRAVEN_SECURITY__ENCRYPTION_SALT=prod_encryption_salt_replace_in_production
       - NETRAVEN_LOGGING__FILE__PATH=/data/logs/worker/worker.log
-    # Custom healthcheck: checks RQ worker process and Redis connectivity
+    volumes:
+      - ./host-logs/netraven/worker:/data/logs/worker
     healthcheck:
       test: ["CMD", "/app/worker_healthcheck.sh"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-    # Mount host log directory for file-based logging
-    volumes:
-      - ./host-logs/netraven/worker:/data/logs/worker
+    restart: unless-stopped
 
   scheduler:
     build:
       context: .
-      dockerfile: docker/api/Dockerfile.dev
-    container_name: netraven-scheduler-dev
+      dockerfile: docker/scheduler/Dockerfile
+    container_name: netraven-scheduler
     entrypoint: ["/app/docker/scheduler/entrypoint.sh"]
     depends_on:
       - redis
       - postgres
     environment:
-      - NETRAVEN_ENV=dev
+      - NETRAVEN_ENV=prod
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
       - NETRAVEN_LOGGING__FILE__PATH=/data/logs/scheduler/scheduler.log
@@ -167,31 +127,31 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    restart: unless-stopped
 
   rq-scheduler:
     build:
       context: .
-      dockerfile: docker/rq_scheduler/Dockerfile  # Use your dedicated Dockerfile if available
-    container_name: netraven-rq-scheduler
-    entrypoint: ["/app/docker/rq_scheduler/rq_scheduler_entrypoint.sh"]
+      dockerfile: docker/rq_scheduler/Dockerfile
+    container_name: netraven-rq
+    entrypoint: ["/app/docker/rq_scheduler/entrypoint.sh"]
     depends_on:
       - redis
       - postgres
     environment:
-      - NETRAVEN_ENV=dev
+      - NETRAVEN_ENV=prod
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
       - NETRAVEN_LOGGING__FILE__PATH=/data/logs/rq_scheduler/rq_scheduler.log
     volumes:
       - ./host-logs/netraven/rq_scheduler:/data/logs/rq_scheduler
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "pgrep", "-f", "rq_scheduler_runner"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
+    restart: unless-stopped
 
 volumes:
-  frontend-node-modules:
-  redis-data:
   postgres-data:
+  redis-data:

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Check if RQ worker process is running
-if ! pgrep -f 'rq worker' > /dev/null; then
-  echo "RQ worker process not running"
+# Check if the NetRaven worker process is running
+if ! pgrep -f 'netraven.worker.worker_runner' > /dev/null; then
+  echo "NetRaven worker process not running"
   exit 1
 fi
 
