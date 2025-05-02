@@ -94,7 +94,9 @@ const routes = [
   },
   {
     path: '/logs',
-    redirect: '/connection-logs'
+    name: 'Logs',
+    component: Logs,
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
   },
   {
     path: '/users',
