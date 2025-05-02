@@ -1,192 +1,180 @@
 <template>
   <div class="container mx-auto p-4">
-    <h1 class="text-2xl font-semibold mb-4">Connection Logs</h1>
+    <h1 class="text-2xl font-semibold mb-4">Logs</h1>
 
-    <!-- Filters -->
-    <ResourceFilter
-      title="Connection Log Filters"
-      :filter-fields="filterFields"
-      :initial-filters="currentFilters"
-      @apply-filters="applyFilters"
-      @reset-filters="resetFilters"
-    />
-
-    <!-- Loading/Error Indicators -->
-    <div v-if="logStore.isLoading && logs.length === 0" class="text-center py-4">Loading Connection Logs...</div>
-     <div v-if="logStore.error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-       <span v-if="logStore.error === 'Not authenticated' || logStore.error === '401 Unauthorized'">
-         Your session has expired or you are not logged in. <router-link to="/login" class="underline text-blue-700">Please log in again.</router-link>
-       </span>
-       <span v-else-if="logStore.error === 'Not Found' || logStore.error === '404 Not Found'">
-         Connection Logs endpoint not found. Please contact support.
-       </span>
-       <span v-else>
-         Error: {{ logStore.error }}
-       </span>
+    <!-- Global Search Bar -->
+    <div class="mb-4 flex flex-row gap-2 items-center">
+      <InputText v-model="globalSearch" placeholder="Global search (message, source, etc.)" class="w-96" @input="onGlobalSearch" />
+      <Button label="Clear" @click="clearGlobalSearch" v-if="globalSearch" size="small" />
     </div>
 
-    <!-- Logs Table -->
-    <div v-if="logs.length > 0" class="bg-white shadow-md rounded my-6" :class="{ 'opacity-50': logStore.isLoading }">
-      <table class="min-w-max w-full table-auto">
-        <thead>
-          <tr class="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
-            <th class="py-3 px-6 text-left">Timestamp</th>
-            <th class="py-3 px-6 text-left">Job ID</th>
-            <th class="py-3 px-6 text-left">Device ID</th>
-            <th class="py-3 px-6 text-left">Log Content</th>
-          </tr>
-        </thead>
-        <tbody class="text-gray-600 text-sm font-light">
-          <tr v-for="log in logs" :key="log.id + 'conn'" class="border-b border-gray-200 hover:bg-gray-100">
-             <td class="py-3 px-6 text-left text-xs whitespace-nowrap">{{ formatDateTime(log.timestamp) }}</td>
-             <td class="py-3 px-6 text-left">{{ log.job_id }}</td>
-             <td class="py-3 px-6 text-left">{{ log.device_id || '-' }}</td>
-             <td class="py-3 px-6 text-left">
-                 <pre class="text-xs whitespace-pre-wrap font-mono">{{ log.log }}</pre>
-             </td>
-          </tr>
-        </tbody>
-      </table>
-       <!-- Pagination Controls -->
-       <PaginationControls
-            v-if="totalPages > 1"
-            :current-page="logStore.pagination.currentPage"
-            :total-pages="totalPages"
-            @change-page="handlePageChange"
-        />
-    </div>
-
-    <!-- No Logs Message -->
-    <div v-if="!logStore.isLoading && logs.length === 0 && !logStore.error" class="text-center text-gray-500 py-6">
-      No connection logs found matching the criteria.
-    </div>
-
+    <!-- DataTable -->
+    <DataTable
+      :value="logs"
+      :loading="logStore.isLoading"
+      :paginator="true"
+      :rows="pageSize"
+      :totalRecords="logStore.totalCount"
+      :first="(currentPage - 1) * pageSize"
+      :rowsPerPageOptions="[10, 20, 50, 100]"
+      :sortField="sortField"
+      :sortOrder="sortOrder"
+      @page="onPageChange"
+      @sort="onSort"
+      @filter="onFilter"
+      :filters="filters"
+      responsiveLayout="scroll"
+      class="shadow-md rounded bg-white"
+      dataKey="id"
+      :emptyMessage="logStore.isLoading ? 'Loading logs...' : 'No logs found.'"
+      :rowClass="rowClass"
+    >
+      <Column field="timestamp" header="Timestamp" :sortable="true" :filter="true" :filterMatchMode="'between'" :dataType="'date'" :body="formatDateTime" style="min-width: 180px" />
+      <Column field="log_type" header="Type" :sortable="true" :filter="true" :filterMatchMode="'equals'" :showFilterMenu="false" :filterElement="logTypeFilter" style="min-width: 120px" />
+      <Column field="level" header="Level" :sortable="true" :filter="true" :filterMatchMode="'equals'" :showFilterMenu="false" :filterElement="logLevelFilter" :body="logLevelBody" style="min-width: 100px" />
+      <Column field="job_id" header="Job ID" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 80px" />
+      <Column field="device_id" header="Device ID" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 80px" />
+      <Column field="source" header="Source" :sortable="true" :filter="true" :filterMatchMode="'contains'" style="min-width: 120px" />
+      <Column field="message" header="Message" :sortable="true" :filter="true" :filterMatchMode="'contains'" style="min-width: 200px" />
+      <Column field="meta" header="Meta" :body="metaBody" style="min-width: 180px" />
+    </DataTable>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, reactive, watch } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useLogStore } from '../store/log'
-import { useRoute, useRouter } from 'vue-router' // To potentially pre-fill filters from query params
-import PaginationControls from '../components/PaginationControls.vue'
-import ResourceFilter from '../components/ResourceFilter.vue'
+import { useRoute, useRouter } from 'vue-router'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import InputText from 'primevue/inputtext'
+import Dropdown from 'primevue/dropdown'
+import Button from 'primevue/button'
 
 const logStore = useLogStore()
-const logs = computed(() => logStore.logs)
-const totalPages = computed(() => logStore.totalPages) // Use computed from store
 const route = useRoute()
 const router = useRouter()
 
-// Filter fields configuration (no log_type)
-const filterFields = [
-  {
-    id: 'job_id',
-    label: 'Job ID',
-    type: 'number',
-    placeholder: 'Filter by Job ID'
-  },
-  {
-    id: 'device_id',
-    label: 'Device ID',
-    type: 'number',
-    placeholder: 'Filter by Device ID'
+const logs = computed(() => logStore.logs)
+const currentPage = ref(1)
+const pageSize = ref(20)
+const sortField = ref('timestamp')
+const sortOrder = ref(-1) // -1: desc, 1: asc
+const filters = ref({})
+const globalSearch = ref('')
+
+// For dropdown filters
+const logTypeOptions = ref([])
+const logLevelOptions = ref([])
+
+// Fetch log types/levels for dropdowns
+async function fetchFilterOptions() {
+  const [types, levels] = await Promise.all([
+    logStore.fetchLogTypes(),
+    logStore.fetchLogLevels()
+  ])
+  logTypeOptions.value = types.map(t => ({ label: t.description || t.log_type, value: t.log_type }))
+  logLevelOptions.value = levels.map(l => ({ label: l.description || l.level, value: l.level }))
+}
+
+onMounted(async () => {
+  await fetchFilterOptions()
+  fetchLogs()
+})
+
+function fetchLogs() {
+  logStore.fetchLogs(currentPage.value, buildFilters())
+}
+
+function buildFilters() {
+  // Build filter object for API from DataTable filters/global search
+  const f = {}
+  if (filters.value.log_type) f.log_type = filters.value.log_type.value
+  if (filters.value.level) f.level = filters.value.level.value
+  if (filters.value.job_id) f.job_id = filters.value.job_id.value
+  if (filters.value.device_id) f.device_id = filters.value.device_id.value
+  if (filters.value.source) f.source = filters.value.source.value
+  if (filters.value.message) f.search = filters.value.message.value
+  if (filters.value.timestamp && filters.value.timestamp.value && filters.value.timestamp.value.length === 2) {
+    f.start_time = filters.value.timestamp.value[0]
+    f.end_time = filters.value.timestamp.value[1]
   }
-]
-
-// Local reactive state for filter inputs, initialized from route query
-const currentFilters = reactive({
-  job_id: route.query.job_id ? parseInt(route.query.job_id) : null,
-  device_id: route.query.device_id ? parseInt(route.query.device_id) : null
-})
-
-// Function to update route query params when filters or page change
-function updateRouteQuery() {
-    const query = { ...route.query }; // Start with existing query params
-
-    // Update filters in query
-    Object.keys(currentFilters).forEach(key => {
-        if (currentFilters[key] != null && currentFilters[key] !== '') {
-            query[key] = currentFilters[key];
-        } else {
-            delete query[key]; // Remove empty/null filters from URL
-        }
-    });
-
-    // Update page in query
-    if (logStore.pagination.currentPage > 1) {
-        query.page = logStore.pagination.currentPage;
-    } else {
-        delete query.page; // Don't show page=1 in URL
-    }
-
-    // Use replace to avoid adding multiple history entries for pagination/filtering
-    router.replace({ query });
+  if (globalSearch.value) f.search = globalSearch.value
+  return f
 }
 
-// Fetch logs when component mounts
-onMounted(() => {
-    const initialPage = route.query.page ? parseInt(route.query.page) : 1;
-    // Pass initial filters and page from route query
-    logStore.fetchLogs(initialPage, currentFilters)
-})
-
-function applyFilters(filters) {
-  // Update currentFilters with the values received from ResourceFilter
-  Object.assign(currentFilters, filters);
-  
-  // fetchLogs in store now resets page to 1 when newFilters are passed
-  logStore.fetchLogs(1, currentFilters);
-  updateRouteQuery(); // Update URL after applying filters
+function onPageChange(e) {
+  currentPage.value = e.page + 1
+  pageSize.value = e.rows
+  fetchLogs()
+}
+function onSort(e) {
+  sortField.value = e.sortField
+  sortOrder.value = e.sortOrder
+  fetchLogs()
+}
+function onFilter(e) {
+  filters.value = e.filters
+  fetchLogs()
+}
+function onGlobalSearch() {
+  fetchLogs()
+}
+function clearGlobalSearch() {
+  globalSearch.value = ''
+  fetchLogs()
 }
 
-function resetFilters() {
-  // Reset all filters to null
-  Object.keys(currentFilters).forEach(key => {
-    currentFilters[key] = null;
-  });
-  
-  // fetchLogs resets page to 1
-  logStore.fetchLogs(1, currentFilters);
-  updateRouteQuery(); // Update URL after resetting filters
+// Custom filter elements for dropdowns
+function logTypeFilter({ filterModel }) {
+  return <Dropdown v-model={filterModel.value} options={logTypeOptions.value} placeholder="All Types" showClear />
+}
+function logLevelFilter({ filterModel }) {
+  return <Dropdown v-model={filterModel.value} options={logLevelOptions.value} placeholder="All Levels" showClear />
 }
 
-function handlePageChange(newPage) {
-    logStore.fetchLogs(newPage); // Fetch new page, filters remain the same
-    updateRouteQuery(); // Update URL after changing page
+// Custom body for meta column
+function metaBody(row) {
+  return row.meta ? <pre class="text-xs whitespace-pre-wrap font-mono">{JSON.stringify(row.meta, null, 2)}</pre> : '-'
 }
-
-// --- Helper Functions ---
-function formatDateTime(dateTimeString) {
-  if (!dateTimeString) return '-';
+// Custom body for log level
+function logLevelBody(row) {
+  const level = row.level ? row.level.toLowerCase() : ''
+  let color = 'bg-gray-200 text-gray-600'
+  if (level === 'critical' || level === 'error') color = 'bg-red-200 text-red-600'
+  else if (level === 'warning') color = 'bg-yellow-200 text-yellow-600'
+  else if (level === 'info') color = 'bg-blue-200 text-blue-600'
+  return <span class={color + ' px-2 py-1 rounded text-xs font-semibold'}>{row.level}</span>
+}
+// Custom row class for hover effect
+function rowClass() {
+  return 'hover:bg-gray-100'
+}
+// Format timestamp
+function formatDateTime(row) {
+  if (!row.timestamp) return '-'
   try {
-    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
-    return new Date(dateTimeString).toLocaleString(undefined, options);
+    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }
+    return new Date(row.timestamp).toLocaleString(undefined, options)
   } catch (e) {
-    return dateTimeString;
+    return row.timestamp
   }
 }
-
-function logLevelClass(level) {
-  if (!level) return 'bg-gray-200 text-gray-600';
-  level = level.toLowerCase();
-  if (level === 'critical' || level === 'error') return 'bg-red-200 text-red-600';
-  if (level === 'warning') return 'bg-yellow-200 text-yellow-600';
-  if (level === 'info') return 'bg-blue-200 text-blue-600';
-  if (level === 'debug') return 'bg-gray-200 text-gray-600';
-  return 'bg-gray-200 text-gray-600';
-}
-
-// Optional: Watch route query changes if you want external links to update the view
-// watch(() => route.query, (newQuery) => {
-//     currentFilters.job_id = newQuery.job_id ? parseInt(newQuery.job_id) : null;
-//     currentFilters.device_id = newQuery.device_id ? parseInt(newQuery.device_id) : null;
-//     currentFilters.log_type = newQuery.log_type || null;
-//     const page = newQuery.page ? parseInt(newQuery.page) : 1;
-//     logStore.fetchLogs(page, currentFilters);
-// }, { deep: true });
-
 </script>
 
 <style scoped>
-/* Add any page-specific styles */
+.p-datatable .p-datatable-thead > tr > th {
+  background: #f3f4f6;
+  color: #374151;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.75rem 1rem;
+}
+.p-datatable .p-datatable-tbody > tr > td {
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+}
+.p-datatable .p-datatable-tbody > tr:hover > td {
+  background: #f1f5f9;
+}
 </style>
