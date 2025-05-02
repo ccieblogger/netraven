@@ -30,8 +30,16 @@
       :rowClass="rowClass"
     >
       <Column field="timestamp" header="Timestamp" :sortable="true" :filter="true" :filterMatchMode="'between'" :dataType="'date'" :body="formatDateTime" style="min-width: 180px" />
-      <Column field="log_type" header="Type" :sortable="true" :filter="true" :filterMatchMode="'equals'" :showFilterMenu="false" :filterElement="logTypeFilter" style="min-width: 120px" />
-      <Column field="level" header="Level" :sortable="true" :filter="true" :filterMatchMode="'equals'" :showFilterMenu="false" :filterElement="logLevelFilter" :body="logLevelBody" style="min-width: 100px" />
+      <Column field="log_type" header="Type" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 120px">
+        <template #filter="{ filterModel }">
+          <Dropdown v-model="filterModel.value" :options="logTypeOptions" placeholder="All Types" showClear />
+        </template>
+      </Column>
+      <Column field="level" header="Level" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 100px" :body="logLevelBody">
+        <template #filter="{ filterModel }">
+          <Dropdown v-model="filterModel.value" :options="logLevelOptions" placeholder="All Levels" showClear />
+        </template>
+      </Column>
       <Column field="job_id" header="Job ID" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 80px" />
       <Column field="device_id" header="Device ID" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 80px" />
       <Column field="source" header="Source" :sortable="true" :filter="true" :filterMatchMode="'contains'" style="min-width: 120px" />
@@ -125,17 +133,9 @@ function clearGlobalSearch() {
   fetchLogs()
 }
 
-// Custom filter elements for dropdowns
-function logTypeFilter({ filterModel }) {
-  return <Dropdown v-model={filterModel.value} options={logTypeOptions.value} placeholder="All Types" showClear />
-}
-function logLevelFilter({ filterModel }) {
-  return <Dropdown v-model={filterModel.value} options={logLevelOptions.value} placeholder="All Levels" showClear />
-}
-
 // Custom body for meta column
 function metaBody(row) {
-  return row.meta ? <pre class="text-xs whitespace-pre-wrap font-mono">{JSON.stringify(row.meta, null, 2)}</pre> : '-'
+  return row.meta ? `<pre class='text-xs whitespace-pre-wrap font-mono'>${JSON.stringify(row.meta, null, 2)}</pre>` : '-'
 }
 // Custom body for log level
 function logLevelBody(row) {
@@ -144,7 +144,7 @@ function logLevelBody(row) {
   if (level === 'critical' || level === 'error') color = 'bg-red-200 text-red-600'
   else if (level === 'warning') color = 'bg-yellow-200 text-yellow-600'
   else if (level === 'info') color = 'bg-blue-200 text-blue-600'
-  return <span class={color + ' px-2 py-1 rounded text-xs font-semibold'}>{row.level}</span>
+  return `<span class='${color} px-2 py-1 rounded text-xs font-semibold'>${row.level}</span>`
 }
 // Custom row class for hover effect
 function rowClass() {
