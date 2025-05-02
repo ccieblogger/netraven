@@ -136,6 +136,16 @@ function bodyClass(field) {
 </script>
 
 <style scoped>
+/* Header underline: strong white or theme color */
+:deep(.p-datatable-thead > tr) {
+  border-bottom: 2px solid var(--nr-text-primary);
+}
+
+/* Row dividers: subtle, theme-aware */
+:deep(.p-datatable-tbody > tr) {
+  border-bottom: 1px solid var(--nr-border);
+}
+
 :deep(.p-paginator) {
   background-color: var(--nr-bg-card) !important;
 }
