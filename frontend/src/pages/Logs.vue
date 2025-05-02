@@ -15,7 +15,7 @@
       :loading="logStore.isLoading"
       :paginator="true"
       :rows="pageSize"
-      :totalRecords="logStore.totalCount"
+      :totalRecords="logStore.pagination.totalItems"
       :first="(currentPage - 1) * pageSize"
       :rowsPerPageOptions="[10, 20, 50, 100]"
       :sortField="sortField"
@@ -76,6 +76,8 @@ const globalSearch = ref('')
 const logTypeOptions = ref([])
 const logLevelOptions = ref([])
 
+let initializedFromQuery = false;
+
 // --- Deep-linking helpers ---
 function parseQueryParams() {
   // Parse query params and set initial state
@@ -99,12 +101,11 @@ function parseQueryParams() {
   if (q.search) globalSearch.value = q.search
 }
 function updateQueryParams() {
-  // Update the URL with the current filter/sort/page state
+  // Build the new query object as before...
   const q = {}
   if (currentPage.value > 1) q.page = currentPage.value
   if (pageSize.value !== 20) q.size = pageSize.value
   if (sortField.value) q.sort = `${sortField.value}_${sortOrder.value === 1 ? 'asc' : 'desc'}`
-  // Filters
   if (filters.value.log_type && filters.value.log_type.value) q.log_type = filters.value.log_type.value
   if (filters.value.level && filters.value.level.value) q.level = filters.value.level.value
   if (filters.value.job_id && filters.value.job_id.value) q.job_id = filters.value.job_id.value
@@ -116,7 +117,18 @@ function updateQueryParams() {
     q.end_time = filters.value.timestamp.value[1]
   }
   if (globalSearch.value) q.search = globalSearch.value
-  router.replace({ query: q })
+  // Only update if different
+  const current = { ...route.query }
+  let changed = false
+  for (const key in q) {
+    if (q[key] !== current[key]) changed = true
+  }
+  for (const key in current) {
+    if (!(key in q)) changed = true
+  }
+  if (changed) {
+    router.replace({ query: q })
+  }
 }
 
 // Fetch log types/levels for dropdowns
@@ -131,7 +143,10 @@ async function fetchFilterOptions() {
 
 onMounted(async () => {
   await fetchFilterOptions()
-  parseQueryParams()
+  if (!initializedFromQuery) {
+    parseQueryParams()
+    initializedFromQuery = true
+  }
   fetchLogs()
 })
 
