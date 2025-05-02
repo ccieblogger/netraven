@@ -1,0 +1,315 @@
+{"timestamp": "2025-05-01 00:45:06,412", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 00:45:06,418", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 00:45:06,575", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 00:45:06,578", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 00:45:06,586", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 00:45:06,594", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 00:45:08,243", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 01:02:05,530", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:02:05,535", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 01:02:05,688", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:02:05,691", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 01:02:05,698", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 01:02:05,706", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 01:02:07,466", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 01:04:14,952", "level": "INFO", "message": Admin user 'admin' already exists with ID: 1}
+{"timestamp": "2025-05-01 01:04:14,954", "level": "INFO", "message": Tag 'default' already exists with ID: 1}
+{"timestamp": "2025-05-01 01:04:14,954", "level": "INFO", "message": Credential with username 'admin' already exists with ID: 1}
+{"timestamp": "2025-05-01 01:04:14,957", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 01:04:14,961", "level": "INFO", "message": Default credential is already associated with default tag}
+{"timestamp": "2025-05-01 01:04:14,963", "level": "INFO", "message": System reachability job already exists with ID: 1}
+{"timestamp": "2025-05-01 01:04:16,523", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 01:06:51,018", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 01:06:51,022", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 01:06:51,022", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 01:06:51,022", "level": "DEBUG", "message": Stored hash: $2b$12$I6N...}
+{"timestamp": "2025-05-01 01:06:51,186", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 01:06:51,187", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 01:47:28,201", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:47:28,205", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 01:47:28,360", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:47:28,362", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 01:47:28,369", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 01:47:28,375", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 01:47:29,972", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 01:48:31,069", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:48:31,074", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 01:48:31,222", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:48:31,224", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 01:48:31,231", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 01:48:31,237", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 01:48:32,699", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 01:53:21,716", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:53:21,721", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 01:53:21,872", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:53:21,874", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 01:53:21,881", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 01:53:21,887", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 01:53:23,467", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 01:56:56,913", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:56:56,918", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 01:56:57,079", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 01:56:57,082", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 01:56:57,089", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 01:56:57,097", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 01:56:58,975", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 01:58:07,754", "level": "INFO", "message": Admin user 'admin' already exists with ID: 1}
+{"timestamp": "2025-05-01 01:58:07,755", "level": "INFO", "message": Tag 'default' already exists with ID: 1}
+{"timestamp": "2025-05-01 01:58:07,756", "level": "INFO", "message": Credential with username 'admin' already exists with ID: 1}
+{"timestamp": "2025-05-01 01:58:07,759", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 01:58:07,762", "level": "INFO", "message": Default credential is already associated with default tag}
+{"timestamp": "2025-05-01 01:58:07,763", "level": "INFO", "message": System reachability job already exists with ID: 1}
+{"timestamp": "2025-05-01 01:58:09,359", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 01:58:17,129", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 01:58:17,131", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 01:58:17,131", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 01:58:17,131", "level": "DEBUG", "message": Stored hash: $2b$12$9E....}
+{"timestamp": "2025-05-01 01:58:17,292", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 01:58:17,293", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 01:59:04,666", "level": "INFO", "message": Admin user 'admin' already exists with ID: 1}
+{"timestamp": "2025-05-01 01:59:04,667", "level": "INFO", "message": Tag 'default' already exists with ID: 1}
+{"timestamp": "2025-05-01 01:59:04,668", "level": "INFO", "message": Credential with username 'admin' already exists with ID: 1}
+{"timestamp": "2025-05-01 01:59:04,670", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 01:59:04,674", "level": "INFO", "message": Default credential is already associated with default tag}
+{"timestamp": "2025-05-01 01:59:04,676", "level": "INFO", "message": System reachability job already exists with ID: 1}
+{"timestamp": "2025-05-01 01:59:06,179", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 02:05:12,960", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 02:05:12,965", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 02:05:13,118", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 02:05:13,121", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 02:05:13,128", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 02:05:13,134", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 02:05:14,703", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 02:05:18,316", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 02:05:18,319", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 02:05:18,319", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 02:05:18,319", "level": "DEBUG", "message": Stored hash: $2b$12$CWD...}
+{"timestamp": "2025-05-01 02:05:18,480", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 02:05:18,481", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 02:31:00,939", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 02:31:00,944", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 02:31:01,098", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 02:31:01,101", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 02:31:01,108", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 02:31:01,115", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 02:31:02,775", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 02:31:05,605", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 02:31:05,608", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 02:31:05,608", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 02:31:05,608", "level": "DEBUG", "message": Stored hash: $2b$12$UGP...}
+{"timestamp": "2025-05-01 02:31:05,768", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 02:31:05,769", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 02:31:12,805", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 02:31:12,807", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 02:31:12,807", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 02:31:12,807", "level": "DEBUG", "message": Stored hash: $2b$12$UGP...}
+{"timestamp": "2025-05-01 02:31:12,953", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 02:31:12,953", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 02:51:56,369", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 02:51:56,375", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 02:51:56,529", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 02:51:56,532", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 02:51:56,540", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 02:51:56,547", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 02:51:58,213", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 02:52:00,298", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 02:52:00,301", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 02:52:00,301", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 02:52:00,301", "level": "DEBUG", "message": Stored hash: $2b$12$lFW...}
+{"timestamp": "2025-05-01 02:52:00,460", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 02:52:00,461", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 02:53:08,726", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 02:53:08,729", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 02:53:08,730", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 02:53:08,730", "level": "DEBUG", "message": Stored hash: $2b$12$lFW...}
+{"timestamp": "2025-05-01 02:53:08,875", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 02:53:08,875", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 02:53:21,891", "level": "INFO", "message": Device created successful [c8000v1] ...}
+{"timestamp": "2025-05-01 02:54:09,334", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 02:54:09,335", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 02:54:09,335", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 02:54:09,335", "level": "DEBUG", "message": Stored hash: $2b$12$lFW...}
+{"timestamp": "2025-05-01 02:54:09,474", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 02:54:09,474", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 02:55:16,164", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 02:55:16,165", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 02:55:16,165", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 02:55:16,165", "level": "DEBUG", "message": Stored hash: $2b$12$lFW...}
+{"timestamp": "2025-05-01 02:55:16,308", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 02:55:16,309", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 02:56:09,720", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 02:56:09,721", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 02:56:09,722", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 02:56:09,722", "level": "DEBUG", "message": Stored hash: $2b$12$lFW...}
+{"timestamp": "2025-05-01 02:56:09,862", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 02:56:09,863", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 03:02:12,169", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 03:02:12,171", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 03:02:12,171", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 03:02:12,171", "level": "DEBUG", "message": Stored hash: $2b$12$lFW...}
+{"timestamp": "2025-05-01 03:02:12,314", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 03:02:12,314", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 03:27:34,832", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 03:27:34,837", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 03:27:34,987", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 03:27:34,990", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 03:27:34,997", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 03:27:35,004", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 03:27:36,618", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 03:27:38,211", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 03:27:38,214", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 03:27:38,214", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 03:27:38,214", "level": "DEBUG", "message": Stored hash: $2b$12$2uP...}
+{"timestamp": "2025-05-01 03:27:38,371", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 03:27:38,371", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 03:46:23,756", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 03:46:23,767", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 03:46:23,767", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 03:46:23,767", "level": "DEBUG", "message": Stored hash: $2b$12$2uP...}
+{"timestamp": "2025-05-01 03:46:23,910", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 03:46:23,910", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 03:47:08,150", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 03:47:08,152", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 03:47:08,152", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 03:47:08,152", "level": "DEBUG", "message": Stored hash: $2b$12$2uP...}
+{"timestamp": "2025-05-01 03:47:08,296", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 03:47:08,296", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 04:19:23,272", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 04:19:23,273", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 04:19:23,273", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 04:19:23,273", "level": "DEBUG", "message": Stored hash: $2b$12$2uP...}
+{"timestamp": "2025-05-01 04:19:23,419", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 04:19:23,420", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 04:20:39,998", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 04:20:40,003", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 04:20:40,150", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 04:20:40,153", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 04:20:40,161", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 04:20:40,168", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 04:20:41,784", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 04:26:04,131", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 04:26:04,135", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 04:26:04,277", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 04:26:04,280", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 04:26:04,286", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 04:26:04,294", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 04:26:05,951", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 04:28:03,084", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 04:28:03,088", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 04:28:03,242", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 04:28:03,245", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 04:28:03,253", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 04:28:03,260", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 04:28:04,727", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 04:28:08,677", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 04:28:08,680", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 04:28:08,680", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 04:28:08,680", "level": "DEBUG", "message": Stored hash: $2b$12$jus...}
+{"timestamp": "2025-05-01 04:28:08,835", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 04:28:08,835", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 16:20:56,193", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 16:20:56,198", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 16:20:56,340", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 16:20:56,343", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 16:20:56,349", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 16:20:56,356", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 16:20:57,910", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 16:25:07,062", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 16:25:07,066", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 16:25:07,066", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 16:25:07,066", "level": "DEBUG", "message": Stored hash: $2b$12$I56...}
+{"timestamp": "2025-05-01 16:25:07,219", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 16:25:07,220", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 16:26:38,955", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 16:26:38,960", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 16:26:39,111", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 16:26:39,114", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 16:26:39,122", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 16:26:39,133", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 16:26:40,627", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 16:41:42,114", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 16:41:42,120", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 16:41:42,272", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 16:41:42,275", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 16:41:42,284", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 16:41:42,292", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 16:41:43,948", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 16:57:30,138", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 16:57:30,143", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 16:57:30,297", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 16:57:30,300", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 16:57:30,307", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 16:57:30,314", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 16:57:31,867", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 17:06:00,033", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 17:06:00,039", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 17:06:00,193", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 17:06:00,196", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 17:06:00,205", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 17:06:00,213", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 17:06:01,825", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 17:07:23,991", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 17:07:23,996", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 17:07:24,145", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 17:07:24,148", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 17:07:24,156", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 17:07:24,162", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 17:07:25,656", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 17:08:39,605", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 17:08:39,608", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 17:08:39,608", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 17:08:39,608", "level": "DEBUG", "message": Stored hash: $2b$12$qiG...}
+{"timestamp": "2025-05-01 17:08:39,761", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 17:08:39,762", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 21:41:34,334", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 21:41:34,336", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 21:41:34,336", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 21:41:34,336", "level": "DEBUG", "message": Stored hash: $2b$12$qiG...}
+{"timestamp": "2025-05-01 21:41:34,481", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 21:41:34,481", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 21:51:46,277", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 21:51:46,282", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 21:51:46,434", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 21:51:46,437", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 21:51:46,444", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 21:51:46,450", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 21:51:48,004", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 22:09:12,482", "level": "INFO", "message": Device created successful [c8000v1] ...}
+{"timestamp": "2025-05-01 22:11:56,437", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 22:11:56,438", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 22:11:56,438", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 22:11:56,438", "level": "DEBUG", "message": Stored hash: $2b$12$n0B...}
+{"timestamp": "2025-05-01 22:11:56,595", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 22:11:56,595", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 22:42:11,394", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 22:42:11,395", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 22:42:11,395", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 22:42:11,395", "level": "DEBUG", "message": Stored hash: $2b$12$n0B...}
+{"timestamp": "2025-05-01 22:42:11,538", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 22:42:11,538", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 23:13:21,380", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 23:13:21,382", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 23:13:21,382", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 23:13:21,382", "level": "DEBUG", "message": Stored hash: $2b$12$n0B...}
+{"timestamp": "2025-05-01 23:13:21,522", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 23:13:21,523", "level": "INFO", "message": Token generated successfully for user: admin}
+{"timestamp": "2025-05-01 23:37:32,733", "level": "INFO", "message": Admin user 'admin' already exists with ID: 1}
+{"timestamp": "2025-05-01 23:37:32,734", "level": "INFO", "message": Tag 'default' already exists with ID: 1}
+{"timestamp": "2025-05-01 23:37:32,736", "level": "INFO", "message": Credential with username 'admin' already exists with ID: 1}
+{"timestamp": "2025-05-01 23:37:32,739", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 23:37:32,742", "level": "INFO", "message": Default credential is already associated with default tag}
+{"timestamp": "2025-05-01 23:37:32,745", "level": "INFO", "message": System reachability job already exists with ID: 1}
+{"timestamp": "2025-05-01 23:37:34,336", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 23:39:25,397", "level": "INFO", "message": Admin user 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 23:39:25,403", "level": "INFO", "message": Tag 'default' created with ID: 1}
+{"timestamp": "2025-05-01 23:39:25,552", "level": "INFO", "message": System credential 'admin' created with ID: 1}
+{"timestamp": "2025-05-01 23:39:25,555", "level": "INFO", "message": All existing devices already have the default tag}
+{"timestamp": "2025-05-01 23:39:25,563", "level": "INFO", "message": Successfully associated default credential (ID: 1) with default tag (ID: 1)}
+{"timestamp": "2025-05-01 23:39:25,571", "level": "INFO", "message": System reachability job created with ID: 1}
+{"timestamp": "2025-05-01 23:39:27,075", "level": "INFO", "message": Successfully connected to Redis for RQ.}
+{"timestamp": "2025-05-01 23:46:01,724", "level": "INFO", "message": Login attempt for user: admin}
+{"timestamp": "2025-05-01 23:46:01,726", "level": "INFO", "message": Attempting password verification for user: admin}
+{"timestamp": "2025-05-01 23:46:01,726", "level": "DEBUG", "message": Password provided length: 8}
+{"timestamp": "2025-05-01 23:46:01,727", "level": "DEBUG", "message": Stored hash: $2b$12$ZBc...}
+{"timestamp": "2025-05-01 23:46:01,886", "level": "INFO", "message": Authentication successful for user: admin}
+{"timestamp": "2025-05-01 23:46:01,886", "level": "INFO", "message": Token generated successfully for user: admin}
