@@ -25,3 +25,10 @@
 - Integrated `DeviceTable`, `ResourceFilter`, and `PaginationControls` into the dashboard.
 
 **Related Issue:** #94 
+
+---
+
+**2025-05-XX**
+- Updated `DeviceTable.vue` to set the paginator background color to match the row color (`bg-slate-800`) using the PrimeVue v4+ `pt` prop: `paginator: { class: 'bg-slate-800' }`.
+- This follows 2025 best practices for DataTable theming and ensures visual consistency between the table rows and paginator.
+- No fallback CSS override was needed at this stage.

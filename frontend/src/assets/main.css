@@ -69,3 +69,21 @@ input[type="date"]::-moz-calendar-picker-indicator {
   color: white !important;
   opacity: 1 !important;
 }
+
+/* PrimeVue DataTable row background override (more specific) */
+.p-datatable-tbody > tr > td {
+  background-color: #23272f !important;
+}
+.p-datatable-tbody > tr:nth-child(even) > td {
+  background-color: #262b35 !important;
+}
+
+/* PrimeVue DataTable paginator background override (more specific) */
+.p-datatable .p-paginator, .p-paginator {
+  background-color: #23272f !important;
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
+:root {
+  --surface-a: #23272f !important;
+}
