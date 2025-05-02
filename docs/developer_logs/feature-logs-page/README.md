@@ -30,7 +30,11 @@ This log documents the refactor of the `/logs` page to a unified, filterable, an
 - Matched Dashboard style (header, row, spacing, color).
 - Added loading and empty states.
 
+### [x] Step 2: Deep-Linking & URL Sync
+- Implemented query param parsing on page load to initialize filters, sort, and page.
+- Added watchers to sync filters, sort, page, and global search to the URL in real time.
+- Users can now share, bookmark, and reload filtered log views at `/logs`.
+
 **Next:**
-- Implement deep-linking (route/query param sync).
-- Add `/logs` to main navigation.
-- Continue updating this log and the GitHub issue with progress and screenshots. 
+- Final acceptance testing and polish.
+- Update documentation/screenshots as needed. 

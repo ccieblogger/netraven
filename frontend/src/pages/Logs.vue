@@ -75,6 +75,49 @@ const globalSearch = ref('')
 const logTypeOptions = ref([])
 const logLevelOptions = ref([])
 
+// --- Deep-linking helpers ---
+function parseQueryParams() {
+  // Parse query params and set initial state
+  const q = route.query
+  if (q.page) currentPage.value = parseInt(q.page)
+  if (q.size) pageSize.value = parseInt(q.size)
+  if (q.sort) {
+    const [field, dir] = q.sort.split('_')
+    sortField.value = field
+    sortOrder.value = dir === 'asc' ? 1 : -1
+  }
+  // Filters
+  filters.value = {}
+  if (q.log_type) filters.value.log_type = { value: q.log_type }
+  if (q.level) filters.value.level = { value: q.level }
+  if (q.job_id) filters.value.job_id = { value: q.job_id }
+  if (q.device_id) filters.value.device_id = { value: q.device_id }
+  if (q.source) filters.value.source = { value: q.source }
+  if (q.message) filters.value.message = { value: q.message }
+  if (q.start_time && q.end_time) filters.value.timestamp = { value: [q.start_time, q.end_time] }
+  if (q.search) globalSearch.value = q.search
+}
+function updateQueryParams() {
+  // Update the URL with the current filter/sort/page state
+  const q = {}
+  if (currentPage.value > 1) q.page = currentPage.value
+  if (pageSize.value !== 20) q.size = pageSize.value
+  if (sortField.value) q.sort = `${sortField.value}_${sortOrder.value === 1 ? 'asc' : 'desc'}`
+  // Filters
+  if (filters.value.log_type && filters.value.log_type.value) q.log_type = filters.value.log_type.value
+  if (filters.value.level && filters.value.level.value) q.level = filters.value.level.value
+  if (filters.value.job_id && filters.value.job_id.value) q.job_id = filters.value.job_id.value
+  if (filters.value.device_id && filters.value.device_id.value) q.device_id = filters.value.device_id.value
+  if (filters.value.source && filters.value.source.value) q.source = filters.value.source.value
+  if (filters.value.message && filters.value.message.value) q.message = filters.value.message.value
+  if (filters.value.timestamp && filters.value.timestamp.value && filters.value.timestamp.value.length === 2) {
+    q.start_time = filters.value.timestamp.value[0]
+    q.end_time = filters.value.timestamp.value[1]
+  }
+  if (globalSearch.value) q.search = globalSearch.value
+  router.replace({ query: q })
+}
+
 // Fetch log types/levels for dropdowns
 async function fetchFilterOptions() {
   const [types, levels] = await Promise.all([
@@ -87,7 +130,13 @@ async function fetchFilterOptions() {
 
 onMounted(async () => {
   await fetchFilterOptions()
+  parseQueryParams()
   fetchLogs()
+})
+
+// Watchers to sync state to URL
+watch([currentPage, pageSize, sortField, sortOrder, filters, globalSearch], () => {
+  updateQueryParams()
 })
 
 function fetchLogs() {
