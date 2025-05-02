@@ -8,7 +8,7 @@
         <h2 class="text-lg uppercase font-semibold text-text-secondary">SYSTEM STATUS</h2>
         <div class="mt-2 grid grid-cols-2 md:grid-cols-2 gap-2 w-full">
           <div v-for="service in services" :key="service.key" class="flex items-center space-x-2">
-            <StatusBadge :status="service.status" :label="service.label" />
+            <ServiceDot :status="service.status" :label="service.label" :tooltip="serviceTooltip(service)" />
           </div>
         </div>
         <div class="border-t border-divider px-4 py-2 flex justify-between items-center text-xs text-text-secondary w-full mt-2">
@@ -39,6 +39,84 @@
       </template>
       <JobsTable :activeTab="'recent'" :recentJobs="jobStore.jobs.slice(0, 5)" />
     </NrCard>
+
+    <!-- Device List Table Section -->
+    <NrCard title="Devices" subtitle="Inventory overview" :contentClass="'pt-1 px-2 pb-6'">
+      <template #header>
+        <div class="px-2 pt-6">
+          <div class="mb-2">
+            <h2 class="text-lg font-semibold text-text-primary">Device Inventory</h2>
+            <p class="text-xs text-text-secondary">Filter and search your device inventory</p>
+          </div>
+          <form class="bg-card rounded-t-lg px-2 py-4 flex flex-row items-center gap-x-4 w-full" @submit.prevent="handleApplyFilters">
+            <label for="tag" class="sr-only">Tag</label>
+            <select
+              id="tag"
+              v-model="selectedTag"
+              class="h-10 w-48 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
+            >
+              <option value="">All Tags</option>
+              <option v-for="tag in tagOptions" :key="tag.value" :value="tag.value">{{ tag.label }}</option>
+            </select>
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="Search hostname or IP..."
+              class="h-10 w-64 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
+              aria-label="Search devices"
+            />
+            <button
+              type="button"
+              @click="handleResetFilters"
+              class="h-10 px-4 rounded-md border border-divider bg-content text-text-primary hover:bg-content/80 focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              Reset
+            </button>
+            <button
+              type="submit"
+              class="h-10 px-4 rounded-md bg-primary text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              Apply Filters
+            </button>
+          </form>
+        </div>
+      </template>
+      <DeviceTable
+        :devices="paginatedDevices"
+        :loading="deviceStore.isLoading"
+        @edit="handleEdit"
+        @delete="handleDelete"
+        @check-reachability="handleCheckReachability"
+        @credential-check="handleCredentialCheck"
+        @view-configs="handleViewConfigs"
+      >
+        <template #pagination>
+          <PaginationControls
+            :currentPage="currentPage"
+            :totalPages="totalPages"
+            :totalItems="filteredDevices.length"
+            :pageSize="pageSize"
+            @page-change="handlePageChange"
+            @page-size-change="handlePageSizeChange"
+          />
+        </template>
+      </DeviceTable>
+    </NrCard>
+
+    <DeviceFormModal
+      :is-open="isFormModalOpen"
+      :device-to-edit="selectedDevice"
+      :backend-error="deviceStore.error"
+      @close="closeFormModal"
+      @save="handleSaveDevice"
+    />
+    <DeleteConfirmationModal
+      :is-open="isDeleteModalOpen"
+      item-type="device"
+      :item-name="deviceToDelete?.hostname"
+      @close="closeDeleteModal"
+      @confirm="handleDeleteConfirm"
+    />
   </PageContainer>
 </template>
 
@@ -47,13 +125,22 @@ import { onMounted, ref, computed, onUnmounted } from 'vue';
 import { useDeviceStore } from '../store/device';
 import { useJobStore } from '../store/job';
 import { useAuthStore } from '../store/auth';
+import { useRouter } from 'vue-router';
 import KpiCard from '../components/ui/KpiCard.vue';
-import StatusBadge from '../components/ui/StatusBadge.vue';
+import ServiceDot from '../components/ui/ServiceDot.vue';
 import JobsTable from '../components/jobs-dashboard/JobsTable.vue';
+import DeviceTable from '../components/DeviceTable.vue';
+import ResourceFilter from '../components/ResourceFilter.vue';
+import PaginationControls from '../components/PaginationControls.vue';
+import DeviceFormModal from '../components/DeviceFormModal.vue';
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue';
+import { useNotificationStore } from '../store/notifications';
 
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
 const authStore = useAuthStore();
+const notificationStore = useNotificationStore();
+const router = useRouter();
 
 // --- System Status Card State ---
 const services = ref([
@@ -129,6 +216,169 @@ function stopPolling() {
 
 // Simulated data for recent activity
 const recentLogs = ref([]);
+
+const searchQuery = ref('');
+const selectedTag = ref('');
+const currentPage = ref(1);
+const pageSize = ref(10);
+
+const filteredDevices = computed(() => {
+  let result = deviceStore.devices;
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase();
+    result = result.filter(d =>
+      d.hostname.toLowerCase().includes(q) ||
+      d.ip_address.toLowerCase().includes(q)
+    );
+  }
+  if (selectedTag.value) {
+    result = result.filter(d => d.tags && d.tags.some(t => t.id === selectedTag.value));
+  }
+  return result;
+});
+
+const paginatedDevices = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredDevices.value.slice(start, start + pageSize.value);
+});
+
+const totalPages = computed(() => Math.ceil(filteredDevices.value.length / pageSize.value));
+
+const tagOptions = computed(() => (deviceStore.tags || []).map(t => ({ value: t.id, label: t.name })));
+
+const isFormModalOpen = ref(false);
+const selectedDevice = ref(null);
+const isDeleteModalOpen = ref(false);
+const deviceToDelete = ref(null);
+const reachabilityLoading = ref({});
+
+function handleEdit(device) {
+  selectedDevice.value = { ...device };
+  isFormModalOpen.value = true;
+}
+function handleDelete(device) {
+  deviceToDelete.value = device;
+  isDeleteModalOpen.value = true;
+}
+function closeFormModal() {
+  isFormModalOpen.value = false;
+  selectedDevice.value = null;
+}
+function closeDeleteModal() {
+  isDeleteModalOpen.value = false;
+  deviceToDelete.value = null;
+}
+async function handleSaveDevice(deviceData) {
+  let success = false;
+  try {
+    if (deviceData.id) {
+      success = await deviceStore.updateDevice(deviceData.id, deviceData);
+    } else {
+      success = await deviceStore.createDevice(deviceData);
+    }
+    if (success) {
+      closeFormModal();
+      await deviceStore.fetchDevices();
+      notificationStore.success('Device saved successfully.');
+    }
+  } catch (error) {
+    notificationStore.error('Failed to save device.');
+  }
+}
+async function handleDeleteConfirm() {
+  if (!deviceToDelete.value) return;
+  let success = false;
+  try {
+    success = await deviceStore.deleteDevice(deviceToDelete.value.id);
+    if (success) {
+      closeDeleteModal();
+      await deviceStore.fetchDevices();
+      notificationStore.success('Device deleted successfully.');
+    }
+  } catch (error) {
+    closeDeleteModal();
+    notificationStore.error('Failed to delete device.');
+  }
+}
+async function handleCheckReachability(device) {
+  reachabilityLoading.value[device.id] = true;
+  try {
+    if (!jobStore.jobs.length) {
+      await jobStore.fetchJobs();
+    }
+    let reachJob = jobStore.jobs.find(j => j.job_type === 'reachability' && j.device_id === device.id);
+    if (!reachJob && device.tags && device.tags.length > 0) {
+      const deviceTagIds = device.tags.map(t => t.id);
+      reachJob = jobStore.jobs.find(j => j.job_type === 'reachability' && j.tags && j.tags.some(tag => deviceTagIds.includes(tag.id)));
+    }
+    if (!reachJob) {
+      notificationStore.error('No reachability job found for this device.');
+      return;
+    }
+    const ok = await jobStore.runJobNow(reachJob.id);
+    if (ok && jobStore.runStatus && jobStore.runStatus.data && jobStore.runStatus.data.job_id) {
+      notificationStore.success('Reachability job started!');
+    } else {
+      notificationStore.error(jobStore.runStatus?.error || 'Failed to start reachability job');
+    }
+  } catch (err) {
+    notificationStore.error('Failed to start reachability job');
+  } finally {
+    reachabilityLoading.value[device.id] = false;
+  }
+}
+async function handleCredentialCheck(device) {
+  try {
+    // Find or create a credential_check job for this device
+    if (!jobStore.jobs.length) {
+      await jobStore.fetchJobs();
+    }
+    let credJob = jobStore.jobs.find(j => j.job_type === 'credential_check' && j.device_id === device.id);
+    if (!credJob && device.tags && device.tags.length > 0) {
+      const deviceTagIds = device.tags.map(t => t.id);
+      credJob = jobStore.jobs.find(j => j.job_type === 'credential_check' && j.tags && j.tags.some(tag => deviceTagIds.includes(tag.id)));
+    }
+    if (!credJob) {
+      // Optionally, create the job via API if not found
+      notificationStore.error('No credential-check job found for this device.');
+      return;
+    }
+    const ok = await jobStore.runJobNow(credJob.id);
+    if (ok && jobStore.runStatus && jobStore.runStatus.data && jobStore.runStatus.data.job_id) {
+      notificationStore.success('Credential-check job started!');
+    } else {
+      notificationStore.error(jobStore.runStatus?.error || 'Failed to start credential-check job');
+    }
+  } catch (err) {
+    notificationStore.error('Failed to start credential-check job');
+  }
+}
+function handleViewConfigs(device) {
+  router.push(`/backups?device_id=${device.id}`);
+}
+function handleFilterChange(filters) {
+  selectedTag.value = filters.tag || '';
+  currentPage.value = 1;
+}
+function handleSearchInput(e) {
+  searchQuery.value = e.target.value;
+  currentPage.value = 1;
+}
+function handlePageChange(page) {
+  currentPage.value = page;
+}
+function handlePageSizeChange(size) {
+  pageSize.value = size;
+  currentPage.value = 1;
+}
+function handleApplyFilters() {
+  handleFilterChange({ tag: selectedTag });
+}
+function handleResetFilters() {
+  selectedTag.value = '';
+  searchQuery.value = '';
+  handleFilterChange({ tag: '' });
+}
 
 onMounted(() => {
   if (authStore.isAuthenticated) {

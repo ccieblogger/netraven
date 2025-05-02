@@ -1,7 +1,7 @@
 <template>
-  <div class="bg-white shadow sm:rounded-lg mb-6">
+  <div class="bg-card border border-divider rounded-lg mb-6 text-text-primary">
     <div class="p-4 sm:p-6">
-      <h3 class="text-base font-semibold leading-6 text-gray-900">
+      <h3 class="text-base font-semibold leading-6 text-text-primary">
         {{ title }}
       </h3>
       
@@ -128,14 +128,14 @@
         <button
           type="button"
           @click="resetFilters"
-          class="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          class="rounded-md border border-divider bg-content py-2 px-4 text-sm font-medium text-text-primary shadow-sm hover:bg-content/80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         >
           Reset
         </button>
         <button
           type="button"
           @click="applyFilters"
-          class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          class="inline-flex justify-center rounded-md border border-transparent bg-primary py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         >
           Apply Filters
         </button>
