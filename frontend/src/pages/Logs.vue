@@ -11,6 +11,7 @@
     <!-- DataTable -->
     <DataTable
       :value="logs"
+      filterDisplay="row"
       :loading="logStore.isLoading"
       :paginator="true"
       :rows="pageSize"
