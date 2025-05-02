@@ -28,7 +28,6 @@
       dataKey="id"
       :emptyMessage="logStore.isLoading ? 'Loading logs...' : 'No logs found.'"
       :rowClass="rowClass"
-      showFilterMenu={false}
     >
       <Column field="timestamp" header="Timestamp" :sortable="true" :filter="true" :filterMatchMode="'between'" :dataType="'date'" :body="formatDateTime" style="min-width: 180px" />
       <Column field="log_type" header="Type" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 120px">
@@ -41,10 +40,10 @@
           <Dropdown v-model="filterModel.value" :options="logLevelOptions" placeholder="All Levels" showClear />
         </template>
       </Column>
-      <Column field="job_id" header="Job ID" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 80px" showFilterMenu={false} />
-      <Column field="device_id" header="Device ID" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 80px" showFilterMenu={false} />
-      <Column field="source" header="Source" :sortable="true" :filter="true" :filterMatchMode="'contains'" style="min-width: 120px" showFilterMenu={false} />
-      <Column field="message" header="Message" :sortable="true" :filter="true" :filterMatchMode="'contains'" style="min-width: 200px" showFilterMenu={false} />
+      <Column field="job_id" header="Job ID" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 80px" />
+      <Column field="device_id" header="Device ID" :sortable="true" :filter="true" :filterMatchMode="'equals'" style="min-width: 80px" />
+      <Column field="source" header="Source" :sortable="true" :filter="true" :filterMatchMode="'contains'" style="min-width: 120px" />
+      <Column field="message" header="Message" :sortable="true" :filter="true" :filterMatchMode="'contains'" style="min-width: 200px" />
       <Column field="meta" header="Meta" :body="metaBody" style="min-width: 180px" />
     </DataTable>
   </div>
