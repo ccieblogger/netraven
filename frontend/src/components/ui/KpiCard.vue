@@ -1,12 +1,17 @@
 <template>
   <div class="nr-card flex flex-col justify-between h-full border-l-4 p-0" :class="borderColor">
-    <div class="flex items-start justify-between pt-3 pl-4 pr-4">
-      <span class="text-sm uppercase font-semibold text-text-secondary">{{ label }}</span>
-      <span class="flex items-center justify-center h-9 w-9 rounded-md" :class="iconBg">
-        <component :is="iconComponent" class="w-6 h-6 text-white" />
+    <div class="flex items-center justify-between pt-2 pl-3 pr-3">
+      <span class="text-xs uppercase font-semibold text-text-secondary">{{ label }}</span>
+      <span
+        class="flex items-center justify-center w-7 h-7 rounded-full flex-shrink-0 flex-grow-0 basis-auto self-center max-w-[1.75rem] max-h-[1.75rem]"
+        :class="iconBg"
+        :title="statusLabel"
+        aria-label="statusLabel"
+      >
+        <component :is="iconComponent" class="w-5 h-5" />
       </span>
     </div>
-    <div class="text-2xl font-bold text-text-primary pb-3 pl-6 pr-4 mt-2">{{ value }}</div>
+    <div class="text-base font-bold text-text-primary pb-2 pl-4 pr-3 mt-1">{{ value }}</div>
   </div>
 </template>
 
@@ -19,29 +24,25 @@ const props = defineProps({
   color: String // e.g., 'red', 'yellow', 'green', 'blue'
 })
 const icons = {
-  status: {
-    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('circle', { cx: '12', cy: '12', r: '10', stroke: 'currentColor', 'stroke-width': '2', fill: 'currentColor' })]) }
+  healthy: {
+    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('circle', { cx: '12', cy: '12', r: '10', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' }), h('path', { d: 'M8 12l2 2 4-4', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })]) }
   },
-  clock: {
-    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('circle', { cx: '12', cy: '12', r: '10', stroke: 'currentColor', 'stroke-width': '2' }), h('path', { d: 'M12 6v6l4 2', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })]) }
+  unhealthy: {
+    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('circle', { cx: '12', cy: '12', r: '10', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' }), h('path', { d: 'M15 9l-6 6M9 9l6 6', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })]) }
   },
-  memory: {
-    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('rect', { x: '4', y: '8', width: '16', height: '8', rx: '2', fill: 'currentColor' })]) }
-  },
-  list: {
-    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('path', { d: 'M4 6h16M4 12h16M4 18h7', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })]) }
-  },
-  queue: {
-    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('rect', { x: '4', y: '4', width: '16', height: '16', rx: '2', fill: 'currentColor' })]) }
-  },
-  'user-group': {
-    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('circle', { cx: '9', cy: '7', r: '4', stroke: 'currentColor', 'stroke-width': '2' }), h('circle', { cx: '17', cy: '7', r: '4', stroke: 'currentColor', 'stroke-width': '2' }), h('rect', { x: '2', y: '15', width: '20', height: '6', rx: '3', fill: 'currentColor' })]) }
-  },
-  progress: {
-    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('circle', { cx: '12', cy: '12', r: '10', stroke: 'currentColor', 'stroke-width': '2' }), h('path', { d: 'M12 6v6l4 2', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })]) }
+  unknown: {
+    render() { return h('svg', { class: 'w-6 h-6', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('circle', { cx: '12', cy: '12', r: '10', stroke: 'currentColor', 'stroke-width': '2', fill: 'none' }), h('text', { x: '12', y: '16', 'text-anchor': 'middle', 'font-size': '16', fill: 'currentColor' }, '?')]) }
   }
 }
-const iconComponent = computed(() => icons[props.icon] || icons.status)
+const statusKey = computed(() => {
+  if (props.value && typeof props.value === 'string') {
+    const v = props.value.toLowerCase()
+    if (v === 'healthy') return 'healthy'
+    if (v === 'unhealthy' || v === 'failed' || v === 'error') return 'unhealthy'
+  }
+  return 'unknown'
+})
+const iconComponent = computed(() => icons[statusKey.value])
 const borderColor = computed(() => {
   if (props.color === 'red') return 'border-l-red-500'
   if (props.color === 'yellow') return 'border-l-yellow-500'
@@ -55,5 +56,10 @@ const iconBg = computed(() => {
   if (props.color === 'green') return 'bg-green-600'
   if (props.color === 'blue') return 'bg-blue-600'
   return 'bg-primary'
+})
+const statusLabel = computed(() => {
+  if (statusKey.value === 'healthy') return 'Healthy'
+  if (statusKey.value === 'unhealthy') return 'Unhealthy'
+  return 'Unknown'
 })
 </script> 
