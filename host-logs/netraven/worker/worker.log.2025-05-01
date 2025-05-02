@@ -1,0 +1,1109 @@
+{"timestamp": "2025-05-01 00:44:38,409", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 00:44:38,428", "level": "DEBUG", "message": Registering birth of worker f37b6e4f694e4063a20e1ef3c9821797}
+{"timestamp": "2025-05-01 00:44:38,430", "level": "INFO", "message": Worker rq:worker:f37b6e4f694e4063a20e1ef3c9821797 started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 00:44:38,431", "level": "INFO", "message": Subscribing to channel rq:pubsub:f37b6e4f694e4063a20e1ef3c9821797}
+{"timestamp": "2025-05-01 00:44:38,433", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 00:44:38,434", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 00:44:38,435", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 00:44:38,437", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 00:44:38,439", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 00:44:38,441", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 00:44:38,442", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 00:44:38,443", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 00:44:38,444", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 00:45:35,048", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 00:45:35,051", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 00:45:35,055", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 00:45:35,060", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 00:45:35,065", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 00:45:35,068", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 00:45:35,071", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 00:45:35,074", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 00:45:35,354", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 00:45:35,366", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 00:45:35,369", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 00:45:35,378", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 00:45:35,384", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 00:45:35,392", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 00:45:35,404", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 00:45:35,407", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 00:45:35,409", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 00:45:35,412", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.06s.}
+{"timestamp": "2025-05-01 00:45:35,417", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.06s}
+{"timestamp": "2025-05-01 00:45:35,421", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 00:45:35,424", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 00:45:35,427", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 00:45:35,430", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 00:45:35,432", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 00:45:35,435", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.349403s on worker f37b6e4f694e4063a20e1ef3c9821797}
+{"timestamp": "2025-05-01 00:45:35,437", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 00:45:35,440", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 00:45:35,443", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 00:45:35,449", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 00:45:35,452", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 00:45:35,455", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 00:45:35,458", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 00:45:35,461", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 00:45:35,463", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 00:47:14,881", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 00:47:14,886", "level": "INFO", "message": Worker f37b6e4f694e4063a20e1ef3c9821797 [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 00:47:14,888", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 00:47:14,897", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:f37b6e4f694e4063a20e1ef3c9821797}
+{"timestamp": "2025-05-01 01:03:19,580", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 01:03:19,607", "level": "DEBUG", "message": Registering birth of worker fe83614183074e05807facadf74cc396}
+{"timestamp": "2025-05-01 01:03:19,611", "level": "INFO", "message": Worker rq:worker:fe83614183074e05807facadf74cc396 started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 01:03:19,614", "level": "INFO", "message": Subscribing to channel rq:pubsub:fe83614183074e05807facadf74cc396}
+{"timestamp": "2025-05-01 01:03:19,619", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 01:03:19,622", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 01:03:19,625", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 01:03:19,629", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 01:03:19,633", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 01:03:19,637", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 01:03:19,641", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 01:03:19,643", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 01:03:19,646", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 01:03:47,062", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 01:03:47,065", "level": "INFO", "message": Worker fe83614183074e05807facadf74cc396 [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 01:03:47,068", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 01:03:47,071", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:fe83614183074e05807facadf74cc396}
+{"timestamp": "2025-05-01 01:04:13,683", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 01:04:13,707", "level": "DEBUG", "message": Registering birth of worker 1d57a3135d764e8b852a03422950b694}
+{"timestamp": "2025-05-01 01:04:13,710", "level": "INFO", "message": Worker rq:worker:1d57a3135d764e8b852a03422950b694 started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 01:04:13,712", "level": "INFO", "message": Subscribing to channel rq:pubsub:1d57a3135d764e8b852a03422950b694}
+{"timestamp": "2025-05-01 01:04:13,717", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 01:04:13,719", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 01:04:13,722", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 01:04:13,726", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 01:04:13,729", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 01:04:13,732", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 01:04:13,735", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 01:04:13,737", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 01:04:13,740", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 01:04:14,311", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 01:04:14,313", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 01:04:14,317", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 01:04:14,321", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 01:04:14,326", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 01:04:14,329", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 01:04:14,333", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 01:04:14,335", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 01:04:14,616", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 01:04:14,628", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 01:04:14,631", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 01:04:14,640", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 01:04:14,647", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 01:04:14,655", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 01:04:14,667", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 01:04:14,670", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 01:04:14,673", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 01:04:14,675", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.06s.}
+{"timestamp": "2025-05-01 01:04:14,681", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.06s}
+{"timestamp": "2025-05-01 01:04:14,684", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 01:04:14,687", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 01:04:14,689", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 01:04:14,692", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 01:04:14,694", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 01:04:14,698", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.351085s on worker 1d57a3135d764e8b852a03422950b694}
+{"timestamp": "2025-05-01 01:04:14,700", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 01:04:14,703", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 01:04:14,705", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 01:04:14,711", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 01:04:14,715", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 01:04:14,718", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 01:04:14,720", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 01:04:14,723", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 01:04:14,725", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 01:10:51,092", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 01:10:52,233", "level": "ERROR", "message": Worker rq:worker:1d57a3135d764e8b852a03422950b694: Redis connection timeout, quitting...}
+{"timestamp": "2025-05-01 01:10:52,247", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 01:10:52,253", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:1d57a3135d764e8b852a03422950b694}
+{"timestamp": "2025-05-01 02:03:48,898", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 02:03:48,922", "level": "DEBUG", "message": Registering birth of worker 9cc4e9d852b54fca909267339c066222}
+{"timestamp": "2025-05-01 02:03:48,926", "level": "INFO", "message": Worker rq:worker:9cc4e9d852b54fca909267339c066222 started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 02:03:48,928", "level": "INFO", "message": Subscribing to channel rq:pubsub:9cc4e9d852b54fca909267339c066222}
+{"timestamp": "2025-05-01 02:03:48,933", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 02:03:48,936", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:03:48,939", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 02:03:48,943", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 02:03:48,947", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 02:03:48,951", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:03:48,955", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:03:48,958", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:03:48,961", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:03:48,969", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 02:03:48,972", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 02:03:48,975", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:03:48,981", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 02:03:48,986", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 02:03:48,990", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 02:03:48,994", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 02:03:48,997", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 02:03:49,290", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 02:03:49,294", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 02:03:49,297", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 02:03:49,308", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 02:03:49,316", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 02:03:49,328", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 02:03:49,342", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 02:03:49,345", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 02:03:49,348", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 02:03:49,350", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.06s.}
+{"timestamp": "2025-05-01 02:03:49,357", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.06s}
+{"timestamp": "2025-05-01 02:03:49,360", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:03:49,363", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:03:49,367", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 02:03:49,369", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:03:49,372", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:03:49,375", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.366162s on worker 9cc4e9d852b54fca909267339c066222}
+{"timestamp": "2025-05-01 02:03:49,378", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:03:49,380", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 02:03:49,383", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 02:03:49,389", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:03:49,393", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:03:49,396", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:03:49,399", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:03:49,402", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:03:49,404", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:04:01,109", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 02:04:01,112", "level": "INFO", "message": Worker 9cc4e9d852b54fca909267339c066222 [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 02:04:01,116", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 02:04:01,119", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:9cc4e9d852b54fca909267339c066222}
+{"timestamp": "2025-05-01 02:04:44,039", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 02:04:44,059", "level": "DEBUG", "message": Registering birth of worker 45d3d3bdc99146c5aac8809ad6255408}
+{"timestamp": "2025-05-01 02:04:44,061", "level": "INFO", "message": Worker rq:worker:45d3d3bdc99146c5aac8809ad6255408 started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 02:04:44,062", "level": "INFO", "message": Subscribing to channel rq:pubsub:45d3d3bdc99146c5aac8809ad6255408}
+{"timestamp": "2025-05-01 02:04:44,064", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 02:04:44,065", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:04:44,066", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 02:04:44,068", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 02:04:44,070", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 02:04:44,072", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:04:44,073", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:04:44,074", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:04:44,075", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:06:39,409", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 02:06:39,413", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 02:06:39,417", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:06:39,421", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 02:06:39,427", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 02:06:39,429", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 02:06:39,433", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 02:06:39,435", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 02:06:39,713", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 02:06:39,717", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 02:06:39,720", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 02:06:39,729", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 02:06:39,734", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 02:06:39,742", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 02:06:39,753", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 02:06:39,756", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 02:06:39,758", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 02:06:39,761", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.05s.}
+{"timestamp": "2025-05-01 02:06:39,767", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.05s}
+{"timestamp": "2025-05-01 02:06:39,770", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:06:39,773", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:06:39,775", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 02:06:39,778", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:06:39,781", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:06:39,784", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.337551s on worker 45d3d3bdc99146c5aac8809ad6255408}
+{"timestamp": "2025-05-01 02:06:39,787", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:06:39,790", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 02:06:39,792", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 02:06:39,799", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:06:39,802", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:06:39,805", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:06:39,807", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:06:39,810", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:06:39,812", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:11:24,677", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 02:13:20,519", "level": "ERROR", "message": Worker rq:worker:45d3d3bdc99146c5aac8809ad6255408: Redis connection timeout, quitting...}
+{"timestamp": "2025-05-01 02:13:20,535", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 02:13:20,541", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:45d3d3bdc99146c5aac8809ad6255408}
+{"timestamp": "2025-05-01 02:13:22,217", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 02:13:22,241", "level": "DEBUG", "message": Registering birth of worker 6ec002907d324c7c895adb606e46892a}
+{"timestamp": "2025-05-01 02:13:22,244", "level": "INFO", "message": Worker rq:worker:6ec002907d324c7c895adb606e46892a started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 02:13:22,246", "level": "INFO", "message": Subscribing to channel rq:pubsub:6ec002907d324c7c895adb606e46892a}
+{"timestamp": "2025-05-01 02:13:22,252", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 02:13:22,255", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:13:22,257", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 02:13:22,261", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 02:13:22,264", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 02:13:22,267", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:13:22,270", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:13:22,272", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:13:22,274", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:20:03,277", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 02:20:03,304", "level": "ERROR", "message": Worker rq:worker:6ec002907d324c7c895adb606e46892a: Redis connection timeout, quitting...}
+{"timestamp": "2025-05-01 02:20:03,307", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 02:20:03,310", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:6ec002907d324c7c895adb606e46892a}
+{"timestamp": "2025-05-01 02:20:04,813", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 02:20:04,845", "level": "DEBUG", "message": Registering birth of worker f6e680f502bc4f05a244812a89562d7d}
+{"timestamp": "2025-05-01 02:20:04,849", "level": "INFO", "message": Worker rq:worker:f6e680f502bc4f05a244812a89562d7d started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 02:20:04,852", "level": "INFO", "message": Subscribing to channel rq:pubsub:f6e680f502bc4f05a244812a89562d7d}
+{"timestamp": "2025-05-01 02:20:04,855", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 02:20:04,858", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:20:04,861", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 02:20:04,864", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 02:20:04,868", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 02:20:04,871", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:20:04,874", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:20:04,876", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:20:04,879", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:26:46,342", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 02:26:46,368", "level": "ERROR", "message": Worker rq:worker:f6e680f502bc4f05a244812a89562d7d: Redis connection timeout, quitting...}
+{"timestamp": "2025-05-01 02:26:46,378", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 02:26:46,383", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:f6e680f502bc4f05a244812a89562d7d}
+{"timestamp": "2025-05-01 02:26:47,858", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 02:26:47,888", "level": "DEBUG", "message": Registering birth of worker 049a76e6c8ab441eac58b5a06ea837aa}
+{"timestamp": "2025-05-01 02:26:47,892", "level": "INFO", "message": Worker rq:worker:049a76e6c8ab441eac58b5a06ea837aa started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 02:26:47,894", "level": "INFO", "message": Subscribing to channel rq:pubsub:049a76e6c8ab441eac58b5a06ea837aa}
+{"timestamp": "2025-05-01 02:26:47,899", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 02:26:47,901", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:26:47,904", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 02:26:47,908", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 02:26:47,910", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 02:26:47,914", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:26:47,916", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:26:47,919", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:26:47,921", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:29:50,546", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 02:29:50,550", "level": "INFO", "message": Worker 049a76e6c8ab441eac58b5a06ea837aa [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 02:29:50,553", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 02:29:50,556", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:049a76e6c8ab441eac58b5a06ea837aa}
+{"timestamp": "2025-05-01 02:30:32,164", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 02:30:32,184", "level": "DEBUG", "message": Registering birth of worker da436ad5133547e68ab27beda3c903dc}
+{"timestamp": "2025-05-01 02:30:32,186", "level": "INFO", "message": Worker rq:worker:da436ad5133547e68ab27beda3c903dc started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 02:30:32,188", "level": "INFO", "message": Subscribing to channel rq:pubsub:da436ad5133547e68ab27beda3c903dc}
+{"timestamp": "2025-05-01 02:30:32,191", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 02:30:32,192", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:30:32,194", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 02:30:32,195", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 02:30:32,197", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 02:30:32,199", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:30:32,200", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:30:32,201", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:30:32,202", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:32:27,848", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 02:32:27,853", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 02:32:27,856", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:32:27,861", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 02:32:27,867", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 02:32:27,870", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 02:32:27,874", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 02:32:27,876", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 02:32:28,157", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 02:32:28,161", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 02:32:28,164", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 02:32:28,173", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 02:32:28,179", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 02:32:28,187", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 02:32:28,198", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 02:32:28,201", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 02:32:28,203", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 02:32:28,206", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.05s.}
+{"timestamp": "2025-05-01 02:32:28,212", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.05s}
+{"timestamp": "2025-05-01 02:32:28,214", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:32:28,217", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:32:28,220", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 02:32:28,223", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:32:28,225", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:32:28,228", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.340865s on worker da436ad5133547e68ab27beda3c903dc}
+{"timestamp": "2025-05-01 02:32:28,230", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 02:32:28,233", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 02:32:28,235", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 02:32:28,242", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:32:28,245", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:32:28,248", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:32:28,250", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:32:28,253", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:32:28,255", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:37:14,973", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 02:38:58,749", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 02:38:58,754", "level": "INFO", "message": Worker da436ad5133547e68ab27beda3c903dc [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 02:38:58,757", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 02:38:58,765", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:da436ad5133547e68ab27beda3c903dc}
+{"timestamp": "2025-05-01 02:39:00,789", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 02:39:00,844", "level": "DEBUG", "message": Registering birth of worker 6c1211d3b9894b15b24dc568c0a651cf}
+{"timestamp": "2025-05-01 02:39:00,847", "level": "INFO", "message": Worker rq:worker:6c1211d3b9894b15b24dc568c0a651cf started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 02:39:00,850", "level": "INFO", "message": Subscribing to channel rq:pubsub:6c1211d3b9894b15b24dc568c0a651cf}
+{"timestamp": "2025-05-01 02:39:00,854", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 02:39:00,857", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:39:00,860", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 02:39:00,863", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 02:39:00,867", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 02:39:00,871", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 02:39:00,874", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:39:00,877", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:39:00,879", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:45:45,938", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 02:45:45,955", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 02:45:45,958", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 02:45:45,961", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 02:45:46,083", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 02:50:54,150", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 02:50:54,188", "level": "INFO", "message": Worker 6c1211d3b9894b15b24dc568c0a651cf [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 02:50:54,191", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 02:50:54,195", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:6c1211d3b9894b15b24dc568c0a651cf}
+{"timestamp": "2025-05-01 04:25:34,472", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 04:25:34,493", "level": "DEBUG", "message": Registering birth of worker 7b447d57bb064837a6068e285f8a0119}
+{"timestamp": "2025-05-01 04:25:34,494", "level": "INFO", "message": Worker rq:worker:7b447d57bb064837a6068e285f8a0119 started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 04:25:34,495", "level": "INFO", "message": Subscribing to channel rq:pubsub:7b447d57bb064837a6068e285f8a0119}
+{"timestamp": "2025-05-01 04:25:34,498", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 04:25:34,500", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 04:25:34,501", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 04:25:34,503", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 04:25:34,505", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 04:25:34,507", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 04:25:34,508", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 04:25:34,509", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 04:25:34,510", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 04:26:33,670", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 04:26:33,675", "level": "INFO", "message": Worker 7b447d57bb064837a6068e285f8a0119 [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 04:26:33,679", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 04:26:33,684", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:7b447d57bb064837a6068e285f8a0119}
+{"timestamp": "2025-05-01 04:27:33,644", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 04:27:33,662", "level": "DEBUG", "message": Registering birth of worker c79f348f2ad24cddb7a1408a344d417b}
+{"timestamp": "2025-05-01 04:27:33,663", "level": "INFO", "message": Worker rq:worker:c79f348f2ad24cddb7a1408a344d417b started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 04:27:33,664", "level": "INFO", "message": Subscribing to channel rq:pubsub:c79f348f2ad24cddb7a1408a344d417b}
+{"timestamp": "2025-05-01 04:27:33,667", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 04:27:33,668", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 04:27:33,669", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 04:27:33,670", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 04:27:33,672", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 04:27:33,674", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 04:27:33,675", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 04:27:33,676", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 04:27:33,677", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 04:29:32,362", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 04:29:32,367", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 04:29:32,370", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 04:29:32,375", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 04:29:32,380", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 04:29:32,383", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 04:29:32,387", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 04:29:32,389", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 04:29:32,651", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 04:29:32,663", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 04:29:32,666", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 04:29:32,675", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 04:29:32,680", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 04:29:32,689", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 04:29:32,700", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 04:29:32,703", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 04:29:32,705", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 04:29:32,709", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.06s.}
+{"timestamp": "2025-05-01 04:29:32,716", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.06s}
+{"timestamp": "2025-05-01 04:29:32,718", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 04:29:32,722", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 04:29:32,725", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 04:29:32,728", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 04:29:32,730", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 04:29:32,733", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.332329s on worker c79f348f2ad24cddb7a1408a344d417b}
+{"timestamp": "2025-05-01 04:29:32,735", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 04:29:32,737", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 04:29:32,739", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 04:29:32,746", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 04:29:32,749", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 04:29:32,752", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 04:29:32,754", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 04:29:32,757", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 04:29:32,759", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 04:31:19,682", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 04:31:19,687", "level": "INFO", "message": Worker c79f348f2ad24cddb7a1408a344d417b [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 04:31:19,690", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 04:31:19,694", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:c79f348f2ad24cddb7a1408a344d417b}
+{"timestamp": "2025-05-01 16:20:27,053", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 16:20:27,071", "level": "DEBUG", "message": Registering birth of worker c311ca5827074acea7b81a90e5ddbd6f}
+{"timestamp": "2025-05-01 16:20:27,073", "level": "INFO", "message": Worker rq:worker:c311ca5827074acea7b81a90e5ddbd6f started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 16:20:27,074", "level": "INFO", "message": Subscribing to channel rq:pubsub:c311ca5827074acea7b81a90e5ddbd6f}
+{"timestamp": "2025-05-01 16:20:27,076", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 16:20:27,077", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 16:20:27,078", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 16:20:27,080", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 16:20:27,081", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 16:20:27,083", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 16:20:27,084", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 16:20:27,085", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 16:20:27,086", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 16:22:26,698", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 16:22:26,703", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 16:22:26,705", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 16:22:26,710", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 16:22:26,715", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 16:22:26,717", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 16:22:26,721", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 16:22:26,723", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 16:22:26,985", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 16:22:26,997", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 16:22:27,000", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 16:22:27,009", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 16:22:27,015", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 16:22:27,023", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 16:22:27,034", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 16:22:27,036", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 16:22:27,040", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 16:22:27,042", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.06s.}
+{"timestamp": "2025-05-01 16:22:27,048", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.06s}
+{"timestamp": "2025-05-01 16:22:27,051", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 16:22:27,054", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 16:22:27,058", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 16:22:27,061", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 16:22:27,064", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 16:22:27,067", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.330479s on worker c311ca5827074acea7b81a90e5ddbd6f}
+{"timestamp": "2025-05-01 16:22:27,070", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 16:22:27,072", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 16:22:27,075", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 16:22:27,081", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 16:22:27,085", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 16:22:27,087", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 16:22:27,091", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 16:22:27,093", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 16:22:27,096", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 16:25:36,816", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 16:25:36,820", "level": "INFO", "message": Worker c311ca5827074acea7b81a90e5ddbd6f [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 16:25:36,823", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 16:25:36,826", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:c311ca5827074acea7b81a90e5ddbd6f}
+{"timestamp": "2025-05-01 17:06:54,399", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 17:06:54,428", "level": "DEBUG", "message": Registering birth of worker 6c1151592ac2450e9e9584e504ad6a7c}
+{"timestamp": "2025-05-01 17:06:54,430", "level": "INFO", "message": Worker rq:worker:6c1151592ac2450e9e9584e504ad6a7c started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 17:06:54,432", "level": "INFO", "message": Subscribing to channel rq:pubsub:6c1151592ac2450e9e9584e504ad6a7c}
+{"timestamp": "2025-05-01 17:06:54,435", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 17:06:54,436", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:06:54,437", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 17:06:54,439", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 17:06:54,441", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 17:06:54,442", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 17:06:54,443", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:06:54,444", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 17:06:54,445", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 17:08:53,968", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 17:08:53,973", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 17:08:53,976", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:08:53,981", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 17:08:53,987", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 17:08:53,989", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 17:08:53,993", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 17:08:53,995", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 17:08:54,284", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 17:08:54,297", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 17:08:54,300", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 17:08:54,309", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 17:08:54,315", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 17:08:54,323", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 17:08:54,336", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 17:08:54,338", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 17:08:54,341", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 17:08:54,344", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.06s.}
+{"timestamp": "2025-05-01 17:08:54,350", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.06s}
+{"timestamp": "2025-05-01 17:08:54,352", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 17:08:54,355", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 17:08:54,357", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 17:08:54,360", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 17:08:54,363", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 17:08:54,366", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.359475s on worker 6c1151592ac2450e9e9584e504ad6a7c}
+{"timestamp": "2025-05-01 17:08:54,368", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 17:08:54,371", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 17:08:54,373", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 17:08:54,380", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:08:54,384", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:08:54,387", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 17:08:54,389", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:08:54,392", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 17:08:54,394", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 17:13:50,517", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 17:15:39,404", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 17:15:39,417", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:15:39,420", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 17:15:39,422", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 17:22:24,491", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 17:22:24,508", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:22:24,511", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 17:22:24,516", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 17:22:24,519", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 17:22:24,522", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 17:22:24,525", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 17:29:09,528", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 17:29:09,541", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:29:09,545", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 17:29:09,547", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 17:35:54,593", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 17:35:54,612", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:35:54,620", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 17:35:54,636", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 17:35:54,645", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 17:35:54,658", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 17:35:54,665", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 17:42:39,711", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 17:42:39,723", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:42:39,726", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 17:42:39,728", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 17:49:24,754", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 17:49:24,777", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:49:24,781", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 17:49:24,784", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 17:49:24,787", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 17:49:24,790", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 17:49:24,812", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 17:56:09,846", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 17:56:09,864", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 17:56:09,869", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 17:56:09,872", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 18:02:54,928", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 18:02:54,944", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:02:54,948", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 18:02:54,951", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 18:02:54,955", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 18:02:54,958", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 18:02:54,961", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 18:09:09,505", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 18:09:09,509", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 18:09:09,512", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:09:09,517", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 18:09:09,522", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 18:09:09,524", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 18:09:09,528", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 18:09:09,530", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 18:09:09,689", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 18:09:09,693", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 18:09:09,696", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 18:09:09,705", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 18:09:09,712", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 18:09:09,719", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 18:09:09,730", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 18:09:09,732", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 18:09:09,734", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 18:09:09,737", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.05s.}
+{"timestamp": "2025-05-01 18:09:09,743", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.05s}
+{"timestamp": "2025-05-01 18:09:09,745", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 18:09:09,749", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 18:09:09,752", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 18:09:09,754", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 18:09:09,757", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 18:09:09,759", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.218340s on worker 6c1151592ac2450e9e9584e504ad6a7c}
+{"timestamp": "2025-05-01 18:09:09,762", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 18:09:09,764", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 18:09:09,766", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 18:09:09,772", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:09:09,776", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:09:09,779", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 18:09:09,782", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:09:09,784", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 18:09:09,786", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 18:15:54,801", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 18:15:54,810", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:15:54,815", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 18:15:54,819", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 18:15:54,823", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 18:15:54,826", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 18:15:54,828", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 18:22:39,893", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 18:22:39,897", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:22:39,900", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 18:22:39,902", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 18:29:24,982", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 18:29:24,994", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:29:24,998", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 18:29:25,001", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 18:29:25,004", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 18:29:25,008", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 18:29:25,010", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 18:36:10,070", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 18:36:10,075", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:36:10,078", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 18:36:10,080", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 18:42:55,090", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 18:42:55,094", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:42:55,098", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 18:42:55,101", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 18:42:55,104", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 18:42:55,107", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 18:42:55,110", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 18:49:40,116", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 18:49:40,120", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:49:40,123", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 18:49:40,125", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 18:56:25,134", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 18:56:25,150", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 18:56:25,156", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 18:56:25,161", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 18:56:25,165", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 18:56:25,168", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 18:56:25,170", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 19:03:10,226", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 19:03:10,235", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:03:10,240", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 19:03:10,242", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 19:09:12,961", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 19:09:12,965", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 19:09:12,968", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:09:12,973", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 19:09:12,977", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 19:09:12,980", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 19:09:12,984", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 19:09:12,986", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 19:09:13,070", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 19:09:13,073", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 19:09:13,076", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 19:09:13,085", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 19:09:13,090", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 19:09:13,097", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 19:09:13,108", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 19:09:13,110", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 19:09:13,113", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 19:09:13,115", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.05s.}
+{"timestamp": "2025-05-01 19:09:13,121", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.05s}
+{"timestamp": "2025-05-01 19:09:13,123", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 19:09:13,125", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 19:09:13,128", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 19:09:13,130", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 19:09:13,132", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 19:09:13,135", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.139053s on worker 6c1151592ac2450e9e9584e504ad6a7c}
+{"timestamp": "2025-05-01 19:09:13,137", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 19:09:13,140", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 19:09:13,142", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 19:09:13,147", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:09:13,151", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:09:13,159", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 19:09:13,162", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 19:09:13,165", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 19:09:13,168", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 19:09:13,170", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:09:13,172", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 19:09:13,175", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 19:15:58,184", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 19:15:58,187", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:15:58,190", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 19:15:58,193", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 19:22:43,277", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 19:22:43,293", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:22:43,297", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 19:22:43,301", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 19:22:43,304", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 19:22:43,307", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 19:22:43,310", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 19:29:28,372", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 19:29:28,377", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:29:28,379", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 19:29:28,382", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 19:36:13,433", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 19:36:13,451", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:36:13,457", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 19:36:13,461", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 19:36:13,465", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 19:36:13,468", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 19:36:13,471", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 19:42:58,526", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 19:42:58,535", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:42:58,540", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 19:42:58,543", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 19:49:43,626", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 19:49:43,630", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:49:43,633", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 19:49:43,638", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 19:49:43,642", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 19:49:43,646", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 19:49:43,649", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 19:56:28,660", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 19:56:28,667", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 19:56:28,670", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 19:56:28,672", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:03:13,771", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 20:03:13,787", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:03:13,792", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 20:03:13,796", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 20:03:13,799", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 20:03:13,802", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:03:13,805", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:09:58,865", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 20:09:58,877", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:09:58,881", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:09:58,883", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:10:08,040", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 20:10:08,043", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 20:10:08,047", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:10:08,053", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 20:10:08,058", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 20:10:08,060", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 20:10:08,064", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 20:10:08,067", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 20:10:08,153", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 20:10:08,155", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 20:10:08,158", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 20:10:08,167", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 20:10:08,173", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 20:10:08,180", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 20:10:08,191", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 20:10:08,194", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 20:10:08,197", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 20:10:08,200", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.05s.}
+{"timestamp": "2025-05-01 20:10:08,205", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.05s}
+{"timestamp": "2025-05-01 20:10:08,207", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 20:10:08,210", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 20:10:08,212", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 20:10:08,215", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 20:10:08,217", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 20:10:08,220", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.143043s on worker 6c1151592ac2450e9e9584e504ad6a7c}
+{"timestamp": "2025-05-01 20:10:08,222", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 20:10:08,224", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 20:10:08,226", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 20:10:08,232", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:10:08,235", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:10:08,238", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 20:10:08,241", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:10:08,243", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:10:08,245", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:16:53,319", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 20:16:53,338", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:16:53,344", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 20:16:53,348", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 20:16:53,351", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 20:16:53,369", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:16:53,371", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:23:38,424", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 20:23:38,432", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:23:38,436", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:23:38,438", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:30:23,530", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 20:30:23,542", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:30:23,544", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 20:30:23,547", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 20:30:23,550", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 20:30:23,553", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:30:23,555", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:37:08,642", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 20:37:08,654", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:37:08,657", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:37:08,660", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:43:53,746", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 20:43:53,764", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:43:53,771", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 20:43:53,776", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 20:43:53,780", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 20:43:53,783", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:43:53,785", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:50:38,796", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 20:50:38,802", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:50:38,807", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:50:38,810", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 20:57:23,823", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 20:57:23,841", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 20:57:23,844", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 20:57:23,847", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 20:57:23,850", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 20:57:23,853", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 20:57:23,862", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 21:04:08,894", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 21:04:08,902", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:04:08,905", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 21:04:08,914", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 21:26:36,564", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 21:26:36,569", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:26:36,575", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 21:26:36,581", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 21:26:36,588", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 21:26:36,596", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 21:26:36,600", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 21:26:37,850", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 21:26:37,854", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 21:26:37,858", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:26:37,864", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 21:26:37,871", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 21:26:37,875", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 21:26:37,879", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 21:26:37,882", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 21:26:37,978", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 21:26:37,982", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 21:26:37,985", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 21:26:37,994", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 21:26:38,001", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 21:26:38,010", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 21:26:38,023", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 21:26:38,026", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 21:26:38,028", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 21:26:38,031", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.05s.}
+{"timestamp": "2025-05-01 21:26:38,037", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.05s}
+{"timestamp": "2025-05-01 21:26:38,041", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:26:38,045", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:26:38,050", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 21:26:38,056", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:26:38,060", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:26:38,065", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.162436s on worker 6c1151592ac2450e9e9584e504ad6a7c}
+{"timestamp": "2025-05-01 21:26:38,068", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:26:38,072", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 21:26:38,075", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 21:26:38,085", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:26:38,093", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:26:38,098", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 21:26:38,102", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:26:38,105", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 21:26:38,109", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 21:33:23,153", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 21:33:23,172", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:33:23,178", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 21:33:23,182", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 21:40:08,279", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 21:40:08,292", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:40:08,296", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 21:40:08,299", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 21:40:08,303", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 21:40:08,306", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 21:40:08,309", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 21:46:53,400", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 21:46:53,413", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:46:53,416", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 21:46:53,418", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 21:50:37,518", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 21:50:37,521", "level": "INFO", "message": Worker 6c1151592ac2450e9e9584e504ad6a7c [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 21:50:37,525", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 21:50:37,528", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:6c1151592ac2450e9e9584e504ad6a7c}
+{"timestamp": "2025-05-01 21:51:17,651", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 21:51:17,671", "level": "DEBUG", "message": Registering birth of worker 69be29b3429243a8865c6733818378c8}
+{"timestamp": "2025-05-01 21:51:17,672", "level": "INFO", "message": Worker rq:worker:69be29b3429243a8865c6733818378c8 started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 21:51:17,674", "level": "INFO", "message": Subscribing to channel rq:pubsub:69be29b3429243a8865c6733818378c8}
+{"timestamp": "2025-05-01 21:51:17,676", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 21:51:17,677", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:51:17,678", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 21:51:17,680", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 21:51:17,681", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 21:51:17,683", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 21:51:17,684", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:51:17,686", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 21:51:17,687", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 21:53:14,174", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 21:53:14,179", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 21:53:14,182", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:53:14,187", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 21:53:14,194", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 21:53:14,196", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 21:53:14,200", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 21:53:14,203", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 21:53:14,500", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 21:53:14,504", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 21:53:14,507", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 21:53:14,516", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 21:53:14,522", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 21:53:14,531", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 21:53:14,542", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 21:53:14,545", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 21:53:14,548", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 21:53:14,550", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.05s.}
+{"timestamp": "2025-05-01 21:53:14,555", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.05s}
+{"timestamp": "2025-05-01 21:53:14,558", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:53:14,561", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:53:14,564", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 21:53:14,566", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:53:14,569", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:53:14,571", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.357767s on worker 69be29b3429243a8865c6733818378c8}
+{"timestamp": "2025-05-01 21:53:14,574", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 21:53:14,576", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 21:53:14,579", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 21:53:14,584", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:53:14,588", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:53:14,592", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 21:53:14,594", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:53:14,597", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 21:53:14,599", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 21:58:03,367", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 21:59:59,695", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 21:59:59,699", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 21:59:59,703", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 21:59:59,705", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 22:06:44,538", "level": "ERROR", "message": Worker rq:worker:69be29b3429243a8865c6733818378c8: Redis connection timeout, quitting...}
+{"timestamp": "2025-05-01 22:06:44,547", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 22:06:44,560", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:69be29b3429243a8865c6733818378c8}
+{"timestamp": "2025-05-01 22:06:46,342", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 22:06:46,363", "level": "DEBUG", "message": Registering birth of worker 1e0229c5669f493f81e59c43ececf5af}
+{"timestamp": "2025-05-01 22:06:46,366", "level": "INFO", "message": Worker rq:worker:1e0229c5669f493f81e59c43ececf5af started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 22:06:46,369", "level": "INFO", "message": Subscribing to channel rq:pubsub:1e0229c5669f493f81e59c43ececf5af}
+{"timestamp": "2025-05-01 22:06:46,372", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 22:06:46,375", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:06:46,377", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 22:06:46,381", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 22:06:46,384", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 22:06:46,387", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 22:06:46,390", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:06:46,393", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 22:06:46,395", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 22:13:31,444", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 22:13:31,457", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:13:31,460", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 22:13:31,463", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 22:13:35,577", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 22:20:16,565", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 22:20:16,572", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:20:16,575", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 22:20:16,579", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 22:20:16,582", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 22:20:16,585", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 22:20:16,588", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 22:27:01,621", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 22:27:01,637", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:27:01,641", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 22:27:01,644", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 22:33:46,745", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 22:33:46,750", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:33:46,752", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 22:33:46,756", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 22:33:46,759", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 22:33:46,762", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 22:33:46,765", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 22:40:31,867", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 22:40:31,879", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:40:31,882", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 22:40:31,884", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 22:47:16,954", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 22:47:16,959", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:47:16,961", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 22:47:16,965", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 22:47:16,969", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 22:47:16,972", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 22:47:16,975", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 22:53:32,349", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 22:53:32,352", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 22:53:32,355", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:53:32,359", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 22:53:32,365", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 22:53:32,368", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 22:53:32,371", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 22:53:32,374", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 22:53:32,518", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 22:53:32,521", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 22:53:32,524", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 22:53:32,534", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 22:53:32,539", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 22:53:32,548", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 22:53:32,559", "level": "INFO", "message": [Job: 1] Loaded 1 devices: ['c8000v1']}
+{"timestamp": "2025-05-01 22:53:32,562", "level": "INFO", "message": [Job: 1] Resolving credentials for 1 device(s)...}
+{"timestamp": "2025-05-01 22:53:32,583", "level": "INFO", "message": [Job: 1] Credential resolution metrics: 1/1 devices resolved (100.0%)}
+{"timestamp": "2025-05-01 22:53:32,585", "level": "INFO", "message": [Job: 1] Handing off 1 device(s) with credentials to dispatcher...}
+{"timestamp": "2025-05-01 22:53:32,588", "level": "INFO", "message": Job '1' started: dispatching tasks to devices}
+{"timestamp": "2025-05-01 22:53:32,590", "level": "INFO", "message": Job '1' will process 1 devices}
+{"timestamp": "2025-05-01 22:53:32,592", "level": "INFO", "message": Submitting task for device 'c8000v1' in job '1'}
+{"timestamp": "2025-05-01 22:53:32,595", "level": "INFO", "message": handle_device called for job_id=1, resolved job_type=reachability}
+{"timestamp": "2025-05-01 22:53:32,598", "level": "INFO", "message": Dispatching job_id=1 (type=reachability) to handler: reachability_handler}
+{"timestamp": "2025-05-01 22:53:32,600", "level": "INFO", "message": Entered reachability_handler for job_id=1, device_id=1}
+{"timestamp": "2025-05-01 22:53:32,603", "level": "INFO", "message": Attempting to ping device at 192.168.4.41 hostname=c8000v1, device_id=1}
+{"timestamp": "2025-05-01 22:53:38,615", "level": "WARNING", "message": Reachability check failed: ICMP: Ping failed; TCP 22: timed out; TCP 443: timed out}
+{"timestamp": "2025-05-01 22:53:38,619", "level": "INFO", "message": save_job_log (failure) completed for job_id={job_id}, device_id={device_id}}
+{"timestamp": "2025-05-01 22:53:38,622", "level": "INFO", "message": Task completed for device 'c8000v1' in job '1'}
+{"timestamp": "2025-05-01 22:53:38,625", "level": "INFO", "message": All device tasks completed for job '1'. Success rate: 0/1}
+{"timestamp": "2025-05-01 22:53:38,628", "level": "INFO", "message": [Job: 1] Dispatcher finished. Success: 0, Failure: 1}
+{"timestamp": "2025-05-01 22:53:38,633", "level": "INFO", "message": [Job: 1] Tasks finished. Final Status: COMPLETED_FAILURE}
+{"timestamp": "2025-05-01 22:53:38,635", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_FAILURE' in 6.12s.}
+{"timestamp": "2025-05-01 22:53:38,641", "level": "INFO", "message": [Job: 1] Job failed with status 'COMPLETED_FAILURE' in 6.12s}
+{"timestamp": "2025-05-01 22:53:38,644", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 22:53:38,647", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 22:53:38,649", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 22:53:38,652", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 22:53:38,654", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 22:53:38,658", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:06.273121s on worker 1e0229c5669f493f81e59c43ececf5af}
+{"timestamp": "2025-05-01 22:53:38,660", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 22:53:38,663", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 22:53:38,665", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 22:53:38,671", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:53:38,674", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:53:38,678", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 22:53:38,680", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 22:53:38,683", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 22:53:38,685", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:00:23,758", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 23:00:23,771", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:00:23,776", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 23:00:23,780", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 23:00:23,784", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 23:00:23,787", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:00:23,789", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:07:08,869", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 23:07:08,873", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:07:08,876", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:07:08,878", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:13:53,910", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 23:13:53,917", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:13:53,921", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 23:13:53,925", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 23:13:53,928", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 23:13:53,931", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:13:53,934", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:20:38,997", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 23:20:39,009", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:20:39,014", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:20:39,018", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:27:24,079", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 23:27:24,083", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:27:24,086", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 23:27:24,089", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 23:27:24,093", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 23:27:24,095", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:27:24,098", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:34:09,164", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 23:34:09,176", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:34:09,179", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:34:09,182", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:36:57,762", "level": "ERROR", "message": Could not connect to Redis instance: Connection closed by server. Retrying in 1 seconds...}
+{"timestamp": "2025-05-01 23:37:00,045", "level": "ERROR", "message": Could not connect to Redis instance: Error -5 connecting to redis:6379. No address associated with hostname. Retrying in 2 seconds...}
+{"timestamp": "2025-05-01 23:37:02,068", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:37:02,080", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:37:02,083", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:38:07,903", "level": "DEBUG", "message": Got signal SIGTERM}
+{"timestamp": "2025-05-01 23:38:07,906", "level": "INFO", "message": Worker 1e0229c5669f493f81e59c43ececf5af [PID 1]: warm shut down requested}
+{"timestamp": "2025-05-01 23:38:07,909", "level": "DEBUG", "message": Registering death}
+{"timestamp": "2025-05-01 23:38:07,912", "level": "INFO", "message": Unsubscribing from channel rq:pubsub:1e0229c5669f493f81e59c43ececf5af}
+{"timestamp": "2025-05-01 23:38:55,880", "level": "INFO", "message": [INFO] Starting rq worker process...}
+{"timestamp": "2025-05-01 23:38:55,900", "level": "DEBUG", "message": Registering birth of worker 1bdff289fda34e1384193ccd7f795150}
+{"timestamp": "2025-05-01 23:38:55,901", "level": "INFO", "message": Worker rq:worker:1bdff289fda34e1384193ccd7f795150 started with PID 1, version 2.3.1}
+{"timestamp": "2025-05-01 23:38:55,902", "level": "INFO", "message": Subscribing to channel rq:pubsub:1bdff289fda34e1384193ccd7f795150}
+{"timestamp": "2025-05-01 23:38:55,904", "level": "INFO", "message": *** Listening on default, high, low...}
+{"timestamp": "2025-05-01 23:38:55,906", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:38:55,907", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 23:38:55,909", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 23:38:55,911", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 23:38:55,913", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 23:38:55,914", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:38:55,915", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:38:55,916", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:40:54,771", "level": "DEBUG", "message": Dequeued job netraven_db_job_1 from default}
+{"timestamp": "2025-05-01 23:40:54,776", "level": "INFO", "message": default: NetRaven Job 1 (system-reachability) - Interval (netraven_db_job_1)}
+{"timestamp": "2025-05-01 23:40:54,779", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:40:54,784", "level": "DEBUG", "message": Started Job Registry set.}
+{"timestamp": "2025-05-01 23:40:54,789", "level": "DEBUG", "message": Preparing for execution of Job ID netraven_db_job_1}
+{"timestamp": "2025-05-01 23:40:54,792", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 90 seconds.}
+{"timestamp": "2025-05-01 23:40:54,795", "level": "DEBUG", "message": Job preparation finished.}
+{"timestamp": "2025-05-01 23:40:54,798", "level": "DEBUG", "message": Performing Job netraven_db_job_1 ...}
+{"timestamp": "2025-05-01 23:40:55,076", "level": "INFO", "message": [Job: 1] Received job request. Starting...}
+{"timestamp": "2025-05-01 23:40:55,087", "level": "DEBUG", "message": [Job: 1] No DB session provided, creating new one.}
+{"timestamp": "2025-05-01 23:40:55,090", "level": "INFO", "message": [Job: 1] Updating job status to 'RUNNING'.}
+{"timestamp": "2025-05-01 23:40:55,099", "level": "INFO", "message": Job started.}
+{"timestamp": "2025-05-01 23:40:55,104", "level": "INFO", "message": [Job: 1] Configuration loaded.}
+{"timestamp": "2025-05-01 23:40:55,112", "level": "INFO", "message": [Job: 1] Loading devices from database via tags...}
+{"timestamp": "2025-05-01 23:40:55,123", "level": "WARNING", "message": [Job: 1] Job tags found, but no devices associated with those tags.}
+{"timestamp": "2025-05-01 23:40:55,126", "level": "WARNING", "message": [Job: 1] No devices found for this job. Final Status: COMPLETED_NO_DEVICES}
+{"timestamp": "2025-05-01 23:40:55,128", "level": "INFO", "message": Job completed: No devices found for this job.}
+{"timestamp": "2025-05-01 23:40:55,130", "level": "INFO", "message": [Job: 1] Updating job status to 'COMPLETED_NO_DEVICES' in 0.05s.}
+{"timestamp": "2025-05-01 23:40:55,136", "level": "INFO", "message": [Job: 1] Job completed with status 'COMPLETED_NO_DEVICES' in 0.05s}
+{"timestamp": "2025-05-01 23:40:55,138", "level": "DEBUG", "message": Finished performing Job netraven_db_job_1}
+{"timestamp": "2025-05-01 23:40:55,141", "level": "DEBUG", "message": Handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 23:40:55,143", "level": "DEBUG", "message": Saving job netraven_db_job_1's successful execution result}
+{"timestamp": "2025-05-01 23:40:55,146", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 23:40:55,148", "level": "DEBUG", "message": Cleaning up execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 23:40:55,152", "level": "INFO", "message": Successfully completed NetRaven Job 1 (system-reachability) - Interval job in 0:00:00.342757s on worker 1bdff289fda34e1384193ccd7f795150}
+{"timestamp": "2025-05-01 23:40:55,154", "level": "DEBUG", "message": Finished handling successful execution of job netraven_db_job_1}
+{"timestamp": "2025-05-01 23:40:55,156", "level": "INFO", "message": default: Job OK (netraven_db_job_1)}
+{"timestamp": "2025-05-01 23:40:55,158", "level": "INFO", "message": Result will never expire, clean up result key manually}
+{"timestamp": "2025-05-01 23:40:55,165", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:40:55,168", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:40:55,171", "level": "DEBUG", "message": *** Listening on default,high,low...}
+{"timestamp": "2025-05-01 23:40:55,173", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:40:55,176", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:40:55,178", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:45:48,996", "level": "WARNING", "message": Pubsub thread exiting on Timeout reading from socket}
+{"timestamp": "2025-05-01 23:47:40,282", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 23:47:40,295", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:47:40,299", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:47:40,302", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}
+{"timestamp": "2025-05-01 23:54:25,330", "level": "DEBUG", "message": BLPOP timeout, no jobs found on queues rq:queue:default, rq:queue:high, rq:queue:low}
+{"timestamp": "2025-05-01 23:54:25,344", "level": "DEBUG", "message": Sent heartbeat to prevent worker timeout. Next one should arrive in 480 seconds.}
+{"timestamp": "2025-05-01 23:54:25,347", "level": "INFO", "message": Cleaning registries for queue: default}
+{"timestamp": "2025-05-01 23:54:25,352", "level": "INFO", "message": Cleaning registries for queue: high}
+{"timestamp": "2025-05-01 23:54:25,355", "level": "INFO", "message": Cleaning registries for queue: low}
+{"timestamp": "2025-05-01 23:54:25,359", "level": "DEBUG", "message": Dequeueing jobs on queues default,high,low and timeout 405}
+{"timestamp": "2025-05-01 23:54:25,361", "level": "DEBUG", "message": Starting BLPOP operation for queues rq:queue:default, rq:queue:high, rq:queue:low with timeout of 405}

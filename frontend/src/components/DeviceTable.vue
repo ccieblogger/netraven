@@ -1,13 +1,13 @@
 <template>
   <!-- Device Table Card: aligns with filter/search section, uses production theme -->
   <div>
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-6 pt-6 mb-2">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-4 pt-6 mb-2">
       <slot name="filters"></slot>
       <slot name="search"></slot>
     </div>
 
     <!-- Table Section: accessible, responsive, themed -->
-    <div class="overflow-x-auto px-6 pb-6">
+    <div class="overflow-x-auto px-4">
       <DataTable
         :value="devices"
         :loading="loading"

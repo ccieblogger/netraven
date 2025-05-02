@@ -41,14 +41,14 @@
     </NrCard>
 
     <!-- Device List Table Section -->
-    <NrCard title="Devices" subtitle="Inventory overview" :contentClass="'pt-1 px-6 pb-6'">
+    <NrCard title="Devices" subtitle="Inventory overview" :contentClass="'pt-1 px-2 pb-6'">
       <template #header>
-        <div class="px-6 pt-6">
+        <div class="px-2 pt-6">
           <div class="mb-2">
             <h2 class="text-lg font-semibold text-text-primary">Device Inventory</h2>
             <p class="text-xs text-text-secondary">Filter and search your device inventory</p>
           </div>
-          <form class="bg-card rounded-t-lg px-6 py-4 flex flex-row items-center gap-x-4 w-full" @submit.prevent="handleApplyFilters">
+          <form class="bg-card rounded-t-lg px-2 py-4 flex flex-row items-center gap-x-4 w-full" @submit.prevent="handleApplyFilters">
             <label for="tag" class="sr-only">Tag</label>
             <select
               id="tag"
