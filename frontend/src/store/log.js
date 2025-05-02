@@ -13,6 +13,8 @@ export const useLogStore = defineStore('logs', () => {
       totalItems: 0,
       totalPages: 0,
   })
+  const logTypes = ref([])
+  const logLevels = ref([])
 
   // Computed property for convenience
   const totalPages = computed(() => pagination.value.totalPages);
@@ -66,6 +68,30 @@ export const useLogStore = defineStore('logs', () => {
     }
   }
 
+  async function fetchLogTypes() {
+    if (logTypes.value.length) return logTypes.value
+    try {
+      const res = await api.get('/logs/types')
+      logTypes.value = res.data
+      return logTypes.value
+    } catch (err) {
+      console.error('Failed to fetch log types:', err)
+      return []
+    }
+  }
+
+  async function fetchLogLevels() {
+    if (logLevels.value.length) return logLevels.value
+    try {
+      const res = await api.get('/logs/levels')
+      logLevels.value = res.data
+      return logLevels.value
+    } catch (err) {
+      console.error('Failed to fetch log levels:', err)
+      return []
+    }
+  }
+
   // Helper to reset pagination state
   function resetPagination() {
       pagination.value.currentPage = 1;
@@ -84,5 +110,5 @@ export const useLogStore = defineStore('logs', () => {
   }
 
   // Expose totalPages computed property as well
-  return { logs, isLoading, error, filters, pagination, totalPages, fetchLogs, $reset }
+  return { logs, isLoading, error, filters, pagination, totalPages, fetchLogs, fetchLogTypes, fetchLogLevels, $reset }
 }) 
