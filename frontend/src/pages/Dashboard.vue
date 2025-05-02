@@ -1,23 +1,27 @@
 <template>
   <PageContainer title="Dashboard" subtitle="Overview of your network management system">
-    <!-- Stats Cards (now 4 columns) -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <KpiCard label="Devices" :value="deviceStore.devices?.length ?? 0" icon="list" color="blue" />
-      <KpiCard label="Jobs" :value="jobStore.jobs?.length ?? 0" icon="queue" color="primary" />
-      <div class="nr-card border-l-4 border-l-gray-500 p-4 flex flex-col items-start">
-        <h2 class="text-lg uppercase font-semibold text-text-secondary">SYSTEM STATUS</h2>
-        <div class="mt-2 grid grid-cols-2 md:grid-cols-2 gap-2 w-full">
-          <div v-for="service in services" :key="service.key" class="flex items-center space-x-2">
-            <ServiceDot :status="service.status" :label="service.label" :tooltip="serviceTooltip(service)" />
-          </div>
-        </div>
-        <div class="border-t border-divider px-4 py-2 flex justify-between items-center text-xs text-text-secondary w-full mt-2">
-          <span>Last checked: {{ lastCheckedDisplay }}</span>
-          <span>
-            Auto-refresh in: {{ countdown }}s
-            <a href="#" @click.prevent="manualRefresh" class="ml-2 text-blue-500 hover:underline" :aria-label="'Refresh system status'" :disabled="isLoading">Refresh now</a>
-          </span>
-        </div>
+    <!-- KPI Cards Row: System Status as individual KPIs -->
+    <div class="w-full px-2 mb-8">
+      <div class="flex flex-row gap-4 w-full">
+        <KpiCard
+          v-for="service in services"
+          :key="service.key"
+          :label="service.label"
+          :value="service.status.charAt(0).toUpperCase() + service.status.slice(1)"
+          icon="status"
+          :color="
+            service.status === 'healthy' ? 'green' :
+            service.status === 'unhealthy' ? 'red' :
+            'yellow'"
+          class="flex-1 min-w-0"
+        />
+        <KpiCard
+          label="RQ"
+          value="Unknown"
+          icon="status"
+          color="yellow"
+          class="flex-1 min-w-0"
+        />
       </div>
     </div>
 
