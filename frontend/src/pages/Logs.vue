@@ -135,11 +135,6 @@ onMounted(async () => {
   fetchLogs()
 })
 
-// Watchers to sync state to URL
-watch([currentPage, pageSize, sortField, sortOrder, filters, globalSearch], () => {
-  updateQueryParams()
-})
-
 function fetchLogs() {
   logStore.fetchLogs(currentPage.value, buildFilters())
 }
@@ -165,22 +160,27 @@ function onPageChange(e) {
   currentPage.value = e.page + 1
   pageSize.value = e.rows
   fetchLogs()
+  updateQueryParams()
 }
 function onSort(e) {
   sortField.value = e.sortField
   sortOrder.value = e.sortOrder
   fetchLogs()
+  updateQueryParams()
 }
 function onFilter(e) {
   filters.value = e.filters
   fetchLogs()
+  updateQueryParams()
 }
 function onGlobalSearch() {
   fetchLogs()
+  updateQueryParams()
 }
 function clearGlobalSearch() {
   globalSearch.value = ''
   fetchLogs()
+  updateQueryParams()
 }
 
 // Custom body for meta column
