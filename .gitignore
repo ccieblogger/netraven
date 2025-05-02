@@ -117,3 +117,6 @@ frontend/.vite/
 # Cursor AI
 .cursor/
 node_modules
+
+# Netraven
+host-logs
