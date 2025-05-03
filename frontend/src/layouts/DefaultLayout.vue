@@ -116,7 +116,7 @@
         </header>
 
         <!-- Page content -->
-        <main class="flex-1 overflow-y-auto bg-content p-6">
+        <main class="flex-1 overflow-y-auto bg-content pt-2 pr-4 pb-4 pl-4">
           <slot></slot>
         </main>
         <footer class="w-full flex items-center justify-between bg-sidebar border-t border-divider px-6 py-2 text-xs text-text-secondary">

@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="Dashboard" subtitle="Overview of your network management system">
+  <PageContainer title="Dashboard" subtitle="System overview and device inventory">
     <!-- KPI Cards Row: System Status as individual KPIs -->
     <div class="w-full px-0 mb-4">
       <div class="flex flex-row gap-4 w-full">

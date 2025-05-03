@@ -28,4 +28,35 @@ Implemented the following UI layout improvements for the dashboard:
 - Phase 3: Test layout on various screen sizes and validate visual improvements.
 - Update this log with test results and any further tweaks.
 
+### Phase 2.1: UI Tweaks After User Feedback
+
+**Date:** [Fill in date]
+
+#### Summary
+- Reduced KPI card height from `h-32` to `h-20` for a less tall appearance.
+- Halved left and top margins for dashboard content by changing `.page-container` padding from `p-6` to `p-3` in `main.scss`.
+
+#### Files Modified
+- `frontend/src/pages/Dashboard.vue`
+- `frontend/src/styles/main.scss`
+
+#### Next Steps
+- Review UI in browser for further feedback or move to final testing/documentation.
+
+### Phase 2.2: Further UI Compaction After User Feedback
+
+**Date:** [Fill in date]
+
+#### Summary
+- Removed `aspect-square` from KPI cards.
+- Set fixed height (`h-16`), width (`w-40`), and max width (`max-w-xs`) for KPI cards for a more compact look.
+- Reduced `.page-container` padding from `p-1` for much smaller left/top dashboard margins.
+
+#### Files Modified
+- `frontend/src/pages/Dashboard.vue`
+- `frontend/src/styles/main.scss`
+
+#### Next Steps
+- Review UI in browser for further feedback or move to final testing/documentation.
+
 --- 
