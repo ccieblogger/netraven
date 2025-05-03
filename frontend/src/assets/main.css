@@ -70,30 +70,9 @@ input[type="date"]::-moz-calendar-picker-indicator {
   opacity: 1 !important;
 }
 
-/* PrimeVue DataTable row background override (more specific) */
-.p-datatable-tbody > tr > td {
-  background-color: #23272f !important;
-}
-.p-datatable-tbody > tr:nth-child(even) > td {
-  background-color: #262b35 !important;
-}
-
-/* PrimeVue DataTable paginator background override (more specific) */
-.p-datatable .p-paginator, .p-paginator {
-  background-color: #23272f !important;
-  border-radius: 0 0 0.5rem 0.5rem;
-}
-
-/* PrimeVue DataTable filter row background override (global, best practice) */
-.p-datatable .p-filter-row, .p-filter-row {
-  background-color: #23272f !important;
-}
-
-/* Global override: PrimeVue DataTable filter row cell background */
-.p-datatable .p-datatable-thead > tr > th.p-filter-column {
-  background-color: #23272f !important; /* Or use var(--nr-bg-card) if you have a variable */
-}
+/* Removed DataTable background and color overrides for PrimeVue theme consistency */
 
 :root {
   --surface-a: #23272f !important;
+  --surface-b: transparent !important;
 }
