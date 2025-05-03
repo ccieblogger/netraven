@@ -1,9 +1,13 @@
 <template>
   <Card title="Logs" subtitle="System and job event history" className="mb-8">
     <template #header>
-      <div class="px-2 pt-2">
-        <h2 class="text-lg font-semibold text-text-primary">Logs</h2>
-        <p class="text-xs text-text-secondary">System and job event history</p>
+      <div class="flex justify-end px-2 pt-2">
+        <IconField>
+          <InputIcon>
+            <i class="pi pi-search" />
+          </InputIcon>
+          <InputText v-model="filters.global.value" placeholder="Keyword Search" class="w-64" />
+        </IconField>
       </div>
     </template>
     <div v-if="isLoading" class="text-center py-8 text-gray-500">Loading logs...</div>
@@ -18,22 +22,71 @@
         :emptyMessage="logs.length === 0 ? 'No logs found.' : ''"
         filterDisplay="row"
         v-model:filters="filters"
+        :globalFilterFields="['timestamp', 'log_type', 'level', 'job_id', 'device_id', 'source', 'message']"
+        :pt="{ bodyRow: 'bg-card', bodyRowEven: 'bg-card', paginator: { class: 'bg-card' } }"
       >
-        <Column field="timestamp" header="Timestamp" :headerClass="headerClass" :bodyClass="bodyClass" filter filterMatchMode="contains" />
-        <Column field="log_type" header="Type" :headerClass="headerClass" :bodyClass="bodyClass" filter filterMatchMode="equals">
-          <template #filter="{ filterModel }">
-            <Dropdown v-model="filterModel.value" :options="logTypeOptions" placeholder="All Types" showClear class="w-full" />
+        <Column field="timestamp" header="Timestamp" style="min-width: 12rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+          <template #body="{ data }">
+            {{ data.timestamp }}
+          </template>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search timestamp" class="w-full" />
           </template>
         </Column>
-        <Column field="level" header="Level" :headerClass="headerClass" :bodyClass="bodyClass" filter filterMatchMode="equals">
-          <template #filter="{ filterModel }">
-            <Dropdown v-model="filterModel.value" :options="logLevelOptions" placeholder="All Levels" showClear class="w-full" />
+        <Column field="log_type" header="Type" style="min-width: 8rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+          <template #body="{ data }">
+            {{ data.log_type }}
+          </template>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search type" class="w-full" />
           </template>
         </Column>
-        <Column field="job_id" header="Job ID" :headerClass="headerClass" :bodyClass="bodyClass" filter filterMatchMode="contains" />
-        <Column field="device_id" header="Device ID" :headerClass="headerClass" :bodyClass="bodyClass" filter filterMatchMode="contains" />
-        <Column field="source" header="Source" :headerClass="headerClass" :bodyClass="bodyClass" filter filterMatchMode="contains" />
-        <Column field="message" header="Message" :headerClass="headerClass" :bodyClass="bodyClass" filter filterMatchMode="contains" />
+        <Column field="level" header="Level" style="min-width: 8rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+          <template #body="{ data }">
+            {{ data.level }}
+          </template>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search level" class="w-full" />
+          </template>
+        </Column>
+        <Column field="job_id" header="Job ID" style="min-width: 8rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+          <template #body="{ data }">
+            {{ data.job_id }}
+          </template>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search job ID" class="w-full" />
+          </template>
+        </Column>
+        <Column field="device_id" header="Device ID" style="min-width: 8rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+          <template #body="{ data }">
+            {{ data.device_id }}
+          </template>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search device ID" class="w-full" />
+          </template>
+        </Column>
+        <Column field="source" header="Source" style="min-width: 10rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+          <template #body="{ data }">
+            {{ data.source }}
+          </template>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search source" class="w-full" />
+          </template>
+        </Column>
+        <Column field="message" header="Message" style="min-width: 16rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+          <template #body="{ data }">
+            {{ data.message }}
+          </template>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search message" class="w-full" />
+          </template>
+        </Column>
+        <template #empty>
+          <div class="text-center py-8 text-gray-500">No logs found.</div>
+        </template>
+        <template #loading>
+          <div class="text-center py-8 text-gray-500">Loading logs data. Please wait.</div>
+        </template>
       </DataTable>
     </div>
   </Card>
@@ -44,41 +97,26 @@ import { ref, onMounted, computed } from 'vue'
 import { useLogStore } from '../store/log'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
-import Dropdown from 'primevue/dropdown'
+import InputText from 'primevue/inputtext'
 import Card from '../components/ui/Card.vue'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 
 const logStore = useLogStore()
 const isLoading = ref(false)
 
 const logs = computed(() => logStore.logs)
 
-const headerClass = 'bg-card text-text-primary font-semibold'
-const bodyClass = 'px-4'
-
-// PrimeVue filter state
 const filters = ref({
+  global: { value: null, matchMode: 'contains' },
   timestamp: { value: null, matchMode: 'contains' },
-  log_type: { value: null, matchMode: 'equals' },
-  level: { value: null, matchMode: 'equals' },
+  log_type: { value: null, matchMode: 'contains' },
+  level: { value: null, matchMode: 'contains' },
   job_id: { value: null, matchMode: 'contains' },
   device_id: { value: null, matchMode: 'contains' },
   source: { value: null, matchMode: 'contains' },
   message: { value: null, matchMode: 'contains' },
 })
-
-// Dropdown options for log_type and level
-const logTypeOptions = ref([
-  { label: 'Job', value: 'job' },
-  { label: 'Connection', value: 'connection' },
-  { label: 'Session', value: 'session' },
-  { label: 'System', value: 'system' },
-])
-const logLevelOptions = ref([
-  { label: 'Info', value: 'info' },
-  { label: 'Warning', value: 'warning' },
-  { label: 'Error', value: 'error' },
-  { label: 'Debug', value: 'debug' },
-])
 
 onMounted(async () => {
   isLoading.value = true
@@ -98,11 +136,29 @@ onMounted(async () => {
   background-color: var(--nr-bg-card) !important;
 }
 :deep(.p-column-filter) {
+  border: none !important;
+  box-shadow: none !important;
+  background: #181a20 !important;
+  color: #fff !important;
   width: 100%;
   min-width: 120px;
   border-radius: 6px;
-  border: 1px solid #e5e7eb;
   padding: 0.5rem 0.75rem;
   font-size: 0.95rem;
+}
+:deep(.p-inputtext) {
+  background: #181a20 !important;
+  color: #fff !important;
+  border: 1px solid var(--nr-border) !important;
+  border-radius: 6px;
+}
+:deep(.p-icon-field) {
+  background: #181a20 !important;
+  border-radius: 6px;
+  border: 1px solid var(--nr-border) !important;
+  color: #fff !important;
+}
+:deep(.p-input-icon) {
+  color: var(--nr-text-secondary) !important;
 }
 </style>
