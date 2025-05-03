@@ -23,15 +23,8 @@
         filterDisplay="row"
         v-model:filters="filters"
         :globalFilterFields="['timestamp', 'log_type', 'level', 'job_id', 'device_id', 'source', 'message']"
-        :pt="{
-          bodyRow: 'bg-card',
-          bodyRowEven: 'bg-card',
-          paginator: { class: 'bg-card' },
-          headerCell: 'bg-card text-text-primary font-semibold',
-          filterCell: 'bg-card text-text-primary font-semibold'
-        }"
       >
-        <Column field="timestamp" header="Timestamp" style="min-width: 12rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+        <Column field="timestamp" header="Timestamp" style="min-width: 12rem" filter :headerClass="'text-text-primary font-semibold'" :bodyClass="'px-4'">
           <template #body="{ data }">
             {{ data.timestamp }}
           </template>
@@ -39,7 +32,7 @@
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search timestamp" class="w-full" />
           </template>
         </Column>
-        <Column field="log_type" header="Type" style="min-width: 8rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+        <Column field="log_type" header="Type" style="min-width: 8rem" filter :headerClass="'text-text-primary font-semibold'" :bodyClass="'px-4'">
           <template #body="{ data }">
             {{ data.log_type }}
           </template>
@@ -47,7 +40,7 @@
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search type" class="w-full" />
           </template>
         </Column>
-        <Column field="level" header="Level" style="min-width: 8rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+        <Column field="level" header="Level" style="min-width: 8rem" filter :headerClass="'text-text-primary font-semibold'" :bodyClass="'px-4'">
           <template #body="{ data }">
             {{ data.level }}
           </template>
@@ -55,7 +48,7 @@
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search level" class="w-full" />
           </template>
         </Column>
-        <Column field="job_id" header="Job ID" style="min-width: 8rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+        <Column field="job_id" header="Job ID" style="min-width: 8rem" filter :headerClass="'text-text-primary font-semibold'" :bodyClass="'px-4'">
           <template #body="{ data }">
             {{ data.job_id }}
           </template>
@@ -63,7 +56,7 @@
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search job ID" class="w-full" />
           </template>
         </Column>
-        <Column field="device_id" header="Device ID" style="min-width: 8rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+        <Column field="device_id" header="Device ID" style="min-width: 8rem" filter :headerClass="'text-text-primary font-semibold'" :bodyClass="'px-4'">
           <template #body="{ data }">
             {{ data.device_id }}
           </template>
@@ -71,7 +64,7 @@
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search device ID" class="w-full" />
           </template>
         </Column>
-        <Column field="source" header="Source" style="min-width: 10rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+        <Column field="source" header="Source" style="min-width: 10rem" filter :headerClass="'text-text-primary font-semibold'" :bodyClass="'px-4'">
           <template #body="{ data }">
             {{ data.source }}
           </template>
@@ -79,7 +72,7 @@
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search source" class="w-full" />
           </template>
         </Column>
-        <Column field="message" header="Message" style="min-width: 16rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
+        <Column field="message" header="Message" style="min-width: 16rem" filter :headerClass="'text-text-primary font-semibold'" :bodyClass="'px-4'">
           <template #body="{ data }">
             {{ data.message }}
           </template>
@@ -130,43 +123,3 @@ onMounted(async () => {
   isLoading.value = false
 })
 </script>
-
-<!--
-<style scoped>
-:deep(.p-datatable-thead > tr) {
-  border-bottom: 2px solid var(--nr-text-primary);
-}
-:deep(.p-datatable-tbody > tr) {
-  border-bottom: 1px solid var(--nr-border);
-}
-:deep(.p-paginator) {
-  background-color: var(--nr-bg-card) !important;
-}
-:deep(.p-column-filter) {
-  border: none !important;
-  box-shadow: none !important;
-  background: inherit !important;
-  color: #fff !important;
-  width: 100%;
-  min-width: 120px;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
-}
-:deep(.p-inputtext) {
-  background: inherit !important;
-  color: #fff !important;
-  border: 1px solid var(--nr-border) !important;
-  border-radius: 6px;
-}
-:deep(.p-icon-field) {
-  background: #181a20 !important;
-  border-radius: 6px;
-  border: 1px solid var(--nr-border) !important;
-  color: #fff !important;
-}
-:deep(.p-input-icon) {
-  color: var(--nr-text-secondary) !important;
-}
-</style>
--->

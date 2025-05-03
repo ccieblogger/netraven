@@ -1,0 +1,112 @@
+/**
+ * PrimeVue Global Overrides - DataTable Component
+ * 
+ * This file contains global style overrides for PrimeVue components
+ * to ensure consistent theming across the application.
+ */
+
+/* DataTable Overrides - Fix background colors */
+.p-datatable {
+  background-color: var(--nr-bg-card) !important;
+
+  .p-datatable-wrapper {
+    background-color: var(--nr-bg-card) !important;
+  }
+
+  .p-datatable-table {
+    background-color: var(--nr-bg-card) !important;
+  }
+
+  .p-datatable-header {
+    background-color: var(--nr-bg-card) !important;
+    border-color: var(--nr-border) !important;
+  }
+
+  .p-datatable-thead {
+    > tr {
+      background-color: var(--nr-bg-card) !important;
+      border-bottom: 2px solid var(--nr-text-primary);
+
+      > th {
+        background-color: var(--nr-bg-card) !important;
+        color: var(--nr-text-primary) !important;
+        border-color: var(--nr-border) !important;
+        font-weight: 600;
+      }
+    }
+
+    tr.p-datatable-thead-filter {
+      background-color: var(--nr-bg-card) !important;
+
+      td {
+        background-color: var(--nr-bg-card) !important;
+      }
+
+      .p-filter-column {
+        background-color: var(--nr-bg-card) !important;
+      }
+    }
+  }
+
+  .p-datatable-tbody {
+    > tr {
+      background-color: var(--nr-bg-card) !important;
+      border-bottom: 1px solid var(--nr-border);
+      color: var(--nr-text-primary) !important;
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.03) !important;
+      }
+
+      > td {
+        border-color: var(--nr-border) !important;
+      }
+    }
+  }
+
+  .p-paginator {
+    background-color: var(--nr-bg-card) !important;
+    border-color: var(--nr-border) !important;
+    color: var(--nr-text-primary) !important;
+  }
+
+  /* Filter styling */
+  .p-column-filter-row {
+    background-color: var(--nr-bg-card) !important;
+  }
+
+  .p-column-filter {
+    background-color: var(--nr-bg-card) !important;
+  }
+}
+
+/* Form control styling within DataTable */
+.p-datatable {
+  .p-inputtext {
+    background: var(--nr-bg-card) !important;
+    color: var(--nr-text-primary) !important;
+    border: 1px solid var(--nr-border) !important;
+    border-radius: 6px;
+
+    &:focus {
+      border-color: var(--nr-primary) !important;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+    }
+  }
+
+  .p-icon-field {
+    background: var(--nr-bg-card) !important;
+    border-radius: 6px;
+    border: 1px solid var(--nr-border) !important;
+    color: var(--nr-text-primary) !important;
+  }
+
+  .p-input-icon {
+    color: var(--nr-text-secondary) !important;
+  }
+}
+
+/* Stripe alternate rows if enabled */
+.p-datatable-striped .p-datatable-tbody > tr.p-row-odd {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+} 

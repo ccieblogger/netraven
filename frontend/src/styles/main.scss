@@ -6,6 +6,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import PrimeVue style overrides */
+@import './primevue-overrides.scss';
+
 /* Base styles */
 html, body {
   margin: 0;
