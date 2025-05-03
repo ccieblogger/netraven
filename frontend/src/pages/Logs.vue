@@ -1,7 +1,8 @@
 <template>
-  <Card title="Logs" subtitle="System and job event history" className="mb-8">
+  <PageContainer title="Dashboard" subtitle="System overview and device inventory">
+  <Card title="Logs" subtitle="System and job event history">
     <template #header>
-      <div class="flex justify-end px-2 pt-2">
+      <div class="flex justify-end px-2 pt-2 text-xs">
         <IconField>
           <InputIcon>
             <i class="pi pi-search" />
@@ -17,7 +18,7 @@
         dataKey="id"
         stripedRows
         responsiveLayout="scroll"
-        class="text-text-primary min-w-full"
+        class="text-text-primary min-w-full text-xs"
         tableStyle="min-width: 100%"
         :emptyMessage="logs.length === 0 ? 'No logs found.' : ''"
         filterDisplay="row"
@@ -89,6 +90,7 @@
       </DataTable>
     </div>
   </Card>
+  </PageContainer>
 </template>
 
 <script setup>

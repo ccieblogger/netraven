@@ -16,7 +16,7 @@
             <th class="py-3 px-6 text-left">Message</th>
           </tr>
         </thead>
-        <tbody class="text-gray-600 text-sm font-light">
+        <tbody class="text-xs text-gray-600 font-light">
           <tr v-for="log in logs" :key="log.id + 'job'" class="border-b border-gray-200 hover:bg-gray-100">
             <td class="py-3 px-6 text-left text-xs whitespace-nowrap">{{ formatDateTime(log.timestamp) }}</td>
             <td class="py-3 px-6 text-left">
