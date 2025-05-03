@@ -23,7 +23,13 @@
         filterDisplay="row"
         v-model:filters="filters"
         :globalFilterFields="['timestamp', 'log_type', 'level', 'job_id', 'device_id', 'source', 'message']"
-        :pt="{ bodyRow: 'bg-card', bodyRowEven: 'bg-card', paginator: { class: 'bg-card' } }"
+        :pt="{
+          bodyRow: 'bg-card',
+          bodyRowEven: 'bg-card',
+          paginator: { class: 'bg-card' },
+          headerCell: 'bg-card text-text-primary font-semibold',
+          filterCell: 'bg-card text-text-primary font-semibold'
+        }"
       >
         <Column field="timestamp" header="Timestamp" style="min-width: 12rem" filter :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="'px-4'">
           <template #body="{ data }">
@@ -125,6 +131,7 @@ onMounted(async () => {
 })
 </script>
 
+<!--
 <style scoped>
 :deep(.p-datatable-thead > tr) {
   border-bottom: 2px solid var(--nr-text-primary);
@@ -138,7 +145,7 @@ onMounted(async () => {
 :deep(.p-column-filter) {
   border: none !important;
   box-shadow: none !important;
-  background: #181a20 !important;
+  background: inherit !important;
   color: #fff !important;
   width: 100%;
   min-width: 120px;
@@ -147,7 +154,7 @@ onMounted(async () => {
   font-size: 0.95rem;
 }
 :deep(.p-inputtext) {
-  background: #181a20 !important;
+  background: inherit !important;
   color: #fff !important;
   border: 1px solid var(--nr-border) !important;
   border-radius: 6px;
@@ -162,3 +169,4 @@ onMounted(async () => {
   color: var(--nr-text-secondary) !important;
 }
 </style>
+-->

@@ -84,6 +84,16 @@ input[type="date"]::-moz-calendar-picker-indicator {
   border-radius: 0 0 0.5rem 0.5rem;
 }
 
+/* PrimeVue DataTable filter row background override (global, best practice) */
+.p-datatable .p-filter-row, .p-filter-row {
+  background-color: #23272f !important;
+}
+
+/* Global override: PrimeVue DataTable filter row cell background */
+.p-datatable .p-datatable-thead > tr > th.p-filter-column {
+  background-color: #23272f !important; /* Or use var(--nr-bg-card) if you have a variable */
+}
+
 :root {
   --surface-a: #23272f !important;
 }

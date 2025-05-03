@@ -20,7 +20,7 @@ curl -s http://localhost:8000/jobs/status \
   -H "Authorization: Bearer $TOKEN" | jq . 
 
 # Use the token to query job-logs endpoint
-curl -X GET "http://localhost:8000/job-logs/" \
+curl -X GET "http://localhost:8000/logs/" \
   -H "Authorization: Bearer $TOKEN" | jq . 
 
 # List Jobs in DB
