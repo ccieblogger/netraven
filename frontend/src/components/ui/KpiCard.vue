@@ -1,5 +1,5 @@
 <template>
-  <div class="nr-card flex flex-col justify-between h-full border-l-4 p-0" :class="borderColor">
+  <div class="nr-card flex flex-col justify-between h-full min-h-0 min-w-0 border-l-4 p-0" :class="borderColor">
     <div class="flex items-center justify-between pt-2 pl-3 pr-3">
       <span class="text-xs uppercase font-semibold text-text-secondary">{{ label }}</span>
       <span

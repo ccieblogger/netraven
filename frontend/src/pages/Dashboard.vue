@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="Dashboard" subtitle="Overview of your network management system">
     <!-- KPI Cards Row: System Status as individual KPIs -->
-    <div class="w-full px-2 mb-8">
+    <div class="w-full px-0 mb-4">
       <div class="flex flex-row gap-4 w-full">
         <KpiCard
           v-for="service in services"
@@ -13,27 +13,27 @@
             service.status === 'healthy' ? 'green' :
             service.status === 'unhealthy' ? 'red' :
             'yellow'"
-          class="flex-1 min-w-0"
+          class="flex-1 min-w-0 aspect-square h-32"
         />
         <KpiCard
           label="RQ"
           value="Unknown"
           icon="status"
           color="yellow"
-          class="flex-1 min-w-0"
+          class="flex-1 min-w-0 aspect-square h-32"
         />
       </div>
     </div>
 
     <!-- Device List Table Section -->
-    <NrCard title="Devices" subtitle="Inventory overview" :contentClass="'pt-0 px-2 pb-2'">
+    <NrCard title="Devices" subtitle="Inventory overview" :contentClass="'pt-0 px-0 pb-2'">
       <template #header>
-        <div class="px-2 pt-2">
+        <div class="px-0 pt-2">
           <div class="mb-1">
             <h2 class="text-lg font-semibold text-text-primary">Device Inventory</h2>
             <p class="text-xs text-text-secondary">Filter and search your device inventory</p>
           </div>
-          <form class="bg-card rounded-t-lg px-2 py-2 flex flex-row items-center gap-x-4 w-full" @submit.prevent="handleApplyFilters">
+          <form class="bg-card rounded-t-lg px-0 py-2 flex flex-row items-center gap-x-4 w-full" @submit.prevent="handleApplyFilters">
             <label for="tag" class="sr-only">Tag</label>
             <select
               id="tag"
