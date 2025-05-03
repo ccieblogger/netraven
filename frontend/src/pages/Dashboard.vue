@@ -13,14 +13,14 @@
             service.status === 'healthy' ? 'green' :
             service.status === 'unhealthy' ? 'red' :
             'yellow'"
-          class="flex-1 min-w-0 aspect-square h-20"
+          class="flex-1 min-w-0 h-16 w-40 max-w-xs"
         />
         <KpiCard
           label="RQ"
           value="Unknown"
           icon="status"
           color="yellow"
-          class="flex-1 min-w-0 aspect-square h-20"
+          class="flex-1 min-w-0 h-16 w-40 max-w-xs"
         />
       </div>
     </div>
