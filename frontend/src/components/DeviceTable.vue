@@ -26,7 +26,7 @@
         stripedRows
         :pt="{ bodyRow: 'bg-card', bodyRowEven: 'bg-card', paginator: { class: 'bg-card' } }"
         filterDisplay="row"
-        :filters="filters"
+        :filters="props.filters"
       >
         <!-- Static columns with header/body color classes -->
         <Column field="hostname" header="Hostname" sortable class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('hostname')" filter>

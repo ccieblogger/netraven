@@ -32,7 +32,7 @@
       <DeviceTable
         :devices="deviceStore.devices"
         :loading="loading"
-        :filters="filters"
+        :filters="filters.value"
         :pageSize="pageSize"
         lazy
         @filter="onTableChange"
@@ -350,6 +350,7 @@ function handleViewConfigs(device) {
 }
 
 async function onTableChange(event) {
+  console.log('onTableChange', event);
   // Build params for API
   const params = {};
   // Pagination
