@@ -35,9 +35,9 @@
         :filters="filters"
         :pageSize="pageSize"
         lazy
-        @filter="onFilter"
-        @page="onPage"
-        @sort="onSort"
+        @filter="onTableChange"
+        @page="onTableChange"
+        @sort="onTableChange"
         @edit="handleEdit"
         @delete="handleDelete"
         @check-reachability="handleCheckReachability"
@@ -349,14 +349,27 @@ function handleViewConfigs(device) {
   router.push(`/backups?device_id=${device.id}`);
 }
 
-async function onFilter(event) {
-  // To be implemented: build params from event.filters, event.first, event.rows, etc.
-}
-async function onPage(event) {
-  // To be implemented: build params from event, call API
-}
-async function onSort(event) {
-  // To be implemented: build params from event, call API
+async function onTableChange(event) {
+  // Build params for API
+  const params = {};
+  // Pagination
+  params.page = event.first !== undefined && event.rows !== undefined
+    ? Math.floor(event.first / event.rows) + 1
+    : 1;
+  params.size = event.rows || 10;
+  // Sorting
+  if (event.sortField) params.sort = event.sortField;
+  if (event.sortOrder) params.order = event.sortOrder === 1 ? 'asc' : 'desc';
+  // Filters
+  if (event.filters) {
+    Object.entries(event.filters).forEach(([key, filterObj]) => {
+      if (filterObj && typeof filterObj.value === 'string' && filterObj.value.trim() !== '') {
+        params[key] = filterObj.value.trim();
+      }
+    });
+  }
+  // Fetch from backend
+  await deviceStore.fetchDevices(params);
 }
 
 onMounted(() => {
