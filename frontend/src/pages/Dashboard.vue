@@ -116,10 +116,9 @@ const countdown = ref(30);
 let intervalId = null;
 let countdownId = null;
 
-function serviceTooltip(service) {
-  if (service.status === 'healthy') return 'Healthy';
-  if (service.status === 'unhealthy') return 'Unhealthy';
-  return 'Unknown';
+function capitalizeStatus(status) {
+  if (!status) return 'Unknown';
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 }
 
 async function fetchSystemStatus(refresh = false) {
@@ -132,17 +131,17 @@ async function fetchSystemStatus(refresh = false) {
     // Map system status fields to services
     services.value.forEach(s => {
       if (s.key === 'api') {
-        s.status = data.api || 'unknown';
-        s.statusValue = data.api || 'Unknown';
+        s.status = data.api ? capitalizeStatus(data.api) : 'Unknown';
+        s.statusValue = data.api ? capitalizeStatus(data.api) : 'Unknown';
         s.tooltip = '';
       } else if (s.key === 'postgres') {
-        s.status = data.postgres || 'unknown';
-        s.statusValue = data.postgres || 'Unknown';
+        s.status = data.postgres ? capitalizeStatus(data.postgres) : 'Unknown';
+        s.statusValue = data.postgres ? capitalizeStatus(data.postgres) : 'Unknown';
         s.tooltip = '';
       } else if (s.key === 'redis') {
         if (data.redis === 'healthy') {
-          s.status = 'healthy';
-          s.statusValue = 'healthy';
+          s.status = 'Healthy';
+          s.statusValue = 'Healthy';
           // Show uptime in tooltip if available
           if (typeof data.redis_uptime === 'number') {
             const d = Math.floor(data.redis_uptime/86400), h = Math.floor((data.redis_uptime%86400)/3600);
@@ -151,25 +150,25 @@ async function fetchSystemStatus(refresh = false) {
             s.tooltip = '';
           }
         } else if (data.redis === 'unhealthy') {
-          s.status = 'unhealthy';
-          s.statusValue = 'unhealthy';
+          s.status = 'Unhealthy';
+          s.statusValue = 'Unhealthy';
           s.tooltip = 'Redis is unhealthy';
         } else {
-          s.status = 'unknown';
-          s.statusValue = 'unknown';
+          s.status = 'Unknown';
+          s.statusValue = 'Unknown';
           s.tooltip = 'Not reported by backend';
         }
       } else if (s.key === 'worker') {
-        s.status = data.worker || 'unknown';
-        s.statusValue = data.worker || 'Unknown';
+        s.status = data.worker ? capitalizeStatus(data.worker) : 'Unknown';
+        s.statusValue = data.worker ? capitalizeStatus(data.worker) : 'Unknown';
         s.tooltip = '';
       } else if (s.key === 'scheduler') {
-        s.status = data.scheduler || 'unknown';
-        s.statusValue = data.scheduler || 'Unknown';
+        s.status = data.scheduler ? capitalizeStatus(data.scheduler) : 'Unknown';
+        s.statusValue = data.scheduler ? capitalizeStatus(data.scheduler) : 'Unknown';
         s.tooltip = '';
       } else if (s.key === 'rq') {
         // Fetch RQ stats from /jobs/status
-        s.status = 'loading';
+        s.status = 'Loading';
         s.statusValue = '...';
         s.tooltip = '';
       }
@@ -180,7 +179,7 @@ async function fetchSystemStatus(refresh = false) {
   } catch (e) {
     console.error("Failed to fetch system status:", e);
     services.value.forEach(s => {
-      s.status = 'unknown';
+      s.status = 'Unknown';
       s.statusValue = 'Unknown';
     });
   } finally {
@@ -196,21 +195,21 @@ async function fetchRQStats() {
     const rqService = services.value.find(s => s.key === 'rq');
     if (rqService) {
       if (Array.isArray(data.rq_queues) && data.rq_queues.length > 0) {
-        rqService.status = 'healthy';
-        rqService.statusValue = 'healthy';
+        rqService.status = 'Healthy';
+        rqService.statusValue = 'Healthy';
         const totalJobs = data.rq_queues.reduce((sum, q) => sum + (q.job_count || 0), 0);
         rqService.tooltip = `Total jobs in queues: ${totalJobs}`;
       } else {
-        rqService.status = 'unhealthy';
-        rqService.statusValue = 'unhealthy';
+        rqService.status = 'Unhealthy';
+        rqService.statusValue = 'Unhealthy';
         rqService.tooltip = 'No RQ queues found';
       }
     }
   } catch (e) {
     const rqService = services.value.find(s => s.key === 'rq');
     if (rqService) {
-      rqService.status = 'unknown';
-      rqService.statusValue = 'unknown';
+      rqService.status = 'Unknown';
+      rqService.statusValue = 'Unknown';
       rqService.tooltip = 'Failed to fetch RQ stats';
     }
   }
