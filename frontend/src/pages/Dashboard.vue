@@ -131,18 +131,17 @@ async function fetchSystemStatus(refresh = false) {
     // Map system status fields to services
     services.value.forEach(s => {
       if (s.key === 'api') {
-        s.status = data.api ? capitalizeStatus(data.api) : 'Unknown';
+        s.status = data.api ? data.api.toLowerCase() : 'unknown';
         s.statusValue = data.api ? capitalizeStatus(data.api) : 'Unknown';
         s.tooltip = '';
       } else if (s.key === 'postgres') {
-        s.status = data.postgres ? capitalizeStatus(data.postgres) : 'Unknown';
+        s.status = data.postgres ? data.postgres.toLowerCase() : 'unknown';
         s.statusValue = data.postgres ? capitalizeStatus(data.postgres) : 'Unknown';
         s.tooltip = '';
       } else if (s.key === 'redis') {
         if (data.redis === 'healthy') {
-          s.status = 'Healthy';
+          s.status = 'healthy';
           s.statusValue = 'Healthy';
-          // Show uptime in tooltip if available
           if (typeof data.redis_uptime === 'number') {
             const d = Math.floor(data.redis_uptime/86400), h = Math.floor((data.redis_uptime%86400)/3600);
             s.tooltip = `Uptime: ${d}d ${h}h`;
@@ -150,25 +149,24 @@ async function fetchSystemStatus(refresh = false) {
             s.tooltip = '';
           }
         } else if (data.redis === 'unhealthy') {
-          s.status = 'Unhealthy';
+          s.status = 'unhealthy';
           s.statusValue = 'Unhealthy';
           s.tooltip = 'Redis is unhealthy';
         } else {
-          s.status = 'Unknown';
+          s.status = 'unknown';
           s.statusValue = 'Unknown';
           s.tooltip = 'Not reported by backend';
         }
       } else if (s.key === 'worker') {
-        s.status = data.worker ? capitalizeStatus(data.worker) : 'Unknown';
+        s.status = data.worker ? data.worker.toLowerCase() : 'unknown';
         s.statusValue = data.worker ? capitalizeStatus(data.worker) : 'Unknown';
         s.tooltip = '';
       } else if (s.key === 'scheduler') {
-        s.status = data.scheduler ? capitalizeStatus(data.scheduler) : 'Unknown';
+        s.status = data.scheduler ? data.scheduler.toLowerCase() : 'unknown';
         s.statusValue = data.scheduler ? capitalizeStatus(data.scheduler) : 'Unknown';
         s.tooltip = '';
       } else if (s.key === 'rq') {
-        // Fetch RQ stats from /jobs/status
-        s.status = 'Loading';
+        s.status = 'loading';
         s.statusValue = '...';
         s.tooltip = '';
       }
@@ -179,7 +177,7 @@ async function fetchSystemStatus(refresh = false) {
   } catch (e) {
     console.error("Failed to fetch system status:", e);
     services.value.forEach(s => {
-      s.status = 'Unknown';
+      s.status = 'unknown';
       s.statusValue = 'Unknown';
     });
   } finally {
@@ -195,12 +193,12 @@ async function fetchRQStats() {
     const rqService = services.value.find(s => s.key === 'rq');
     if (rqService) {
       if (Array.isArray(data.rq_queues) && data.rq_queues.length > 0) {
-        rqService.status = 'Healthy';
+        rqService.status = 'healthy';
         rqService.statusValue = 'Healthy';
         const totalJobs = data.rq_queues.reduce((sum, q) => sum + (q.job_count || 0), 0);
         rqService.tooltip = `Total jobs in queues: ${totalJobs}`;
       } else {
-        rqService.status = 'Unhealthy';
+        rqService.status = 'unhealthy';
         rqService.statusValue = 'Unhealthy';
         rqService.tooltip = 'No RQ queues found';
       }
@@ -208,7 +206,7 @@ async function fetchRQStats() {
   } catch (e) {
     const rqService = services.value.find(s => s.key === 'rq');
     if (rqService) {
-      rqService.status = 'Unknown';
+      rqService.status = 'unknown';
       rqService.statusValue = 'Unknown';
       rqService.tooltip = 'Failed to fetch RQ stats';
     }
