@@ -121,54 +121,12 @@ function serviceTooltip(service) {
   return 'Unknown';
 }
 
-function updateServicesStatus(statusObj) {
-  services.value.forEach(s => {
-    if (s.key === 'redis') {
-      if (statusObj.redis_uptime) {
-        s.status = 'healthy';
-        const d = Math.floor(statusObj.redis_uptime/86400), h = Math.floor((statusObj.redis_uptime%86400)/3600);
-        s.statusValue = `Up (${d}d, ${h}h)`;
-        s.tooltip = '';
-      } else {
-        s.status = 'unknown';
-        s.statusValue = 'Unknown';
-        s.tooltip = 'Not reported by backend';
-      }
-    } else if (s.key === 'rq') {
-      if (Array.isArray(statusObj.rq_queues)) {
-        const totalJobs = statusObj.rq_queues.reduce((sum, q) => sum + (q.job_count || 0), 0);
-        s.status = 'healthy';
-        s.statusValue = totalJobs.toString();
-        s.tooltip = '';
-      } else {
-        s.status = 'unknown';
-        s.statusValue = 'Unknown';
-        s.tooltip = 'Not reported by backend';
-      }
-    } else if (s.key === 'worker') {
-      if (Array.isArray(statusObj.workers) && statusObj.workers.length > 0) {
-        s.status = 'healthy';
-        s.statusValue = statusObj.workers[0].status || 'Active';
-        s.tooltip = '';
-      } else {
-        s.status = 'unknown';
-        s.statusValue = 'Unknown';
-        s.tooltip = 'Not reported by backend';
-      }
-    } else if (['api', 'postgres', 'scheduler'].includes(s.key)) {
-      s.status = 'unknown';
-      s.statusValue = 'Unknown';
-      s.tooltip = 'Not reported by backend';
-    }
-  });
-}
-
 async function fetchSystemStatus(refresh = false) {
   if (!authStore.isAuthenticated) return;
   isLoading.value = true;
   try {
-    // Use /jobs/status for all service KPIs
-    const url = `/jobs/status`;
+    // Use /system/status for health KPIs
+    const url = `/system/status${refresh ? '?refresh=true' : ''}`;
     const token = localStorage.getItem('authToken');
     const res = await fetch(url, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {}
@@ -177,7 +135,37 @@ async function fetchSystemStatus(refresh = false) {
       throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     }
     const data = await res.json();
-    updateServicesStatus(data);
+    // Map system status fields to services
+    services.value.forEach(s => {
+      if (s.key === 'api') {
+        s.status = data.api || 'unknown';
+        s.statusValue = data.api || 'Unknown';
+        s.tooltip = '';
+      } else if (s.key === 'postgres') {
+        s.status = data.postgres || 'unknown';
+        s.statusValue = data.postgres || 'Unknown';
+        s.tooltip = '';
+      } else if (s.key === 'redis') {
+        s.status = data.redis || 'unknown';
+        s.statusValue = data.redis === 'healthy' ? 'Up' : 'Unknown';
+        s.tooltip = '';
+      } else if (s.key === 'worker') {
+        s.status = data.worker || 'unknown';
+        s.statusValue = data.worker || 'Unknown';
+        s.tooltip = '';
+      } else if (s.key === 'scheduler') {
+        s.status = data.scheduler || 'unknown';
+        s.statusValue = data.scheduler || 'Unknown';
+        s.tooltip = '';
+      } else if (s.key === 'rq') {
+        // Fetch RQ stats from /jobs/status
+        s.status = 'loading';
+        s.statusValue = '...';
+        s.tooltip = '';
+      }
+    });
+    // Fetch RQ stats separately
+    fetchRQStats();
     lastChecked.value = new Date();
   } catch (e) {
     console.error("Failed to fetch system status:", e);
@@ -188,6 +176,40 @@ async function fetchSystemStatus(refresh = false) {
   } finally {
     isLoading.value = false;
     countdown.value = 30;
+  }
+}
+
+async function fetchRQStats() {
+  try {
+    const url = `/jobs/status`;
+    const token = localStorage.getItem('authToken');
+    const res = await fetch(url, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    const data = await res.json();
+    const rqService = services.value.find(s => s.key === 'rq');
+    if (rqService) {
+      if (Array.isArray(data.rq_queues)) {
+        const totalJobs = data.rq_queues.reduce((sum, q) => sum + (q.job_count || 0), 0);
+        rqService.status = 'healthy';
+        rqService.statusValue = totalJobs.toString();
+        rqService.tooltip = '';
+      } else {
+        rqService.status = 'unknown';
+        rqService.statusValue = 'Unknown';
+        rqService.tooltip = 'Not reported by backend';
+      }
+    }
+  } catch (e) {
+    const rqService = services.value.find(s => s.key === 'rq');
+    if (rqService) {
+      rqService.status = 'unknown';
+      rqService.statusValue = 'Unknown';
+      rqService.tooltip = 'Failed to fetch RQ stats';
+    }
   }
 }
 
