@@ -62,4 +62,21 @@
 **Next Steps:**
 - Implement paginated device data and total record count in the table and store.
 - Review and improve loading/error/empty states.
-- Update this log as work progresses. 
+- Update this log as work progresses.
+
+---
+
+**Step 2: PrimeIcons-Only Refactor (2025 Best Practice)**
+- Consolidated all action and status icons in DeviceTable.vue to use PrimeIcons (`<i class="pi pi-...">`).
+- Removed all Heroicons imports and usage from the component.
+- Added `aria-label` and `title` attributes to all icons for accessibility.
+- Verified that PrimeIcons CSS is imported in main.js and that the `primeicons` package is installed.
+- Rebuilt frontend containers to ensure new dependency is available in the environment.
+- **Pending:** Action button icon rendering is awaiting user confirmation. Do not assume these are fixed until confirmed by the user.
+- **Note:** Status icon rendering issues are being tracked and handled in a separate GitHub issue; no further changes to status icon logic in this phase.
+- This approach matches current (2025) best practices for PrimeVue + Vite + Vue 3 projects.
+
+**Next Steps:**
+- Await user confirmation on action button icon rendering. Troubleshoot further if needed.
+- Continue with any remaining UI/UX polish (e.g., paginator dropdown centering).
+- Finalize phase 4 with additional testing and documentation as needed. 
