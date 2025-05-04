@@ -28,12 +28,12 @@
     <!-- Device List Table Section -->
     <NrCard title="Devices" subtitle="Inventory overview" :contentClass="'pt-0 px-0 pb-2'">
       <template #header>
-        <div class="px-0 pt-2">
-          <div class="mb-1">
+        <div class="flex flex-row justify-between items-center w-full">
+          <div class="mb-4">
             <h2 class="text-lg font-semibold text-text-primary">Device Inventory</h2>
             <p class="text-xs text-text-secondary">Filter and search your device inventory</p>
           </div>
-          <form class="bg-card rounded-t-lg px-0 py-2 flex flex-row items-center gap-x-4 w-full" @submit.prevent="() => {}">
+          <form class="bg-card rounded-t-lg py-2 flex flex-row items-center gap-x-4" @submit.prevent="() => {}">
             <input
               type="text"
               v-model="searchQuery"

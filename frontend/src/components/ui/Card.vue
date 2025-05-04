@@ -8,7 +8,7 @@
       className
     ]"
   >
-    <div v-if="$slots.header || title" class="border-b border-divider p-4">
+    <div v-if="$slots.header || title" :class="`border-b border-divider ${headerClass}`">
       <slot name="header">
         <h3 class="text-lg font-medium text-text-primary">{{ title }}</h3>
         <p v-if="subtitle" class="text-sm text-text-secondary mt-1">{{ subtitle }}</p>
@@ -54,6 +54,10 @@ defineProps({
   accent: {
     type: Boolean,
     default: false
+  },
+  headerClass: {
+    type: String,
+    default: 'p-0'
   }
 });
 </script> 

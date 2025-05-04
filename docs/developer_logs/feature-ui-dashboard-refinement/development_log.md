@@ -256,4 +256,27 @@ Based on the provided screenshot, I'll implement the following changes to refact
 - The application benefits from the latest Vue and Tailwind CSS features
 - The codebase is more maintainable with better theming support
 - Performance is improved with the optimized build system
-- The development experience is enhanced with better tooling 
+- The development experience is enhanced with better tooling
+
+## 2024-05-03: Card Header Padding Refactor
+
+### Summary
+- Refactored `Card.vue` to add a `headerClass` prop (default: `p-0`) and replaced the hardcoded `p-4` in the header div.
+- Updated `Dashboard.vue` to remove custom header padding, so the Device Inventory header and search box now align flush with the card edge.
+
+### Reasoning
+- The previous default (`p-4`) caused the header area to be indented more than the card's edge, which was visually inconsistent and not desired for dashboard cards.
+- Making `p-0` the default for `headerClass` ensures all cards have flush header alignment unless overridden.
+
+### Next Steps
+- Review other usages of `Card.vue` to ensure the new default header padding is visually appropriate across the app.
+- If any card needs extra header padding, use the new `headerClass` prop to specify it explicitly.
+
+## 2024-05-03: Right-align Device Inventory Search Box
+
+### Summary
+- Updated the Device Inventory card header in `Dashboard.vue` to use a flex layout with `justify-between`, so the search box is right-aligned (flush with the card's right edge) and the title/subtitle remain left-aligned.
+- Removed extra left margin/padding from the search box form for proper alignment.
+
+### Reasoning
+- This change improves the visual alignment and usability, matching the desired layout where the search box is flush with the card's right edge. 
