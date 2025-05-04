@@ -26,7 +26,7 @@
         stripedRows
         :pt="{ bodyRow: 'bg-card', bodyRowEven: 'bg-card', paginator: { class: 'bg-card' } }"
         filterDisplay="row"
-        v-model:filters="props.filters"
+        v-model:filters="filters"
       >
         <!-- Static columns with header/body color classes -->
         <Column field="hostname" header="Hostname" sortable class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('hostname')" filter>
@@ -107,7 +107,7 @@
 
 <script setup>
 // DeviceTable.vue: Device inventory table with best practices for theming, accessibility, and UX
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from './ui/Button.vue';
@@ -126,12 +126,31 @@ const props = defineProps({
   devices: { type: Array, required: true },
   loading: { type: Boolean, default: false },
   pageSize: { type: Number, default: 10 },
-  filters: { type: Object, default: undefined },
+  filters: { type: Object, required: true },
 });
-const emit = defineEmits(['edit', 'delete', 'check-reachability', 'credential-check', 'view-configs', 'row-click']);
+const emit = defineEmits(['edit', 'delete', 'check-reachability', 'credential-check', 'view-configs', 'row-click', 'update:filters']);
 
 const sortField = ref('hostname');
 const sortOrder = ref(1); // 1 = asc, -1 = desc
+
+// Local filters state for v-model sync
+const filters = ref({ ...props.filters });
+// Sync local filters with prop
+watch(
+  () => props.filters,
+  (newFilters) => {
+    filters.value = { ...newFilters };
+  },
+  { deep: true }
+);
+// Emit updates to parent
+watch(
+  filters,
+  (newVal) => {
+    emit('update:filters', newVal);
+  },
+  { deep: true }
+);
 
 function onSort(e) {
   sortField.value = e.sortField;
