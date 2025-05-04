@@ -10,7 +10,7 @@ from rq_scheduler import Scheduler
 from datetime import datetime, timezone
 
 # Import routers
-from .routers import devices, jobs, users, auth_router, tags, credentials, backups, logs, scheduler  # Import the new logs router and the new scheduler router
+from .routers import devices, jobs, users, auth_router, tags, credentials, backups, logs, scheduler, job_results_router  # Import the new logs router, the new scheduler router, and the new job results router
 
 # Load configuration
 config = load_config()
@@ -130,3 +130,4 @@ app.include_router(jobs.router)
 app.include_router(backups.router)  # Include the backups router
 app.include_router(logs.router)
 app.include_router(scheduler.router)  # Register the scheduler router
+app.include_router(job_results_router)  # Register the job results router

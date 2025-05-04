@@ -23,6 +23,7 @@ from netraven.db.models.device_config import DeviceConfiguration
 from netraven.db.models.credential import Credential
 from netraven.db.models.system_setting import SystemSetting
 from netraven.db.models.user import User
+from netraven.db.models.job_result import JobResult
 
 # These are all exported for convenience when importing from netraven.db.models
 __all__ = [
@@ -40,5 +41,6 @@ __all__ = [
     "DeviceConfiguration",
     "Credential",
     "SystemSetting",
-    "User"
+    "User",
+    "JobResult"
 ] 

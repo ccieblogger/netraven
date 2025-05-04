@@ -30,10 +30,13 @@ import time
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from datetime import datetime, timezone
 
 from netraven.worker.executor import handle_device
 from netraven.worker.error_handler import ErrorCategory, ErrorInfo, classify_exception
 from netraven.utils.unified_logger import get_unified_logger
+from netraven.db.models import JobResult
 
 # Default thread pool size if not specified in config
 DEFAULT_THREAD_POOL_SIZE = 5
@@ -170,24 +173,18 @@ def dispatch_tasks(
         # Process completed futures as they complete
         for future in concurrent.futures.as_completed(future_to_device):
             try:
-                # Handle case where in tests, futures might be mocked
                 if future in future_to_device:
                     device = future_to_device[future]
                     device_id = getattr(device, 'id', 0)
                     device_name = getattr(device, 'hostname', f"Device_{device_id}")
                 else:
-                    # This is likely a mocked future in a test
                     try:
-                        # Try to get the result to see if it contains device info
                         result = future.result()
                         device_id = result.get('device_id', 0)
                         device_name = result.get('device_name', f"Device_{device_id}")
                     except Exception:
-                        # If that fails, use defaults
                         device_id = 0
                         device_name = "Unknown_Device"
-                
-                # Get the result - may raise exception if the task failed
                 result = future.result()
                 logger.log(
                     f"Task completed for device '{device_name}' in job '{job_id}'",
@@ -198,8 +195,54 @@ def dispatch_tasks(
                     source="dispatcher",
                 )
                 results.append(result)
+                # --- JobResult DB Write ---
+                if db is not None:
+                    try:
+                        # Determine job_type and status
+                        job_type = result.get('job_type')
+                        if not job_type:
+                            # Fallback: fetch from DB if not present
+                            from netraven.db.models import Job
+                            job_obj = db.query(Job).filter(Job.id == job_id).first()
+                            job_type = getattr(job_obj, 'job_type', 'unknown')
+                        status = 'success' if result.get('success') else 'failure'
+                        # Compose details (exclude redundant fields if needed)
+                        details = dict(result)
+                        # Remove fields that are already top-level in JobResult
+                        for k in ['device_id', 'job_type', 'status', 'job_id', 'result_time', 'created_at']:
+                            details.pop(k, None)
+                        job_result = JobResult(
+                            job_id=job_id,
+                            device_id=device_id,
+                            job_type=job_type,
+                            status=status,
+                            result_time=datetime.now(timezone.utc),
+                            details=details,
+                            created_at=datetime.now(timezone.utc)
+                        )
+                        db.add(job_result)
+                        db.commit()
+                        logger.log(
+                            f"JobResult created for job_id={job_id}, device_id={device_id}, status={status}, job_type={job_type}",
+                            level="INFO",
+                            destinations=["stdout", "file", "db"],
+                            job_id=job_id,
+                            device_id=device_id,
+                            source="dispatcher",
+                            log_type="job"
+                        )
+                    except SQLAlchemyError as db_exc:
+                        db.rollback()
+                        logger.log(
+                            f"Failed to create JobResult for job_id={job_id}, device_id={device_id}: {db_exc}",
+                            level="ERROR",
+                            destinations=["stdout", "file", "db"],
+                            job_id=job_id,
+                            device_id=device_id,
+                            source="dispatcher",
+                            log_type="job"
+                        )
             except Exception as e:
-                # This handles errors from the future/thread itself, not from the device task
                 logger.log(
                     f"Thread error processing device '{device_name}' in job '{job_id}': {e}",
                     level="ERROR",
