@@ -33,42 +33,21 @@
             <h2 class="text-lg font-semibold text-text-primary">Device Inventory</h2>
             <p class="text-xs text-text-secondary">Filter and search your device inventory</p>
           </div>
-          <form class="bg-card rounded-t-lg px-0 py-2 flex flex-row items-center gap-x-4 w-full" @submit.prevent="handleApplyFilters">
-            <label for="tag" class="sr-only">Tag</label>
-            <select
-              id="tag"
-              v-model="selectedTag"
-              class="h-10 w-48 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
-            >
-              <option value="">All Tags</option>
-              <option v-for="tag in tagOptions" :key="tag.value" :value="tag.value">{{ tag.label }}</option>
-            </select>
+          <form class="bg-card rounded-t-lg px-0 py-2 flex flex-row items-center gap-x-4 w-full" @submit.prevent="() => {}">
             <input
               type="text"
               v-model="searchQuery"
               placeholder="Search hostname or IP..."
-              class="h-10 w-64 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
+              class="h-8 w-62 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
               aria-label="Search devices"
             />
-            <button
-              type="button"
-              @click="handleResetFilters"
-              class="h-10 px-4 rounded-md border border-divider bg-content text-text-primary hover:bg-content/80 focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              Reset
-            </button>
-            <button
-              type="submit"
-              class="h-10 px-4 rounded-md bg-primary text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              Apply Filters
-            </button>
           </form>
         </div>
       </template>
       <DeviceTable
         :devices="paginatedDevices"
         :loading="deviceStore.isLoading"
+        :filters="deviceTableFilters"
         @edit="handleEdit"
         @delete="handleDelete"
         @check-reachability="handleCheckReachability"
@@ -106,7 +85,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, computed, onUnmounted } from 'vue';
+import { onMounted, ref, computed, onUnmounted, watch } from 'vue';
 import { useDeviceStore } from '../store/device';
 import { useJobStore } from '../store/job';
 import { useAuthStore } from '../store/auth';
@@ -203,7 +182,6 @@ function stopPolling() {
 const recentLogs = ref([]);
 
 const searchQuery = ref('');
-const selectedTag = ref('');
 const currentPage = ref(1);
 const pageSize = ref(10);
 
@@ -216,9 +194,6 @@ const filteredDevices = computed(() => {
       d.ip_address.toLowerCase().includes(q)
     );
   }
-  if (selectedTag.value) {
-    result = result.filter(d => d.tags && d.tags.some(t => t.id === selectedTag.value));
-  }
   return result;
 });
 
@@ -229,13 +204,25 @@ const paginatedDevices = computed(() => {
 
 const totalPages = computed(() => Math.ceil(filteredDevices.value.length / pageSize.value));
 
-const tagOptions = computed(() => (deviceStore.tags || []).map(t => ({ value: t.id, label: t.name })));
-
 const isFormModalOpen = ref(false);
 const selectedDevice = ref(null);
 const isDeleteModalOpen = ref(false);
 const deviceToDelete = ref(null);
 const reachabilityLoading = ref({});
+
+// Add deviceTableFilters for DataTable filtering
+const deviceTableFilters = ref({
+  global: { value: null, matchMode: 'contains' },
+  hostname: { value: null, matchMode: 'contains' },
+  ip_address: { value: null, matchMode: 'contains' },
+  serial: { value: null, matchMode: 'contains' },
+  job_status: { value: null, matchMode: 'contains' },
+});
+
+// Optionally, wire the search box to the global filter
+watch(searchQuery, (val) => {
+  deviceTableFilters.value.global.value = val;
+});
 
 function handleEdit(device) {
   selectedDevice.value = { ...device };
@@ -341,28 +328,12 @@ async function handleCredentialCheck(device) {
 function handleViewConfigs(device) {
   router.push(`/backups?device_id=${device.id}`);
 }
-function handleFilterChange(filters) {
-  selectedTag.value = filters.tag || '';
-  currentPage.value = 1;
-}
-function handleSearchInput(e) {
-  searchQuery.value = e.target.value;
-  currentPage.value = 1;
-}
 function handlePageChange(page) {
   currentPage.value = page;
 }
 function handlePageSizeChange(size) {
   pageSize.value = size;
   currentPage.value = 1;
-}
-function handleApplyFilters() {
-  handleFilterChange({ tag: selectedTag });
-}
-function handleResetFilters() {
-  selectedTag.value = '';
-  searchQuery.value = '';
-  handleFilterChange({ tag: '' });
 }
 
 onMounted(() => {

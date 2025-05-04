@@ -1,7 +1,7 @@
 <template>
   <!-- Device Table Card: aligns with filter/search section, uses production theme -->
   <div>
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-2 pt-6 mb-2">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-2 pt-4 mb-2">
       <slot name="filters"></slot>
       <slot name="search"></slot>
     </div>
@@ -15,7 +15,7 @@
         :paginator="true"
         :rows="pageSize"
         :rowsPerPageOptions="[10, 20, 50]"
-        class="text-text-primary min-w-full"
+        class="text-text-primary text-xs min-w-full"
         tableStyle="min-width: 100%"
         responsiveLayout="scroll"
         :emptyMessage="emptyMessage"
@@ -25,11 +25,25 @@
         @rowClick="onRowClick"
         stripedRows
         :pt="{ bodyRow: 'bg-card', bodyRowEven: 'bg-card', paginator: { class: 'bg-card' } }"
+        filterDisplay="row"
+        :filters="filters"
       >
         <!-- Static columns with header/body color classes -->
-        <Column field="hostname" header="Hostname" sortable class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('hostname')" />
-        <Column field="ip_address" header="Host IP" sortable class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('ip_address')" />
-        <Column field="serial" header="Serial" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('serial')" />
+        <Column field="hostname" header="Hostname" sortable class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('hostname')" filter>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search hostname" class="w-full" />
+          </template>
+        </Column>
+        <Column field="ip_address" header="Host IP" sortable class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('ip_address')" filter>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search IP" class="w-full" />
+          </template>
+        </Column>
+        <Column field="serial" header="Serial" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('serial')" filter>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search serial" class="w-full" />
+          </template>
+        </Column>
         <Column header="Reachable" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'">
           <template #body="{ data }">
             <ServiceDot
@@ -39,7 +53,11 @@
             />
           </template>
         </Column>
-        <Column field="job_status" header="JobStat" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('job_status')" />
+        <Column field="job_status" header="JobStat" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('job_status')" filter>
+          <template #filter="{ filterModel, filterCallback }">
+            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search job status" class="w-full" />
+          </template>
+        </Column>
         <Column header="Tags" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'">
           <template #body="{ data }">
             <span v-for="tag in data.tags" :key="tag.id" class="bg-blue-900/30 text-blue-200 py-1 px-3 rounded-full text-xs mr-1">
@@ -95,17 +113,20 @@ import Column from 'primevue/column';
 import Button from './ui/Button.vue';
 import ServiceDot from './ui/ServiceDot.vue';
 import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import InputText from 'primevue/inputtext';
 
 /**
  * Props:
  *  - devices: Array of device objects to display
  *  - loading: Boolean, show loading state
  *  - pageSize: Number, default page size
+ *  - filters: Object, filter model for DataTable
  */
 const props = defineProps({
   devices: { type: Array, required: true },
   loading: { type: Boolean, default: false },
   pageSize: { type: Number, default: 10 },
+  filters: { type: Object, default: undefined },
 });
 const emit = defineEmits(['edit', 'delete', 'check-reachability', 'credential-check', 'view-configs', 'row-click']);
 

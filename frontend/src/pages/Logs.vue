@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="Dashboard" subtitle="System overview and device inventory">
+  <PageContainer title="Logs" subtitle="System and device Logs">
   <Card title="Logs" subtitle="System and job event history">
     <template #header>
       <div class="flex justify-end px-2 pt-2 text-xs">
