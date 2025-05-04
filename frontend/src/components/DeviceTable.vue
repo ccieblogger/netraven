@@ -164,14 +164,21 @@ function bodyClass(field) {
 }
 
 function mapReachabilityStatus(status) {
+  // Map job result status to ServiceDot status
   if (!status) return 'unknown';
   const normalized = String(status).toLowerCase();
-  if (['success', 'reachable', 'ok', 'online'].includes(normalized)) return 'healthy';
-  if (['failure', 'unreachable', 'offline', 'error'].includes(normalized)) return 'unhealthy';
-  if (['warning', 'partial'].includes(normalized)) return 'warning';
-  if (normalized === 'unknown') return 'unknown';
+  // Debug: log the incoming status
+  console.log('DeviceTable: mapping reachability status:', status, '->', normalized);
+  if ([
+    'success', 'reachable', 'ok', 'online'
+  ].includes(normalized)) return 'healthy';
+  if ([
+    'failure', 'unreachable', 'offline', 'error'
+  ].includes(normalized)) return 'unhealthy';
+  if ([
+    'warning', 'partial'
+  ].includes(normalized)) return 'warning';
   // Fallback for unexpected values
-  console.warn('Unknown reachability status:', status);
   return 'unknown';
 }
 </script>
