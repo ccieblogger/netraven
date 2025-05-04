@@ -47,7 +47,7 @@
         <Column header="Reachable" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'">
           <template #body="{ data }">
             <ServiceDot
-              :status="data.last_reachability_status === 'success' ? 'healthy' : data.last_reachability_status === 'failure' ? 'unhealthy' : 'unknown'"
+              :status="mapReachabilityStatus(data.last_reachability_status)"
               :label="''"
               :tooltip="reachabilityTooltip(data)"
             />
@@ -172,6 +172,18 @@ const emptyMessage = computed(() => props.loading ? 'Loading devices...' : 'No d
 // Add bodyClass to highlight sorted column
 function bodyClass(field) {
   return field === sortField ? 'text-blue-400' : '';
+}
+
+function mapReachabilityStatus(status) {
+  if (!status) return 'unknown';
+  const normalized = String(status).toLowerCase();
+  if (['success', 'reachable', 'ok', 'online'].includes(normalized)) return 'healthy';
+  if (['failure', 'unreachable', 'offline', 'error'].includes(normalized)) return 'unhealthy';
+  if (['warning', 'partial'].includes(normalized)) return 'warning';
+  if (normalized === 'unknown') return 'unknown';
+  // Fallback for unexpected values
+  console.warn('Unknown reachability status:', status);
+  return 'unknown';
 }
 </script>
 

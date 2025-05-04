@@ -376,6 +376,7 @@ async function onTableChange(event) {
 onMounted(() => {
   if (authStore.isAuthenticated) {
     fetchSystemStatus();
+    deviceStore.fetchDevices({ page: 1, size: 10 });
   }
   startPolling();
   jobStore.fetchJobs();
