@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '../services/api'
+import { getLatestReachabilityJobResult } from '../services/api'
 
 export const useDeviceStore = defineStore('devices', () => {
   const devices = ref([])
@@ -115,6 +116,18 @@ export const useDeviceStore = defineStore('devices', () => {
     }
   }
 
+  /**
+   * Fetch devices and their latest reachability job result
+   */
+  async function fetchDevicesWithReachabilityStatus(params = {}) {
+    await fetchDevices(params);
+    // For each device, fetch the latest reachability job result
+    await Promise.all(devices.value.map(async (device) => {
+      const result = await getLatestReachabilityJobResult(device.id);
+      device.last_reachability_status = result ? result.status : null;
+    }));
+  }
+
   function $reset() {
     devices.value = []
     isLoading.value = false
@@ -138,6 +151,7 @@ export const useDeviceStore = defineStore('devices', () => {
     deleteDevice, 
     fetchDeviceCredentials,
     $reset,
-    deviceCredentialsCache
+    deviceCredentialsCache,
+    fetchDevicesWithReachabilityStatus
   }
 }) 

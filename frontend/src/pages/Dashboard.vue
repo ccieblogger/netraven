@@ -373,10 +373,10 @@ async function onTableChange(event) {
   await deviceStore.fetchDevices(params);
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (authStore.isAuthenticated) {
     fetchSystemStatus();
-    deviceStore.fetchDevices({ page: 1, size: 10 });
+    await deviceStore.fetchDevicesWithReachabilityStatus();
   }
   startPolling();
   jobStore.fetchJobs();

@@ -80,4 +80,22 @@ api.interceptors.response.use(
   }
 );
 
+/**
+ * Fetch the latest reachability job result for a device
+ * @param {number} deviceId
+ * @returns {Promise<Object|null>} Latest job result or null if not found
+ */
+export async function getLatestReachabilityJobResult(deviceId) {
+  try {
+    const res = await api.get(`/job-results/?device_id=${deviceId}&job_type=reachability&page=1&size=1`);
+    if (res.data && Array.isArray(res.data.items) && res.data.items.length > 0) {
+      return res.data.items[0];
+    }
+    return null;
+  } catch (err) {
+    console.error('Failed to fetch reachability job result:', err);
+    return null;
+  }
+}
+
 export default api;

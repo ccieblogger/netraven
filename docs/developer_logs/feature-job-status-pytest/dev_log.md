@@ -22,8 +22,15 @@ This log documents the process of reviewing and extending pytest coverage for th
 - Added `test_jobs_status_invalid_token` to verify that requests with an invalid token are rejected (401/403).
 - Tests follow the style and structure of the existing suite.
 
+## Device Datatable Status Icon Wiring (June 2024)
+- Extended the API service with `getLatestReachabilityJobResult(deviceId)` to fetch the latest reachability job result for a device.
+- Added `fetchDevicesWithReachabilityStatus` to the device store, which fetches devices and then, for each device, fetches the latest reachability job result and sets `device.last_reachability_status`.
+- Updated `Dashboard.vue` to use `fetchDevicesWithReachabilityStatus` on mount, ensuring each device row in the datatable has the correct status for the icon.
+- The DeviceTable now displays a green check for success, red X for failure, and a white question mark if no job result is found.
+
 ## Next Steps
-- Run the full test suite inside the API container to verify all tests pass.
+- Test the UI to ensure the correct icon is shown for each device status scenario.
+- Consider batch optimization if the device list is large (future enhancement).
 - Commit changes and update the GitHub issue with progress.
 
 ---
