@@ -77,10 +77,10 @@
           <template #body="{ data }">
             <div class="flex flex-row space-x-1">
               <Button size="sm" variant="ghost" @click="$emit('edit', data)" aria-label="Edit Device" title="Edit Device" iconOnly>
-                <PencilIcon class="h-4 w-4" />
+                <i class="pi pi-pencil h-4 w-4" aria-label="Edit" title="Edit"></i>
               </Button>
               <Button size="sm" variant="ghost" @click="$emit('delete', data)" aria-label="Delete Device" title="Delete Device" iconOnly>
-                <TrashIcon class="h-4 w-4" />
+                <i class="pi pi-trash h-4 w-4" aria-label="Delete" title="Delete"></i>
               </Button>
             </div>
           </template>
@@ -89,13 +89,13 @@
           <template #body="{ data }">
             <div class="flex flex-row space-x-1">
               <Button size="sm" variant="ghost" @click="$emit('check-reachability', data)" :disabled="data.status === 'offline'" aria-label="Check Reachability" title="Check Reachability" iconOnly>
-                <i class="pi pi-check-circle h-4 w-4" />
+                <i class="pi pi-check-circle h-4 w-4" aria-label="Check Reachability" title="Check Reachability"></i>
               </Button>
               <Button size="sm" variant="ghost" @click="$emit('credential-check', data)" aria-label="Credential Check" title="Credential Check" iconOnly>
-                <i class="pi pi-key h-4 w-4" />
+                <i class="pi pi-key h-4 w-4" aria-label="Credential Check" title="Credential Check"></i>
               </Button>
               <Button size="sm" variant="ghost" @click="$emit('view-configs', data)" aria-label="View Configs" title="View Configs" iconOnly>
-                <i class="pi pi-eye h-4 w-4" />
+                <i class="pi pi-eye h-4 w-4" aria-label="View Configs" title="View Configs"></i>
               </Button>
             </div>
           </template>
@@ -112,7 +112,6 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from './ui/Button.vue';
 import ServiceDot from './ui/ServiceDot.vue';
-import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline';
 import InputText from 'primevue/inputtext';
 
 /**
