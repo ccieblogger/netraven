@@ -30,35 +30,29 @@
           <form class="bg-card rounded-t-lg py-2 flex flex-row items-center gap-x-4" @submit.prevent="() => {}">
             <input
               type="text"
-              v-model="filterState.search"
-              placeholder="Search hostname or IP..."
+              v-model="filters.value.global.value"
+              placeholder="Search hostname, IP, serial..."
               class="h-8 w-62 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
-              aria-label="Search devices"
+              aria-label="Global search devices"
             />
           </form>
         </div>
       </template>
       <DeviceTable
         :devices="deviceStore.devices"
-        :loading="deviceStore.isLoading"
-        :filters="deviceTableFilters"
+        :loading="loading"
+        :filters="filters"
+        :pageSize="pageSize"
+        lazy
+        @filter="onFilter"
+        @page="onPage"
+        @sort="onSort"
         @edit="handleEdit"
         @delete="handleDelete"
         @check-reachability="handleCheckReachability"
         @credential-check="handleCredentialCheck"
         @view-configs="handleViewConfigs"
-      >
-        <template #pagination>
-          <PaginationControls
-            :currentPage="filterState.page"
-            :totalPages="totalPages"
-            :totalItems="totalItems"
-            :pageSize="filterState.size"
-            @page-change="handlePageChange"
-            @page-size-change="handlePageSizeChange"
-          />
-        </template>
-      </DeviceTable>
+      />
     </NrCard>
 
     <DeviceFormModal
@@ -94,6 +88,7 @@ import DeviceFormModal from '../components/DeviceFormModal.vue';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue';
 import { useNotificationStore } from '../store/notifications';
 import api from '../services/api';
+import { FilterMatchMode } from 'primevue/api';
 
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
@@ -238,13 +233,6 @@ function stopPolling() {
 // Simulated data for recent activity
 const recentLogs = ref([]);
 
-const searchQuery = ref('');
-const currentPage = ref(1);
-const pageSize = ref(10);
-
-const totalItems = computed(() => deviceStore.devices.length);
-const totalPages = computed(() => Math.ceil(totalItems.value / filterState.size));
-
 const isFormModalOpen = ref(false);
 const selectedDevice = ref(null);
 const isDeleteModalOpen = ref(false);
@@ -252,18 +240,18 @@ const deviceToDelete = ref(null);
 const reachabilityLoading = ref({});
 
 // Add deviceTableFilters for DataTable filtering
-const deviceTableFilters = ref({
-  global: { value: null, matchMode: 'contains' },
-  hostname: { value: null, matchMode: 'contains' },
-  ip_address: { value: null, matchMode: 'contains' },
-  serial: { value: null, matchMode: 'contains' },
-  job_status: { value: null, matchMode: 'contains' },
+const filters = ref({
+  global: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  hostname: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  ip_address: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  serial: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  job_status: { value: null, matchMode: FilterMatchMode.CONTAINS },
 });
-
-// Optionally, wire the search box to the global filter
-watch(searchQuery, (val) => {
-  deviceTableFilters.value.global.value = val;
-});
+const first = ref(0);
+const totalRecords = ref(0);
+const sortField = ref(null);
+const sortOrder = ref(null);
+const loading = ref(false);
 
 function handleEdit(device) {
   selectedDevice.value = { ...device };
@@ -369,63 +357,22 @@ async function handleCredentialCheck(device) {
 function handleViewConfigs(device) {
   router.push(`/backups?device_id=${device.id}`);
 }
-function handlePageChange(page) {
-  filterState.page = page;
-  debouncedFetchDevices();
+
+async function onFilter(event) {
+  // To be implemented: build params from event.filters, event.first, event.rows, etc.
 }
-function handlePageSizeChange(size) {
-  filterState.size = size;
-  filterState.page = 1;
-  debouncedFetchDevices();
+async function onPage(event) {
+  // To be implemented: build params from event, call API
 }
-
-const filterState = ref({
-  search: '',
-  hostname: '',
-  ip_address: '',
-  serial: '',
-  job_status: '',
-  page: 1,
-  size: 10,
-});
-
-// Native debounce implementation
-function debounce(fn, delay) {
-  let timeout;
-  return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => fn(...args), delay);
-  };
+async function onSort(event) {
+  // To be implemented: build params from event, call API
 }
-
-// Debounced fetch
-const debouncedFetchDevices = debounce(() => {
-  deviceStore.fetchDevices({
-    search: filterState.search,
-    hostname: filterState.hostname,
-    ip_address: filterState.ip_address,
-    serial: filterState.serial,
-    job_status: filterState.job_status,
-    page: filterState.page,
-    size: filterState.size,
-  });
-}, 300);
-
-watch(
-  () => ({ ...filterState }),
-  () => {
-    filterState.page = 1; // Reset to first page on filter/search change
-    debouncedFetchDevices();
-  },
-  { deep: true }
-);
 
 onMounted(() => {
   if (authStore.isAuthenticated) {
     fetchSystemStatus();
   }
   startPolling();
-  debouncedFetchDevices();
   jobStore.fetchJobs();
 
   // Simulate loading delay for recent activity
