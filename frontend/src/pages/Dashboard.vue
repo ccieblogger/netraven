@@ -32,7 +32,7 @@
       <DeviceTable
         :devices="deviceStore.devices"
         :loading="loading"
-        :filters="filters.value"
+        v-model:filters="filters"
         :pageSize="pageSize"
         lazy
         @filter="onTableChange"
@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, computed, onUnmounted, watch } from 'vue';
+import { onMounted, ref, computed, onUnmounted, watch, reactive } from 'vue';
 import { useDeviceStore } from '../store/device';
 import { useJobStore } from '../store/job';
 import { useAuthStore } from '../store/auth';
@@ -231,7 +231,7 @@ const deviceToDelete = ref(null);
 const reachabilityLoading = ref({});
 
 // Add deviceTableFilters for DataTable filtering
-const filters = ref({
+const filters = reactive({
   global: { value: '', matchMode: FilterMatchMode.CONTAINS },
   hostname: { value: '', matchMode: FilterMatchMode.CONTAINS },
   ip_address: { value: '', matchMode: FilterMatchMode.CONTAINS },
