@@ -94,7 +94,6 @@ import DeviceFormModal from '../components/DeviceFormModal.vue';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue';
 import { useNotificationStore } from '../store/notifications';
 import api from '../services/api';
-import { debounce } from 'lodash-es';
 
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
@@ -389,6 +388,15 @@ const filterState = ref({
   page: 1,
   size: 10,
 });
+
+// Native debounce implementation
+function debounce(fn, delay) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), delay);
+  };
+}
 
 // Debounced fetch
 const debouncedFetchDevices = debounce(() => {
