@@ -93,6 +93,7 @@ import PaginationControls from '../components/PaginationControls.vue';
 import DeviceFormModal from '../components/DeviceFormModal.vue';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue';
 import { useNotificationStore } from '../store/notifications';
+import api from '../services/api';
 
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
@@ -125,16 +126,9 @@ async function fetchSystemStatus(refresh = false) {
   if (!authStore.isAuthenticated) return;
   isLoading.value = true;
   try {
-    // Use /system/status for health KPIs
     const url = `/system/status${refresh ? '?refresh=true' : ''}`;
-    const token = localStorage.getItem('authToken');
-    const res = await fetch(url, {
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-    });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    }
-    const data = await res.json();
+    const res = await api.get(url);
+    const data = res.data;
     // Map system status fields to services
     services.value.forEach(s => {
       if (s.key === 'api') {
@@ -181,15 +175,8 @@ async function fetchSystemStatus(refresh = false) {
 
 async function fetchRQStats() {
   try {
-    const url = `/jobs/status`;
-    const token = localStorage.getItem('authToken');
-    const res = await fetch(url, {
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-    });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    }
-    const data = await res.json();
+    const res = await api.get('/jobs/status');
+    const data = res.data;
     const rqService = services.value.find(s => s.key === 'rq');
     if (rqService) {
       if (Array.isArray(data.rq_queues)) {
