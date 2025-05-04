@@ -279,4 +279,12 @@ Based on the provided screenshot, I'll implement the following changes to refact
 - Removed extra left margin/padding from the search box form for proper alignment.
 
 ### Reasoning
-- This change improves the visual alignment and usability, matching the desired layout where the search box is flush with the card's right edge. 
+- This change improves the visual alignment and usability, matching the desired layout where the search box is flush with the card's right edge.
+
+## 2024-05-03: Center-align Device Inventory Search Box
+
+### Summary
+- Removed the `mb-4` class from the left header block in `Dashboard.vue` so the Device Inventory title/subtitle and the search box are now vertically centered in the card header.
+
+### Reasoning
+- This ensures a cleaner, more balanced appearance, with both the title/subtitle and search box aligned in the middle of the card header for improved visual harmony. 

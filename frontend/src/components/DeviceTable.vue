@@ -29,22 +29,22 @@
         :filters="filters"
       >
         <!-- Static columns with header/body color classes -->
-        <Column field="hostname" header="Hostname" sortable class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('hostname')" filter>
+        <Column field="hostname" header="Hostname" sortable class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('hostname')" filter>
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search hostname" class="w-full" />
           </template>
         </Column>
-        <Column field="ip_address" header="Host IP" sortable class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('ip_address')" filter>
+        <Column field="ip_address" header="Host IP" sortable class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('ip_address')" filter>
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search IP" class="w-full" />
           </template>
         </Column>
-        <Column field="serial" header="Serial" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('serial')" filter>
+        <Column field="serial" header="Serial" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('serial')" filter>
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search serial" class="w-full" />
           </template>
         </Column>
-        <Column header="Reachable" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'">
+        <Column header="Reachable" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'">
           <template #body="{ data }">
             <ServiceDot
               :status="data.last_reachability_status === 'success' ? 'healthy' : data.last_reachability_status === 'failure' ? 'unhealthy' : 'unknown'"
@@ -53,19 +53,19 @@
             />
           </template>
         </Column>
-        <Column field="job_status" header="JobStat" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'" :bodyClass="bodyClass('job_status')" filter>
+        <Column field="job_status" header="JobStat" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('job_status')" filter>
           <template #filter="{ filterModel, filterCallback }">
             <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search job status" class="w-full" />
           </template>
         </Column>
-        <Column header="Tags" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'">
+        <Column header="Tags" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'">
           <template #body="{ data }">
             <span v-for="tag in data.tags" :key="tag.id" class="bg-blue-900/30 text-blue-200 py-1 px-3 rounded-full text-xs mr-1">
               {{ tag.name }}
             </span>
           </template>
         </Column>
-        <Column header="Credential" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'">
+        <Column header="Credential" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'">
           <template #body="{ data }">
             <span v-if="data.matching_credentials_count > 0" class="text-blue-300 cursor-pointer hover:text-blue-100 underline">
               {{ data.matching_credentials_count }} credential(s)
@@ -73,7 +73,7 @@
             <span v-else class="text-red-400 font-semibold">No credentials found.</span>
           </template>
         </Column>
-        <Column header="Actions" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'">
+        <Column header="Actions" class="px-3 text-left min-w-[80px]" :headerClass="'bg-card text-text-primary font-semibold text-left'">
           <template #body="{ data }">
             <div class="flex flex-row space-x-1">
               <Button size="sm" variant="ghost" @click="$emit('edit', data)" aria-label="Edit Device" title="Edit Device" iconOnly>
@@ -85,7 +85,7 @@
             </div>
           </template>
         </Column>
-        <Column header="Other" class="px-4" :headerClass="'bg-card text-text-primary font-semibold'">
+        <Column header="Other" class="px-3 text-left min-w-[80px]" :headerClass="'bg-card text-text-primary font-semibold text-left'">
           <template #body="{ data }">
             <div class="flex flex-row space-x-1">
               <Button size="sm" variant="ghost" @click="$emit('check-reachability', data)" :disabled="data.status === 'offline'" aria-label="Check Reachability" title="Check Reachability" iconOnly>
