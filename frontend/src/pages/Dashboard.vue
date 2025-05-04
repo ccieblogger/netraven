@@ -179,22 +179,22 @@ async function fetchRQStats() {
     const data = res.data;
     const rqService = services.value.find(s => s.key === 'rq');
     if (rqService) {
-      if (Array.isArray(data.rq_queues)) {
-        const totalJobs = data.rq_queues.reduce((sum, q) => sum + (q.job_count || 0), 0);
+      if (Array.isArray(data.rq_queues) && data.rq_queues.length > 0) {
         rqService.status = 'healthy';
-        rqService.statusValue = totalJobs.toString();
-        rqService.tooltip = '';
+        rqService.statusValue = 'healthy';
+        const totalJobs = data.rq_queues.reduce((sum, q) => sum + (q.job_count || 0), 0);
+        rqService.tooltip = `Total jobs in queues: ${totalJobs}`;
       } else {
-        rqService.status = 'unknown';
-        rqService.statusValue = 'Unknown';
-        rqService.tooltip = 'Not reported by backend';
+        rqService.status = 'unhealthy';
+        rqService.statusValue = 'unhealthy';
+        rqService.tooltip = 'No RQ queues found';
       }
     }
   } catch (e) {
     const rqService = services.value.find(s => s.key === 'rq');
     if (rqService) {
       rqService.status = 'unknown';
-      rqService.statusValue = 'Unknown';
+      rqService.statusValue = 'unknown';
       rqService.tooltip = 'Failed to fetch RQ stats';
     }
   }
