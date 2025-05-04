@@ -11,11 +11,11 @@ export const useDeviceStore = defineStore('devices', () => {
   const credentialError = ref(null)
   const deviceCredentialsCache = ref({})
 
-  async function fetchDevices() {
+  async function fetchDevices(params = {}) {
     isLoading.value = true
     error.value = null
     try {
-      const response = await api.get('/api/devices/')
+      const response = await api.get('/api/devices/', { params })
       if (response.data && response.data.items) {
         devices.value = response.data.items
       } else {

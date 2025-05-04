@@ -30,7 +30,7 @@
           <form class="bg-card rounded-t-lg py-2 flex flex-row items-center gap-x-4" @submit.prevent="() => {}">
             <input
               type="text"
-              v-model="searchQuery"
+              v-model="filterState.value.search"
               placeholder="Search hostname or IP..."
               class="h-8 w-62 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
               aria-label="Search devices"
@@ -39,7 +39,7 @@
         </div>
       </template>
       <DeviceTable
-        :devices="paginatedDevices"
+        :devices="deviceStore.devices"
         :loading="deviceStore.isLoading"
         :filters="deviceTableFilters"
         @edit="handleEdit"
@@ -50,10 +50,10 @@
       >
         <template #pagination>
           <PaginationControls
-            :currentPage="currentPage"
+            :currentPage="filterState.value.page"
             :totalPages="totalPages"
-            :totalItems="filteredDevices.length"
-            :pageSize="pageSize"
+            :totalItems="totalItems"
+            :pageSize="filterState.value.size"
             @page-change="handlePageChange"
             @page-size-change="handlePageSizeChange"
           />
@@ -94,6 +94,7 @@ import DeviceFormModal from '../components/DeviceFormModal.vue';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue';
 import { useNotificationStore } from '../store/notifications';
 import api from '../services/api';
+import { debounce } from 'lodash-es';
 
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
@@ -242,24 +243,8 @@ const searchQuery = ref('');
 const currentPage = ref(1);
 const pageSize = ref(10);
 
-const filteredDevices = computed(() => {
-  let result = deviceStore.devices;
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase();
-    result = result.filter(d =>
-      d.hostname.toLowerCase().includes(q) ||
-      d.ip_address.toLowerCase().includes(q)
-    );
-  }
-  return result;
-});
-
-const paginatedDevices = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value;
-  return filteredDevices.value.slice(start, start + pageSize.value);
-});
-
-const totalPages = computed(() => Math.ceil(filteredDevices.value.length / pageSize.value));
+const totalItems = computed(() => deviceStore.devices.length);
+const totalPages = computed(() => Math.ceil(totalItems.value / filterState.value.size));
 
 const isFormModalOpen = ref(false);
 const selectedDevice = ref(null);
@@ -393,12 +378,54 @@ function handlePageSizeChange(size) {
   currentPage.value = 1;
 }
 
+const filterState = ref({
+  search: '',
+  hostname: '',
+  ip_address: '',
+  serial: '',
+  job_status: '',
+  page: 1,
+  size: 10,
+});
+
+// Debounced fetch
+const debouncedFetchDevices = debounce(() => {
+  deviceStore.fetchDevices({
+    search: filterState.value.search,
+    hostname: filterState.value.hostname,
+    ip_address: filterState.value.ip_address,
+    serial: filterState.value.serial,
+    job_status: filterState.value.job_status,
+    page: filterState.value.page,
+    size: filterState.value.size,
+  });
+}, 300);
+
+watch(
+  () => ({ ...filterState.value }),
+  () => {
+    filterState.value.page = 1; // Reset to first page on filter/search change
+    debouncedFetchDevices();
+  },
+  { deep: true }
+);
+
+function handlePageChange(page) {
+  filterState.value.page = page;
+  debouncedFetchDevices();
+}
+function handlePageSizeChange(size) {
+  filterState.value.size = size;
+  filterState.value.page = 1;
+  debouncedFetchDevices();
+}
+
 onMounted(() => {
   if (authStore.isAuthenticated) {
     fetchSystemStatus();
   }
   startPolling();
-  deviceStore.fetchDevices();
+  debouncedFetchDevices();
   jobStore.fetchJobs();
 
   // Simulate loading delay for recent activity
