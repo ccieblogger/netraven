@@ -352,8 +352,9 @@ class WorkerStatus(BaseSchema):
     jobs_in_progress: int
 
 class JobDashboardStatus(BaseSchema):
-    """Schema for overall jobs dashboard status (for jobs/status endpoint).
-    Includes Redis, RQ, and worker info.
+    """Schema for job/queue/worker dashboard status (for /jobs/status endpoint).
+    Includes Redis, RQ, and worker info for job/queue/worker metrics only.
+    Does NOT include system-wide health (see /system/status).
     """
     redis_uptime: int | None = None  # seconds
     redis_memory: int | None = None  # bytes

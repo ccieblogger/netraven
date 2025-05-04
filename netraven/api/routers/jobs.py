@@ -279,11 +279,11 @@ def get_job_types(db: Session = Depends(get_db_session)):
 
 @router.get("/status", response_model=JobDashboardStatus)
 def get_jobs_status():
-    """Return Redis, RQ, and worker status for dashboard cards."""
-    # Try to use the same redis/rq connection as job runner
+    """Return Redis, RQ, and worker status for job/queue/worker dashboard cards only.
+    This endpoint does NOT provide system-wide health (see /system/status).
+    """
     from rq import Queue, Worker
     from redis import Redis
-    import os
     from netraven.config.loader import load_config
     config = load_config()
     redis_url = config.get('scheduler', {}).get('redis_url', 'redis://localhost:6379/0')
