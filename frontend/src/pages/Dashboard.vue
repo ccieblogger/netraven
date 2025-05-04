@@ -140,9 +140,25 @@ async function fetchSystemStatus(refresh = false) {
         s.statusValue = data.postgres || 'Unknown';
         s.tooltip = '';
       } else if (s.key === 'redis') {
-        s.status = data.redis || 'unknown';
-        s.statusValue = data.redis === 'healthy' ? 'Up' : 'Unknown';
-        s.tooltip = '';
+        if (data.redis === 'healthy') {
+          s.status = 'healthy';
+          s.statusValue = 'healthy';
+          // Show uptime in tooltip if available
+          if (typeof data.redis_uptime === 'number') {
+            const d = Math.floor(data.redis_uptime/86400), h = Math.floor((data.redis_uptime%86400)/3600);
+            s.tooltip = `Uptime: ${d}d ${h}h`;
+          } else {
+            s.tooltip = '';
+          }
+        } else if (data.redis === 'unhealthy') {
+          s.status = 'unhealthy';
+          s.statusValue = 'unhealthy';
+          s.tooltip = 'Redis is unhealthy';
+        } else {
+          s.status = 'unknown';
+          s.statusValue = 'unknown';
+          s.tooltip = 'Not reported by backend';
+        }
       } else if (s.key === 'worker') {
         s.status = data.worker || 'unknown';
         s.statusValue = data.worker || 'Unknown';
