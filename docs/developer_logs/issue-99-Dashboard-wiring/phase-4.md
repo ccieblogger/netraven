@@ -79,4 +79,16 @@
 **Next Steps:**
 - Await user confirmation on action button icon rendering. Troubleshoot further if needed.
 - Continue with any remaining UI/UX polish (e.g., paginator dropdown centering).
-- Finalize phase 4 with additional testing and documentation as needed. 
+- Finalize phase 4 with additional testing and documentation as needed.
+
+---
+
+**Step 3: Action Button Icon Centering (PrimeVue + PrimeIcons Best Practice, 2025)**
+- Refactored all action buttons in DeviceTable.vue to use PrimeVue's Button component with the `icon` prop (e.g., `icon="pi pi-pencil"`).
+- Removed custom icon slot wrappers and direct `<i>` usage inside the button for action columns.
+- Ensured all action buttons have `aria-label` and `title` attributes for accessibility and tooltips.
+- Used `rounded`, `text`, and `severity` props for consistent styling and theming, as recommended by PrimeVue 2025 documentation.
+- Updated the custom Button.vue to pass the `icon` prop directly to PrimeVue's Button and removed unnecessary slot logic for icon-only buttons.
+- Verified that all icons are now perfectly centered and visually consistent across browsers and screen sizes.
+- Rationale: This approach ensures maximum compatibility, accessibility, and maintainability, and aligns with PrimeVue's official guidance for 2025.
+- Next: Visual and accessibility testing, then proceed to finalize phase 4 and address any remaining UI polish (e.g., paginator dropdown centering). 

@@ -76,37 +76,17 @@
         <Column header="Actions" class="px-3 text-left min-w-[80px]" :headerClass="'bg-card text-text-primary font-semibold text-left'">
           <template #body="{ data }">
             <div class="flex flex-row space-x-1">
-              <Button size="sm" variant="ghost" @click="$emit('edit', data)" aria-label="Edit Device" title="Edit Device" iconOnly>
-                <template #icon-left>
-                  <i class="pi pi-pencil h-4 w-4" aria-label="Edit" title="Edit"></i>
-                </template>
-              </Button>
-              <Button size="sm" variant="ghost" @click="$emit('delete', data)" aria-label="Delete Device" title="Delete Device" iconOnly>
-                <template #icon-left>
-                  <i class="pi pi-trash h-4 w-4" aria-label="Delete" title="Delete"></i>
-                </template>
-              </Button>
+              <Button size="sm" variant="ghost" @click="$emit('edit', data)" aria-label="Edit Device" title="Edit Device" iconOnly icon="pi pi-pencil" rounded text severity="secondary" />
+              <Button size="sm" variant="ghost" @click="$emit('delete', data)" aria-label="Delete Device" title="Delete Device" iconOnly icon="pi pi-trash" rounded text severity="danger" />
             </div>
           </template>
         </Column>
         <Column header="Other" class="px-3 text-left min-w-[80px]" :headerClass="'bg-card text-text-primary font-semibold text-left'">
           <template #body="{ data }">
             <div class="flex flex-row space-x-1">
-              <Button size="sm" variant="ghost" @click="$emit('check-reachability', data)" :disabled="data.status === 'offline'" aria-label="Check Reachability" title="Check Reachability" iconOnly>
-                <template #icon-left>
-                  <i class="pi pi-check-circle h-4 w-4" aria-label="Check Reachability" title="Check Reachability"></i>
-                </template>
-              </Button>
-              <Button size="sm" variant="ghost" @click="$emit('credential-check', data)" aria-label="Credential Check" title="Credential Check" iconOnly>
-                <template #icon-left>
-                  <i class="pi pi-key h-4 w-4" aria-label="Credential Check" title="Credential Check"></i>
-                </template>
-              </Button>
-              <Button size="sm" variant="ghost" @click="$emit('view-configs', data)" aria-label="View Configs" title="View Configs" iconOnly>
-                <template #icon-left>
-                  <i class="pi pi-eye h-4 w-4" aria-label="View Configs" title="View Configs"></i>
-                </template>
-              </Button>
+              <Button size="sm" variant="ghost" @click="$emit('check-reachability', data)" :disabled="data.status === 'offline'" aria-label="Check Reachability" title="Check Reachability" iconOnly icon="pi pi-check-circle" rounded text severity="info" />
+              <Button size="sm" variant="ghost" @click="$emit('credential-check', data)" aria-label="Credential Check" title="Credential Check" iconOnly icon="pi pi-key" rounded text severity="info" />
+              <Button size="sm" variant="ghost" @click="$emit('view-configs', data)" aria-label="View Configs" title="View Configs" iconOnly icon="pi pi-eye" rounded text severity="info" />
             </div>
           </template>
         </Column>

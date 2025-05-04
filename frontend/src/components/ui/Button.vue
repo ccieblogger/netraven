@@ -1,5 +1,6 @@
 <template>
-  <button
+  <Button
+    :icon="icon"
     :class="[
       'inline-flex items-center justify-center rounded font-medium transition focus:outline-none',
       sizeClasses,
@@ -10,17 +11,18 @@
     :type="type"
     :disabled="disabled"
     @click="$emit('click', $event)"
+    :aria-label="ariaLabel"
+    :title="title"
   >
-    <slot name="icon-left"></slot>
-    <span v-if="!iconOnly" :class="{ 'ml-2': $slots['icon-left'] }">
+    <span v-if="!iconOnly && $slots.default" :class="{ 'ml-2': icon }">
       <slot></slot>
     </span>
-    <slot name="icon-right"></slot>
-  </button>
+  </Button>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import Button from 'primevue/button';
 
 const props = defineProps({
   variant: {
@@ -44,6 +46,18 @@ const props = defineProps({
   iconOnly: {
     type: Boolean,
     default: false
+  },
+  icon: {
+    type: String,
+    default: ''
+  },
+  ariaLabel: {
+    type: String,
+    default: ''
+  },
+  title: {
+    type: String,
+    default: ''
   }
 });
 
