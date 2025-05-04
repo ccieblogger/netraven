@@ -102,12 +102,33 @@ input, select, textarea {
   }
 }
 
-/* Center PrimeIcons in buttons and icon-only buttons */
-.pi {
-  display: inline-block;
-  vertical-align: middle;
-  font-size: 1.2em;
-  width: auto;
-  height: auto;
-  line-height: 1;
-} 
+/* Button styling */
+.nr-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  
+  &.primary {
+    background-color: var(--nr-primary);
+    color: white;
+    
+    &:hover {
+      background-color: var(--nr-primary-dark);
+    }
+  }
+  
+  &.secondary {
+    background-color: transparent;
+    border: 1px solid var(--nr-border);
+    color: var(--nr-text-secondary);
+    
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+}
