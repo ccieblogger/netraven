@@ -371,11 +371,13 @@ function handleViewConfigs(device) {
   router.push(`/backups?device_id=${device.id}`);
 }
 function handlePageChange(page) {
-  currentPage.value = page;
+  filterState.value.page = page;
+  debouncedFetchDevices();
 }
 function handlePageSizeChange(size) {
-  pageSize.value = size;
-  currentPage.value = 1;
+  filterState.value.size = size;
+  filterState.value.page = 1;
+  debouncedFetchDevices();
 }
 
 const filterState = ref({
@@ -409,16 +411,6 @@ watch(
   },
   { deep: true }
 );
-
-function handlePageChange(page) {
-  filterState.value.page = page;
-  debouncedFetchDevices();
-}
-function handlePageSizeChange(size) {
-  filterState.value.size = size;
-  filterState.value.page = 1;
-  debouncedFetchDevices();
-}
 
 onMounted(() => {
   if (authStore.isAuthenticated) {
