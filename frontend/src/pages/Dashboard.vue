@@ -7,19 +7,13 @@
           v-for="service in services"
           :key="service.key"
           :label="service.label"
-          :value="service.status.charAt(0).toUpperCase() + service.status.slice(1)"
+          :value="service.statusValue"
           icon="status"
           :color="
             service.status === 'healthy' ? 'green' :
             service.status === 'unhealthy' ? 'red' :
             'yellow'"
-          class="flex-1 min-w-0 h-16 w-40 max-w-xs"
-        />
-        <KpiCard
-          label="RQ"
-          value="Unknown"
-          icon="status"
-          color="yellow"
+          :tooltip="service.tooltip"
           class="flex-1 min-w-0 h-16 w-40 max-w-xs"
         />
       </div>
@@ -108,11 +102,12 @@ const router = useRouter();
 
 // --- System Status Card State ---
 const services = ref([
-  { key: 'api', label: 'API', status: 'unknown' },
-  { key: 'postgres', label: 'PostgreSQL', status: 'unknown' },
-  { key: 'redis', label: 'Redis', status: 'unknown' },
-  { key: 'worker', label: 'Worker', status: 'unknown' },
-  { key: 'scheduler', label: 'Scheduler', status: 'unknown' },
+  { key: 'api', label: 'API', status: 'unknown', statusValue: 'Unknown', tooltip: 'Not reported by backend' },
+  { key: 'postgres', label: 'PostgreSQL', status: 'unknown', statusValue: 'Unknown', tooltip: 'Not reported by backend' },
+  { key: 'redis', label: 'Redis', status: 'unknown', statusValue: 'Unknown', tooltip: '' },
+  { key: 'worker', label: 'Worker', status: 'unknown', statusValue: 'Unknown', tooltip: '' },
+  { key: 'scheduler', label: 'Scheduler', status: 'unknown', statusValue: 'Unknown', tooltip: 'Not reported by backend' },
+  { key: 'rq', label: 'RQ', status: 'unknown', statusValue: 'Unknown', tooltip: '' },
 ]);
 const isLoading = ref(false);
 const lastChecked = ref(null);
@@ -128,7 +123,43 @@ function serviceTooltip(service) {
 
 function updateServicesStatus(statusObj) {
   services.value.forEach(s => {
-    s.status = statusObj[s.key] || 'unknown';
+    if (s.key === 'redis') {
+      if (statusObj.redis_uptime) {
+        s.status = 'healthy';
+        const d = Math.floor(statusObj.redis_uptime/86400), h = Math.floor((statusObj.redis_uptime%86400)/3600);
+        s.statusValue = `Up (${d}d, ${h}h)`;
+        s.tooltip = '';
+      } else {
+        s.status = 'unknown';
+        s.statusValue = 'Unknown';
+        s.tooltip = 'Not reported by backend';
+      }
+    } else if (s.key === 'rq') {
+      if (Array.isArray(statusObj.rq_queues)) {
+        const totalJobs = statusObj.rq_queues.reduce((sum, q) => sum + (q.job_count || 0), 0);
+        s.status = 'healthy';
+        s.statusValue = totalJobs.toString();
+        s.tooltip = '';
+      } else {
+        s.status = 'unknown';
+        s.statusValue = 'Unknown';
+        s.tooltip = 'Not reported by backend';
+      }
+    } else if (s.key === 'worker') {
+      if (Array.isArray(statusObj.workers) && statusObj.workers.length > 0) {
+        s.status = 'healthy';
+        s.statusValue = statusObj.workers[0].status || 'Active';
+        s.tooltip = '';
+      } else {
+        s.status = 'unknown';
+        s.statusValue = 'Unknown';
+        s.tooltip = 'Not reported by backend';
+      }
+    } else if (['api', 'postgres', 'scheduler'].includes(s.key)) {
+      s.status = 'unknown';
+      s.statusValue = 'Unknown';
+      s.tooltip = 'Not reported by backend';
+    }
   });
 }
 
@@ -136,7 +167,8 @@ async function fetchSystemStatus(refresh = false) {
   if (!authStore.isAuthenticated) return;
   isLoading.value = true;
   try {
-    const url = `/api/system/status${refresh ? '?refresh=true' : ''}`;
+    // Use /jobs/status for all service KPIs
+    const url = `/jobs/status`;
     const token = localStorage.getItem('authToken');
     const res = await fetch(url, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {}
@@ -149,7 +181,10 @@ async function fetchSystemStatus(refresh = false) {
     lastChecked.value = new Date();
   } catch (e) {
     console.error("Failed to fetch system status:", e);
-    services.value.forEach(s => (s.status = 'unknown'));
+    services.value.forEach(s => {
+      s.status = 'unknown';
+      s.statusValue = 'Unknown';
+    });
   } finally {
     isLoading.value = false;
     countdown.value = 30;
