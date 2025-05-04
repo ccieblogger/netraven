@@ -104,10 +104,10 @@ input, select, textarea {
 
 /* Center PrimeIcons in buttons and icon-only buttons */
 .pi {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
+  display: inline-block;
+  vertical-align: middle;
   font-size: 1.2em;
+  width: auto;
+  height: auto;
+  line-height: 1;
 } 
