@@ -65,8 +65,10 @@ def list_job_results(
         f"JobResults listed (total={total}) with filters: device_id={device_id}, job_id={job_id}, tag_id={tag_id}, job_type={job_type}, status={status}",
         level="INFO", destinations=["stdout", "file", "db"]
     )
+    # Convert ORM objects to Pydantic models
+    items = [JobResultRead.model_validate(r) for r in results]
     return PaginatedJobResultResponse(
-        items=results,
+        items=items,
         total=total,
         page=page,
         size=size,
