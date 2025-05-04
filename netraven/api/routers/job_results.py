@@ -66,7 +66,7 @@ def list_job_results(
         level="INFO", destinations=["stdout", "file", "db"]
     )
     # Convert ORM objects to Pydantic models
-    items = [JobResultRead.model_validate(r) for r in results]
+    items = [JobResultRead.from_orm(r) for r in results]
     return PaginatedJobResultResponse(
         items=items,
         total=total,

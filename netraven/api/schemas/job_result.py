@@ -14,8 +14,7 @@ class JobResultBase(BaseModel):
 class JobResultRead(JobResultBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}
 
 class JobResultFilter(BaseModel):
     device_id: Optional[int] = None
