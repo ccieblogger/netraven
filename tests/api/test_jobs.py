@@ -547,4 +547,17 @@ class TestJobsAPI(BaseAPITest):
         assert "rq_queues" in data
         assert "workers" in data
         assert isinstance(data["rq_queues"], list)
-        assert isinstance(data["workers"], list) 
+        assert isinstance(data["workers"], list)
+
+    def test_jobs_status_auth_required(self):
+        """Test /jobs/status requires authentication (should fail with 401/403)."""
+        unauth_client = TestClient(app)
+        response = unauth_client.get("/jobs/status")
+        assert response.status_code in (401, 403)
+
+    def test_jobs_status_invalid_token(self):
+        """Test /jobs/status with an invalid token (should fail with 401/403)."""
+        client = TestClient(app)
+        headers = {"Authorization": "Bearer invalidtoken123"}
+        response = client.get("/jobs/status", headers=headers)
+        assert response.status_code in (401, 403) 
