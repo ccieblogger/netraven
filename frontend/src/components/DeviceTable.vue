@@ -46,9 +46,8 @@
         </Column>
         <Column header="Reachable" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'">
           <template #body="{ data }">
-            <ServiceDot
+            <StatusIcon
               :status="mapReachabilityStatus(data.last_reachability_status)"
-              :label="''"
               :tooltip="reachabilityTooltip(data)"
             />
           </template>
@@ -103,6 +102,7 @@ import Column from 'primevue/column';
 import Button from './ui/Button.vue';
 import ServiceDot from './ui/ServiceDot.vue';
 import InputText from 'primevue/inputtext';
+import StatusIcon from './ui/StatusIcon.vue';
 
 /**
  * Props:
