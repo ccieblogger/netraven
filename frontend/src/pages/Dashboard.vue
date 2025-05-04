@@ -27,15 +27,6 @@
             <h2 class="text-lg font-semibold text-text-primary">Device Inventory</h2>
             <p class="text-xs text-text-secondary">Filter and search your device inventory</p>
           </div>
-          <form class="bg-card rounded-t-lg py-2 flex flex-row items-center gap-x-4" @submit.prevent="() => {}">
-            <input
-              type="text"
-              v-model="filters.value.global.value"
-              placeholder="Search hostname, IP, serial..."
-              class="h-8 w-62 rounded-md border-divider bg-content text-text-primary px-3 focus:border-primary focus:ring-primary"
-              aria-label="Global search devices"
-            />
-          </form>
         </div>
       </template>
       <DeviceTable
@@ -241,11 +232,11 @@ const reachabilityLoading = ref({});
 
 // Add deviceTableFilters for DataTable filtering
 const filters = ref({
-  global: { value: null, matchMode: FilterMatchMode.CONTAINS },
-  hostname: { value: null, matchMode: FilterMatchMode.CONTAINS },
-  ip_address: { value: null, matchMode: FilterMatchMode.CONTAINS },
-  serial: { value: null, matchMode: FilterMatchMode.CONTAINS },
-  job_status: { value: null, matchMode: FilterMatchMode.CONTAINS },
+  global: { value: '', matchMode: FilterMatchMode.CONTAINS },
+  hostname: { value: '', matchMode: FilterMatchMode.CONTAINS },
+  ip_address: { value: '', matchMode: FilterMatchMode.CONTAINS },
+  serial: { value: '', matchMode: FilterMatchMode.CONTAINS },
+  job_status: { value: '', matchMode: FilterMatchMode.CONTAINS },
 });
 const first = ref(0);
 const totalRecords = ref(0);
