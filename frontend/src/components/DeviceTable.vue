@@ -100,7 +100,6 @@ import { ref, computed, watch } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from './ui/Button.vue';
-import ServiceDot from './ui/ServiceDot.vue';
 import InputText from 'primevue/inputtext';
 import StatusIcon from './ui/StatusIcon.vue';
 
@@ -164,7 +163,7 @@ function bodyClass(field) {
 }
 
 function mapReachabilityStatus(status) {
-  // Map job result status to ServiceDot status
+  // Map job result status to StatusIcon status
   if (!status) return 'unknown';
   const normalized = String(status).toLowerCase();
   // Debug: log the incoming status

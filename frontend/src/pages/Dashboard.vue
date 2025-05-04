@@ -70,7 +70,6 @@ import { useJobStore } from '../store/job';
 import { useAuthStore } from '../store/auth';
 import { useRouter } from 'vue-router';
 import KpiCard from '../components/ui/KpiCard.vue';
-import ServiceDot from '../components/ui/ServiceDot.vue';
 import JobsTable from '../components/jobs-dashboard/JobsTable.vue';
 import DeviceTable from '../components/DeviceTable.vue';
 import ResourceFilter from '../components/ResourceFilter.vue';
@@ -243,6 +242,7 @@ const totalRecords = ref(0);
 const sortField = ref(null);
 const sortOrder = ref(null);
 const loading = ref(false);
+const pageSize = ref(10); // Default page size for DeviceTable
 
 function handleEdit(device) {
   selectedDevice.value = { ...device };
