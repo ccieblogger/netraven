@@ -1,22 +1,25 @@
 <template>
-  <div class="overflow-x-auto px-6 bg-card rounded-lg shadow">
-    <table class="min-w-full">
+  <div class="nr-card overflow-x-auto">
+    <table class="min-w-full table-auto">
       <thead>
-        <tr>
-          <th class="px-4 py-2">Name</th>
-          <th class="px-4 py-2">Status</th>
-          <th class="px-4 py-2">Started</th>
-          <th class="px-4 py-2">Devices</th>
+        <tr style="border-bottom:2px solid #fff;" class="bg-card text-text-primary font-semibold text-sm">
+          <th class="py-2 px-4 text-left">Name</th>
+          <th class="py-2 px-4 text-left">Status</th>
+          <th class="py-2 px-4 text-left">Started</th>
+          <th class="py-2 px-4 text-left">Devices</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="job in jobs" :key="job.id">
-          <td class="px-4 py-2">{{ job.name }}</td>
-          <td class="px-4 py-2">
+        <tr v-for="job in jobs" :key="job.id" class="border-b border-divider text-text-primary">
+          <td class="py-2 px-4 text-xs">{{ job.name }}</td>
+          <td class="py-2 px-4 text-xs">
             <span :class="statusClass(job.status)">{{ job.status }}</span>
           </td>
-          <td class="px-4 py-2">{{ job.started }}</td>
-          <td class="px-4 py-2">{{ job.devices }}</td>
+          <td class="py-2 px-4 text-xs">{{ job.started }}</td>
+          <td class="py-2 px-4 text-xs">{{ job.devices }}</td>
+        </tr>
+        <tr v-if="jobs.length === 0">
+          <td colspan="4" class="text-center text-text-secondary py-4 text-xs">No job runs found.</td>
         </tr>
       </tbody>
     </table>
@@ -35,6 +38,6 @@ function statusClass(status) {
   if (status === 'Running') return 'text-info font-semibold'
   if (status === 'Succeeded') return 'text-success font-semibold'
   if (status === 'Failed') return 'text-danger font-semibold'
-  return ''
+  return 'text-text-primary'
 }
 </script> 

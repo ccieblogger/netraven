@@ -26,6 +26,8 @@
   - Refactored/extended JobsDashboard.vue to add summary cards, filters bar, and tabbed tables per spec (mock data only).
   - Created JobSummaryCards.vue, JobFiltersBar.vue, JobRunsTable.vue, UnifiedLogsTable.vue in components/jobs-dashboard/ (all use mock data, Tailwind/PrimeVue styling).
 - **[BUGFIX]** Fixed missing TabPanel import in JobsDashboard.vue (PrimeVue). This resolves the '[Vue warn]: Failed to resolve component: TabPanel' error and allows tabs and datatables to render as expected. Verified in browser; UI now matches phase 1 requirements.
+- **[UI POLISH]** Removed test TabView section from JobsDashboard.vue. Refactored JobRunsTable and UnifiedLogsTable to use 'nr-card' wrapper, project-standard table classes, and text color theming. All dashboard tables now match the look and feel of Dashboard.vue.
+- **[VISUAL CONSISTENCY]** Updated JobRunsTable and UnifiedLogsTable to use border-divider for row lines, strong border only under header, and text-text-primary/font-semibold for header. All horizontal lines and font weights now visually match Dashboard.vue device table.
 
 ---
 

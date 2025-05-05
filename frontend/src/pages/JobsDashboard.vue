@@ -12,24 +12,47 @@
     <!-- Main Card for Filters and Tabbed Tables -->
     <Card title="Job Runs & Logs" subtitle="Filter and search job runs and logs" :contentClass="'pt-0 px-0 pb-2'">
       <JobFiltersBar :filters="filters" @updateFilters="onUpdateFilters" />
-      <TabView v-model:activeIndex="activeTab">
-        <TabPanel header="Job Runs">
-          <JobRunsTable :jobs="jobRuns" />
-        </TabPanel>
-        <TabPanel header="Unified Logs">
-          <UnifiedLogsTable :logs="unifiedLogs" />
-        </TabPanel>
-      </TabView>
+      <div class="bg-card rounded-lg px-2 py-2">
+        <TabGroup>
+          <div class="border border-divider rounded-lg bg-card">
+            <TabList class="flex space-x-2 px-4 pt-4 bg-card rounded-t-lg border-b border-divider">
+              <Tab v-slot="{ selected }" as="template">
+                <button
+                  :class="[
+                    'px-3 py-2 text-sm font-semibold focus:outline-none',
+                    selected
+                      ? 'bg-card text-text-primary border-b-2 border-white -mb-px z-10'
+                      : 'text-text-secondary border-b-2 border-transparent',
+                  ]"
+                >
+                  Job Runs
+                </button>
+              </Tab>
+              <Tab v-slot="{ selected }" as="template">
+                <button
+                  :class="[
+                    'px-3 py-2 text-sm font-semibold focus:outline-none',
+                    selected
+                      ? 'bg-card text-text-primary border-b-2 border-white -mb-px z-10'
+                      : 'text-text-secondary border-b-2 border-transparent',
+                  ]"
+                >
+                  Unified Logs
+                </button>
+              </Tab>
+            </TabList>
+            <TabPanels class="p-4">
+              <TabPanel>
+                <JobRunsTable :jobs="jobRuns" />
+              </TabPanel>
+              <TabPanel>
+                <UnifiedLogsTable :logs="unifiedLogs" />
+              </TabPanel>
+            </TabPanels>
+          </div>
+        </TabGroup>
+      </div>
     </Card>
-    <!-- Minimal TabView Test Block -->
-    <TabView>
-      <TabPanel header="Test Tab 1">
-        <div style="color:white">Tab 1 Content</div>
-      </TabPanel>
-      <TabPanel header="Test Tab 2">
-        <div style="color:white">Tab 2 Content</div>
-      </TabPanel>
-    </TabView>
   </PageContainer>
 </template>
 
@@ -40,8 +63,7 @@ import Card from '../components/ui/Card.vue'
 import JobRunsTable from '../components/jobs-dashboard/JobRunsTable.vue'
 import UnifiedLogsTable from '../components/jobs-dashboard/UnifiedLogsTable.vue'
 import JobFiltersBar from '../components/jobs-dashboard/JobFiltersBar.vue'
-import TabView from 'primevue/tabview'
-import TabPanel from 'primevue/tabpanel'
+import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/vue'
 // Phase 1: mock data only
 const jobSummary = ref({ total: 12, running: 2, succeeded: 8, failed: 2 })
 const filters = ref({ status: '', type: '', search: '' })
@@ -55,7 +77,15 @@ const unifiedLogs = ref([
   { id: 102, timestamp: '2025-05-01 10:02', level: 'error', message: 'Device unreachable', job_id: 1 },
   { id: 103, timestamp: '2025-05-01 09:01', level: 'info', message: 'Job completed', job_id: 2 },
 ])
-const activeTab = ref(0)
 function onUpdateFilters(newFilters) { filters.value = newFilters }
 // TODO: Phase 2 - Replace mock data with API integration
-</script> 
+</script>
+
+<style scoped>
+.bg-card {
+  background: var(--nr-bg-card);
+}
+.border-divider {
+  border-color: var(--nr-border);
+}
+</style> 
