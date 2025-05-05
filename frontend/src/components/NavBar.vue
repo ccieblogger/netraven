@@ -217,8 +217,8 @@ const navigationItems = [
   {
     name: 'Jobs',
     children: [
+      { name: 'Job Status Dashboard', href: '/jobs-dashboard' },
       { name: 'List', href: '/jobs' },
-      { name: 'Dashboard', href: '/jobs-dashboard' },
     ]
   },
   { name: 'Devices', href: '/devices' },

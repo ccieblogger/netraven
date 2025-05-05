@@ -1,177 +1,60 @@
 <template>
-  <PageContainer title="Jobs Dashboard">
-    <!-- Metrics Cards: Grouped in columns with headers -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <!-- Redis Column -->
-      <div>
-        <div class="text-lg font-semibold text-text-primary mb-3 pl-1 flex flex-col gap-1">
-          <span>Redis</span>
-          <div class="w-full h-1 bg-white rounded"></div>
-        </div>
-        <div class="flex flex-col gap-4">
-          <MetricCard label="Redis Status" :value="redisStatus" icon="status" color="red" />
-          <MetricCard label="Redis Uptime" :value="redisUptime" icon="clock" color="red" />
-          <MetricCard label="Redis Memory" :value="redisMemory" icon="memory" color="red" />
-        </div>
-      </div>
-      <!-- RQ Column -->
-      <div>
-        <div class="text-lg font-semibold text-text-primary mb-3 pl-1 flex flex-col gap-1">
-          <span>RQ</span>
-          <div class="w-full h-1 bg-white rounded"></div>
-        </div>
-        <div class="flex flex-col gap-4">
-          <MetricCard label="RQ Total Jobs" :value="rqTotalJobs" icon="list" color="yellow" />
-          <MetricCard label="RQ Low Queue" :value="rqLowQueue" icon="queue" color="yellow" />
-          <MetricCard label="RQ High Queue" :value="rqHighQueue" icon="queue" color="yellow" />
-        </div>
-      </div>
-      <!-- Worker Column -->
-      <div>
-        <div class="text-lg font-semibold text-text-primary mb-3 pl-1 flex flex-col gap-1">
-          <span>Worker</span>
-          <div class="w-full h-1 bg-white rounded"></div>
-        </div>
-        <div class="flex flex-col gap-4">
-          <MetricCard label="Worker Status" :value="workerContainerStatus" icon="status" :color="workerContainerStatusColor" />
-          <MetricCard label="Worker Status" :value="workerStatus" icon="user-group" color="green" />
-          <MetricCard label="Jobs in Progress" :value="jobsInProc" icon="progress" color="green" />
-        </div>
+  <PageContainer title="Job Status Dashboard">
+    <!-- KPI Cards Row: Job Status KPIs -->
+    <div class="w-full px-0 mb-4">
+      <div class="flex flex-row gap-4 w-full">
+        <KpiCard label="Total" :value="jobSummary.total" icon="status" color="blue" class="flex-1 min-w-0 h-16 w-40 max-w-xs" />
+        <KpiCard label="Running" :value="jobSummary.running" icon="status" color="yellow" class="flex-1 min-w-0 h-16 w-40 max-w-xs" />
+        <KpiCard label="Succeeded" :value="jobSummary.succeeded" icon="status" color="green" class="flex-1 min-w-0 h-16 w-40 max-w-xs" />
+        <KpiCard label="Failed" :value="jobSummary.failed" icon="status" color="red" class="flex-1 min-w-0 h-16 w-40 max-w-xs" />
       </div>
     </div>
-    <!-- Job Types Section -->
-    <div class="nr-card flex flex-row items-center gap-4 mb-6 p-4">
-      <button
-        class="flex items-center gap-2 px-4 py-2 rounded-full bg-green-600 text-white font-medium hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-400"
-        @click="onCreateJob"
-      >
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        New Job
-      </button>
-      <div class="flex flex-col gap-2 flex-1">
-        <span class="text-sm font-semibold text-text-secondary mb-1">Job Schedule Filter</span>
-        <JobTypesCard
-          :job-types="dashboardStore.jobTypes"
-          :selected-type="selectedType"
-          @select="onJobTypeSelect"
-        />
-      </div>
-    </div>
-    <!-- Jobs Table -->
-    <div class="nr-card p-0">
-      <JobsTableTabs v-model:tab="activeTab" />
-      <JobsTableFilter :activeTab="activeTab" :selectedFilters="selectedFilters" @removeFilter="removeFilter" />
-      <JobsTable
-        :activeTab="activeTab"
-        :filters="selectedFilters"
-        :scheduled-jobs="filteredScheduledJobs"
-        :recent-jobs="dashboardStore.recentJobs"
-      />
-    </div>
-    <div v-if="dashboardStore.loading" class="text-center py-4 text-text-secondary">Loading dashboard...</div>
-    <div v-if="dashboardStore.error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-      Error: {{ dashboardStore.error }}
-    </div>
-    <JobFormModal :is-open="isFormModalOpen" @close="closeFormModal" @save="onJobSaved" />
+    <!-- Main Card for Filters and Tabbed Tables -->
+    <Card title="Job Runs & Logs" subtitle="Filter and search job runs and logs" :contentClass="'pt-0 px-0 pb-2'">
+      <JobFiltersBar :filters="filters" @updateFilters="onUpdateFilters" />
+      <TabView v-model:activeIndex="activeTab">
+        <TabPanel header="Job Runs">
+          <JobRunsTable :jobs="jobRuns" />
+        </TabPanel>
+        <TabPanel header="Unified Logs">
+          <UnifiedLogsTable :logs="unifiedLogs" />
+        </TabPanel>
+      </TabView>
+    </Card>
+    <!-- Minimal TabView Test Block -->
+    <TabView>
+      <TabPanel header="Test Tab 1">
+        <div style="color:white">Tab 1 Content</div>
+      </TabPanel>
+      <TabPanel header="Test Tab 2">
+        <div style="color:white">Tab 2 Content</div>
+      </TabPanel>
+    </TabView>
   </PageContainer>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useJobsDashboardStore } from '../store/jobsDashboard'
-import PageContainer from '../components/ui/PageContainer.vue'
-import MetricCard from '../components/jobs-dashboard/MetricCard.vue'
-import JobTypesCard from '../components/jobs-dashboard/JobTypesCard.vue'
-import JobsTableTabs from '../components/jobs-dashboard/JobsTableTabs.vue'
-import JobsTableFilter from '../components/jobs-dashboard/JobsTableFilter.vue'
-import JobsTable from '../components/jobs-dashboard/JobsTable.vue'
-import api from '../services/api'
-import JobFormModal from '../components/JobFormModal.vue'
-
-const dashboardStore = useJobsDashboardStore()
-const activeTab = ref('scheduled')
-const selectedFilters = ref([])
-const selectedType = ref('')
-const workerContainerStatus = ref('-')
-const workerContainerStatusColor = computed(() => workerContainerStatus.value === 'healthy' ? 'green' : 'red')
-const isFormModalOpen = ref(false)
-const systemHealth = ref({})
-
-onMounted(() => {
-  fetchSystemHealth()
-  fetchWorkerContainerStatus()
-  dashboardStore.fetchAll()
-})
-
-function removeFilter(filter) {
-  selectedFilters.value = selectedFilters.value.filter(f => f !== filter)
-}
-function onJobTypeSelect(type) {
-  selectedType.value = type
-  // Optionally update filters or jobs table here
-}
-function onCreateJob() {
-  isFormModalOpen.value = true
-}
-function closeFormModal() {
-  isFormModalOpen.value = false
-}
-
-async function fetchSystemHealth() {
-  try {
-    const res = await api.get('/system/status')
-    systemHealth.value = res.data
-  } catch (e) {
-    systemHealth.value = {}
-  }
-}
-
-async function fetchWorkerContainerStatus() {
-  try {
-    const res = await api.get('/system/status')
-    workerContainerStatus.value = res.data.worker || '-'
-  } catch (e) {
-    workerContainerStatus.value = 'unreachable'
-  }
-}
-
-// Metric values (computed from store)
-const redisStatus = computed(() => {
-  const status = systemHealth.value.redis
-  if (status && status.toLowerCase() === 'healthy') return 'Healthy'
-  if (status && status.toLowerCase() === 'unhealthy') return 'Unhealthy'
-  return 'Unknown'
-})
-const redisUptime = computed(() => {
-  const s = systemHealth.value.redis_uptime
-  if (!s) return '-'
-  const d = Math.floor(s/86400), h = Math.floor((s%86400)/3600)
-  return `${d}d, ${h}h`
-})
-const redisMemory = computed(() => systemHealth.value.redis_memory ? `${(systemHealth.value.redis_memory/1024/1024).toFixed(0)} MB` : '-')
-const rqTotalJobs = computed(() => systemHealth.value.rq_queues?.reduce((sum, q) => sum + (q.job_count || 0), 0) || 0)
-const rqLowQueue = computed(() => systemHealth.value.rq_queues?.find(q => q.name === 'low')?.job_count || 0)
-const rqHighQueue = computed(() => systemHealth.value.rq_queues?.find(q => q.name === 'high')?.job_count || 0)
-const workerStatus = computed(() => systemHealth.value.workers?.[0]?.status || 'idle')
-const jobsInProc = computed(() => systemHealth.value.workers?.[0]?.jobs_in_progress || 0)
-
-// Filter scheduled jobs by selected type
-const filteredScheduledJobs = computed(() => {
-  if (!selectedType.value) return dashboardStore.scheduledJobs
-  return dashboardStore.scheduledJobs.filter(j => j.job_type === selectedType.value)
-})
-
-async function onJobSaved(payload) {
-  try {
-    await api.post('/jobs/', payload);
-    isFormModalOpen.value = false;
-    await dashboardStore.fetchScheduledJobs();
-    await dashboardStore.fetchRecentJobs();
-  } catch (error) {
-    // Optionally show error notification here
-    console.error('Failed to create job:', error);
-  }
-}
+import { ref } from 'vue'
+import KpiCard from '../components/ui/KpiCard.vue'
+import Card from '../components/ui/Card.vue'
+import JobRunsTable from '../components/jobs-dashboard/JobRunsTable.vue'
+import UnifiedLogsTable from '../components/jobs-dashboard/UnifiedLogsTable.vue'
+import JobFiltersBar from '../components/jobs-dashboard/JobFiltersBar.vue'
+import TabView from 'primevue/tabview'
+// Phase 1: mock data only
+const jobSummary = ref({ total: 12, running: 2, succeeded: 8, failed: 2 })
+const filters = ref({ status: '', type: '', search: '' })
+const jobRuns = ref([
+  { id: 1, name: 'Backup Core', status: 'Running', started: '2025-05-01 10:00', devices: 5 },
+  { id: 2, name: 'Audit Edge', status: 'Succeeded', started: '2025-05-01 09:00', devices: 3 },
+  { id: 3, name: 'Config Pull', status: 'Failed', started: '2025-04-30 22:00', devices: 2 },
+])
+const unifiedLogs = ref([
+  { id: 101, timestamp: '2025-05-01 10:01', level: 'info', message: 'Job started', job_id: 1 },
+  { id: 102, timestamp: '2025-05-01 10:02', level: 'error', message: 'Device unreachable', job_id: 1 },
+  { id: 103, timestamp: '2025-05-01 09:01', level: 'info', message: 'Job completed', job_id: 2 },
+])
+const activeTab = ref(0)
+function onUpdateFilters(newFilters) { filters.value = newFilters }
+// TODO: Phase 2 - Replace mock data with API integration
 </script> 
