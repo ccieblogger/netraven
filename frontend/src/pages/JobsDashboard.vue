@@ -41,6 +41,7 @@ import JobRunsTable from '../components/jobs-dashboard/JobRunsTable.vue'
 import UnifiedLogsTable from '../components/jobs-dashboard/UnifiedLogsTable.vue'
 import JobFiltersBar from '../components/jobs-dashboard/JobFiltersBar.vue'
 import TabView from 'primevue/tabview'
+import TabPanel from 'primevue/tabpanel'
 // Phase 1: mock data only
 const jobSummary = ref({ total: 12, running: 2, succeeded: 8, failed: 2 })
 const filters = ref({ status: '', type: '', search: '' })
