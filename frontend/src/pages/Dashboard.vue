@@ -25,25 +25,45 @@
         <div class="flex flex-row justify-between items-center w-full">
           <div class="mb-4">
             <h2 class="text-lg font-semibold text-text-primary">Device Inventory</h2>
-            <p class="text-xs text-text-secondary">Filter and search your device inventory</p>
+            <p class="text-xs text-text-secondary">Inventory of your network devices</p>
           </div>
         </div>
       </template>
-      <DeviceTable
-        :devices="deviceStore.devices"
-        :loading="loading"
-        v-model:filters="filters"
-        :pageSize="pageSize"
-        lazy
-        @filter="onTableChange"
-        @page="onTableChange"
-        @sort="onTableChange"
-        @edit="handleEdit"
-        @delete="handleDelete"
-        @check-reachability="handleCheckReachability"
-        @credential-check="handleCredentialCheck"
-        @view-configs="handleViewConfigs"
-      />
+      <TabGroup>
+        <div class="border border-divider rounded-lg bg-card w-full">
+          <TabList class="flex space-x-2 px-4 pt-4 bg-card rounded-t-lg border-b border-divider">
+            <Tab v-slot="{ selected }" as="template">
+              <button
+                :class="[
+                  'px-3 py-2 text-sm font-semibold focus:outline-none',
+                  selected
+                    ? 'bg-card text-text-primary border-b-2 border-white -mb-px z-10'
+                    : 'text-text-secondary border-b-2 border-transparent',
+                ]"
+              >
+                Devices
+              </button>
+            </Tab>
+          </TabList>
+          <TabPanels class="p-4">
+            <TabPanel>
+              <DeviceFiltersBar :filters="filters" @updateFilters="onUpdateFilters" />
+              <DeviceInventoryTable
+                :devices="filteredDevices"
+                :loading="loading"
+                :sortField="sortField"
+                :sortOrder="sortOrder"
+                @sort="handleSort"
+                @edit="handleEdit"
+                @delete="handleDelete"
+                @check-reachability="handleCheckReachability"
+                @credential-check="handleCredentialCheck"
+                @view-configs="handleViewConfigs"
+              />
+            </TabPanel>
+          </TabPanels>
+        </div>
+      </TabGroup>
     </NrCard>
 
     <DeviceFormModal
@@ -71,7 +91,7 @@ import { useAuthStore } from '../store/auth';
 import { useRouter } from 'vue-router';
 import KpiCard from '../components/ui/KpiCard.vue';
 import JobsTable from '../components/jobs-dashboard/JobsTable.vue';
-import DeviceTable from '../components/DeviceTable.vue';
+import DeviceInventoryTable from '../components/dashboard/DeviceInventoryTable.vue';
 import ResourceFilter from '../components/ResourceFilter.vue';
 import PaginationControls from '../components/PaginationControls.vue';
 import DeviceFormModal from '../components/DeviceFormModal.vue';
@@ -79,6 +99,8 @@ import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue';
 import { useNotificationStore } from '../store/notifications';
 import api from '../services/api';
 import { FilterMatchMode } from 'primevue/api';
+import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@headlessui/vue';
+import DeviceFiltersBar from '../components/dashboard/DeviceFiltersBar.vue';
 
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
@@ -230,17 +252,49 @@ const deviceToDelete = ref(null);
 const reachabilityLoading = ref({});
 
 // Add deviceTableFilters for DataTable filtering
-const filters = reactive({
-  global: { value: '', matchMode: FilterMatchMode.CONTAINS },
-  hostname: { value: '', matchMode: FilterMatchMode.CONTAINS },
-  ip_address: { value: '', matchMode: FilterMatchMode.CONTAINS },
-  serial: { value: '', matchMode: FilterMatchMode.CONTAINS },
-  job_status: { value: '', matchMode: FilterMatchMode.CONTAINS },
+const filters = reactive({ hostname: '', ip_address: '', serial: '', job_status: '', global: '' });
+function onUpdateFilters(newFilters) {
+  Object.assign(filters, newFilters);
+}
+const sortField = ref('hostname');
+const sortOrder = ref(1); // 1 = asc, -1 = desc
+function handleSort({ field, order }) {
+  sortField.value = field;
+  sortOrder.value = order;
+}
+const filteredDevices = computed(() => {
+  // Simple local filtering for demo; replace with backend filtering if needed
+  let result = deviceStore.devices.filter(device => {
+    const matchesHostname = !filters.hostname || device.hostname?.toLowerCase().includes(filters.hostname.toLowerCase());
+    const matchesIP = !filters.ip_address || device.ip_address?.includes(filters.ip_address);
+    const matchesSerial = !filters.serial || device.serial?.toLowerCase().includes(filters.serial.toLowerCase());
+    const matchesGlobal = !filters.global ||
+      device.hostname?.toLowerCase().includes(filters.global.toLowerCase()) ||
+      device.ip_address?.includes(filters.global) ||
+      device.serial?.toLowerCase().includes(filters.global.toLowerCase());
+    return matchesHostname && matchesIP && matchesSerial && matchesGlobal;
+  });
+  // Sorting
+  if (sortField.value) {
+    result = result.slice().sort((a, b) => {
+      let aVal = a[sortField.value];
+      let bVal = b[sortField.value];
+      if (sortField.value === 'last_backup') {
+        aVal = aVal ? new Date(aVal) : new Date(0);
+        bVal = bVal ? new Date(bVal) : new Date(0);
+      } else {
+        aVal = aVal ? aVal.toString().toLowerCase() : '';
+        bVal = bVal ? bVal.toString().toLowerCase() : '';
+      }
+      if (aVal < bVal) return -1 * sortOrder.value;
+      if (aVal > bVal) return 1 * sortOrder.value;
+      return 0;
+    });
+  }
+  return result;
 });
 const first = ref(0);
 const totalRecords = ref(0);
-const sortField = ref(null);
-const sortOrder = ref(null);
 const loading = ref(false);
 const pageSize = ref(10); // Default page size for DeviceTable
 
@@ -347,30 +401,6 @@ async function handleCredentialCheck(device) {
 }
 function handleViewConfigs(device) {
   router.push(`/backups?device_id=${device.id}`);
-}
-
-async function onTableChange(event) {
-  console.log('onTableChange', event);
-  // Build params for API
-  const params = {};
-  // Pagination
-  params.page = event.first !== undefined && event.rows !== undefined
-    ? Math.floor(event.first / event.rows) + 1
-    : 1;
-  params.size = event.rows || 10;
-  // Sorting
-  if (event.sortField) params.sort = event.sortField;
-  if (event.sortOrder) params.order = event.sortOrder === 1 ? 'asc' : 'desc';
-  // Filters
-  if (event.filters) {
-    Object.entries(event.filters).forEach(([key, filterObj]) => {
-      if (filterObj && typeof filterObj.value === 'string' && filterObj.value.trim() !== '') {
-        params[key] = filterObj.value.trim();
-      }
-    });
-  }
-  // Fetch from backend
-  await deviceStore.fetchDevices(params);
 }
 
 onMounted(async () => {
