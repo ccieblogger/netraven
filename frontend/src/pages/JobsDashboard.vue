@@ -11,7 +11,7 @@
     </div>
     <!-- Main Card for Filters and Tabbed Tables -->
     <Card title="Job Runs & Logs" subtitle="Filter and search job runs and logs" :contentClass="'pt-0 px-0 pb-2'" class="mb-6">
-      <JobFiltersBar :filters="filters" @updateFilters="onUpdateFilters" class="pt-4"/>
+      <JobFiltersBar :filters="filters" :jobNames="jobNames" :jobTypes="jobTypes" @updateFilters="onUpdateFilters" class="pt-4"/>
       <div class="bg-card rounded-lg w-full">
         <TabGroup>
           <div class="border border-divider rounded-lg bg-card w-full">
@@ -43,10 +43,36 @@
             </TabList>
             <TabPanels class="p-4">
               <TabPanel>
-                <JobRunsTable :jobs="jobRuns" @show-details="openDetailsModal" />
+                <JobRunsTable :jobs="paginatedJobRuns" @show-details="openDetailsModal" />
+                <div class="flex justify-between items-center gap-2 mt-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs">Rows:</span>
+                    <select v-model="jobRunsPageSize" @change="setJobRunsPageSize(Number($event.target.value))" class="form-select form-select-xs w-16">
+                      <option v-for="size in jobRunsPageSizeOptions" :key="size" :value="size">{{ size }}</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button class="btn btn-sm" :disabled="jobRunsPage===1" @click="prevJobRunsPage">Prev</button>
+                    <span class="text-xs">Page {{ jobRunsPage }} / {{ Math.ceil(jobRunsTotal/jobRunsPageSize) }}</span>
+                    <button class="btn btn-sm" :disabled="jobRunsPage*jobRunsPageSize>=jobRunsTotal" @click="nextJobRunsPage">Next</button>
+                  </div>
+                </div>
               </TabPanel>
               <TabPanel>
-                <UnifiedLogsTable :logs="unifiedLogs" />
+                <UnifiedLogsTable :logs="paginatedLogs" @show-meta="openMetaModal" />
+                <div class="flex justify-between items-center gap-2 mt-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs">Rows:</span>
+                    <select v-model="logsPageSize" @change="setLogsPageSize(Number($event.target.value))" class="form-select form-select-xs w-16">
+                      <option v-for="size in logsPageSizeOptions" :key="size" :value="size">{{ size }}</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button class="btn btn-sm" :disabled="logsPage===1" @click="prevLogsPage">Prev</button>
+                    <span class="text-xs">Page {{ logsPage }} / {{ Math.ceil(logsTotal/logsPageSize) }}</span>
+                    <button class="btn btn-sm" :disabled="logsPage*logsPageSize>=logsTotal" @click="nextLogsPage">Next</button>
+                  </div>
+                </div>
               </TabPanel>
             </TabPanels>
           </div>
@@ -60,11 +86,18 @@
         </div>
       </template>
     </BaseModal>
+    <BaseModal :isOpen="showMetaModal" title="Log Meta Details" @close="closeMetaModal">
+      <template #content>
+        <div v-if="selectedMeta">
+          <pre class="bg-gray-100 p-4 rounded text-xs">{{ JSON.stringify(selectedMeta, null, 2) }}</pre>
+        </div>
+      </template>
+    </BaseModal>
   </PageContainer>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import KpiCard from '../components/ui/KpiCard.vue'
 import Card from '../components/ui/Card.vue'
 import JobRunsTable from '../components/jobs-dashboard/JobRunsTable.vue'
@@ -108,12 +141,46 @@ const jobRuns = ref([
   },
 ])
 const unifiedLogs = ref([
-  { id: 101, timestamp: '2025-05-01 10:01', level: 'info', message: 'Job started', job_id: 1 },
-  { id: 102, timestamp: '2025-05-01 10:02', level: 'error', message: 'Device unreachable', job_id: 1 },
-  { id: 103, timestamp: '2025-05-01 09:01', level: 'info', message: 'Job completed', job_id: 2 },
+  {
+    id: 101,
+    timestamp: '2025-05-01T10:01:00Z',
+    log_type: 'job',
+    level: 'info',
+    job_id: 1,
+    device_id: 1,
+    source: 'worker.executor',
+    message: 'Job started',
+    meta: { user: 'admin', extra: 'Started by scheduler' },
+  },
+  {
+    id: 102,
+    timestamp: '2025-05-01T10:02:00Z',
+    log_type: 'job',
+    level: 'error',
+    job_id: 1,
+    device_id: 2,
+    source: 'worker.executor',
+    message: 'Device unreachable',
+    meta: { error: 'Timeout', ip: '10.0.0.2' },
+  },
+  {
+    id: 103,
+    timestamp: '2025-05-01T09:01:00Z',
+    log_type: 'job',
+    level: 'info',
+    job_id: 2,
+    device_id: 2,
+    source: 'worker.executor',
+    message: 'Job completed',
+    meta: { duration: '1m', result: 'success' },
+  },
 ])
 const showDetailsModal = ref(false)
 const selectedDetails = ref(null)
+const showMetaModal = ref(false)
+const selectedMeta = ref(null)
+const jobNames = computed(() => Array.from(new Set(jobRuns.value.map(j => j.job_name))))
+const jobTypes = computed(() => Array.from(new Set(jobRuns.value.map(j => j.job_type))))
 function onUpdateFilters(newFilters) { filters.value = newFilters }
 function openDetailsModal(details) {
   selectedDetails.value = details
@@ -123,6 +190,31 @@ function closeDetailsModal() {
   showDetailsModal.value = false
   selectedDetails.value = null
 }
+function openMetaModal(meta) {
+  selectedMeta.value = meta
+  showMetaModal.value = true
+}
+function closeMetaModal() {
+  showMetaModal.value = false
+  selectedMeta.value = null
+}
+const jobRunsPage = ref(1)
+const jobRunsPageSize = ref(5)
+const jobRunsPageSizeOptions = [5, 10, 20, 50]
+const jobRunsTotal = computed(() => jobRuns.value.length)
+const paginatedJobRuns = computed(() => jobRuns.value.slice((jobRunsPage.value-1)*jobRunsPageSize.value, jobRunsPage.value*jobRunsPageSize.value))
+function nextJobRunsPage() { if (jobRunsPage.value * jobRunsPageSize.value < jobRunsTotal.value) jobRunsPage.value++ }
+function prevJobRunsPage() { if (jobRunsPage.value > 1) jobRunsPage.value-- }
+function setJobRunsPageSize(size) { jobRunsPageSize.value = size; jobRunsPage.value = 1 }
+
+const logsPage = ref(1)
+const logsPageSize = ref(5)
+const logsPageSizeOptions = [5, 10, 20, 50]
+const logsTotal = computed(() => unifiedLogs.value.length)
+const paginatedLogs = computed(() => unifiedLogs.value.slice((logsPage.value-1)*logsPageSize.value, logsPage.value*logsPageSize.value))
+function nextLogsPage() { if (logsPage.value * logsPageSize.value < logsTotal.value) logsPage.value++ }
+function prevLogsPage() { if (logsPage.value > 1) logsPage.value-- }
+function setLogsPageSize(size) { logsPageSize.value = size; logsPage.value = 1 }
 // TODO: Phase 2 - Replace mock data with API integration
 </script>
 
