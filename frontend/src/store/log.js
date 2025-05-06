@@ -6,7 +6,7 @@ export const useLogStore = defineStore('logs', () => {
   const logs = ref([])
   const isLoading = ref(false)
   const error = ref(null)
-  const filters = ref({ job_id: null, device_id: null, log_type: null }) // Store filters
+  const filters = ref({ search: '' }) // Only search filter
   const pagination = ref({
       currentPage: 1,
       itemsPerPage: 20, // Default page size
@@ -43,14 +43,15 @@ export const useLogStore = defineStore('logs', () => {
 
         console.log("Fetching logs with params:", params);
         const response = await api.get('/logs/', { params })
+        console.log('logs API response:', response.data)
 
         // Assuming API returns PaginatedResponse structure
         if (response.data && Array.isArray(response.data.items)) {
             logs.value = response.data.items;
-            pagination.value.totalItems = response.data.total_items;
-            pagination.value.totalPages = response.data.total_pages;
-            pagination.value.currentPage = response.data.current_page;
-            pagination.value.itemsPerPage = response.data.page_size; // Update size from response if needed
+            pagination.value.totalItems = response.data.total;
+            pagination.value.totalPages = response.data.pages;
+            pagination.value.currentPage = response.data.page;
+            pagination.value.itemsPerPage = response.data.size;
         } else {
             console.error("Unexpected API response format:", response.data);
             logs.value = [];
@@ -104,7 +105,7 @@ export const useLogStore = defineStore('logs', () => {
     logs.value = []
     isLoading.value = false
     error.value = null
-    filters.value = { job_id: null, device_id: null, log_type: null }
+    filters.value = { search: '' }
     resetPagination(); // Use helper here
     pagination.value.itemsPerPage = 20; // Reset page size to default
   }
