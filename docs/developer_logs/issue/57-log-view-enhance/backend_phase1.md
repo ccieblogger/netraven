@@ -15,7 +15,6 @@
    - Refactored `/api/job-logs` endpoint to support:
      - Filtering by job name, device names (multi-select), job type, and keyword search.
      - Joins with Job and Device tables to enrich response with job name, device name, and job type.
-   - Added new endpoint `/api/job-logs/job-names` to return unique job names that have logs.
    - Confirmed that device names for dropdowns should be sourced from `/devices` and log levels are static (no new endpoints needed).
 
 ### Test Results
@@ -34,7 +33,7 @@
 - Device filter now uses a single-select dropdown for scalability.
 - API call for devices updated to `/devices/` (trailing slash) for backend compatibility.
 - Filter logic improved to handle device_names as string or array.
-- Confirmed `/job-logs/` endpoint performs real DB queries (no mock data).
+- `/job-logs/` endpoint is not implemented and should not be referenced. Use `/logs/` for all log/event queries.
 - All changes and investigation steps logged in the GitHub issue and here.
 
 --- 

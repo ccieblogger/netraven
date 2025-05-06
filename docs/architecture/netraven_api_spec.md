@@ -1121,6 +1121,9 @@ Authorization: Bearer <access_token>
 ---
 
 #### `GET /jobs/{job_id}/devices` — Get per-device job results
+
+> **DEPRECATED**: This endpoint is deprecated and will be removed in a future release. Use `/job-results/?job_id=...` for canonical per-device job status. This endpoint currently returns per-device job logs (from the `logs` table, not `job_results`) and is maintained for legacy UI compatibility only.
+
 **Description:** Get job results for each device targeted by a job.
 
 **Authentication:** Bearer token required.
@@ -1202,9 +1205,9 @@ NetRaven stores per-device job status and logs in two places:
 
 ### Endpoint Relationships
 - `/job-results/`: Canonical for per-device job outcomes. Use for reporting, analytics, and device/job status dashboards.
-- `/jobs/{job_id}/devices`: Returns per-device job logs (from `logs` table, not `job_results`). Used for legacy UI compatibility; may be consolidated in future.
+- `/jobs/{job_id}/devices`: **DEPRECATED**. Use `/job-results/?job_id=...` for canonical per-device job status. This endpoint is maintained for legacy UI compatibility only and will be removed after migration.
 - `/logs/`: Canonical for all log events, including job, connection, and system logs. Use for log tables, filtering, and streaming.
-- `/job-logs/`: **Deprecated**. Not implemented in backend. Frontend should use `/logs/` instead.
+- `/job-logs/`: **REMOVED**. This endpoint is not implemented in the backend and should not be referenced in frontend or documentation. Use `/logs/` for all log/event queries.
 
 ### Data Flow Diagram
 
@@ -1220,8 +1223,11 @@ NetRaven stores per-device job status and logs in two places:
 ```
 
 ### Migration Notes
-- **Frontend**: Use `/job-results/` for per-device job status. Use `/logs/` for log/event tables. Do not use `/job-logs/`.
-- **Backend**: Maintain both tables for now; plan to consolidate `/jobs/{job_id}/devices` into `/job-results/` in a future release.
+- `/jobs/{job_id}/devices` is deprecated. All consumers should migrate to `/job-results/?job_id=...` for per-device job status.
+- `/job-logs/` is not implemented and should be removed from all documentation and frontend code. Use `/logs/` for all log/event queries.
+- **Canonical Data Sources:**
+    - `/job-results/` is the only source for per-device job status.
+    - `/logs/` is the canonical source for event/audit logs.
 
 ---
 

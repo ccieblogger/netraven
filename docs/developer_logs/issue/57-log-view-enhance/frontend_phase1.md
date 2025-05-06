@@ -6,7 +6,7 @@
 - Began frontend phase for enhancement #57 (advanced job log view).
 - Refactored filter UI in `JobLogs.vue` to include:
   - Keyword search bar
-  - Async job name dropdown (from `/api/job-logs/job-names`)
+  - Async job name dropdown (from `/logs/` endpoint; `/job-logs/` and related endpoints are not implemented and should not be referenced)
   - Async multi-select device dropdown (from `/api/devices`)
   - Job type dropdown (from `jobTypeRegistry`)
   - Static log level dropdown

@@ -48,3 +48,5 @@ docker logs -f netraven-worker-dev 2>&1 | grep UnifiedLogger
 rq info --url redis://redis:6379/0
 
 docker exec netraven-worker-dev rq info --url redis://redis:6379/0
+
+Note: `/job-logs/` endpoint is not implemented and should not be used. Use `/logs/` for all log/event queries.

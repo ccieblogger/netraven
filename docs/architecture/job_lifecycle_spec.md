@@ -79,13 +79,21 @@ During job execution, the system writes per-device job outcomes to both:
 
 ### Endpoint Relationships
 - `/job-results/`: Canonical for per-device job outcomes.
-- `/jobs/{job_id}/devices`: Returns per-device job logs (from `logs` table, not `job_results`). Used for legacy UI compatibility; may be consolidated in future.
+- `/jobs/{job_id}/devices`: **DEPRECATED**. Use `/job-results/?job_id=...` for canonical per-device job status. This endpoint is maintained for legacy UI compatibility only and will be removed after migration.
 - `/logs/`: Canonical for all log events.
-- `/job-logs/`: **Deprecated**. Not implemented in backend. Frontend should use `/logs/` instead.
+- `/job-logs/`: **REMOVED**. This endpoint is not implemented in the backend and should not be referenced in frontend or documentation. Use `/logs/` for all log/event queries.
 
 ### Migration Guidance
-- **Frontend**: Use `/job-results/` for per-device job status. Use `/logs/` for log/event tables. Do not use `/job-logs/`.
-- **Backend**: Maintain both tables for now; plan to consolidate `/jobs/{job_id}/devices` into `/job-results/` in a future release.
+- **Frontend**: Use `/job-results/` for per-device job status. Use `/logs/` for log/event tables. Do not use `/job-logs/` (endpoint is not implemented and all references should be removed).
+- **Backend**: Maintain both tables for now; `/jobs/{job_id}/devices` is deprecated and will be removed after migration to `/job-results/` is complete.
+
+# Migration Notes
+
+- `/jobs/{job_id}/devices` is deprecated. All consumers should migrate to `/job-results/?job_id=...` for per-device job status.
+- `/job-logs/` is not implemented and should be removed from all documentation and frontend code. Use `/logs/` for all log/event queries.
+- **Canonical Data Sources:**
+    - `/job-results/` is the only source for per-device job status.
+    - `/logs/` is the canonical source for event/audit logs.
 
 ---
 
