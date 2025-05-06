@@ -165,6 +165,8 @@ Authorization: Bearer <access_token>
 - `items` is a list of user objects (no passwords).
 - Pagination fields: `total`, `page`, `size`, `pages`.
 
+> **NOTE:** The Users endpoint is not fully implemented. User management is incomplete, not production-ready, and subject to change. Some features and fields described below may not be available or may change in future releases.
+
 ---
 
 #### `POST /users/` — Create user

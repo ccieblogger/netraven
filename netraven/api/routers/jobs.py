@@ -533,9 +533,14 @@ async def trigger_job_run(
 @router.get("/{job_id}/devices", response_model=List[dict])
 def get_job_device_results(
     job_id: int,
-    db: Session = Depends(get_db_session)
+    db: Session = Depends(get_db_session),
+    response: Response = None
 ):
-    """Return per-device job results for a given job."""
+    """[DEPRECATED] Return per-device job results for a given job.\n\n    This endpoint is deprecated and will be removed in a future release.\n    Use `/job-results/?job_id=...` for canonical per-device job status.\n    """
+    logger.warning("[DEPRECATED] /jobs/{job_id}/devices called. This endpoint will be removed in a future release. Use /job-results/?job_id=... instead.")
+    if response is not None:
+        response.headers["Deprecation"] = "true"
+        response.headers["Deprecation-Notice"] = "/jobs/{job_id}/devices is deprecated and will be removed. Use /job-results/?job_id=... instead."
     # Query all job logs for this job that are associated with a device
     logs = (
         db.query(Log, Device)
@@ -551,4 +556,7 @@ def get_job_device_results(
             "device_ip": device.ip_address,
             "log": log.model_dump(),
         })
-    return results
+    return {
+        "deprecation_notice": "/jobs/{job_id}/devices is deprecated and will be removed. Use /job-results/?job_id=... instead.",
+        "results": results
+    }

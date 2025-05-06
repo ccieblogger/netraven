@@ -20,4 +20,14 @@
 
 [2024-06-09] Updated API documentation to deprecate `/jobs/{job_id}/devices` and remove `/job-logs/`. Added migration notes clarifying canonical data sources for per-device job status and logs.
 
-[2024-06-09] Workstream 1 complete: Deprecated `/jobs/{job_id}/devices` in API and architecture docs, removed `/job-logs/` references, clarified canonical endpoints, and added migration notes. Updated: `netraven_api_spec.md`, `job_lifecycle_spec.md`, `MyNotes.md`, and relevant developer logs. 
+[2024-06-09] Workstream 1 complete: Deprecated `/jobs/{job_id}/devices` in API and architecture docs, removed `/job-logs/` references, clarified canonical endpoints, and added migration notes. Updated: `netraven_api_spec.md`, `job_lifecycle_spec.md`, `MyNotes.md`, and relevant developer logs.
+
+[2025-05-06] Workstream 2 complete: Refactored frontend to use `/job-results/` for per-device job status and `/logs/` for logs/events. Updated: `JobMonitor.vue`, `store/job_log.js`. Removed all usage of deprecated endpoints. All changes tested and validated in the UI.
+
+[2025-05-06] Workstream 3 complete: Marked `/jobs/{job_id}/devices` as deprecated in backend code with warning log, response header, and deprecation notice in response. Confirmed no /job-logs/ endpoint or custom log endpoints exist. `/logs/` is the only log endpoint. Updated: `netraven/api/routers/jobs.py`. All changes tested and validated.
+
+[2025-05-06] Workstream 4 complete: Audited DB indexes on `job_results` and `logs` tables. All major filter fields (`job_id`, `device_id`, `log_type`, `level`, `status`, `job_type`, `result_time`, `timestamp`) are already indexed. No changes required. All findings logged and validated.
+
+[2025-05-06] Noted that the Users endpoint is not fully implemented. User-related test failures are expected and user management is excluded from the current test/fix scope. This status is now documented in the API spec.
+
+[2025-05-06] Ran targeted tests for /logs/ endpoint (tests/api/test_logs.py) after API cleanup. All 12 tests passed. No direct tests found for /jobs/{job_id}/devices or /job-results/ endpoints; recommend adding/expanding tests for these in the future. All changes validated for /logs/. 

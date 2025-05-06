@@ -1,8 +1,12 @@
 Run tests inside docker:
 docker exec -it netraven-api-dev bash -c "cd /app && PYTHONPATH=/app poetry run pytest tests/api/"
 
-get all api endpoints.
+# get all api endpoints.
 curl -s http://localhost:8000/openapi.json | jq '.paths | keys'
+
+# Get API endpoint detail
+curl -s http://localhost:8000/openapi.json | jq .
+
 
 Get user access token:
 curl -s -X POST http://localhost/api/auth/token \

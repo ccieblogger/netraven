@@ -32,8 +32,10 @@ export const useJobLogStore = defineStore('job_logs', () => {
     jobNamesLoading.value = true
     jobNamesError.value = null
     try {
-      const response = await api.get('/job-logs/job-names')
-      jobNames.value = response.data || []
+      // No /logs/job-names endpoint; fetch logs and extract unique job names client-side
+      const response = await api.get('/logs/', { params: { size: 1000 } })
+      const items = response.data.items || response.data || []
+      jobNames.value = [...new Set(items.map(l => l.job_name).filter(Boolean))]
     } catch (err) {
       jobNamesError.value = err.response?.data?.detail || 'Failed to fetch job names'
       jobNames.value = []
@@ -85,7 +87,7 @@ export const useJobLogStore = defineStore('job_logs', () => {
         }
       }
       Object.keys(params).forEach(key => (params[key] == null || params[key] === '' || (Array.isArray(params[key]) && params[key].length === 0)) && delete params[key])
-      const response = await api.get('/job-logs/', { params })
+      const response = await api.get('/logs/', { params })
       if (response.data && Array.isArray(response.data.items)) {
         logs.value = response.data.items
         pagination.value.totalItems = response.data.total

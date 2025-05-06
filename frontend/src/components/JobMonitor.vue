@@ -481,8 +481,8 @@ async function fetchJobStatus() {
   try {
     const jobResponse = await api.get(`/jobs/${props.jobId}`);
     job.value = jobResponse.data;
-    const deviceResponse = await api.get(`/jobs/${props.jobId}/devices`);
-    deviceResults.value = deviceResponse.data;
+    const deviceResponse = await api.get(`/job-results/?job_id=${props.jobId}`);
+    deviceResults.value = deviceResponse.data.items || deviceResponse.data || [];
     lastChecked.value = new Date();
     updateLastCheckedDisplay();
     if (job.value.status === 'COMPLETED' || job.value.status === 'FAILED') {
