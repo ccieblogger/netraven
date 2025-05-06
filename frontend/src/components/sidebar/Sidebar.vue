@@ -13,6 +13,7 @@
         :key="item.name"
         :item="item"
         :active-route="currentRoute"
+        :level="0"
       />
     </div>
     <SidebarUserSection />

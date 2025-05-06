@@ -1,7 +1,7 @@
 <template>
   <div>
     <div v-if="isGroup" class="flex items-center gap-x-0 px-0 py-2 rounded cursor-pointer select-none hover:bg-card"
-         :class="{ 'bg-card text-text-primary': isActive, 'text-text-secondary': !isActive }"
+         :class="[paddingClass, { 'bg-card text-text-primary': isActive, 'text-text-secondary': !isActive }]"
          @click="$emit('toggle')">
       <component :is="item.icon" class="w-4 h-5" />
       <span class="truncate flex-1">{{ item.name }}</span>
@@ -11,7 +11,7 @@
       </span>
     </div>
     <router-link v-else :to="item.path" class="flex items-center gap-x-0 px-0 py-2 rounded hover:bg-card"
-      :class="{ 'bg-card text-text-primary': isActive, 'text-text-secondary': !isActive }">
+      :class="[paddingClass, { 'bg-card text-text-primary': isActive, 'text-text-secondary': !isActive }]">
       <component :is="item.icon" class="w-4 h-5" />
       <span class="truncate">{{ item.name }}</span>
     </router-link>
@@ -23,7 +23,14 @@ const props = defineProps({
   item: Object,
   activeRoute: String,
   isGroup: Boolean,
-  isOpen: Boolean
+  isOpen: Boolean,
+  level: {
+    type: Number,
+    default: 0
+  }
 })
 const isActive = props.activeRoute && props.item.path && props.activeRoute.startsWith(props.item.path)
+
+// Compute padding class based on level
+const paddingClass = `pl-${props.level * 4}`
 </script> 
