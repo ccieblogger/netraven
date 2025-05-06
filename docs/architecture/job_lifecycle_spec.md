@@ -71,6 +71,24 @@ This document details the lifecycle of a job in the NetRaven system, from creati
 
 ---
 
+## Job Results and Logs: Dual Write and Canonical Sources
+
+During job execution, the system writes per-device job outcomes to both:
+- **Job Results Table (`job_results`)**: Structured, canonical per-device job outcome (status, details, timestamps). Used for reporting, analytics, and dashboards. Exposed via `/job-results/`.
+- **Unified Logs Table (`logs`)**: Unstructured, canonical event log (job, connection, system, etc.). Used for log/event tables, filtering, and streaming. Exposed via `/logs/`.
+
+### Endpoint Relationships
+- `/job-results/`: Canonical for per-device job outcomes.
+- `/jobs/{job_id}/devices`: Returns per-device job logs (from `logs` table, not `job_results`). Used for legacy UI compatibility; may be consolidated in future.
+- `/logs/`: Canonical for all log events.
+- `/job-logs/`: **Deprecated**. Not implemented in backend. Frontend should use `/logs/` instead.
+
+### Migration Guidance
+- **Frontend**: Use `/job-results/` for per-device job status. Use `/logs/` for log/event tables. Do not use `/job-logs/`.
+- **Backend**: Maintain both tables for now; plan to consolidate `/jobs/{job_id}/devices` into `/job-results/` in a future release.
+
+---
+
 ## Job Lifecycle Flow Diagram (ASCII)
 
 ```
