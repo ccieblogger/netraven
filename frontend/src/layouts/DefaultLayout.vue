@@ -5,89 +5,7 @@
       <NotificationToast />
       
       <!-- Sidebar -->
-      <aside class="h-screen w-sidebar flex-shrink-0 flex flex-col bg-sidebar border-r border-divider">
-        <!-- Sidebar header with logo -->
-        <div class="flex items-center px-4 py-4">
-          <router-link to="/" class="flex items-center space-x-2">
-            <span class="text-xl font-semibold">
-              <span class="text-primary">Net</span><span class="text-text-primary">Raven</span>
-            </span>
-          </router-link>
-        </div>
-
-        <!-- Navigation -->
-        <nav class="flex-1 px-2 py-4 space-y-1">
-          <template v-for="item in navigation" :key="item.name">
-            <div v-if="item.children">
-              <div class="flex items-center px-3 py-2 text-sm font-medium text-text-secondary cursor-default">
-                <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0 mr-3"></div>
-                <span class="truncate">{{ item.name }}</span>
-              </div>
-              <div class="ml-8 flex flex-col">
-                <router-link
-                  v-for="child in item.children"
-                  :key="child.name"
-                  :to="child.path"
-                  class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out mt-1"
-                  :class="[
-                    $route.path.startsWith(child.path)
-                      ? 'text-text-primary bg-card border-l-4 border-primary pl-2'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
-                  ]"
-                >
-                  <span class="truncate">{{ child.name }}</span>
-                </router-link>
-              </div>
-            </div>
-            <router-link
-              v-else
-              :to="item.path"
-              class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ease-in-out"
-              :class="[
-                $route.path.startsWith(item.path)
-                  ? 'text-text-primary bg-card border-l-4 border-primary pl-2'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-card border-l-4 border-transparent'
-              ]"
-            >
-              <div v-html="item.icon.template" class="w-5 h-5 flex-shrink-0 mr-3"></div>
-              <span class="truncate">{{ item.name }}</span>
-            </router-link>
-          </template>
-        </nav>
-
-        <!-- User account -->
-        <div class="p-4 mt-auto border-t border-divider">
-          <div class="flex items-center gap-3">
-            <div class="flex-shrink-0">
-              <div class="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg">
-                A
-              </div>
-            </div>
-            <div>
-              <p class="text-sm font-medium text-text-primary">{{ authStore.user?.username || 'admin' }}</p>
-            </div>
-          </div>
-          
-          <!-- Theme Switcher -->
-          <div class="mt-3 pb-3">
-            <ThemeSwitcher />
-          </div>
-          
-          <div class="mt-2">
-            <button 
-              @click="authStore.logout" 
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-text-primary rounded-md hover:bg-card group"
-            >
-              <svg class="h-5 w-5 text-text-secondary group-hover:text-text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
-              Logout
-            </button>
-          </div>
-        </div>
-      </aside>
+      <Sidebar />
 
       <!-- Main content -->
       <div class="flex flex-col flex-1 overflow-hidden">
@@ -144,6 +62,7 @@ import SystemClock from '../components/ui/SystemClock.vue'
 import { ref, onMounted, computed } from 'vue'
 import api from '../services/api'
 import { useRoute } from 'vue-router';
+import Sidebar from '../components/sidebar/Sidebar.vue';
 
 const authStore = useAuthStore();
 const systemUtcTime = ref('');
