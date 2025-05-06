@@ -21,6 +21,13 @@ export const useThemeStore = defineStore('theme', {
         // Add new theme class
         document.documentElement.classList.add(`theme-${theme}`);
         
+        // Tailwind dark mode support
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+        
         // Update state
         this.currentTheme = theme;
         
