@@ -19,8 +19,8 @@ export default [
     name: 'Jobs',
     icon: ClipboardDocumentListIcon,
     children: [
-      { name: 'List', path: '/jobs' },
-      { name: 'Dashboard', path: '/jobs-dashboard' }
+      { name: 'List', path: '/jobs', icon: ClipboardDocumentListIcon },
+      { name: 'Dashboard', path: '/jobs-dashboard', icon: HomeIcon }
     ]
   },
   {
