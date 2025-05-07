@@ -560,4 +560,45 @@ class TestJobsAPI(BaseAPITest):
         client = TestClient(app)
         headers = {"Authorization": "Bearer invalidtoken123"}
         response = client.get("/jobs/status", headers=headers)
-        assert response.status_code in (401, 403) 
+        assert response.status_code in (401, 403)
+
+    def test_job_results_include_names(self, client: TestClient, admin_headers: Dict, db_session: Session):
+        """Test that /job-results/ includes job_name and device_name in each result."""
+        # Create device
+        from netraven.db.models.device import Device
+        device = Device(hostname="test-device-jobresults", ip_address="10.0.9.1", device_type="cisco_ios")
+        db_session.add(device)
+        db_session.commit()
+        db_session.refresh(device)
+        # Create job
+        from netraven.db.models.job import Job
+        job = Job(name="Test Job Results Names", job_type="backup", status="completed")
+        db_session.add(job)
+        db_session.commit()
+        db_session.refresh(job)
+        # Create job result
+        from netraven.db.models.job_result import JobResult
+        import datetime
+        jr = JobResult(
+            job_id=job.id,
+            device_id=device.id,
+            job_type=job.job_type,
+            status="success",
+            result_time=datetime.datetime.utcnow(),
+            details={"output": "ok"},
+            created_at=datetime.datetime.utcnow()
+        )
+        db_session.add(jr)
+        db_session.commit()
+        # Query /job-results/
+        response = client.get("/job-results/", headers=admin_headers)
+        self.assert_successful_response(response)
+        data = response.json()
+        assert data["total"] >= 1
+        found = False
+        for item in data["items"]:
+            if item["job_id"] == job.id and item["device_id"] == device.id:
+                assert item["job_name"] == job.name
+                assert item["device_name"] == device.hostname
+                found = True
+        assert found, "Expected job result with job_name and device_name not found." 

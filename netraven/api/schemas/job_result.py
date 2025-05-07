@@ -27,8 +27,12 @@ class JobResultFilter(BaseModel):
     page: int = 1
     size: int = 20
 
+class JobResultWithNamesRead(JobResultRead):
+    job_name: str
+    device_name: str
+
 class PaginatedJobResultResponse(BaseModel):
-    items: List[JobResultRead]
+    items: List[JobResultWithNamesRead]
     total: int
     page: int
     size: int

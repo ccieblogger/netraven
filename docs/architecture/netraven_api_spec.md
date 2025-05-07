@@ -1233,4 +1233,53 @@ NetRaven stores per-device job status and logs in two places:
 
 ---
 
+#### `GET /job-results/` — List job results (per-device)
+**Description:** Retrieve a paginated list of job results, including human-readable job and device names for each result. Each result now includes `job_name` (from the jobs table) and `device_name` (from the devices table) as top-level fields, in addition to `job_id` and `device_id`.
+
+**Authentication:** Bearer token required.
+
+**Query Parameters:**
+- `device_id` (int, optional): Filter by device ID
+- `job_id` (int, optional): Filter by job ID
+- `tag_id` (int, optional): Filter by tag ID
+- `job_type` (str, optional): Filter by job type
+- `status` (str, optional): Filter by job result status
+- `start_time` (datetime, optional): Filter by result time (start)
+- `end_time` (datetime, optional): Filter by result time (end)
+- `page` (int, default 1): Page number
+- `size` (int, default 20): Items per page
+
+**Request Example:**
+```http
+GET /job-results/?job_id=2&page=1&size=2 HTTP/1.1
+Authorization: Bearer <access_token>
+```
+**Response Example:**
+```json
+{
+  "items": [
+    {
+      "id": 4,
+      "job_id": 2,
+      "job_name": "Backup Core Routers Daily",
+      "device_id": 1,
+      "device_name": "core-switch-01",
+      "job_type": "backup",
+      "status": "success",
+      "result_time": "2024-06-09T14:05:00.000Z",
+      "details": { "output": "ok" },
+      "created_at": "2024-06-09T14:05:01.000Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "size": 2,
+  "pages": 1
+}
+```
+**Frontend Notes:**
+- Use for per-device job status tables and dashboards.
+- `job_name` and `device_name` are always present for each result.
+- Pagination fields: `total`, `page`, `size`, `pages`.
+
 # Credentials, and Jobs will be documented next in the same detailed format. 

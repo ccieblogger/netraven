@@ -6,7 +6,7 @@ from datetime import datetime
 
 from netraven.api.dependencies import get_db_session, get_current_active_user
 from netraven.db.models import JobResult, Device, Job, Tag
-from netraven.api.schemas.job_result import JobResultRead, PaginatedJobResultResponse
+from netraven.api.schemas.job_result import JobResultWithNamesRead, PaginatedJobResultResponse
 from netraven.utils.unified_logger import get_unified_logger
 
 router = APIRouter(
@@ -30,8 +30,8 @@ def list_job_results(
     size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db_session)
 ):
-    """Retrieve job results with flexible filtering and pagination."""
-    query = db.query(JobResult)
+    """Retrieve job results with flexible filtering and pagination, including job_name and device_name."""
+    query = db.query(JobResult).join(Job).join(Device)
     filters = []
     if device_id:
         filters.append(JobResult.device_id == device_id)
@@ -65,8 +65,14 @@ def list_job_results(
         f"JobResults listed (total={total}) with filters: device_id={device_id}, job_id={job_id}, tag_id={tag_id}, job_type={job_type}, status={status}",
         level="INFO", destinations=["stdout", "file", "db"]
     )
-    # Convert ORM objects to Pydantic models
-    items = [JobResultRead.from_orm(r) for r in results]
+    # Convert ORM objects to Pydantic models with job_name and device_name
+    items = [
+        JobResultWithNamesRead(
+            **r.__dict__,
+            job_name=r.job.name if r.job else None,
+            device_name=r.device.hostname if r.device else None
+        ) for r in results
+    ]
     return PaginatedJobResultResponse(
         items=items,
         total=total,
@@ -75,7 +81,7 @@ def list_job_results(
         pages=pages
     )
 
-@router.get("/{job_result_id}", response_model=JobResultRead)
+@router.get("/{job_result_id}", response_model=JobResultWithNamesRead)
 def get_job_result(job_result_id: int, db: Session = Depends(get_db_session)):
     job_result = db.query(JobResult).filter(JobResult.id == job_result_id).first()
     if not job_result:
@@ -88,4 +94,8 @@ def get_job_result(job_result_id: int, db: Session = Depends(get_db_session)):
         f"JobResult retrieved: id={job_result_id}",
         level="INFO", destinations=["stdout", "file", "db"]
     )
-    return job_result 
+    return JobResultWithNamesRead(
+        **job_result.__dict__,
+        job_name=job_result.job.name if job_result.job else None,
+        device_name=job_result.device.hostname if job_result.device else None
+    ) 
