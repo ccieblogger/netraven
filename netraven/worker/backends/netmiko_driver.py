@@ -119,8 +119,17 @@ def run_command(
         if 'command_timeout' in config['worker']:
             command_timeout = config['worker']['command_timeout']
     
-    log.info(f"[Job: {job_id}] Connecting to device {device_name} ({device_ip}) with {conn_timeout}s timeout", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
-    
+    comm_msg = "Connecting to device {device_name} ({device_ip}) with {conn_timeout}s timeout"
+    logger.log(
+        comm_msg,
+        level="INFO",
+        destinations=["stdout", "file", "db"],
+        job_id=job_id,
+        device_id=getattr(device, 'id', None),
+        source="netmiko_driver",
+    )    
+
+
     # Build connection details
     connection_details = {
         "device_type": device.device_type,

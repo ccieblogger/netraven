@@ -84,7 +84,7 @@ def reachability_handler(device, job_id, config, db):
       - Use INFO for success, ERROR for failure.
     """
     logger.log(
-        f"Entered reachability_handler for job_id={job_id}, device_id={getattr(device, 'id', None)}",
+        f"Starting reachability check for job_id={job_id}, device_id={getattr(device, 'id', None)}",
         level="INFO",
         destinations=["stdout", "file", "db"],
         job_id=job_id,
@@ -149,7 +149,7 @@ def reachability_handler(device, job_id, config, db):
             )
             logger.log(
                 "save_job_log (success) completed for job_id={job_id}, device_id={device_id}",
-                level="INFO",
+                level="DEBUG",
                 destinations=["stdout", "file", "db"],
                 job_id=job_id,
                 device_id=device_id,
@@ -175,7 +175,7 @@ def reachability_handler(device, job_id, config, db):
             )
             logger.log(
                 "save_job_log (failure) completed for job_id={job_id}, device_id={device_id}",
-                level="INFO",
+                level="DEBUG",
                 destinations=["stdout", "file", "db"],
                 job_id=job_id,
                 device_id=device_id,
