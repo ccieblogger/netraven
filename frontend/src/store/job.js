@@ -10,20 +10,16 @@ export const useJobStore = defineStore('jobs', () => {
   const error = ref(null);
   const runStatus = ref(null); // To store status of manual run trigger
 
-  async function fetchJobs() {
+  async function fetchJobs(params = {}) {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await api.get('/jobs/');
-      // Handle pagination response structure
+      const response = await api.get('/jobs/', { params });
       if (response.data && response.data.items) {
-        // API returns paginated response with items array
         jobs.value = response.data.items;
       } else if (Array.isArray(response.data)) {
-        // Fallback for array response
         jobs.value = response.data;
       } else {
-        // Default to empty array if response format is unexpected
         jobs.value = [];
       }
     } catch (err) {
