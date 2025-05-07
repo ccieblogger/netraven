@@ -31,7 +31,12 @@ def list_job_results(
     db: Session = Depends(get_db_session)
 ):
     """Retrieve job results with flexible filtering and pagination, including job_name and device_name."""
-    query = db.query(JobResult).join(Job).join(Device)
+    # Use explicit join conditions to avoid ORM ambiguity
+    query = (
+        db.query(JobResult)
+        .join(Job, JobResult.job_id == Job.id)
+        .join(Device, JobResult.device_id == Device.id)
+    )
     filters = []
     if device_id:
         filters.append(JobResult.device_id == device_id)
