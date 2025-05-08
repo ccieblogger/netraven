@@ -2,7 +2,7 @@
   <PageContainer title="Jobs" subtitle="Manage and monitor automation jobs">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-semibold">Jobs</h2>
-      <button class="btn btn-primary" @click="openCreateModal">+ Create Job</button>
+      <button class="btn btn-primary" @click="openCreateModal">+ Schedule Job</button>
     </div>
     <div class="mb-4 flex gap-2">
       <input v-model="filters.name" placeholder="Search by name" class="form-input w-48" />

@@ -8,6 +8,7 @@
 - The page now fetches scheduled jobs from the `/jobs/scheduled` API endpoint and joins this data with the main jobs list by job ID.
 - The `Next Run` column displays the next scheduled execution time for each job, or `-` if not scheduled.
 - This improves clarity for users by showing both the schedule and the next run time for all jobs, supporting both ad-hoc and recurring jobs.
+- Changed the button label from '+ Create Job' to '+ Schedule Job' to better reflect the action of scheduling a job instance.
 
 ## Rationale
 - Users need to see not just the job schedule, but also when the next execution will occur, especially for recurring jobs.
