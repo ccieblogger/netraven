@@ -8,7 +8,7 @@ from sqlalchemy import text  # Add this import
 
 # Import the main runner function
 from netraven.worker import runner
-from netraven.db.models import Job, Device, JobLog, ConnectionLog, LogLevel, Tag # Import Tag
+from netraven.db.models import Job, Device, Tag  # JobLog, ConnectionLog, LogLevel removed in Issue 110 refactor
 from sqlalchemy.orm import Session
 from netraven.config.loader import load_config # Import the actual loader
 from netraven.db import models
@@ -71,12 +71,6 @@ def mock_external_io(): # Only patch commit_git and sleep
             }
 
 # --- Helper Functions (No change needed) --- 
-def get_job_logs(db: Session, job_id: int) -> list[JobLog]:
-    return db.query(JobLog).filter(JobLog.job_id == job_id).order_by(JobLog.timestamp).all()
-
-def get_connection_logs(db: Session, job_id: int) -> list[ConnectionLog]:
-    return db.query(ConnectionLog).filter(ConnectionLog.job_id == job_id).order_by(ConnectionLog.timestamp).all()
-
 def get_job(db: Session, job_id: int) -> Job:
     return db.query(Job).filter(Job.id == job_id).first()
 

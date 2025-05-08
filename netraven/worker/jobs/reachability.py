@@ -29,10 +29,12 @@ def run(device, job_id, config, db):
         "device_id": device_id,
         "device_name": device_name,
         "success": False,
-        "icmp_ping": {},
-        "tcp_22": {},
-        "tcp_443": {},
-        "errors": []
+        "details": {
+            "icmp_ping": {},
+            "tcp_22": {},
+            "tcp_443": {},
+            "errors": []
+        }
     }
     # ICMP Ping
     try:
@@ -48,25 +50,25 @@ def run(device, job_id, config, db):
         ping_cmd = ["ping", "-c", "1", "-W", "2", device_ip]
         ping_proc = subprocess.run(ping_cmd, capture_output=True, text=True)
         if ping_proc.returncode == 0:
-            result["icmp_ping"] = {"success": True, "latency": "OK"}
+            result["details"]["icmp_ping"] = {"success": True, "latency": "OK"}
         else:
-            result["icmp_ping"] = {"success": False, "error": ping_proc.stderr or "Ping failed"}
+            result["details"]["icmp_ping"] = {"success": False, "error": ping_proc.stderr or "Ping failed"}
     except Exception as e:
-        result["icmp_ping"] = {"success": False, "error": str(e)}
-        result["errors"].append(str(e))
+        result["details"]["icmp_ping"] = {"success": False, "error": str(e)}
+        result["details"]["errors"].append(str(e))
     # TCP Port Checks
     for port in [22, 443]:
         try:
             sock = socket.create_connection((device_ip, port), timeout=2)
             sock.close()
-            result[f"tcp_{port}"] = {"success": True}
+            result["details"][f"tcp_{port}"] = {"success": True}
         except Exception as e:
-            result[f"tcp_{port}"] = {"success": False, "error": str(e)}
+            result["details"][f"tcp_{port}"] = {"success": False, "error": str(e)}
     # Mark job as successful if ANY test succeeded
     result["success"] = (
-        result["icmp_ping"].get("success") or
-        result["tcp_22"].get("success") or
-        result["tcp_443"].get("success")
+        result["details"]["icmp_ping"].get("success") or
+        result["details"]["tcp_22"].get("success") or
+        result["details"]["tcp_443"].get("success")
     )
     # --- Device-level job log for reachability ---
     try:
@@ -82,11 +84,11 @@ def run(device, job_id, config, db):
             )
         else:
             error_msgs = []
-            if not result["icmp_ping"].get("success"):
-                error_msgs.append(f"ICMP: {result['icmp_ping'].get('error','failed')}")
+            if not result["details"]["icmp_ping"].get("success"):
+                error_msgs.append(f"ICMP: {result['details']['icmp_ping'].get('error','failed')}")
             for port in [22, 443]:
-                if not result[f"tcp_{port}"].get("success"):
-                    error_msgs.append(f"TCP {port}: {result[f'tcp_{port}'].get('error','failed')}")
+                if not result["details"][f"tcp_{port}"].get("success"):
+                    error_msgs.append(f"TCP {port}: {result['details'][f'tcp_{port}'].get('error','failed')}")
             msg = "Reachability check failed: " + "; ".join(error_msgs)
             logger.log(
                 msg,

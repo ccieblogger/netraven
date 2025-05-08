@@ -3,6 +3,7 @@ import pkgutil
 import os
 import sys
 from datetime import datetime
+import inspect
 
 # Directory containing job modules
 JOBS_PATH = os.path.join(os.path.dirname(__file__), "jobs")
@@ -42,6 +43,30 @@ for _, module_name, _ in pkgutil.iter_modules([JOBS_PATH]):
     meta["job_type"] = module_name
     if not callable(run_func):
         dev_log(f"WARNING: Module '{module_name}' missing callable run(). Skipped.")
+        continue
+    # --- Contract Enforcement: Validate run() return value ---
+    required_fields = ["success", "device_id"]
+    try:
+        sig = inspect.signature(run_func)
+        # Prepare dummy args for signature
+        dummy_device = type("DummyDevice", (), {"id": 0, "hostname": "dummy", "ip_address": "127.0.0.1"})()
+        dummy_job_id = 0
+        dummy_config = {}
+        dummy_db = None
+        # Only call if function expects 4 or fewer args
+        if len(sig.parameters) == 4:
+            result = run_func(dummy_device, dummy_job_id, dummy_config, dummy_db)
+            if not isinstance(result, dict):
+                dev_log(f"ERROR: Module '{module_name}' run() did not return a dict. Skipped.")
+                continue
+            missing = [f for f in required_fields if f not in result]
+            if missing:
+                dev_log(f"ERROR: Module '{module_name}' run() result missing required fields: {missing}. Skipped.")
+                continue
+        else:
+            dev_log(f"WARNING: Module '{module_name}' run() signature does not match expected (device, job_id, config, db). Skipped contract check.")
+    except Exception as e:
+        dev_log(f"ERROR: Exception during contract check for module '{module_name}': {e}. Skipped.")
         continue
     if module_name in JOB_TYPE_REGISTRY:
         dev_log(f"ERROR: Duplicate job_type/filename '{module_name}' in module '{module_name}'. Skipped.")

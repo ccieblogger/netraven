@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch, ANY
 
-from netraven.worker.executor import reachability_handler
+from netraven.worker.job_registry import JOB_TYPE_REGISTRY
 
 @pytest.fixture
 def fake_device():
@@ -28,6 +28,7 @@ def test_reachability_handler_logs_success(fake_device):
         # Simulate TCP success (no exception)
         mock_socket.return_value = MagicMock()
         # Call handler
+        reachability_handler = JOB_TYPE_REGISTRY["reachability"]
         result = reachability_handler(fake_device, job_id=123, config=None, db=MagicMock())
         # Assert log was called for success
         mock_save_log.assert_any_call(
@@ -44,6 +45,7 @@ def test_reachability_handler_logs_failure(fake_device):
         mock_run.return_value.returncode = 1
         mock_run.return_value.stderr = "Ping failed"
         # Call handler
+        reachability_handler = JOB_TYPE_REGISTRY["reachability"]
         result = reachability_handler(fake_device, job_id=123, config=None, db=MagicMock())
         # Assert log was called for failure
         assert any(

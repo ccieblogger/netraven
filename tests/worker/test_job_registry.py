@@ -87,4 +87,22 @@ def test_multiple_unique_filenames_registered():
     assert "job_a" in reg.JOB_TYPE_REGISTRY
     assert "job_b" in reg.JOB_TYPE_REGISTRY
     assert reg.JOB_TYPE_META["job_a"]["job_type"] == "job_a"
-    assert reg.JOB_TYPE_META["job_b"]["job_type"] == "job_b" 
+    assert reg.JOB_TYPE_META["job_b"]["job_type"] == "job_b"
+
+def test_run_returns_non_dict_skipped():
+    write_job_module("bad_return_type", '''\nJOB_META = {"label": "Bad Return"}\ndef run(device, job_id, config, db):\n    return 123\n''')
+    reg = reload_registry("bad_return_type")
+    assert "bad_return_type" not in reg.JOB_TYPE_REGISTRY
+    assert "bad_return_type" not in reg.JOB_TYPE_META
+
+def test_run_missing_required_fields_skipped():
+    write_job_module("missing_fields", '''\nJOB_META = {"label": "Missing Fields"}\ndef run(device, job_id, config, db):\n    return {"success": True}\n''')
+    reg = reload_registry("missing_fields")
+    assert "missing_fields" not in reg.JOB_TYPE_REGISTRY
+    assert "missing_fields" not in reg.JOB_TYPE_META
+
+def test_run_with_required_fields_registered():
+    write_job_module("good_job", '''\nJOB_META = {"label": "Good Job"}\ndef run(device, job_id, config, db):\n    return {"success": True, "device_id": 1}\n''')
+    reg = reload_registry("good_job")
+    assert "good_job" in reg.JOB_TYPE_REGISTRY
+    assert reg.JOB_TYPE_META["good_job"]["job_type"] == "good_job" 

@@ -186,6 +186,25 @@ def dispatch_tasks(
                         device_id = 0
                         device_name = "Unknown_Device"
                 result = future.result()
+                # --- Result Validation ---
+                required_fields = ["success", "device_id"]
+                if not isinstance(result, dict) or any(f not in result for f in required_fields):
+                    logger.log(
+                        f"Invalid or missing result from job run() for device '{device_name}' in job '{job_id}'. Generating failure result.",
+                        level="ERROR",
+                        destinations=["stdout", "file", "db"],
+                        job_id=job_id,
+                        device_id=device_id,
+                        source="dispatcher",
+                    )
+                    # Generate failure result
+                    result = {
+                        "device_id": device_id,
+                        "device_name": device_name,
+                        "success": False,
+                        "error": "Job run() did not return a valid result.",
+                        "error_info": {"type": "InvalidResult", "msg": "Job run() did not return a dict with required fields."}
+                    }
                 logger.log(
                     f"Task completed for device '{device_name}' in job '{job_id}'",
                     level="INFO",

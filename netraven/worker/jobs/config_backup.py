@@ -17,6 +17,9 @@ DEFAULT_GIT_REPO_PATH = "/data/git-repo/"
 logger = get_unified_logger()
 
 def run(device, job_id, config, db):
+    """
+    Job contract: Must return a dict with at least 'success' (bool) and 'device_id' (int) in all code paths.
+    """
     device_id = getattr(device, 'id', None)
     device_name = getattr(device, 'hostname', None)
     job_type = "config_backup"
@@ -53,7 +56,7 @@ def run(device, job_id, config, db):
                 job_id=job_id,
                 device_id=device_id
             )
-            return {"success": False, "error": str(e)}
+            return {"success": False, "device_id": device_id, "details": {"error": str(e)}}
         except Exception as e:
             logger.log(
                 f"Error retrieving config: {e}",
@@ -64,7 +67,7 @@ def run(device, job_id, config, db):
                 job_id=job_id,
                 device_id=device_id
             )
-            return {"success": False, "error": str(e)}
+            return {"success": False, "device_id": device_id, "details": {"error": str(e)}}
         # 2. Redact sensitive info
         try:
             redacted_config = redactor.redact(config_output, config)
@@ -121,7 +124,7 @@ def run(device, job_id, config, db):
                 job_id=job_id,
                 device_id=device_id
             )
-            return {"success": False, "error": str(e)}
+            return {"success": False, "device_id": device_id, "details": {"error": str(e)}}
         except Exception as e:
             logger.log(
                 f"Unexpected error during Git commit: {e}",
@@ -132,7 +135,7 @@ def run(device, job_id, config, db):
                 job_id=job_id,
                 device_id=device_id
             )
-            return {"success": False, "error": str(e)}
+            return {"success": False, "device_id": device_id, "details": {"error": str(e)}}
         logger.log(
             "Configuration backup completed successfully.",
             level="INFO",
@@ -142,7 +145,7 @@ def run(device, job_id, config, db):
             job_id=job_id,
             device_id=device_id
         )
-        return {"success": True, "commit": commit_hash}
+        return {"success": True, "device_id": device_id, "details": {"commit_hash": commit_hash}}
     except Exception as e:
         logger.log(
             f"Unexpected error in config backup: {e}",
@@ -153,4 +156,4 @@ def run(device, job_id, config, db):
             job_id=job_id,
             device_id=device_id
         )
-        return {"success": False, "error": str(e)} 
+        return {"success": False, "device_id": device_id, "details": {"error": str(e)}} 
