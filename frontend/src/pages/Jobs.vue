@@ -35,21 +35,21 @@
         </thead>
         <tbody>
           <tr v-for="job in filteredJobsWithNextRun" :key="job.id" class="border-b text-text-primary">
-            <td class="py-2 px-4">{{ job.name }}</td>
-            <td class="py-2 px-4 flex items-center gap-2">
+            <td class="py-2 px-4 text-xs">{{ job.name }}</td>
+            <td class="py-2 px-4 flex items-center gap-2 text-xs">
               <component :is="iconForType(job.job_type)" class="w-4 h-4" />
               {{ labelForType(job.job_type) }}
             </td>
-            <td class="py-2 px-4">{{ job.status }}</td>
-            <td class="py-2 px-4">
+            <td class="py-2 px-4 text-xs">{{ job.status }}</td>
+            <td class="py-2 px-4 text-xs">
               <span v-if="job.schedule_type === 'interval'">Every {{ job.interval_seconds }}s</span>
               <span v-else-if="job.schedule_type === 'cron'">{{ job.cron_string }}</span>
               <span v-else-if="job.schedule_type === 'onetime'">{{ formatDate(job.scheduled_for) }}</span>
               <span v-else>-</span>
             </td>
-            <td class="py-2 px-4">{{ formatDate(job.completed_at || job.started_at) }}</td>
-            <td class="py-2 px-4">{{ formatDate(job.next_run) }}</td>
-            <td class="py-2 px-4 flex gap-1">
+            <td class="py-2 px-4 text-xs">{{ formatDate(job.completed_at || job.started_at) }}</td>
+            <td class="py-2 px-4 text-xs">{{ formatDate(job.next_run) }}</td>
+            <td class="py-2 px-4 flex gap-1 text-xs">
               <button class="btn btn-xs btn-ghost" @click="runJob(job)">Run</button>
               <button class="btn btn-xs btn-ghost" @click="openEditModal(job)">Edit</button>
               <button class="btn btn-xs btn-ghost text-red-500" @click="openDeleteModal(job)">Delete</button>

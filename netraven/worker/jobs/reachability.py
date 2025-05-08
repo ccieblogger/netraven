@@ -6,7 +6,7 @@ JOB_META = {
     "label": "Reachability Check",
     "description": "Performs ICMP and TCP reachability checks on the device.",
     "icon": "mdi-lan-connect",
-    "default_schedule": "daily"
+    "default_schedule": "hourly"
 }
 
 logger = get_unified_logger()
