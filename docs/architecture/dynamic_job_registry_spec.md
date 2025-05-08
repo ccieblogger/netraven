@@ -37,8 +37,8 @@ netraven/
 Each job module in `netraven/worker/jobs/` must provide:
 
 - `JOB_META` (dict):
-  - Required: `job_type` (string, unique)
-  - Optional: `label`, `description`, `icon`, `default_schedule`, etc.
+  - Required: user-facing fields such as `label`, `description`, `icon`, `default_schedule`, etc.
+  - **Do NOT set `job_type` manually.** The loader will automatically set `job_type` in `JOB_META` to the filename (without `.py`).
 - `run(device, job_id, config, db)` (function):
   - The main job logic, same signature as current handlers.
 
@@ -47,7 +47,6 @@ Each job module in `netraven/worker/jobs/` must provide:
 # netraven/worker/jobs/config_backup.py
 
 JOB_META = {
-    "job_type": "backup",
     "label": "Configuration Backup",
     "description": "Backs up device running-config and stores in Git.",
     "icon": "mdi-content-save",
@@ -57,6 +56,7 @@ JOB_META = {
 def run(device, job_id, config, db):
     # ...job logic...
     return {"success": True, ...}
+# job_type will be set automatically to "config_backup" by the loader
 ```
 
 ---
@@ -68,11 +68,12 @@ def run(device, job_id, config, db):
 - On import, scan the `jobs/` folder for all `.py` files (excluding `__init__.py`).
 - Import each module.
 - Validate:
-  - `JOB_META` exists and contains a unique `job_type`.
+  - `JOB_META` exists.
   - `run()` function exists.
+- **Set `job_type` in `JOB_META` automatically to the filename (without `.py`).**
 - Build:
-  - `JOB_TYPE_REGISTRY`: `{job_type: run_function}`
-  - `JOB_TYPE_META`: `{job_type: JOB_META}`
+  - `JOB_TYPE_REGISTRY`: `{filename: run_function}`
+  - `JOB_TYPE_META`: `{filename: JOB_META}`
 
 **Pseudocode:**
 ```python
@@ -91,15 +92,15 @@ for _, module_name, _ in pkgutil.iter_modules([JOBS_PATH]):
     module = importlib.import_module(f"netraven.worker.jobs.{module_name}")
     meta = getattr(module, "JOB_META", None)
     run_func = getattr(module, "run", None)
-    if not meta or "job_type" not in meta or not callable(run_func):
+    if not meta or not callable(run_func):
         # Log warning and skip
         continue
-    job_type = meta["job_type"]
-    if job_type in JOB_TYPE_REGISTRY:
-        # Log error: duplicate job_type
+    meta["job_type"] = module_name  # Set automatically
+    if module_name in JOB_TYPE_REGISTRY:
+        # Log error: duplicate filename
         continue
-    JOB_TYPE_REGISTRY[job_type] = run_func
-    JOB_TYPE_META[job_type] = meta
+    JOB_TYPE_REGISTRY[module_name] = run_func
+    JOB_TYPE_META[module_name] = meta
 ```
 
 ---
@@ -126,7 +127,7 @@ for _, module_name, _ in pkgutil.iter_modules([JOBS_PATH]):
 
 - On startup, log and skip any job module that:
   - Lacks `JOB_META` or `run()`
-  - Has a duplicate `job_type`
+  - Has a duplicate filename
 - Optionally, fail fast if there are critical errors (e.g., no valid job types found).
 
 ---
@@ -160,7 +161,7 @@ for _, module_name, _ in pkgutil.iter_modules([JOBS_PATH]):
 To ensure all job execution logs are consistent, easily filterable, and maintainable, all job modules must use a standardized logging utility called `JobLogger`. This logger leverages the unified logging system, but enforces a consistent structure for job logs:
 
 - `log_type='job'` for all job-related logs
-- A `source` field following the convention: `worker.job.{job_type}` (where `job_type` is from the job module's `JOB_META`)
+- A `source` field following the convention: `worker.job.{job_type}` (where `job_type` is set automatically from the filename)
 - Required metadata fields such as `job_id` and (optionally) `device_id`
 - Optional additional metadata via the `meta` field
 
@@ -221,7 +222,6 @@ def run(device, job_id, config, db):
 from netraven.worker.logging import JobLogger
 
 JOB_META = {
-    "job_type": "example",
     "label": "Example Job",
     "description": "This is an example job type.",
     "icon": "mdi-star",
@@ -234,11 +234,21 @@ def run(device, job_id, config, db):
     # Implement job logic here
     logger.log("info", "Example job completed")
     return {"success": True, "details": "Example job completed."}
+# job_type will be set automatically to "example_job" by the loader
 ```
 
 ---
 
-## 12. References
+## 12. Rationale for Filename-Based job_type (Update)
+
+- **Uniqueness:** Using the filename as job_type guarantees uniqueness without manual tracking.
+- **Developer Experience:** Reduces manual error and simplifies job module creation.
+- **Plug-and-Play:** New jobs are added by simply dropping in a new file.
+- **Consistency:** The loader, registry, API, and UI all use the same unique identifier.
+
+---
+
+## 13. References
 - [Plugin/Registry Patterns in Python](https://realpython.com/python-import/#importing-modules-programmatically)
 - [NetRaven Architecture Statement of Truth](architecture_sot.md)
 - [Job Lifecycle Spec](job_lifecycle_spec.md)
