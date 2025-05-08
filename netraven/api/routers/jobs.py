@@ -29,6 +29,8 @@ from netraven.api.schemas.tag import Tag as TagSchema
 # Potentially move to utils?
 from .devices import get_tags_by_ids # Reuse tag helper from device router for now
 
+from netraven.worker.job_registry import JOB_TYPE_META
+
 router = APIRouter(
     prefix="/jobs",
     tags=["Jobs"],
@@ -243,20 +245,8 @@ def get_recent_jobs(db: Session = Depends(get_db_session), limit: int = 20):
 @router.get("/job-types", response_model=List[JobTypeSummary])
 def get_job_types(db: Session = Depends(get_db_session)):
     """Return list of available job types, their labels, descriptions, icons, and last-used timestamp."""
-    # Use a static registry (could be loaded from config or code)
-    job_type_registry = {
-        "reachability": {
-            "label": "Check Reachability",
-            "description": "Test device reachability via ping and port checks.",
-            "icon": "NetworkCheckIcon"
-        },
-        "backup": {
-            "label": "Device Backup",
-            "description": "Backup device running configuration.",
-            "icon": "BackupIcon"
-        }
-        # Add more job types as needed
-    }
+    # Use dynamic registry
+    job_type_meta = JOB_TYPE_META
     # Find last-used timestamp for each job type
     last_used_map = {}
     jobs = db.query(models.Job).all()
@@ -267,10 +257,10 @@ def get_job_types(db: Session = Depends(get_db_session)):
             if jt not in last_used_map or (last_used_map[jt] and ts > last_used_map[jt]):
                 last_used_map[jt] = ts
     result = []
-    for jt, meta in job_type_registry.items():
+    for jt, meta in job_type_meta.items():
         result.append(JobTypeSummary(
             job_type=jt,
-            label=meta["label"],
+            label=meta.get("label", jt),
             description=meta.get("description"),
             icon=meta.get("icon"),
             last_used=last_used_map.get(jt)
