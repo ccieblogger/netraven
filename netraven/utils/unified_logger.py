@@ -129,6 +129,30 @@ class UnifiedLogger:
             source: Optional[str] = None, is_connection_log: bool = False, **kwargs):
         """
         Log a message to one or more destinations.
+
+        Parameters:
+            message (str): The log message.
+            level (str, optional): Log level (e.g., "INFO", "ERROR"). Defaults to "INFO".
+            destinations (List[str], optional): List of destinations ("stdout", "file", "redis", "db"). If None, uses enabled destinations from config.
+            job_id (int, optional): Associated job ID.
+            device_id (int, optional): Associated device ID.
+            extra (dict, optional): Arbitrary structured data to include in the log record. This is the intended way to pass custom metadata for jobs or other log events. The contents of 'extra' will be stored in the database 'meta' column (JSONB) and made available for UI/API consumption. Use this to pass any job-specific or structured data you want to persist and view in the UI.
+            source (str, optional): Source module or service name.
+            is_connection_log (bool, optional): If True, log_type defaults to "connection" if not otherwise specified.
+            log_type (str, optional): Log type for DB logging ("job", "connection", "session", etc.). Pass as a keyword argument.
+            Any additional keyword arguments (**kwargs) will be added to the log record and, if logging to DB, stored in the log entry.
+
+        Example:
+            logger.log(
+                "Device session started",
+                level="INFO",
+                log_type="session",  # Sets the log_type for DB logging
+                job_id=123,
+                device_id=456,
+                source="worker.executor",
+                extra={"custom_field": "value", "result": {"status": "success", "duration": 12.5}},
+                custom_param="custom_value"  # This will be included in the log record but not in the DB meta column unless included in 'extra'.
+            )
         """
         # Build log record with metadata
         record = {
@@ -208,7 +232,7 @@ class UnifiedLogger:
             # Determine log_type
             log_type = record.get("log_type")
             if not log_type:
-                log_type = "connection" if is_connection_log else "job"
+                log_type = "connection" if is_connection_log else "system"
             # Use save_log for all DB log events
             save_log(
                 message=record.get("message"),
