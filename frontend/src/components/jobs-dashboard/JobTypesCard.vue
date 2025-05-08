@@ -10,7 +10,7 @@
       >
         <span class="flex items-center justify-center h-6 w-6 rounded-md"
           :class="iconBg(type.job_type)">
-          <component :is="iconForType(type.job_type)" class="w-4 h-4" />
+          <component :is="iconForType(type)" class="w-4 h-4" />
         </span>
         {{ type.label }}
       </button>
@@ -20,26 +20,25 @@
 
 <script setup>
 import { h } from 'vue'
-// Example icons (replace with your icon set as needed)
-const BackupIcon = {
-  render() { return h('svg', { class: 'w-4 h-4 text-green-300', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M12 4v16m8-8H4' })]) }
+// Import Heroicons
+import { DocumentIcon, CloudArrowDownIcon, SignalIcon, BellAlertIcon, QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
+
+// Map icon string from API to Heroicon component
+const heroiconMap = {
+  BackupIcon: CloudArrowDownIcon,
+  NetworkCheckIcon: SignalIcon,
+  NotifyIcon: BellAlertIcon,
+  // Add more mappings as needed
+  // Fallbacks for common names
+  DocumentIcon: DocumentIcon,
 }
-const SyncIcon = {
-  render() { return h('svg', { class: 'w-4 h-4 text-yellow-300', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M4 4v6h6M20 20v-6h-6M5 19A9 9 0 0021 7.5M19 5A9 9 0 003 16.5' })]) }
+
+const iconForType = (typeObj) => {
+  // Use the icon string from the API, fallback to QuestionMarkCircleIcon
+  const iconStr = typeObj.icon
+  return heroiconMap[iconStr] || QuestionMarkCircleIcon
 }
-const ReportIcon = {
-  render() { return h('svg', { class: 'w-4 h-4 text-purple-300', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('rect', { x: '3', y: '4', width: '18', height: '16', rx: '2', ry: '2' }), h('line', { x1: '16', y1: '2', x2: '16', y2: '6' }), h('line', { x1: '8', y1: '2', x2: '8', y2: '6' })]) }
-}
-const NotifyIcon = {
-  render() { return h('svg', { class: 'w-4 h-4 text-pink-300', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 7.165 6 9.388 6 12v2.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' })]) }
-}
-const iconForType = (type) => {
-  if (type === 'backup') return BackupIcon
-  if (type === 'sync') return SyncIcon
-  if (type === 'report') return ReportIcon
-  if (type === 'notify') return NotifyIcon
-  return BackupIcon
-}
+
 const iconBg = (type) => {
   if (type === 'backup') return 'bg-green-700'
   if (type === 'sync') return 'bg-yellow-700'
