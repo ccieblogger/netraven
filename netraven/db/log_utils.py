@@ -2,6 +2,7 @@ from netraven.db.session import get_db
 from netraven.db.models import Log, LogLevel, LogType
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
+from netraven.db.models.job import Job
 
 def save_log(
     message: str,
@@ -17,6 +18,12 @@ def save_log(
     """
     db = next(get_db())
     try:
+        # Validate job_id: must be None or a valid job PK
+        if job_id is not None:
+            if job_id == 0 or db.query(Job.id).filter(Job.id == job_id).first() is None:
+                print(f"[LOGGER WARNING] Invalid job_id {job_id} for log. Logging as system event.")
+                job_id = None
+                log_type = 'system'
         entry = Log(
             message=message,
             log_type=log_type,

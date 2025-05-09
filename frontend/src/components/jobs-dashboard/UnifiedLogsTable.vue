@@ -25,7 +25,7 @@
           <td class="py-2 px-4 text-xs">{{ log.device_id }}</td>
           <td class="py-2 px-4 text-xs">{{ log.message }}</td>
           <td class="py-2 px-4 text-xs">
-            <button v-if="log.meta" class="text-primary underline" @click="$emit('show-meta', log.meta)">View</button>
+            <button v-if="hasMeta(log.meta)" class="text-primary underline" @click="$emit('show-meta', log.meta)">View</button>
             <span v-else class="text-text-secondary">-</span>
           </td>
         </tr>
@@ -55,5 +55,23 @@ function formatDate(dateStr) {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+function hasMeta(meta) {
+  if (!meta) return false;
+  if (typeof meta === 'string') {
+    try {
+      const parsed = JSON.parse(meta);
+      if (typeof parsed === 'object' && parsed !== null) return Object.keys(parsed).length > 0;
+      if (Array.isArray(parsed)) return parsed.length > 0;
+      return !!parsed;
+    } catch {
+      return !!meta;
+    }
+  }
+  if (typeof meta === 'object') {
+    if (Array.isArray(meta)) return meta.length > 0;
+    return Object.keys(meta).length > 0;
+  }
+  return !!meta;
 }
 </script> 

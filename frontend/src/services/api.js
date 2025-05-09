@@ -98,4 +98,18 @@ export async function getLatestReachabilityJobResult(deviceId) {
   }
 }
 
+/**
+ * Fetch available job types from the backend
+ * @returns {Promise<Array>} List of job type objects
+ */
+export async function getJobTypes() {
+  try {
+    const res = await api.get('/jobs/job-types');
+    return res.data;
+  } catch (err) {
+    console.error('Failed to fetch job types:', err);
+    return [];
+  }
+}
+
 export default api;

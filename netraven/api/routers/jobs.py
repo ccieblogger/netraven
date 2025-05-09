@@ -244,10 +244,8 @@ def get_recent_jobs(db: Session = Depends(get_db_session), limit: int = 20):
 
 @router.get("/job-types", response_model=List[JobTypeSummary])
 def get_job_types(db: Session = Depends(get_db_session)):
-    """Return list of available job types, their labels, descriptions, icons, and last-used timestamp."""
-    # Use dynamic registry
+    """Return list of available job types, their labels, descriptions, icons, and last-used timestamp. Deduplicate aliases."""
     job_type_meta = JOB_TYPE_META
-    # Find last-used timestamp for each job type
     last_used_map = {}
     jobs = db.query(models.Job).all()
     for job in jobs:
@@ -257,7 +255,13 @@ def get_job_types(db: Session = Depends(get_db_session)):
             if jt not in last_used_map or (last_used_map[jt] and ts > last_used_map[jt]):
                 last_used_map[jt] = ts
     result = []
+    seen_signatures = set()
     for jt, meta in job_type_meta.items():
+        # Build a signature of label, description, icon to deduplicate aliases
+        sig = (meta.get("label"), meta.get("description"), meta.get("icon"))
+        if sig in seen_signatures:
+            continue  # Skip aliases/duplicates
+        seen_signatures.add(sig)
         result.append(JobTypeSummary(
             job_type=jt,
             label=meta.get("label", jt),

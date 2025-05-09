@@ -38,6 +38,8 @@ export const useLogStore = defineStore('logs', () => {
             size: pagination.value.itemsPerPage,
             ...filters.value // Add current filters
         };
+        // Always filter for log_type='job' for the jobs dashboard
+        params.log_type = 'job';
         // Remove null/empty filters
         Object.keys(params).forEach(key => (params[key] == null || params[key] === '') && delete params[key]);
 

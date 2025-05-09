@@ -49,7 +49,7 @@ def load_devices_for_job(job_id: int, db: Session) -> List[Device]:
         - Returns an empty list if no job is found, or if the job has no tags
         - Devices are deduplicated if they appear in multiple tags
     """
-    logger.log(f"[Job: {job_id}] Loading devices from database via tags...", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+    logger.log(f"[Job: {job_id}] Loading devices from database via tags...", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
     job = (
         db.query(Job)
         .options(
@@ -61,11 +61,11 @@ def load_devices_for_job(job_id: int, db: Session) -> List[Device]:
     )
 
     if not job:
-        logger.log(f"[Job: {job_id}] Job not found in database.", level="WARNING", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+        logger.log(f"[Job: {job_id}] Job not found in database.", level="WARNING", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
         return []
 
     if not job.tags:
-        logger.log(f"[Job: {job_id}] Job found, but has no associated tags.", level="WARNING", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+        logger.log(f"[Job: {job_id}] Job found, but has no associated tags.", level="WARNING", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
         return []
 
     # Collect unique devices from all associated tags
@@ -77,11 +77,11 @@ def load_devices_for_job(job_id: int, db: Session) -> List[Device]:
     
     loaded_devices = list(unique_devices)
     if not loaded_devices:
-        logger.log(f"[Job: {job_id}] Job tags found, but no devices associated with those tags.", level="WARNING", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+        logger.log(f"[Job: {job_id}] Job tags found, but no devices associated with those tags.", level="WARNING", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
         return []
 
     device_names = [d.hostname for d in loaded_devices]
-    logger.log(f"[Job: {job_id}] Loaded {len(loaded_devices)} devices: {device_names}", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+    logger.log(f"[Job: {job_id}] Loaded {len(loaded_devices)} devices: {device_names}", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
     return loaded_devices
 
 def update_job_status(job_id: int, status: str, db: Session, start_time: float = None, end_time: float = None):
@@ -106,7 +106,7 @@ def update_job_status(job_id: int, status: str, db: Session, start_time: float =
         - Converts Unix timestamps to formatted datetime strings for database storage
     """
     duration_msg = f" in {end_time - start_time:.2f}s" if start_time and end_time else ""
-    logger.log(f"[Job: {job_id}] Updating job status to '{status}'{duration_msg}.", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+    logger.log(f"[Job: {job_id}] Updating job status to '{status}'{duration_msg}.", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
         if job:
@@ -121,9 +121,9 @@ def update_job_status(job_id: int, status: str, db: Session, start_time: float =
             # Use commit inside the session passed, don't manage transaction here
             # db.commit() # REMOVED - handled by caller or session context
         else:
-            logger.log(f"[Job: {job_id}] Cannot update status, Job not found.", level="ERROR", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+            logger.log(f"[Job: {job_id}] Cannot update status, Job not found.", level="ERROR", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
     except Exception as e:
-        logger.log(f"[Job: {job_id}] Failed to update job status: {e}", level="ERROR", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+        logger.log(f"[Job: {job_id}] Failed to update job status: {e}", level="ERROR", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
         # db.rollback() # REMOVED - handled by caller or session context
         raise # Re-raise so caller knows update failed
 
@@ -226,7 +226,7 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         - Sets appropriate final status based on task results
     """
     start_time = time.time()
-    logger.log(f"[Job: {job_id}] Received job request. Starting...", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+    logger.log(f"[Job: {job_id}] Received job request. Starting...", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
     
     # Determine if we need to manage the session lifecycle
     session_managed = False
@@ -250,7 +250,7 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
              db_to_use.commit() # Commit status update only if session is managed here
         # Log job started
         logger.log(
-            "Job started.",
+            f"Job {job_id} started.",
             level="INFO",
             destinations=["stdout", "file", "db"],
             job_id=job_id,
@@ -298,7 +298,7 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
         else:
             # 1.5 Resolve credentials for devices
             try:
-                logger.log(f"[Job: {job_id}] Resolving credentials for {len(devices_to_process)} device(s)...", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+                logger.log(f"[Job: {job_id}] Resolving credentials for {len(devices_to_process)} device(s)...", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
                 devices_with_credentials = resolve_device_credentials_batch(
                     devices_to_process, db_to_use, job_id
                 )
@@ -313,11 +313,11 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
                 
                 if not devices_with_credentials:
                     final_status = JobStatus.COMPLETED_NO_CREDENTIALS
-                    logger.log(f"[Job: {job_id}] No devices with valid credentials found. Final Status: {final_status}", level="WARNING", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+                    logger.log(f"[Job: {job_id}] No devices with valid credentials found. Final Status: {final_status}", level="WARNING", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
                 else:
                     # 2. Dispatch tasks for all devices (now with credentials)
                     device_count = len(devices_with_credentials)
-                    logger.log(f"[Job: {job_id}] Handing off {device_count} device(s) with credentials to dispatcher...", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+                    logger.log(f"[Job: {job_id}] Handing off {device_count} device(s) with credentials to dispatcher...", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
                     
                     # Pass devices with credentials instead of original devices
                     results: List[Dict] = dispatcher.dispatch_tasks(
@@ -344,7 +344,7 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
                     else:
                         success_count = sum(1 for r in results if r.get("success"))
                         failure_count = device_count - success_count
-                        logger.log(f"[Job: {job_id}] Dispatcher finished. Success: {success_count}, Failure: {failure_count}", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+                        logger.log(f"[Job: {job_id}] Dispatcher finished. Success: {success_count}, Failure: {failure_count}", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
 
                         if failure_count == 0:
                             final_status = JobStatus.COMPLETED_SUCCESS

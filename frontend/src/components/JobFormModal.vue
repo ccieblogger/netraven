@@ -34,8 +34,9 @@
           :error="validationErrors.job_type"
         >
           <option value="">Select job type</option>
-          <option value="backup">Backup</option>
-          <option value="reachability">Reachability</option>
+          <option v-for="jt in jobTypes" :key="jt.job_type" :value="jt.job_type">
+            {{ jt.label || jt.job_type }}
+          </option>
         </FormField>
 
         <!-- Target Type Toggle -->
@@ -146,9 +147,10 @@
       </form>
     </template>
     <template #actions>
+      <div v-if="!devicesExist" class="text-red-600 text-sm mb-2">At least one device must exist to schedule a job.</div>
       <button
         type="button"
-        :disabled="isSaving"
+        :disabled="isSaving || !devicesExist"
         class="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
         @click="submitForm"
       >
@@ -173,6 +175,7 @@ import TagSelector from './TagSelector.vue';
 import { useTagStore } from '../store/tag';
 import { useDeviceStore } from '../store/device';
 import { useNotificationStore } from '../store/notifications';
+import { getJobTypes } from '../services/api';
 
 const props = defineProps({
   isOpen: {
@@ -213,6 +216,10 @@ const form = ref({
 
 const modalTitle = computed(() => props.jobToEdit ? 'Edit Job' : 'Create New Job');
 
+const devicesExist = computed(() => deviceStore.devices && deviceStore.devices.length > 0);
+
+const jobTypes = ref([]);
+
 // Helper function to format date for datetime-local input
 function formatDateForInput(date) {
   if (!date) return '';
@@ -222,8 +229,9 @@ function formatDateForInput(date) {
 }
 
 // Watch for the modal opening or jobToEdit changing
-watch(() => props.isOpen, (newVal) => {
+watch(() => props.isOpen, async (newVal) => {
   if (newVal) {
+    console.log('[JobFormModal] Modal opened, fetching job types...');
     resetForm();
     clearValidationErrors();
     
@@ -234,6 +242,10 @@ watch(() => props.isOpen, (newVal) => {
     if (deviceStore.devices.length === 0 && !deviceStore.isLoading) {
       deviceStore.fetchDevices();
     }
+    // Fetch job types
+    const types = await getJobTypes();
+    console.log('[JobFormModal] getJobTypes() returned:', types);
+    jobTypes.value = types;
   }
 });
 
@@ -358,12 +370,15 @@ async function submitForm() {
       delete payload.id;
     }
 
-    // Only send device_id or tag_ids, not both
+    // Only send device_id or tags, not both
     if (targetType.value === 'device') {
-      payload.tag_ids = [];
+      payload.tags = [];
+      if (!payload.device_id) payload.device_id = null;
     } else if (targetType.value === 'tags') {
-      payload.device_id = '';
+      payload.tags = [...form.value.tag_ids];
+      payload.device_id = null;
     }
+    delete payload.tag_ids;
 
     await emit('save', payload);
     notificationStore.success(`Job ${props.jobToEdit ? 'updated' : 'created'} successfully!`);
@@ -381,12 +396,20 @@ async function submitForm() {
 }
 
 // Fetch initial tags if needed
-onMounted(() => {
-  if (props.isOpen && tagStore.tags.length === 0 && !tagStore.isLoading) {
-    tagStore.fetchTags();
-  }
-  if (props.isOpen && deviceStore.devices.length === 0 && !deviceStore.isLoading) {
-    deviceStore.fetchDevices();
+onMounted(async () => {
+  if (props.isOpen) {
+    console.log('[JobFormModal] mounted, fetching job types...');
+    resetForm();
+    clearValidationErrors();
+    if (tagStore.tags.length === 0 && !tagStore.isLoading) {
+      tagStore.fetchTags();
+    }
+    if (deviceStore.devices.length === 0 && !deviceStore.isLoading) {
+      deviceStore.fetchDevices();
+    }
+    const types = await getJobTypes();
+    console.log('[JobFormModal] getJobTypes() returned (onMounted):', types);
+    jobTypes.value = types;
   }
 });
 </script> 

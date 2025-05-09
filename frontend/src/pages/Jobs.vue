@@ -4,67 +4,17 @@
       <h2 class="text-xl font-semibold">Jobs</h2>
       <button class="btn btn-primary" @click="openCreateModal">+ Schedule Job</button>
     </div>
-    <div class="mb-4 flex gap-2">
-      <input v-model="filters.name" placeholder="Search by name" class="form-input w-48" />
-      <select v-model="filters.type" class="form-select w-40">
-        <option value="">All Types</option>
-        <option v-for="type in jobTypes" :key="type.job_type" :value="type.job_type">
-          {{ type.label }}
-        </option>
-      </select>
-      <select v-model="filters.status" class="form-select w-32">
-        <option value="">All Statuses</option>
-        <option value="pending">Pending</option>
-        <option value="running">Running</option>
-        <option value="completed">Completed</option>
-        <option value="failed">Failed</option>
-      </select>
-    </div>
-    <div class="nr-card overflow-x-auto">
-      <table class="min-w-full table-auto">
-        <thead>
-          <tr class="bg-card text-text-secondary text-sm">
-            <th class="py-2 px-4 text-left">Name</th>
-            <th class="py-2 px-4 text-left">Type</th>
-            <th class="py-2 px-4 text-left">Status</th>
-            <th class="py-2 px-4 text-left">Schedule</th>
-            <th class="py-2 px-4 text-left">Last Run</th>
-            <th class="py-2 px-4 text-left">Next Run</th>
-            <th class="py-2 px-4 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="job in filteredJobsWithNextRun" :key="job.id" class="border-b text-text-primary">
-            <td class="py-2 px-4 text-xs">{{ job.name }}</td>
-            <td class="py-2 px-4 flex items-center gap-2 text-xs">
-              <component :is="iconForType(job.job_type)" class="w-4 h-4" />
-              {{ labelForType(job.job_type) }}
-            </td>
-            <td class="py-2 px-4 text-xs">{{ job.status }}</td>
-            <td class="py-2 px-4 text-xs">
-              <span v-if="job.schedule_type === 'interval'">Every {{ job.interval_seconds }}s</span>
-              <span v-else-if="job.schedule_type === 'cron'">{{ job.cron_string }}</span>
-              <span v-else-if="job.schedule_type === 'onetime'">{{ formatDate(job.scheduled_for) }}</span>
-              <span v-else>-</span>
-            </td>
-            <td class="py-2 px-4 text-xs">{{ formatDate(job.completed_at || job.started_at) }}</td>
-            <td class="py-2 px-4 text-xs">{{ formatDate(job.next_run) }}</td>
-            <td class="py-2 px-4 flex gap-1 text-xs">
-              <button class="btn btn-xs btn-ghost" @click="runJob(job)">Run</button>
-              <button class="btn btn-xs btn-ghost" @click="openEditModal(job)">Edit</button>
-              <button class="btn btn-xs btn-ghost text-red-500" @click="openDeleteModal(job)">Delete</button>
-              <button class="btn btn-xs btn-ghost" @click="openDetailsModal(job)">Details</button>
-            </td>
-          </tr>
-          <tr v-if="!isLoading && filteredJobsWithNextRun.length === 0">
-            <td colspan="6" class="text-center text-text-secondary py-4">No jobs found.</td>
-          </tr>
-          <tr v-if="isLoading">
-            <td colspan="6" class="text-center text-text-secondary py-4">Loading jobs...</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <JobList
+      :jobs="filteredJobsWithNextRun"
+      :job-types="jobTypes"
+      :is-loading="isLoading"
+      :filters="filters"
+      @run="runJob"
+      @edit="openEditModal"
+      @delete="openDeleteModal"
+      @details="openDetailsModal"
+      @update:filters="val => { filters.value = val }"
+    />
     <JobFormModal
       v-if="showFormModal"
       :is-open="showFormModal"
@@ -97,6 +47,7 @@ import { useJobStore } from '../store/job'
 import { useJobsDashboardStore } from '../store/jobsDashboard'
 import JobFormModal from '../components/JobFormModal.vue'
 import BaseModal from '../components/BaseModal.vue'
+import JobList from '../components/jobs-dashboard/JobList.vue'
 import { CloudArrowDownIcon, SignalIcon, QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
 
 const jobStore = useJobStore()
@@ -148,9 +99,19 @@ async function confirmDeleteJob() {
   closeDeleteModal()
   jobStore.fetchJobs()
 }
-async function handleSaveJob() {
-  closeFormModal()
-  jobStore.fetchJobs()
+async function handleSaveJob(payload) {
+  let success = false;
+  if (!selectedJob.value) {
+    // Create mode
+    success = await jobStore.createJob(payload);
+  } else {
+    // Edit mode
+    success = await jobStore.updateJob(payload.id, payload);
+  }
+  if (success) {
+    closeFormModal();
+    jobStore.fetchJobs();
+  }
 }
 async function runJob(job) {
   await jobStore.runJobNow(job.id)

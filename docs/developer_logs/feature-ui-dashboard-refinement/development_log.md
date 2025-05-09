@@ -29,6 +29,12 @@
 **Results:**
 - The login issue has been resolved and users can now authenticate successfully
 
+## Phase 2: Device Object Validation
+- Added a device validation function (`is_valid_device`) to the dispatcher.
+- Before submitting a device to the thread pool, the dispatcher now checks for required attributes (`id`, `hostname`, `device_type`).
+- If a device is invalid, it is skipped and a warning is logged.
+- This prevents errors from DummyDevice or incomplete device objects during job runs.
+
 ## Phase 2: UI Refactoring Plan
 
 Based on the provided screenshot, I'll implement the following changes to refactor the UI:
@@ -76,51 +82,10 @@ Based on the provided screenshot, I'll implement the following changes to refact
 4. Create any new reusable components needed for consistent styling
 5. Test the changes thoroughly before committing
 
-## Phase 3: Implementation of UI Changes
-
-**Date:** 2025-04-15
-
-**Changes:**
-
-### 3.1 Global Styles Update
-1. Added global CSS styles in `frontend/src/App.vue`:
-   - Set the main background color to #0D1321 (Rich Black)
-   - Created custom utility classes:
-     - `.netraven-card` for card styling with proper border-radius, shadows, and borders
-     - `.icon-container` for circular icon containers
-     - `.stat-counter` for large numeric counters
-     - `.view-details` for "View Details" links
-
-### 3.2 Dashboard Component Refactoring
-1. Updated `frontend/src/pages/Dashboard.vue`:
-   - Applied the `.netraven-card` class to all card components
-   - Updated colors to match the screenshot (bg-blue-700, bg-green-700, bg-purple-700, etc.)
-   - Styled card headers, counters, and footer sections to match the design
-   - Used consistent spacing and font sizes across all elements
-   - Updated the Recent Activity section with the correct border styling and loading indicator
-
-### 3.3 Layout Component Refactoring
-1. Updated `frontend/src/layouts/DefaultLayout.vue`:
-   - Changed the sidebar background color to match the screenshot (#0D1321)
-   - Updated the NetRaven logo to use `<span>` elements with different colors
-   - Styled navigation links with proper hover effects
-   - Applied a semi-transparent background for active routes
-   - Added CSS for proper active link indicator (green icon highlight)
-   - Updated border opacity for a more subtle appearance
-
-### 3.4 Tailwind Configuration Update
-1. Updated `frontend/tailwind.config.js` to define the custom color palette:
-   - Added specific blue colors (including #0D1321 for main background)
-   - Enhanced green colors for Jobs card and accents
-   - Updated purple colors for Credentials card
-   - Added descriptive comments for each color's purpose
-
-**Rationale:**
-- These changes bring the UI in line with the design in the screenshot
-- Using utility classes improves consistency across components
-- The color scheme now follows the intended design with rich blues, greens, and purples
-- The layout now properly emphasizes the dashboard cards and navigation
-- The Tailwind configuration ensures consistent color usage throughout the application
+## Phase 3: Worker Job Type Registration
+- Audited the job type registry in the worker.
+- Registered 'backup' as an alias for the 'config_backup' handler.
+- Jobs with job_type 'backup' are now handled correctly, resolving 'No handler registered' errors.
 
 ## Phase 4: Final UI Refinements
 
@@ -287,4 +252,84 @@ Based on the provided screenshot, I'll implement the following changes to refact
 - Removed the `mb-4` class from the left header block in `Dashboard.vue` so the Device Inventory title/subtitle and the search box are now vertically centered in the card header.
 
 ### Reasoning
-- This ensures a cleaner, more balanced appearance, with both the title/subtitle and search box aligned in the middle of the card header for improved visual harmony. 
+- This ensures a cleaner, more balanced appearance, with both the title/subtitle and search box aligned in the middle of the card header for improved visual harmony.
+
+## Phase 7: Job Management UI Refactor — Discovery & Design (Issue 111)
+
+**Date:** 2025-06-11
+
+**Developer:** Nova (AI Assistant)
+
+**Branch:** issue/111-job-mgmt-page-sw1
+
+**Goal:** Audit and redesign the job management and scheduler UI for a modern, modular, and maintainable experience using Vue Headless patterns, as outlined in GitHub issue #111.
+
+### 7.1 Current State Audit
+
+- **Jobs.vue**: Implements job listing, filtering, and actions (run, edit, delete, details) in a single file. Uses a modal for job creation/editing and details. Table is not yet modularized; filtering and pagination are handled inline.
+- **JobFormModal.vue**: Handles job creation/editing in a modal. Contains form fields for all job properties, device/tag selection, and schedule type. Validation and form state are managed locally. Not yet headless or composable.
+- **JobMonitor.vue**: Provides a detailed job monitoring view, including job overview, live log stream, execution times, and device results. Large, monolithic component with many UI responsibilities.
+- **JobLogTable.vue**: Displays job logs in a table, with filtering by job/device. Uses a store for log data. Not yet integrated as a subcomponent of job detail/monitoring views.
+
+### 7.2 Key Job Management UI Flows Identified
+- List jobs (sortable, filterable, paginated)
+- Create/edit job (modal form)
+- Delete job (confirmation modal)
+- View job details/monitoring (status, logs, results, device breakdown)
+- Run job (immediate execution)
+- Bulk actions (optional, not currently implemented)
+
+### 7.3 Proposed Modular Component Structure
+- `JobsPage.vue` (container/page)
+  - `JobList.vue` (table, filters, pagination)
+  - `JobFormModal.vue` (create/edit modal, refactored to headless pattern)
+  - `JobDetailModal.vue` (job monitoring/detail, refactored from JobMonitor.vue)
+    - `JobStatusCard.vue` (overview/status)
+    - `JobDeviceResults.vue` (device breakdown)
+    - `JobLogTable.vue` (logs)
+  - `JobBulkActions.vue` (optional, for future bulk operations)
+
+### 7.4 UI/UX & Accessibility Notes
+- Use Vue Composition API and slots for headless/modal patterns
+- Ensure all actions are accessible via keyboard and screen readers
+- Maintain NetRaven's visual identity (color, iconography, spacing)
+- Responsive layout for all screen sizes
+
+## Phase 8: Job Management UI Refactor — Modularization Step 1 (Issue 111)
+
+**Date:** 2025-06-11
+
+**Developer:** Nova (AI Assistant)
+
+**Branch:** issue/111-job-mgmt-page-sw1
+
+### 8.1 JobList.vue Extraction and Integration
+- Extracted the job table and filter controls from `Jobs.vue` into a new `JobList.vue` component under `components/jobs-dashboard/`.
+- `JobList.vue` accepts props for jobs, jobTypes, isLoading, and filters, and emits events for all job actions and filter changes.
+- Refactored `Jobs.vue` to use the new `JobList.vue` component, passing all necessary props and handling events to open modals or trigger actions.
+- Verified that all job list actions (run, edit, delete, details) and filters are handled via the new component, maintaining previous UI/UX.
+
+### 8.2 Bug Fix: Job Creation in Modularized UI
+- Identified that the handleSaveJob function in Jobs.vue did not accept the job payload and did not call jobStore.createJob, so new jobs were not being created.
+- Updated handleSaveJob to accept the payload from JobFormModal, call createJob for new jobs, and updateJob for edits. The modal now only closes and refreshes jobs after a successful operation.
+- Verified that job creation and editing now work as expected from the modal.
+
+### 8.3 Enhancement: Device Existence Check Before Job Creation
+- Added a computed property in JobFormModal.vue to check if any devices exist in the system.
+- The Save Job button is now disabled and a warning is shown if no devices exist, preventing job creation with no possible targets.
+- This improves user experience and prevents invalid job scheduling.
+
+**Next:**
+- Review the modularized job list in the UI.
+- Proceed to further modularization: extract job detail/monitoring modal and refactor job form modal to headless pattern.
+
+---
+
+**Next:**
+- Proceed to Phase 2: Refactor and modularize `Jobs.vue` and supporting components as outlined above.
+- All further progress will be logged in this file under new phase sections.
+
+## Phase 4: Dynamic Job Type Selection
+- The job creation modal now fetches available job types dynamically from the backend `/jobs/job-types` endpoint.
+- Hardcoded job type options have been removed from the UI.
+- This ensures job types are always registry-driven and extensible, matching the backend registry. 

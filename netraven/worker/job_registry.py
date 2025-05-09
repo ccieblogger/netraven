@@ -49,7 +49,7 @@ for _, module_name, _ in pkgutil.iter_modules([JOBS_PATH]):
     try:
         sig = inspect.signature(run_func)
         # Prepare dummy args for signature
-        dummy_device = type("DummyDevice", (), {"id": 0, "hostname": "dummy", "ip_address": "127.0.0.1"})()
+        dummy_device = type("DummyDevice", (), {"id": 0, "hostname": "dummy", "ip_address": "127.0.0.1", "device_type": "test"})()
         dummy_job_id = 0
         dummy_config = {}
         dummy_db = None

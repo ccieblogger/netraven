@@ -37,7 +37,7 @@
                       : 'text-text-secondary border-b-2 border-transparent',
                   ]"
                 >
-                  Unified Logs
+                  Job Logs
                 </button>
               </Tab>
             </TabList>

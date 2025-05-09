@@ -107,7 +107,7 @@ services:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
-    container_name: netraven-worker
+    container_name: netraven-worker-dev
     entrypoint: ["/app/docker/worker/entrypoint.sh"]
     depends_on:
       - redis
@@ -133,7 +133,7 @@ services:
     build:
       context: .
       dockerfile: docker/scheduler/Dockerfile
-    container_name: netraven-scheduler
+    container_name: netraven-scheduler-dev
     entrypoint: ["/app/docker/scheduler/entrypoint.sh"]
     depends_on:
       - redis
@@ -157,7 +157,7 @@ services:
     build:
       context: .
       dockerfile: docker/rq_scheduler/Dockerfile
-    container_name: netraven-rq
+    container_name: netraven-rq-dev
     entrypoint: ["/app/docker/rq_scheduler/entrypoint.sh"]
     depends_on:
       - redis

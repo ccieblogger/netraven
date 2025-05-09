@@ -148,6 +148,17 @@ def dispatch_tasks(
         for device in devices:
             device_id = getattr(device, 'id', 0)
             device_name = getattr(device, 'hostname', f"Device_{device_id}")
+            # Device validation
+            if not is_valid_device(device):
+                logger.log(
+                    f"Skipping invalid device (missing required attributes) for job '{job_id}': {device}",
+                    level="WARNING",
+                    destinations=["stdout", "file", "db"],
+                    job_id=job_id,
+                    device_id=device_id,
+                    source="dispatcher",
+                )
+                continue
             print(f"[DEBUG dispatcher] Submitting device_id={device_id} device_name={device_name} job_id={job_id}")
             logger.log(
                 f"Submitting task for device '{device_name}' in job '{job_id}'",
@@ -508,3 +519,10 @@ def task_with_retry(
             result['success'] = True
     
     return result
+
+def is_valid_device(device):
+    required_attrs = ['id', 'hostname', 'device_type']
+    for attr in required_attrs:
+        if not hasattr(device, attr) or getattr(device, attr) in (None, '', 0):
+            return False
+    return True
