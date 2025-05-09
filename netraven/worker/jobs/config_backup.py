@@ -1,18 +1,17 @@
 from netraven.utils.unified_logger import get_unified_logger
 from netraven.worker.backends import netmiko_driver
 from netraven.worker import redactor
-from netraven.worker import git_writer
+from netraven.utils.hash_utils import sha256_hex
+from netraven.db.models.device_config import DeviceConfiguration
+from sqlalchemy.orm import Session
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
-from git import GitCommandError
 
 JOB_META = {
     "label": "Configuration Backup",
-    "description": "Backs up device running-config and stores in Git.",
+    "description": "Backs up device running-config and stores in database with deduplication.",
     "icon": "mdi-content-save",
     "default_schedule": "daily"
 }
-
-DEFAULT_GIT_REPO_PATH = "/data/git-repo/"
 
 logger = get_unified_logger()
 
@@ -32,7 +31,6 @@ def run(device, job_id, config, db):
         job_id=job_id,
         device_id=device_id
     )
-    repo_path = config.get("git_repo_path", DEFAULT_GIT_REPO_PATH) if config else DEFAULT_GIT_REPO_PATH
     try:
         # 1. Retrieve running config
         try:
@@ -91,43 +89,45 @@ def run(device, job_id, config, db):
                 device_id=device_id
             )
             redacted_config = config_output
-        # 3. Store in Git
+        # 3. Compute hash and deduplicate
+        config_hash = sha256_hex(redacted_config)
+        session: Session = db
+        latest = session.query(DeviceConfiguration).filter_by(device_id=device_id).order_by(DeviceConfiguration.retrieved_at.desc()).first()
+        if latest and latest.data_hash == config_hash:
+            logger.log(
+                "No change in configuration. Snapshot skipped (deduplicated).",
+                level="INFO",
+                destinations=["stdout", "file", "db"],
+                log_type="job",
+                source=f"worker.job.{job_type}",
+                job_id=job_id,
+                device_id=device_id
+            )
+            return {"success": True, "device_id": device_id, "details": {"deduplicated": True}}
+        # 4. Store in database
         try:
-            commit_hash = git_writer.commit_configuration_to_git(device_id, redacted_config, job_id, repo_path)
-            if commit_hash:
-                logger.log(
-                    f"Configuration committed to Git. Commit: {commit_hash}",
-                    level="INFO",
-                    destinations=["stdout", "file", "db"],
-                    log_type="job",
-                    source=f"worker.job.{job_type}",
-                    job_id=job_id,
-                    device_id=device_id
-                )
-            else:
-                logger.log(
-                    "Failed to commit configuration to Git.",
-                    level="WARNING",
-                    destinations=["stdout", "file", "db"],
-                    log_type="job",
-                    source=f"worker.job.{job_type}",
-                    job_id=job_id,
-                    device_id=device_id
-                )
-        except GitCommandError as e:
+            new_snapshot = DeviceConfiguration(
+                device_id=device_id,
+                config_data=redacted_config,
+                data_hash=config_hash,
+                config_metadata={"job_id": job_id}
+            )
+            session.add(new_snapshot)
+            session.commit()
             logger.log(
-                f"Git command error: {e}",
-                level="ERROR",
+                "Configuration snapshot stored in database.",
+                level="INFO",
                 destinations=["stdout", "file", "db"],
                 log_type="job",
                 source=f"worker.job.{job_type}",
                 job_id=job_id,
                 device_id=device_id
             )
-            return {"success": False, "device_id": device_id, "details": {"error": str(e)}}
+            return {"success": True, "device_id": device_id, "details": {"db_snapshot_id": new_snapshot.id}}
         except Exception as e:
+            session.rollback()
             logger.log(
-                f"Unexpected error during Git commit: {e}",
+                f"Database error: {e}",
                 level="ERROR",
                 destinations=["stdout", "file", "db"],
                 log_type="job",
@@ -136,16 +136,6 @@ def run(device, job_id, config, db):
                 device_id=device_id
             )
             return {"success": False, "device_id": device_id, "details": {"error": str(e)}}
-        logger.log(
-            "Configuration backup completed successfully.",
-            level="INFO",
-            destinations=["stdout", "file", "db"],
-            log_type="job",
-            source=f"worker.job.{job_type}",
-            job_id=job_id,
-            device_id=device_id
-        )
-        return {"success": True, "device_id": device_id, "details": {"commit_hash": commit_hash}}
     except Exception as e:
         logger.log(
             f"Unexpected error in config backup: {e}",
@@ -156,4 +146,4 @@ def run(device, job_id, config, db):
             job_id=job_id,
             device_id=device_id
         )
-        return {"success": False, "device_id": device_id, "details": {"error": str(e)}} 
+        return {"success": False, "device_id": device_id, "details": {"error": str(e)}}

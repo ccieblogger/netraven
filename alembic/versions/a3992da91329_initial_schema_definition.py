@@ -81,8 +81,15 @@ def upgrade() -> None:
     sa.Column('config_data', sa.Text(), nullable=False),
     sa.Column('retrieved_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('config_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('data_hash', sa.Text(), nullable=False),  # NEW: SHA-256 hex of config_data
     sa.ForeignKeyConstraint(['device_id'], ['devices.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
+    )
+    # NEW: Full-text search GIN index
+    op.create_index('idx_device_configurations_fts',
+        'device_configurations',
+        [sa.text("to_tsvector('english', config_data)")],
+        postgresql_using='gin'
     )
     op.create_table('device_tag_association',
     sa.Column('device_id', sa.Integer(), nullable=False),
