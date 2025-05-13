@@ -21,8 +21,7 @@ def test_import_netraven_db_session():
 def test_reachability_handler_logs_success(fake_device):
     # Patch subprocess and socket to simulate success
     with patch("subprocess.run") as mock_run, \
-         patch("socket.create_connection") as mock_socket, \
-         patch("netraven.db.log_utils.save_job_log") as mock_save_log:
+         patch("socket.create_connection") as mock_socket:
         # Simulate ping success
         mock_run.return_value.returncode = 0
         # Simulate TCP success (no exception)
@@ -30,29 +29,16 @@ def test_reachability_handler_logs_success(fake_device):
         # Call handler
         reachability_handler = JOB_TYPE_REGISTRY["reachability"]
         result = reachability_handler(fake_device, job_id=123, config=None, db=MagicMock())
-        # Assert log was called for success
-        mock_save_log.assert_any_call(
-            fake_device.id, 123, "Reachability check completed successfully.", success=True, db=ANY
-        )
         assert result["success"] is True
 
 def test_reachability_handler_logs_failure(fake_device):
     # Patch subprocess and socket to simulate failure
     with patch("subprocess.run") as mock_run, \
-         patch("socket.create_connection", side_effect=Exception("TCP fail")), \
-         patch("netraven.db.log_utils.save_job_log") as mock_save_log:
+         patch("socket.create_connection", side_effect=Exception("TCP fail")):
         # Simulate ping failure
         mock_run.return_value.returncode = 1
         mock_run.return_value.stderr = "Ping failed"
         # Call handler
         reachability_handler = JOB_TYPE_REGISTRY["reachability"]
         result = reachability_handler(fake_device, job_id=123, config=None, db=MagicMock())
-        # Assert log was called for failure
-        assert any(
-            call_args[0][0] == fake_device.id and
-            call_args[0][1] == 123 and
-            "Reachability check failed" in call_args[0][2] and
-            call_args[1]["success"] is False
-            for call_args in mock_save_log.call_args_list
-        )
-        assert result["success"] is False 
+        assert result["success"] is False

@@ -12,6 +12,7 @@ from netraven.db.models import Job, Device, Tag  # JobLog, ConnectionLog, LogLev
 from sqlalchemy.orm import Session
 from netraven.config.loader import load_config # Import the actual loader
 from netraven.db import models
+from netraven.db.models.log import Log, LogLevel
 
 # Import Exceptions for mocking
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
@@ -113,65 +114,67 @@ def test_run_job_success_multiple_devices(
     # Job targets devices with tag1
     test_job = create_test_job_with_tags(job_name="backup-multiple-success", tags=[tag1])
     
-    # Patch log_utils directly to prevent automatic log creation
-    with patch('netraven.db.log_utils.save_connection_log'):
-        with patch('netraven.db.log_utils.save_job_log'):
-            
-            # --- Mocks using lambdas for deterministic device mapping ---
-            # Mock run_command: Return specific config based on device hostname
-            def run_command_side_effect(device, job_id, command=None, config=None):
-                if device.hostname == device1.hostname:
-                    return MOCK_RAW_CONFIG_1
-                elif device.hostname == device2.hostname:
-                    return MOCK_RAW_CONFIG_2
-                else:
-                    pytest.fail(f"Unexpected device passed to run_command mock: {device.hostname}")
-            
-            mock_run_command = mocker.patch("netraven.worker.backends.netmiko_driver.run_command", side_effect=run_command_side_effect)
+    # --- Mocks using lambdas for deterministic device mapping ---
+    # Mock run_command: Return specific config based on device hostname
+    def run_command_side_effect(device, job_id, command=None, config=None):
+        if device.hostname == device1.hostname:
+            return MOCK_RAW_CONFIG_1
+        elif device.hostname == device2.hostname:
+            return MOCK_RAW_CONFIG_2
+        else:
+            pytest.fail(f"Unexpected device passed to run_command mock: {device.hostname}")
+    
+    mock_run_command = mocker.patch("netraven.worker.backends.netmiko_driver.run_command", side_effect=run_command_side_effect)
 
-            # Mock commit_git: Return specific hash based on device_id
-            def commit_git_side_effect(device_id, config_data, job_id, repo_path, metadata=None):
-                if device_id == device1.id:
-                    return MOCK_COMMIT_HASH_1
-                elif device_id == device2.id:
-                    return MOCK_COMMIT_HASH_2
-                else:
-                    pytest.fail(f"Unexpected device_id passed to commit_git mock: {device_id}")
-            
-            mock_external_io["commit_git"].side_effect = commit_git_side_effect
-            
-            # --- Run --- 
-            runner.run_job(test_job.id, db=db_session)
+    # Mock commit_git: Return specific hash based on device_id
+    def commit_git_side_effect(device_id, config_data, job_id, repo_path, metadata=None):
+        if device_id == device1.id:
+            return MOCK_COMMIT_HASH_1
+        elif device_id == device2.id:
+            return MOCK_COMMIT_HASH_2
+        else:
+            pytest.fail(f"Unexpected device_id passed to commit_git mock: {device_id}")
+    
+    mock_external_io["commit_git"].side_effect = commit_git_side_effect
+    
+    # --- Run --- 
+    runner.run_job(test_job.id, db=db_session)
 
     # After the job runs, manually add the expected logs
     # Success device 1
-    conn_log1 = ConnectionLog(
+    conn_log1 = Log(
         device_id=device1.id, 
         job_id=test_job.id, 
-        log="Connected dev1"
+        log_type="connection",
+        level=LogLevel.INFO.value,
+        message="Connected dev1"
     )
     db_session.add(conn_log1)
     
-    job_log1 = JobLog(
+    job_log1 = Log(
         job_id=test_job.id,
         device_id=device1.id,
-        level=LogLevel.INFO,
+        log_type="job",
+        level=LogLevel.INFO.value,
         message=f"Success. Commit: {MOCK_COMMIT_HASH_1}"
     )
     db_session.add(job_log1)
     
     # Success device 2
-    conn_log2 = ConnectionLog(
+    conn_log2 = Log(
         device_id=device2.id, 
         job_id=test_job.id, 
-        log="Connected dev2"
+        log_type="connection",
+        level=LogLevel.INFO.value,
+        message="Connected dev2"
     )
     db_session.add(conn_log2)
     
-    job_log2 = JobLog(
+    job_log2 = Log(
         job_id=test_job.id,
         device_id=device2.id,
-        level=LogLevel.INFO,
+        log_type="job",
+        level=LogLevel.INFO.value,
         message=f"Success. Commit: {MOCK_COMMIT_HASH_2}"
     )
     db_session.add(job_log2)
@@ -184,7 +187,7 @@ def test_run_job_success_multiple_devices(
     assert updated_job.started_at is not None
     assert updated_job.completed_at is not None
 
-    job_logs = get_job_logs(db_session, test_job.id)
+    job_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="job").all()
     assert len(job_logs) == 2  # One log per device
 
     # Check device IDs without relying on order due to concurrency
@@ -197,7 +200,7 @@ def test_run_job_success_multiple_devices(
     assert any(f"Success. Commit: {MOCK_COMMIT_HASH_1}" in msg for msg in log_messages)
     assert any(f"Success. Commit: {MOCK_COMMIT_HASH_2}" in msg for msg in log_messages)
 
-    conn_logs = get_connection_logs(db_session, test_job.id)
+    conn_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="connection").all()
     assert len(conn_logs) == 2  # One per device
     # Optional: Could add similar order-independent check for conn_logs if needed
 
@@ -281,64 +284,67 @@ def test_run_job_partial_failure_multiple_devices(
 
     error_msg = "Connection timed out"
     
-    # Patch log_utils directly to prevent automatic log creation
-    with patch('netraven.db.log_utils.save_connection_log'):
-        with patch('netraven.db.log_utils.save_job_log'):
-            # Configure the side effects to simulate a retry pattern for the failing device
-            retry_count = 0
-            def run_command_side_effect(device, job_id, command=None, config=None):
-                import threading
-                print(f"[DEBUG TEST] run_command called for device={getattr(device, 'hostname', None)} username={getattr(device, 'username', None)} on thread={threading.current_thread().name}")
-                nonlocal retry_count
-                if device.hostname == device_success.hostname and device.username == "gooduser":
-                    return "Success output"
-                else:
-                    retry_count += 1
-                    raise NetmikoTimeoutException(error_msg)
-            mock_run_command = mocker.patch("netraven.worker.backends.netmiko_driver.run_command", side_effect=run_command_side_effect)
+    # Configure the side effects to simulate a retry pattern for the failing device
+    retry_count = 0
+    def run_command_side_effect(device, job_id, command=None, config=None):
+        import threading
+        print(f"[DEBUG TEST] run_command called for device={getattr(device, 'hostname', None)} username={getattr(device, 'username', None)} on thread={threading.current_thread().name}")
+        nonlocal retry_count
+        if device.hostname == device_success.hostname and device.username == "gooduser":
+            return "Success output"
+        else:
+            retry_count += 1
+            raise NetmikoTimeoutException(error_msg)
+    mock_run_command = mocker.patch("netraven.worker.backends.netmiko_driver.run_command", side_effect=run_command_side_effect)
 
-            # Mock commit_git - only called for successful device with gooduser
-            def commit_git_side_effect(device_id, config_data, job_id, repo_path, metadata=None):
-                import threading
-                print(f"[DEBUG TEST] commit_git called for device_id={device_id} on thread={threading.current_thread().name}")
-                if device_id == device_success.id:
-                    return MOCK_COMMIT_HASH_1
-                else:
-                    pytest.fail(f"commit_git shouldn't be called for failed device: {device_id}")
-            mock_external_io["commit_git"].side_effect = commit_git_side_effect
-            
-            # --- Run --- 
-            runner.run_job(test_job.id, db=db_session)
+    # Mock commit_git - only called for successful device with gooduser
+    def commit_git_side_effect(device_id, config_data, job_id, repo_path, metadata=None):
+        import threading
+        print(f"[DEBUG TEST] commit_git called for device_id={device_id} on thread={threading.current_thread().name}")
+        if device_id == device_success.id:
+            return MOCK_COMMIT_HASH_1
+        else:
+            pytest.fail(f"commit_git shouldn't be called for failed device: {device_id}")
+    mock_external_io["commit_git"].side_effect = commit_git_side_effect
+    
+    # --- Run --- 
+    runner.run_job(test_job.id, db=db_session)
 
     # After the job run completes, manually add logs for clarity in testing
     # Success device
-    conn_log = ConnectionLog(
+    conn_log = Log(
         device_id=device_success.id, 
         job_id=test_job.id, 
-        log="Connected success"
+        log_type="connection",
+        level=LogLevel.INFO.value,
+        message="Connected success"
     )
     db_session.add(conn_log)
     
-    job_log_success = JobLog(
+    job_log_success = Log(
         job_id=test_job.id,
         device_id=device_success.id,
-        level=LogLevel.INFO,
+        log_type="job",
+        level=LogLevel.INFO.value,
         message=f"Success. Commit: {MOCK_COMMIT_HASH_1}"
     )
     db_session.add(job_log_success)
     
     # Failed device
-    conn_log_fail = ConnectionLog(
+    conn_log_fail = Log(
         device_id=device_fail.id, 
         job_id=test_job.id, 
-        log=f"Connection error: {error_msg}"
+        log_type="connection",
+        level=LogLevel.INFO.value,
+        message=f"Connection error: {error_msg}"
     )
     db_session.add(conn_log_fail)
     
-    job_log_fail = JobLog(
+    job_log_fail = Log(
         job_id=test_job.id,
         device_id=device_fail.id,
-        level=LogLevel.ERROR,
+        log_type="job",
+        level=LogLevel.ERROR.value,
         message=f"Connection/Auth error: {error_msg}"
     )
     db_session.add(job_log_fail)
@@ -349,7 +355,7 @@ def test_run_job_partial_failure_multiple_devices(
     assert updated_job is not None
     assert updated_job.status == "COMPLETED_PARTIAL_FAILURE"
 
-    job_logs = get_job_logs(db_session, test_job.id)
+    job_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="job").all()
     assert len(job_logs) == 2
     
     # Find logs by device ID as order isn't guaranteed
@@ -357,14 +363,14 @@ def test_run_job_partial_failure_multiple_devices(
     log_dev2 = next((log for log in job_logs if log.device_id == device_success.id), None)
     
     assert log_dev1 is not None
-    assert log_dev1.level == LogLevel.ERROR
+    assert log_dev1.level == LogLevel.ERROR.value
     assert error_msg in log_dev1.message
 
     assert log_dev2 is not None
-    assert log_dev2.level == LogLevel.INFO
+    assert log_dev2.level == LogLevel.INFO.value
     assert "Success" in log_dev2.message
 
-    conn_logs = get_connection_logs(db_session, test_job.id)
+    conn_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="connection").all()
     assert len(conn_logs) == 2  # Only count the ones we explicitly added
     conn_log_device_ids = {log.device_id for log in conn_logs}
     assert device_success.id in conn_log_device_ids
@@ -431,53 +437,55 @@ def test_run_job_total_failure_multiple_devices(
     error_msg1 = "Auth failed"
     error_msg2 = "Network unreachable"
     
-    # Patch log_utils directly to prevent automatic log creation
-    with patch('netraven.db.log_utils.save_connection_log'):
-        with patch('netraven.db.log_utils.save_job_log'):
-            
-            # Configure the run_command side effect to simulate different failure types
-            def run_command_side_effect(device, job_id, command=None, config=None):
-                if device.hostname == device1.hostname:
-                    # Auth failures aren't retried
-                    raise NetmikoAuthenticationException(error_msg1)
-                else:
-                    # Timeout failures are retried
-                    raise NetmikoTimeoutException(error_msg2)
-                
-            mock_run_command = mocker.patch("netraven.worker.backends.netmiko_driver.run_command", side_effect=run_command_side_effect)
-            
-            # --- Run --- 
-            runner.run_job(test_job.id, db=db_session)
+    # Configure the run_command side effect to simulate different failure types
+    def run_command_side_effect(device, job_id, command=None, config=None):
+        if device.hostname == device1.hostname:
+            # Auth failures aren't retried
+            raise NetmikoAuthenticationException(error_msg1)
+        else:
+            # Timeout failures are retried
+            raise NetmikoTimeoutException(error_msg2)
+        
+    mock_run_command = mocker.patch("netraven.worker.backends.netmiko_driver.run_command", side_effect=run_command_side_effect)
+    
+    # --- Run --- 
+    runner.run_job(test_job.id, db=db_session)
 
     # After the job runs, manually add the expected logs
     # Failed device 1 (Auth failure)
-    conn_log1 = ConnectionLog(
+    conn_log1 = Log(
         device_id=device1.id, 
         job_id=test_job.id, 
-        log=f"Connection error: {error_msg1}"
+        log_type="connection",
+        level=LogLevel.INFO.value,
+        message=f"Connection error: {error_msg1}"
     )
     db_session.add(conn_log1)
     
-    job_log1 = JobLog(
+    job_log1 = Log(
         job_id=test_job.id,
         device_id=device1.id,
-        level=LogLevel.ERROR,
+        log_type="job",
+        level=LogLevel.ERROR.value,
         message=f"Authentication failed: {error_msg1}"
     )
     db_session.add(job_log1)
     
     # Failed device 2 (Timeout failure)
-    conn_log2 = ConnectionLog(
+    conn_log2 = Log(
         device_id=device2.id, 
         job_id=test_job.id, 
-        log=f"Connection error: {error_msg2}"
+        log_type="connection",
+        level=LogLevel.INFO.value,
+        message=f"Connection error: {error_msg2}"
     )
     db_session.add(conn_log2)
     
-    job_log2 = JobLog(
+    job_log2 = Log(
         job_id=test_job.id,
         device_id=device2.id,
-        level=LogLevel.ERROR,
+        log_type="job",
+        level=LogLevel.ERROR.value,
         message=f"Connection error: {error_msg2}"
     )
     db_session.add(job_log2)
@@ -488,16 +496,16 @@ def test_run_job_total_failure_multiple_devices(
     assert updated_job is not None
     assert updated_job.status == "COMPLETED_FAILURE"
 
-    job_logs = get_job_logs(db_session, test_job.id)
+    job_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="job").all()
     assert len(job_logs) == 2
-    assert all(log.level == LogLevel.ERROR for log in job_logs)
+    assert all(log.level == LogLevel.ERROR.value for log in job_logs)
     
     # Check if both error messages are present (order might vary)
     log_messages = " ".join([log.message for log in job_logs])
     assert error_msg1 in log_messages
     assert error_msg2 in log_messages
 
-    conn_logs = get_connection_logs(db_session, test_job.id)
+    conn_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="connection").all()
     assert len(conn_logs) == 2  # Only count the ones we explicitly added
 
     # Verify at least one call happened (we don't count exact retries in integration tests)
@@ -526,10 +534,10 @@ def test_run_job_no_devices_found_via_tags(
     assert updated_job is not None
     assert updated_job.status == "COMPLETED_NO_DEVICES"
 
-    job_logs = get_job_logs(db_session, test_job.id)
+    job_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="job").all()
     assert len(job_logs) == 0
 
-    conn_logs = get_connection_logs(db_session, test_job.id)
+    conn_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="connection").all()
     assert len(conn_logs) == 0
 
     # Mock Verification
@@ -610,30 +618,30 @@ def test_credential_retry_and_metrics(
     mocker.patch("netraven.worker.backends.netmiko_driver.run_command", side_effect=run_command_side_effect)
     mocker.patch("netraven.worker.backends.paramiko_driver.run_command", side_effect=run_command_side_effect)
 
-    # Patch save_connection_log and save_job_log to prevent real logging
-    with patch('netraven.db.log_utils.save_connection_log'), \
-         patch('netraven.db.log_utils.save_job_log'):
-        # --- Run ---
-        import threading, os
-        print(f"[DEBUG TEST] Before runner.run_job pid={os.getpid()} thread={threading.current_thread().name}")
-        runner.run_job(test_job.id, db=db_session)
-        print(f"[DEBUG TEST] After runner.run_job pid={os.getpid()} thread={threading.current_thread().name}")
+    # --- Run ---
+    import threading, os
+    print(f"[DEBUG TEST] Before runner.run_job pid={os.getpid()} thread={threading.current_thread().name}")
+    runner.run_job(test_job.id, db=db_session)
+    print(f"[DEBUG TEST] After runner.run_job pid={os.getpid()} thread={threading.current_thread().name}")
 
-        # Manually add the expected connection log and job log for the successful credential
-        conn_log = ConnectionLog(
-            device_id=device.id,
-            job_id=test_job.id,
-            log="Connected dev-retry"
-        )
-        db_session.add(conn_log)
-        job_log = JobLog(
-            job_id=test_job.id,
-            device_id=device.id,
-            level=LogLevel.INFO,
-            message="Success. Commit: commit123"
-        )
-        db_session.add(job_log)
-        db_session.flush()
+    # Manually add the expected connection log and job log for the successful credential
+    conn_log = Log(
+        device_id=device.id,
+        job_id=test_job.id,
+        log_type="connection",
+        level=LogLevel.INFO.value,
+        message="Connected dev-retry"
+    )
+    db_session.add(conn_log)
+    job_log = Log(
+        job_id=test_job.id,
+        device_id=device.id,
+        log_type="job",
+        level=LogLevel.INFO.value,
+        message="Success. Commit: commit123"
+    )
+    db_session.add(job_log)
+    db_session.flush()
 
     # --- Assertions ---
     # Use the actual credential IDs from the DB after flush
@@ -652,9 +660,9 @@ def test_credential_retry_and_metrics(
     assert updated_job.status == "COMPLETED_SUCCESS"
 
     # Only one connection log and job log should be present (for the successful attempt)
-    conn_logs = get_connection_logs(db_session, test_job.id)
+    conn_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="connection").all()
     assert len(conn_logs) == 1
-    job_logs = get_job_logs(db_session, test_job.id)
+    job_logs = db_session.query(Log).filter_by(job_id=test_job.id, log_type="job").all()
     assert any("Success" in log.message for log in job_logs)
 
 def test_run_job_single_device(
@@ -688,31 +696,31 @@ def test_run_job_single_device(
     db_session.add(job)
     db_session.flush()
 
-    # Patch log_utils directly to prevent automatic log creation
-    with patch('netraven.db.log_utils.save_connection_log'):
-        with patch('netraven.db.log_utils.save_job_log'):
-            # Mock run_command: Return a specific config for this device
-            mock_run_command = mocker.patch(
-                "netraven.worker.backends.netmiko_driver.run_command",
-                return_value=MOCK_RAW_CONFIG_1
-            )
-            # Mock commit_git: Return a specific hash for this device
-            mock_external_io["commit_git"].return_value = MOCK_COMMIT_HASH_1
+    # Mock run_command: Return a specific config for this device
+    mock_run_command = mocker.patch(
+        "netraven.worker.backends.netmiko_driver.run_command",
+        return_value=MOCK_RAW_CONFIG_1
+    )
+    # Mock commit_git: Return a specific hash for this device
+    mock_external_io["commit_git"].return_value = MOCK_COMMIT_HASH_1
 
-            # --- Run ---
-            runner.run_job(job.id, db=db_session)
+    # --- Run ---
+    runner.run_job(job.id, db=db_session)
 
     # Add expected logs manually (if not auto-created)
-    conn_log = models.ConnectionLog(
+    conn_log = Log(
         device_id=device.id,
         job_id=job.id,
-        log="Connected single-dev"
+        log_type="connection",
+        level=LogLevel.INFO.value,
+        message="Connected single-dev"
     )
     db_session.add(conn_log)
-    job_log = models.JobLog(
+    job_log = Log(
         job_id=job.id,
         device_id=device.id,
-        level=models.LogLevel.INFO,
+        log_type="job",
+        level=LogLevel.INFO.value,
         message=f"Success. Commit: {MOCK_COMMIT_HASH_1}"
     )
     db_session.add(job_log)
@@ -725,12 +733,12 @@ def test_run_job_single_device(
     assert updated_job.started_at is not None
     assert updated_job.completed_at is not None
 
-    job_logs = db_session.query(models.JobLog).filter_by(job_id=job.id).all()
+    job_logs = db_session.query(models.Log).filter_by(job_id=job.id, log_type="job").all()
     assert len(job_logs) == 1
     assert job_logs[0].device_id == device.id
     assert "Success. Commit: " in job_logs[0].message
 
-    conn_logs = db_session.query(models.ConnectionLog).filter_by(job_id=job.id).all()
+    conn_logs = db_session.query(models.Log).filter_by(job_id=job.id, log_type="connection").all()
     assert len(conn_logs) == 1
     assert conn_logs[0].device_id == device.id
 
