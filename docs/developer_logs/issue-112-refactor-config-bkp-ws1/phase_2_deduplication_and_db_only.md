@@ -18,6 +18,15 @@
 - No changes required in `job_registration.py` as the scheduling logic is handled in `scheduler_runner.py`.
 - Next: Expand `/api/configs` endpoints and add/expand tests as per the plan.
 
+## Phase 2: API Endpoint Expansion
+
+- Added new endpoints to `/api/configs`:
+    - `GET /api/configs/list`: List all config snapshots, with optional device filter and pagination.
+    - `DELETE /api/configs/{config_id}`: Delete a config snapshot by ID.
+    - `POST /api/configs/{config_id}/restore`: Mark a config as restored (no device push performed; logs action).
+- All endpoints use existing DB session and models, with error handling and concise logic.
+- Next: Add/expand tests for these endpoints and retention logic.
+
 ## Next Steps
 - Implement the Python script for processing old snapshots and scheduling via RQ/Redis.
 - Begin work on API endpoints for config retrieval, search, and diff.

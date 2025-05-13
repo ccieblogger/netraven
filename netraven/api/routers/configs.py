@@ -120,3 +120,74 @@ def diff_config_snapshots(
         "config_id_b": row_b.id,
         "diff": diff
     }
+
+@router.get("/list", summary="List all config snapshots")
+def list_configs(
+    device_id: int = Query(None, description="Filter by device ID"),
+    start: int = Query(0, description="Offset for pagination"),
+    limit: int = Query(50, description="Max results to return"),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    List all configuration snapshots, optionally filtered by device_id, paginated.
+    """
+    sql = text("""
+        SELECT id, device_id, retrieved_at, config_metadata
+        FROM device_configurations
+        WHERE (:device_id IS NULL OR device_id = :device_id)
+        ORDER BY retrieved_at DESC
+        OFFSET :start LIMIT :limit
+    """)
+    results = db.execute(sql, {"device_id": device_id, "start": start, "limit": limit}).fetchall()
+    return [
+        {
+            "id": row.id,
+            "device_id": row.device_id,
+            "retrieved_at": row.retrieved_at,
+            "config_metadata": row.config_metadata
+        }
+        for row in results
+    ]
+
+@router.delete("/{config_id}", summary="Delete a config snapshot by ID")
+def delete_config_snapshot(
+    config_id: int,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Delete a specific configuration snapshot by ID.
+    """
+    sql = text("""
+        DELETE FROM device_configurations WHERE id = :config_id RETURNING id
+    """)
+    result = db.execute(sql, {"config_id": config_id})
+    db.commit()
+    row = result.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Config snapshot not found")
+    return {"deleted_id": row.id}
+
+@router.post("/{config_id}/restore", summary="Restore a config snapshot (mark as restored)")
+def restore_config_snapshot(
+    config_id: int,
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Mark a config as restored (optionally, create a new snapshot or update device state).
+    For now, just log/return the action (actual device push is out of scope).
+    """
+    sql = text("""
+        SELECT id, device_id, config_data, config_metadata, retrieved_at
+        FROM device_configurations WHERE id = :config_id
+    """)
+    row = db.execute(sql, {"config_id": config_id}).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Config snapshot not found")
+    # In a real system, this would push config_data to the device.
+    # Here, we just log/return the action.
+    return {
+        "restored_id": row.id,
+        "device_id": row.device_id,
+        "restored_at": row.retrieved_at,
+        "message": "Config marked as restored (no device push performed)"
+    }
