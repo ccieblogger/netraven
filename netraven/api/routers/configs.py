@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from netraven.db.session import get_db
 from typing import List, Dict, Any
+import difflib
 
 router = APIRouter(
     prefix="/api/configs",
@@ -88,4 +89,34 @@ def get_config_snapshot(
         "retrieved_at": row.retrieved_at,
         "config_metadata": row.config_metadata,
         "config_data": row.config_data
+    }
+
+@router.get("/diff", summary="Get unified diff between two config snapshots")
+def diff_config_snapshots(
+    config_id_a: int = Query(..., description="ID of the first config snapshot"),
+    config_id_b: int = Query(..., description="ID of the second config snapshot"),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Return a unified diff between two config snapshots' config_data fields.
+    """
+    sql = text("""
+        SELECT id, config_data FROM device_configurations WHERE id = :id
+    """)
+    row_a = db.execute(sql, {"id": config_id_a}).fetchone()
+    row_b = db.execute(sql, {"id": config_id_b}).fetchone()
+    if not row_a or not row_b:
+        raise HTTPException(status_code=404, detail="One or both config snapshots not found")
+    a_lines = row_a.config_data.splitlines(keepends=True)
+    b_lines = row_b.config_data.splitlines(keepends=True)
+    diff = list(difflib.unified_diff(
+        a_lines, b_lines,
+        fromfile=f"config_{row_a.id}",
+        tofile=f"config_{row_b.id}",
+        lineterm=''  # No extra newlines
+    ))
+    return {
+        "config_id_a": row_a.id,
+        "config_id_b": row_b.id,
+        "diff": diff
     }

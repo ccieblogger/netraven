@@ -4,6 +4,11 @@ applyTo: "**"
 
 ## Always start each chat conversation with "🤖 Hi! I'm Copilot, your IA assistant!"
 
+## Tool meta 
+- **Tool Name:** Github 
+- **Project Name:** netraven
+- **owner:** ccieblogger
+
 ### **Project Coding Principles**
 
 #### **1. Code Quality and Maintainability**
