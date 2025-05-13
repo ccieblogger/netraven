@@ -8,11 +8,42 @@ from netraven.db.session import get_db
 from netraven.db.models import Job # Assuming Job model exists as defined
 
 # Job definition import
-from netraven.scheduler.job_definitions import run_device_job
+from netraven.scheduler.job_definitions import run_device_job, prune_old_device_configs
 from netraven.worker.runner import run_job as run_worker_job # Use correct worker function import
 
 def generate_rq_job_id(db_job_id: int) -> str:
     return f"netraven_db_job_{db_job_id}"
+
+def schedule_retention_job(scheduler, interval_seconds: int = 86400, retain_count: int = 10):
+    """
+    Schedules the prune_old_device_configs job to run at a fixed interval (default: daily).
+    Args:
+        scheduler: The RQ Scheduler instance.
+        interval_seconds: How often to run the retention job (default: 86400 = 1 day)
+        retain_count: How many configs to retain per device
+    """
+    job_id = "prune_old_device_configs"
+    # Avoid duplicate scheduling
+    existing = [job for job in scheduler.get_jobs() if job.id == job_id]
+    if existing:
+        return
+    scheduler.schedule(
+        scheduled_time=datetime.now(timezone.utc),
+        func=prune_old_device_configs,
+        args=[retain_count],
+        interval=interval_seconds,
+        repeat=None,
+        id=job_id,
+        description="Prune old device configuration snapshots (retention job)",
+        meta={"system_job": True}
+    )
+    logger = get_unified_logger()
+    logger.log(
+        f"Scheduled retention job 'prune_old_device_configs' (interval: {interval_seconds}s, retain_count: {retain_count})",
+        level="INFO",
+        destinations=["stdout", "file", "db"],
+        source="scheduler_job_registration",
+    )
 
 def sync_jobs_from_db(scheduler: Scheduler):
     """Fetches enabled jobs from the database and schedules them using RQ Scheduler.

@@ -5,7 +5,7 @@ from rq_scheduler import Scheduler
 
 # Use the central config loader
 from netraven.config.loader import load_config
-from netraven.scheduler.job_registration import sync_jobs_from_db
+from netraven.scheduler.job_registration import sync_jobs_from_db, schedule_retention_job
 from netraven.utils.unified_logger import get_unified_logger
 
 class UnifiedLoggerHandler(logging.Handler):
@@ -59,6 +59,11 @@ if __name__ == "__main__":
             source="scheduler_runner",
         )
         scheduler = Scheduler(connection=redis_conn)
+        # Schedule the retention job (configurable via config, else defaults)
+        retention_cfg = config.get("retention", {})
+        retention_interval = retention_cfg.get("interval_seconds", 86400)
+        retain_count = retention_cfg.get("retain_count", 10)
+        schedule_retention_job(scheduler, interval_seconds=retention_interval, retain_count=retain_count)
     except Exception as e:
         logger.log(
             f"Failed to connect to Redis or initialize scheduler: {e}",

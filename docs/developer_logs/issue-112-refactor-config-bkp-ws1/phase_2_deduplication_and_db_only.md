@@ -9,6 +9,15 @@
 - Updated the SQLAlchemy model and initialization migration for the new `data_hash` column and FTS index.
 - All changes committed to feature branch `issue/112-refactor-config-bkp-ws1`.
 
+## Phase 2: Retention Job Registration & Scheduling
+
+- Implemented `prune_old_device_configs` in `netraven/scheduler/job_definitions.py` to prune old config snapshots per device, keeping the N most recent (configurable).
+- Registered and scheduled the retention job in the scheduler via `schedule_retention_job` in `netraven/scheduler/scheduler_runner.py`.
+    - The job is scheduled to run at a configurable interval (default: daily) and is registered only once.
+    - Logging is performed for job registration and execution.
+- No changes required in `job_registration.py` as the scheduling logic is handled in `scheduler_runner.py`.
+- Next: Expand `/api/configs` endpoints and add/expand tests as per the plan.
+
 ## Next Steps
 - Implement the Python script for processing old snapshots and scheduling via RQ/Redis.
 - Begin work on API endpoints for config retrieval, search, and diff.
