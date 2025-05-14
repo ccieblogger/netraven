@@ -15,6 +15,7 @@ class User(Base):
         hashed_password: Securely hashed password (never store plaintext)
         is_active: Whether the user account is currently active
         role: User's role determining permissions ("admin" or "user")
+        full_name: Full name of the user
         created_at: Timestamp when the user account was created
         updated_at: Timestamp when the user account was last updated
     """
@@ -26,8 +27,9 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     role = Column(String, default="user")  # Options: "admin", "user"
+    full_name = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships can be added here if needed
-    # Example: jobs = relationship("Job", back_populates="user") 
+    # Example: jobs = relationship("Job", back_populates="user")

@@ -19,7 +19,8 @@ class TestUsersAPI(BaseAPITest):
             "password": "securepassword123",
             "full_name": "Test User 123",
             "role": "user",
-            "is_active": True
+            "is_active": True,
+            "email": "testuser123@example.com"
         }
 
     def test_create_user(self, client: TestClient, admin_headers: Dict, test_user_data: Dict):
@@ -55,7 +56,8 @@ class TestUsersAPI(BaseAPITest):
                 hashed_password=auth.get_password_hash("testpass"),
                 full_name=f"List User {i}",
                 role="user",
-                is_active=True
+                is_active=True,
+                email=f"listuser{i}@example.com"
             )
             db_session.add(user)
         db_session.commit()
@@ -80,7 +82,8 @@ class TestUsersAPI(BaseAPITest):
             hashed_password=auth.get_password_hash("testpass"),
             full_name="Get User By ID",
             role="user",
-            is_active=True
+            is_active=True,
+            email="getuserbyid@example.com"
         )
         db_session.add(user)
         db_session.commit()
@@ -113,7 +116,8 @@ class TestUsersAPI(BaseAPITest):
             hashed_password=auth.get_password_hash("testpass"),
             full_name="Update User",
             role="user",
-            is_active=True
+            is_active=True,
+            email="updateuser@example.com"
         )
         db_session.add(user)
         db_session.commit()
@@ -144,7 +148,8 @@ class TestUsersAPI(BaseAPITest):
             hashed_password=auth.get_password_hash(original_password),
             full_name="Password Update User",
             role="user",
-            is_active=True
+            is_active=True,
+            email="passwordupdateuser@example.com"
         )
         db_session.add(user)
         db_session.commit()
@@ -177,14 +182,16 @@ class TestUsersAPI(BaseAPITest):
             hashed_password=auth.get_password_hash("testpass"),
             full_name="Update Conflict 1",
             role="user",
-            is_active=True
+            is_active=True,
+            email="updateconflict1@example.com"
         )
         user2 = models.User(
             username="updateconflict2",
             hashed_password=auth.get_password_hash("testpass"),
             full_name="Update Conflict 2",
             role="user",
-            is_active=True
+            is_active=True,
+            email="updateconflict2@example.com"
         )
         db_session.add_all([user1, user2])
         db_session.commit()
@@ -207,7 +214,8 @@ class TestUsersAPI(BaseAPITest):
             hashed_password=auth.get_password_hash("testpass"),
             full_name="Delete User",
             role="user",
-            is_active=True
+            is_active=True,
+            email="deleteuser@example.com"
         )
         db_session.add(user)
         db_session.commit()
@@ -229,7 +237,8 @@ class TestUsersAPI(BaseAPITest):
             hashed_password=auth.get_password_hash("testpass"),
             full_name="Cannot Delete",
             role="user",
-            is_active=True
+            is_active=True,
+            email="cannotdelete@example.com"
         )
         db_session.add(user)
         db_session.commit()

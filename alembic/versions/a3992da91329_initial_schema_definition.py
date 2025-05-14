@@ -65,6 +65,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('type', sa.String(), nullable=True),
+    sa.Column('description', sa.String(), nullable=True),  # Added for tag description
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_tags_name'), 'tags', ['name'], unique=True)
@@ -151,6 +152,7 @@ def upgrade() -> None:
         sa.Column('hashed_password', sa.String(), nullable=False),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.sql.expression.true()),
         sa.Column('role', sa.String(), nullable=False, server_default='user'),
+        sa.Column('full_name', sa.String(length=100), nullable=True),  # Added for user full name
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     )

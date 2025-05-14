@@ -149,6 +149,20 @@ def list_configs(
         for row in results
     ]
 
+@router.get("", summary="List all config snapshots (root endpoint)")
+def list_configs_root(
+    device_id: int = Query(None, description="Filter by device ID"),
+    start: int = Query(0, description="Offset for pagination"),
+    limit: int = Query(50, description="Max results to return"),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    List all configuration snapshots, optionally filtered by device_id, paginated.
+    This is a root endpoint version to avoid path conflicts.
+    """
+    # Reuse the existing implementation
+    return list_configs(device_id, start, limit, db)
+
 @router.delete("/{config_id}", summary="Delete a config snapshot by ID")
 def delete_config_snapshot(
     config_id: int,

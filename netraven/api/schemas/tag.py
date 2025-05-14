@@ -21,6 +21,7 @@ class TagBase(BaseSchema):
     Attributes:
         name: Name of the tag
         type: Optional categorization of the tag (e.g., 'location', 'role')
+        description: Optional description for the tag
     """
     name: str = Field(
         ...,
@@ -35,6 +36,12 @@ class TagBase(BaseSchema):
         max_length=50,
         example="location",
         description="Optional tag type for categorization (e.g., 'location', 'role', 'environment', etc.)"
+    )
+    description: Optional[str] = Field(
+        None,
+        max_length=255,
+        example="Used for core network devices",
+        description="Optional description for the tag."
     )
     
     @field_validator('name')
@@ -75,6 +82,7 @@ class TagUpdate(BaseSchema):
     Attributes:
         name: Optional updated tag name
         type: Optional updated tag type
+        description: Optional updated tag description
     """
     name: Optional[str] = Field(
         None,
@@ -89,6 +97,12 @@ class TagUpdate(BaseSchema):
         max_length=50,
         example="location",
         description="Tag type"
+    )
+    description: Optional[str] = Field(
+        None,
+        max_length=255,
+        example="Used for core network devices",
+        description="Optional description for the tag."
     )
     
     @field_validator('name')
@@ -119,8 +133,14 @@ class Tag(TagBase, BaseSchemaWithId): # Inherit ID
         id: Primary key identifier for the tag
         name: Name of the tag
         type: Optional categorization of the tag
+        description: Optional description for the tag
     """
-    pass 
+    description: Optional[str] = Field(
+        None,
+        max_length=255,
+        example="Used for core network devices",
+        description="Optional description for the tag."
+    )
 
 # Paginated response model
-PaginatedTagResponse = create_paginated_response(Tag) 
+PaginatedTagResponse = create_paginated_response(Tag)

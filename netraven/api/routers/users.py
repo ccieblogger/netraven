@@ -83,7 +83,8 @@ def list_users(
     username: Optional[str] = None,
     role: Optional[str] = None,
     is_active: Optional[bool] = None,
-    db: Session = Depends(get_db_session)
+    db: Session = Depends(get_db_session),
+    _: models.User = Depends(require_admin_role)  # Explicitly require admin
 ):
     """Retrieve a list of all users with pagination and filtering.
     

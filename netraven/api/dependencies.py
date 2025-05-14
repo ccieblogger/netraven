@@ -64,7 +64,7 @@ async def get_current_active_user(
 ) -> User:
     """Checks if the user retrieved from the token is active."""
     if not current_user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=403, detail="Inactive user")
     return current_user
 
 # --- Role-Based Access (Example) ---

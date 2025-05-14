@@ -46,6 +46,7 @@ class Tag(Base):
         id: Primary key identifier for the tag
         name: Unique name of the tag (used for display and reference)
         type: Optional category for the tag (e.g., 'location', 'role', 'custom')
+        description: Optional description for the tag
         devices: Relationship to associated Device objects
         credentials: Relationship to associated Credential objects 
         jobs: Relationship to associated Job objects
@@ -55,6 +56,7 @@ class Tag(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, unique=True)
     type = Column(String)  # E.g., 'location', 'role', 'custom'
+    description = Column(String, nullable=True)
 
     devices = relationship(
         "Device",
@@ -70,4 +72,4 @@ class Tag(Base):
         "Job",
         secondary=job_tags_association,
         back_populates="tags"
-    ) 
+    )
