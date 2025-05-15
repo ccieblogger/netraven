@@ -62,6 +62,15 @@ export const configSnapshotsService = {
     return api.get(`/configs/${deviceId}/${snapshotId}/download`, {
       responseType: 'blob'
     });
+  },
+
+  /**
+   * Get history of configuration snapshots for a specific device
+   * @param {String} deviceId - Device ID
+   * @returns {Promise} Promise resolving to the history data
+   */
+  getHistory(deviceId) {
+    return api.get(`/configs/${deviceId}/history`);
   }
 };
 

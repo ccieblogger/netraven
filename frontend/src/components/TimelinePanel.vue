@@ -62,11 +62,10 @@ async function loadSnapshots() {
   loading.value = true;
   error.value = null;
   try {
-    // Use real API call
-    const response = await configSnapshotsService.search({ deviceId: props.device.id }, 1, 100);
-    // API returns { data: { snapshots: [...] } } or { data: [...] }
-    const data = response.data.snapshots || response.data || [];
-    snapshots.value = data;
+    // Use device-specific config history endpoint
+    const response = await configSnapshotsService.getHistory(props.device.id);
+    // API returns an array of snapshots
+    snapshots.value = response.data || [];
   } catch (e) {
     error.value = 'Failed to load snapshots';
     snapshots.value = [];
