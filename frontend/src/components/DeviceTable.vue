@@ -86,6 +86,7 @@
               <Button size="sm" variant="ghost" @click="$emit('check-reachability', data)" :disabled="data.status === 'offline'" aria-label="Check Reachability" title="Check Reachability" iconOnly icon="pi pi-check-circle" rounded text severity="info" />
               <Button size="sm" variant="ghost" @click="$emit('credential-check', data)" aria-label="Credential Check" title="Credential Check" iconOnly icon="pi pi-key" rounded text severity="info" />
               <Button size="sm" variant="ghost" @click="$emit('view-configs', data)" aria-label="View Configs" title="View Configs" iconOnly icon="pi pi-eye" rounded text severity="info" />
+              <Button size="sm" variant="ghost" @click="$emit('timeline', data)" aria-label="Timeline" title="Timeline" iconOnly icon="pi pi-clock" rounded text severity="info" />
             </div>
           </template>
         </Column>
@@ -196,4 +197,4 @@ function mapReachabilityStatus(status) {
 :deep(.p-paginator) {
   background-color: var(--nr-bg-card) !important;
 }
-</style> 
+</style>
