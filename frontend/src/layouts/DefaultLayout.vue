@@ -153,6 +153,10 @@ const pageTitleMap = {
   '/users': 'Users',
   '/config-diff': 'Config Diff',
   '/logs': 'Logs',
+  '/backups': 'Backups',
+  '/backups/configurations': 'Configuration Snapshots',
+  '/backups/schedules': 'Backup Schedules',
+  '/backups/audit-logs': 'Audit Logs',
 };
 const pageTitle = computed(() => {
   // Try to match the start of the path for nested routes

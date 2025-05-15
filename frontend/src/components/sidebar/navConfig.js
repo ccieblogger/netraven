@@ -6,7 +6,8 @@ import {
   KeyIcon,
   UserIcon,
   AdjustmentsHorizontalIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  ServerIcon
 } from '@heroicons/vue/24/outline'
 
 export default [
@@ -47,6 +48,15 @@ export default [
     name: 'Config Diff',
     path: '/config-diff',
     icon: AdjustmentsHorizontalIcon
+  },
+  {
+    name: 'Backups',
+    icon: ServerIcon,
+    children: [
+      { name: 'Configuration Snapshots', path: '/backups/configurations', icon: DocumentTextIcon },
+      { name: 'Backup Schedules', path: '/backups/schedules', icon: ClipboardDocumentListIcon },
+      { name: 'Audit Logs', path: '/backups/audit-logs', icon: DocumentTextIcon }
+    ]
   },
   {
     name: 'Logs',

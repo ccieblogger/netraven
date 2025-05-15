@@ -116,6 +116,34 @@ const routes = [
     component: Unauthorized, // Use actual Unauthorized component
     meta: { requiresAuth: false }
   },
+  // Backups section
+  {
+    path: '/backups',
+    component: () => import('../layouts/BackupsLayout.vue'),
+    meta: { requiresAuth: true, roles: ['admin', 'user'] },
+    children: [
+      { 
+        path: 'configurations', 
+        name: 'ConfigSnapshots', 
+        component: () => import('../pages/ConfigSnapshots.vue'),
+        meta: { requiresAuth: true, roles: ['admin', 'user'] }
+      },
+      { 
+        path: 'schedules', 
+        name: 'BackupSchedules', 
+        component: () => import('../pages/BackupSchedules.vue'),
+        meta: { requiresAuth: true, roles: ['admin', 'user'] }
+      },
+      { 
+        path: 'audit-logs', 
+        name: 'AuditLogs', 
+        component: () => import('../pages/AuditLogs.vue'),
+        meta: { requiresAuth: true, roles: ['admin', 'user'] }
+      },
+      // Redirect /backups to /backups/configurations by default
+      { path: '', redirect: 'configurations' }
+    ]
+  },
   // Catch-all route (optional)
   // { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFoundComponent }
 ];
