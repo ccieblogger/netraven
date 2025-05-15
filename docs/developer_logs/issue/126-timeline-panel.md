@@ -32,3 +32,18 @@
 - Awaiting approval to proceed with implementation as per plan above.
 
 ---
+
+## 2025-05-15 (Phase 2 Update)
+
+### Progress
+- Integrated real API calls in `TimelinePanel.vue` for device snapshots.
+- Implemented View and Diff action handlers (currently stubbed; ready for further integration).
+- Migrated and expanded TimelinePanel unit tests to `tests/frontend/components/` (frontend test execution pending, as per latest instructions).
+- All changes committed to feature branch as per project coding principles.
+- GitHub issue updated with this progress and next steps.
+
+### Next Steps
+- Await further instructions for full View/Diff integration or additional UI/UX workstreams.
+- Run frontend tests when appropriate environment/command is available.
+
+---
