@@ -14,6 +14,7 @@
         </div>
         <div class="flex-1 overflow-y-auto p-4">
           <div v-if="loading" class="text-center py-8 text-text-secondary">Loading...</div>
+          <div v-else-if="error" class="text-center py-8 text-red-500">{{ error }}</div>
           <div v-else-if="snapshots.length === 0" class="text-center py-8 text-text-secondary">No snapshots found.</div>
           <ul v-else class="space-y-4">
             <li v-for="snap in snapshots" :key="snap.id" class="bg-card-secondary rounded p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -35,7 +36,7 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue';
-import { fetchDeviceSnapshots } from '../services/configSnapshots';
+import { configSnapshotsService } from '../services/configSnapshots';
 
 const props = defineProps({
   isOpen: Boolean,
@@ -45,6 +46,7 @@ const emit = defineEmits(['close', 'view', 'diff']);
 
 const loading = ref(false);
 const snapshots = ref([]);
+const error = ref(null);
 
 function closePanel() {
   emit('close');
@@ -58,11 +60,15 @@ function formatDate(dateStr) {
 async function loadSnapshots() {
   if (!props.device) return;
   loading.value = true;
+  error.value = null;
   try {
-    // Replace with real API call
-    const result = await fetchDeviceSnapshots(props.device.id);
-    snapshots.value = result || [];
+    // Use real API call
+    const response = await configSnapshotsService.search({ deviceId: props.device.id }, 1, 100);
+    // API returns { data: { snapshots: [...] } } or { data: [...] }
+    const data = response.data.snapshots || response.data || [];
+    snapshots.value = data;
   } catch (e) {
+    error.value = 'Failed to load snapshots';
     snapshots.value = [];
   } finally {
     loading.value = false;

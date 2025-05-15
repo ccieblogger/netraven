@@ -66,6 +66,8 @@
         :isOpen="showTimelinePanel"
         :device="timelineDevice"
         @close="closeTimelinePanel"
+        @view="handleTimelineView"
+        @diff="handleTimelineDiff"
       />
 
   </div>
@@ -83,6 +85,7 @@ import api from '../services/api' // assumed API service
 import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../store/notifications'
 import { useJobStore } from '../store/job'
+import { configSnapshotsService } from '../services/configSnapshots';
 
 const deviceStore = useDeviceStore()
 const devices = computed(() => deviceStore.devices)
@@ -261,6 +264,23 @@ function openTimelinePanel(device) {
 function closeTimelinePanel() {
   showTimelinePanel.value = false;
   timelineDevice.value = null;
+}
+
+// TimelinePanel event handlers
+function handleTimelineView(snapshot) {
+  // Open a modal or navigate to a detailed snapshot view
+  // For now, navigate to a snapshot detail route (e.g., /snapshots/:id)
+  if (snapshot && snapshot.id) {
+    router.push({ name: 'SnapshotDetail', params: { id: snapshot.id } });
+  }
+}
+
+function handleTimelineDiff(snapshot) {
+  // Open a modal or navigate to a diff view
+  // For now, navigate to a diff route (e.g., /snapshots/:id/diff)
+  if (snapshot && snapshot.id) {
+    router.push({ name: 'SnapshotDiff', params: { id: snapshot.id } });
+  }
 }
 
 </script>
