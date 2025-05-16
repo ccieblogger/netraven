@@ -98,7 +98,7 @@ def run_command(
         source="netmiko_driver",
         log_type="job"
     )
-    device_id = getattr(device, 'id', 0)
+    device_id = getattr(device, 'id', None)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
     device_ip = getattr(device, 'ip_address', 'Unknown')
     device_username = getattr(device, 'username', 'Unknown')
@@ -127,6 +127,19 @@ def run_command(
         source="netmiko_driver",
         log_type="job"
     )    
+
+    # --- DEBUG: Log credential info before connection ---
+    # WARNING: This log is for debugging only. Remove after troubleshooting!
+    debug_password = getattr(device, 'password', None)
+    logger.log(
+        f"[DEBUG] About to connect with username='{device_username}', password='{debug_password}' (len={len(debug_password) if debug_password else 0}) for device '{device_name}' (job_id={job_id})",
+        level="DEBUG",
+        destinations=["stdout", "file", "db"],
+        job_id=job_id,
+        device_id=device_id,
+        source="netmiko_driver",
+        log_type="job"
+    )
 
     # Build connection details
     connection_details = {
