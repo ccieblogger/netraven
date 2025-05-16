@@ -24,6 +24,7 @@ import time
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
 from netraven.utils.unified_logger import get_unified_logger
+from netraven.services.credential_utils import get_device_password
 
 # Configure logging
 logger = get_unified_logger()
@@ -34,17 +35,6 @@ COMMAND_SHOW_RUN = "show running-config"
 # Default timeout values if not specified in config
 DEFAULT_CONN_TIMEOUT = 60  # seconds
 DEFAULT_COMMAND_TIMEOUT = 120  # seconds
-
-def get_device_password(device):
-    """Retrieve the decrypted password from a device object, supporting both model and plain dicts."""
-    # Try the most secure and explicit property first
-    if hasattr(device, 'get_password') and callable(getattr(device, 'get_password')):
-        return device.get_password()
-    # Support property (not method)
-    if hasattr(device, 'get_password'):
-        return getattr(device, 'get_password')
-    # Fallback to 'password' attribute (may be plain or encrypted)
-    return getattr(device, 'password', None)
 
 def run_command(
     device: Any, 
