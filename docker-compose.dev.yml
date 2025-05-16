@@ -41,16 +41,13 @@ services:
   api:
     build:
       context: .
-      dockerfile: docker/api/Dockerfile
+      dockerfile: docker/api/Dockerfile.dev
     container_name: netraven-api-dev
     ports:
       - "8000:8000"
     entrypoint: ["/app/docker/api/entrypoint.sh"]
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
       - ./host-logs/netraven/api:/data/logs/api
-      - ./docker/fernet_key/fernet.key:/app/docker/fernet_key/fernet.key:ro
     env_file:
       - .env.dev
     environment:
@@ -109,7 +106,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: docker/worker/Dockerfile
+      dockerfile: docker/worker/Dockerfile.dev
     container_name: netraven-worker-dev
     entrypoint: ["/app/docker/worker/entrypoint.sh"]
     depends_on:
@@ -135,7 +132,7 @@ services:
   scheduler:
     build:
       context: .
-      dockerfile: docker/scheduler/Dockerfile
+      dockerfile: docker/scheduler/Dockerfile.dev
     container_name: netraven-scheduler-dev
     entrypoint: ["/app/docker/scheduler/entrypoint.sh"]
     depends_on:

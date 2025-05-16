@@ -1,0 +1,97 @@
+# Ignore version control
+.git/
+.gitignore
+
+# Python cache and test artifacts
+__pycache__/
+.pytest_cache/
+
+# Editor/IDE settings
+.vscode/
+.idea/
+
+# Documentation and backups
+/docs/
+_archive/
+schema_backups/
+
+# Node/Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+
+# Docker Compose and config files (don't copy to image)
+docker-compose.*
+README.md
+LICENSE
+
+# Logs and runtime data
+logs/
+host-logs/
+*.log
+
+# Miscellaneous
+*.swp
+*.bak
+*.tmp
+*.orig
+
+# Exclude local development scripts and setup
+setup/
+
+# Exclude test files
+# tests/
+
+# Exclude feature branches and experimental folders
+feature-*/
+
+# Exclude local containers folder
+containers/
+
+# Exclude frontend copies
+frontend copy/
+
+# Exclude source of truth and guides
+source_of_truth/
+guides/
+
+# Exclude alembic migration cache
+#alembic/versions/
+
+# Exclude Docker build context for frontend (if not needed)
+frontend/docker/
+
+# Exclude Docker build context for backend (if not needed)
+docker/api/
+docker/worker/
+docker/scheduler/
+docker/rq_scheduler/
+docker/fernet_key/
+#docker/nginx/
+#docker/postgres/
+
+# Allow Dockerfiles and entrypoints
+!docker/api/Dockerfile*
+!docker/api/entrypoint.sh
+!docker/worker/Dockerfile*
+!docker/worker/entrypoint.sh
+!docker/worker/worker_healthcheck.sh
+!docker/scheduler/Dockerfile*
+!docker/scheduler/entrypoint.sh
+!docker/rq_scheduler/Dockerfile*
+!docker/rq_scheduler/entrypoint.sh
+!docker/fernet_key/fernet.key
+!docker/nginx/
+!docker/postgres/
+
+# Allow pyproject and poetry files
+!pyproject.toml
+!poetry.lock
+
+# Allow main source code
+!netraven/
+
+# Allow scripts
+!scripts/
