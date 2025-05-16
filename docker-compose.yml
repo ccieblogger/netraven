@@ -23,14 +23,15 @@ services:
       - "8000:8000"
     volumes:
       - ./host-logs/netraven/api:/data/logs/api
+      - ./docker/fernet_key/fernet.key:/app/docker/fernet_key/fernet.key:ro
     env_file:
       - .env.prod
     environment:
       - NETRAVEN_ENV=prod
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
-      - NETRAVEN_SECURITY__ENCRYPTION_KEY=prod_encryption_key_replace_in_production
       - NETRAVEN_SECURITY__ENCRYPTION_SALT=prod_encryption_salt_replace_in_production
+    entrypoint: ["/app/docker/api/entrypoint.sh"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,11 +93,11 @@ services:
       - NETRAVEN_ENV=prod
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
-      - NETRAVEN_SECURITY__ENCRYPTION_KEY=prod_encryption_key_replace_in_production
       - NETRAVEN_SECURITY__ENCRYPTION_SALT=prod_encryption_salt_replace_in_production
       - NETRAVEN_LOGGING__FILE__PATH=/data/logs/worker/worker.log
     volumes:
       - ./host-logs/netraven/worker:/data/logs/worker
+      - ./docker/fernet_key/fernet.key:/app/docker/fernet_key/fernet.key:ro
     healthcheck:
       test: ["CMD", "/app/worker_healthcheck.sh"]
       interval: 30s

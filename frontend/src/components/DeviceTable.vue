@@ -1,199 +1,125 @@
 <template>
-  <!-- Device Table Card: aligns with filter/search section, uses production theme -->
-  <div>
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-2 pt-4 mb-2">
-      <slot name="filters"></slot>
-      <slot name="search"></slot>
-    </div>
-
-    <!-- Table Section: accessible, responsive, themed -->
-    <div class="overflow-x-auto px-2">
-      <DataTable
-        :value="devices"
-        :loading="loading"
-        dataKey="id"
-        :paginator="true"
-        :rows="pageSize"
-        :rowsPerPageOptions="[10, 20, 50]"
-        class="text-text-primary text-xs min-w-full"
-        tableStyle="min-width: 100%"
-        responsiveLayout="scroll"
-        :emptyMessage="emptyMessage"
-        :sortField="sortField"
-        :sortOrder="sortOrder"
-        @sort="onSort"
-        @rowClick="onRowClick"
-        stripedRows
-        :pt="{ bodyRow: 'bg-card', bodyRowEven: 'bg-card', paginator: { class: 'bg-card' } }"
-        filterDisplay="row"
-        v-model:filters="filters"
-      >
-        <!-- Static columns with header/body color classes -->
-        <Column field="hostname" header="Hostname" sortable class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('hostname')" filter>
-          <template #filter="{ filterModel, filterCallback }">
-            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search hostname" class="w-full" />
-          </template>
-        </Column>
-        <Column field="ip_address" header="Host IP" sortable class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('ip_address')" filter>
-          <template #filter="{ filterModel, filterCallback }">
-            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search IP" class="w-full" />
-          </template>
-        </Column>
-        <Column field="serial" header="Serial" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('serial')" filter>
-          <template #filter="{ filterModel, filterCallback }">
-            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search serial" class="w-full" />
-          </template>
-        </Column>
-        <Column header="Reachable" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'">
-          <template #body="{ data }">
-            <StatusIcon
-              :status="mapReachabilityStatus(data.last_reachability_status)"
-              :tooltip="reachabilityTooltip(data)"
-            />
-          </template>
-        </Column>
-        <Column field="job_status" header="JobStat" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'" :bodyClass="'text-left ' + bodyClass('job_status')" filter>
-          <template #filter="{ filterModel, filterCallback }">
-            <InputText v-model="filterModel.value" type="text" @input="filterCallback()" placeholder="Search job status" class="w-full" />
-          </template>
-        </Column>
-        <Column header="Tags" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'">
-          <template #body="{ data }">
-            <span v-for="tag in data.tags" :key="tag.id" class="bg-blue-900/30 text-blue-200 py-1 px-3 rounded-full text-xs mr-1">
+  <div class="nr-card overflow-x-auto">
+    <table class="min-w-full table-auto">
+      <thead>
+        <tr class="bg-card text-text-secondary text-sm">
+          <th class="py-2 px-4 text-left cursor-pointer select-none" @click="changeSort('hostname')">
+            Hostname
+            <span v-if="sortField === 'hostname'">{{ sortOrder === 1 ? '▲' : '▼' }}</span>
+          </th>
+          <th class="py-2 px-4 text-left cursor-pointer select-none" @click="changeSort('ip_address')">
+            Host IP
+            <span v-if="sortField === 'ip_address'">{{ sortOrder === 1 ? '▲' : '▼' }}</span>
+          </th>
+          <th class="py-2 px-4 text-left">Serial</th>
+          <th class="py-2 px-4 text-left">Reachable</th>
+          <th class="py-2 px-4 text-left">Tags</th>
+          <th class="py-2 px-4 text-left">Credential</th>
+          <th class="py-2 px-4 text-left">Actions</th>
+          <th class="py-2 px-4 text-left">Other</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="device in sortedDevices" :key="device.id" class="border-b text-text-primary">
+          <td class="py-2 px-4">{{ device.hostname }}</td>
+          <td class="py-2 px-4">{{ device.ip_address }}</td>
+          <td class="py-2 px-4">{{ device.serial }}</td>
+          <td class="py-2 px-4">
+            <StatusIcon :status="mapReachabilityStatus(device.last_reachability_status)" :tooltip="reachabilityTooltip(device)" />
+          </td>
+          <td class="py-2 px-4">
+            <span v-for="tag in device.tags" :key="tag.id" class="bg-blue-900/30 text-blue-200 py-1 px-3 rounded-full text-xs mr-1">
               {{ tag.name }}
             </span>
-          </template>
-        </Column>
-        <Column header="Credential" class="px-2 text-left" :headerClass="'bg-card text-text-primary font-semibold text-left'">
-          <template #body="{ data }">
-            <span v-if="data.matching_credentials_count > 0" class="text-blue-300 cursor-pointer hover:text-blue-100 underline">
-              {{ data.matching_credentials_count }} credential(s)
+          </td>
+          <td class="py-2 px-4">
+            <span v-if="device.matching_credentials_count > 0" class="text-blue-300 cursor-pointer hover:text-blue-100 underline">
+              {{ device.matching_credentials_count }} credential(s)
             </span>
             <span v-else class="text-red-400 font-semibold">No credentials found.</span>
-          </template>
-        </Column>
-        <Column header="Actions" class="px-3 text-left min-w-[80px]" :headerClass="'bg-card text-text-primary font-semibold text-left'">
-          <template #body="{ data }">
+          </td>
+          <td class="py-2 px-4">
             <div class="flex flex-row space-x-1">
-              <Button size="sm" variant="ghost" @click="$emit('edit', data)" aria-label="Edit Device" title="Edit Device" iconOnly icon="pi pi-pencil" rounded text severity="secondary" />
-              <Button size="sm" variant="ghost" @click="$emit('delete', data)" aria-label="Delete Device" title="Delete Device" iconOnly icon="pi pi-trash" rounded text severity="danger" />
+              <button class="btn btn-xs btn-ghost" @click="$emit('edit', device)" title="Edit Device">
+                <i class="pi pi-pencil"></i>
+              </button>
+              <button class="btn btn-xs btn-ghost text-red-500" @click="$emit('delete', device)" title="Delete Device">
+                <i class="pi pi-trash"></i>
+              </button>
             </div>
-          </template>
-        </Column>
-        <Column header="Other" class="px-3 text-left min-w-[80px]" :headerClass="'bg-card text-text-primary font-semibold text-left'">
-          <template #body="{ data }">
+          </td>
+          <td class="py-2 px-4">
             <div class="flex flex-row space-x-1">
-              <Button size="sm" variant="ghost" @click="$emit('check-reachability', data)" :disabled="data.status === 'offline'" aria-label="Check Reachability" title="Check Reachability" iconOnly icon="pi pi-check-circle" rounded text severity="info" />
-              <Button size="sm" variant="ghost" @click="$emit('credential-check', data)" aria-label="Credential Check" title="Credential Check" iconOnly icon="pi pi-key" rounded text severity="info" />
-              <Button size="sm" variant="ghost" @click="$emit('view-configs', data)" aria-label="View Configs" title="View Configs" iconOnly icon="pi pi-eye" rounded text severity="info" />
+              <button class="btn btn-xs btn-ghost" @click="$emit('check-reachability', device)" :disabled="device.status === 'offline'" title="Check Reachability">
+                <i class="pi pi-check-circle"></i>
+              </button>
+              <button class="btn btn-xs btn-ghost" @click="$emit('credential-check', device)" title="Credential Check">
+                <i class="pi pi-key"></i>
+              </button>
+              <button class="btn btn-xs btn-ghost" @click="$emit('view-configs', device)" title="View Configs">
+                <i class="pi pi-eye"></i>
+              </button>
+              <button class="btn btn-xs btn-ghost" @click="$emit('timeline', device)" title="Timeline">
+                <i class="pi pi-clock"></i>
+              </button>
             </div>
-          </template>
-        </Column>
-      </DataTable>
-    </div>
+          </td>
+        </tr>
+        <tr v-if="!loading && devices.length === 0">
+          <td colspan="8" class="text-center text-text-secondary py-4">No devices found.</td>
+        </tr>
+        <tr v-if="loading">
+          <td colspan="8" class="text-center text-text-secondary py-4">Loading devices...</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
 <script setup>
-// DeviceTable.vue: Device inventory table with best practices for theming, accessibility, and UX
-import { ref, computed, watch } from 'vue';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import Button from './ui/Button.vue';
-import InputText from 'primevue/inputtext';
+import { ref, computed } from 'vue';
 import StatusIcon from './ui/StatusIcon.vue';
 
-/**
- * Props:
- *  - devices: Array of device objects to display
- *  - loading: Boolean, show loading state
- *  - pageSize: Number, default page size
- *  - filters: Object, filter model for DataTable
- */
 const props = defineProps({
   devices: { type: Array, required: true },
-  loading: { type: Boolean, default: false },
-  pageSize: { type: Number, default: 10 },
-  filters: { type: Object, required: true },
+  loading: { type: Boolean, default: false }
 });
-const emit = defineEmits(['edit', 'delete', 'check-reachability', 'credential-check', 'view-configs', 'row-click', 'update:filters']);
-
 const sortField = ref('hostname');
 const sortOrder = ref(1); // 1 = asc, -1 = desc
-
-// Local filters state for v-model sync
-const filters = ref({ ...props.filters });
-// Sync local filters with prop
-watch(
-  () => props.filters,
-  (newFilters) => {
-    filters.value = { ...newFilters };
-  },
-  { deep: true }
-);
-// Emit updates to parent
-watch(
-  filters,
-  (newVal) => {
-    emit('update:filters', newVal);
-  },
-  { deep: true }
-);
-
-function onSort(e) {
-  sortField.value = e.sortField;
-  sortOrder.value = e.sortOrder;
+function changeSort(field) {
+  if (sortField.value === field) {
+    sortOrder.value = -sortOrder.value;
+  } else {
+    sortField.value = field;
+    sortOrder.value = 1;
+  }
 }
-
-function onRowClick(e) {
-  emit('row-click', e.data);
-}
-
+const sortedDevices = computed(() => {
+  const arr = [...props.devices];
+  if (!sortField.value) return arr;
+  return arr.sort((a, b) => {
+    const aVal = a[sortField.value] || '';
+    const bVal = b[sortField.value] || '';
+    if (aVal < bVal) return -1 * sortOrder.value;
+    if (aVal > bVal) return 1 * sortOrder.value;
+    return 0;
+  });
+});
 function reachabilityTooltip(device) {
   if (device.last_reachability_status === 'success') return 'Reachable';
   if (device.last_reachability_status === 'failure') return 'Unreachable';
   return 'Never Checked';
 }
-
-const emptyMessage = computed(() => props.loading ? 'Loading devices...' : 'No devices found');
-
-// Add bodyClass to highlight sorted column
-function bodyClass(field) {
-  return field === sortField ? 'text-blue-400' : '';
-}
-
 function mapReachabilityStatus(status) {
-  // Map job result status to StatusIcon status
   if (!status) return 'unknown';
   const normalized = String(status).toLowerCase();
-  // Debug: log the incoming status
-  console.log('DeviceTable: mapping reachability status:', status, '->', normalized);
-  if ([
-    'success', 'reachable', 'ok', 'online'
-  ].includes(normalized)) return 'healthy';
-  if ([
-    'failure', 'unreachable', 'offline', 'error'
-  ].includes(normalized)) return 'unhealthy';
-  if ([
-    'warning', 'partial'
-  ].includes(normalized)) return 'warning';
-  // Fallback for unexpected values
+  if ([ 'success', 'reachable', 'ok', 'online' ].includes(normalized)) return 'healthy';
+  if ([ 'failure', 'unreachable', 'offline', 'error' ].includes(normalized)) return 'unhealthy';
+  if ([ 'warning', 'partial' ].includes(normalized)) return 'warning';
   return 'unknown';
 }
 </script>
 
 <style scoped>
-/* Header underline: strong white or theme color */
-:deep(.p-datatable-thead > tr) {
-  border-bottom: 2px solid var(--nr-text-primary);
-}
-
-/* Row dividers: subtle, theme-aware */
-:deep(.p-datatable-tbody > tr) {
-  border-bottom: 1px solid var(--nr-border);
-}
-
-:deep(.p-paginator) {
-  background-color: var(--nr-bg-card) !important;
-}
-</style> 
+/* Add any table-specific styles here */
+</style>

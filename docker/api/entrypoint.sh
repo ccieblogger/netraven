@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e
 
+# Fernet key setup (moved from entrypoint_with_fernet.sh)
+FERNET_KEY_FILE="/app/docker/fernet_key/fernet.key"
+if [ ! -f "$FERNET_KEY_FILE" ]; then
+    echo "Fernet key file not found: $FERNET_KEY_FILE" >&2
+    exit 1
+fi
+export NETRAVEN_SECURITY__ENCRYPTION_KEY=$(cat "$FERNET_KEY_FILE")
+
 # Print commands for debugging
 set -x
 
@@ -22,4 +30,4 @@ echo "Initializing database with default data..."
 poetry run python -m netraven.db.init_data
 
 echo "Starting API server..."
-exec poetry run uvicorn netraven.api.main:app --host 0.0.0.0 --port 8000 ${API_ARGS:-"--reload"} 
+exec poetry run uvicorn netraven.api.main:app --host 0.0.0.0 --port 8000 ${API_ARGS:-"--reload"}

@@ -22,9 +22,11 @@ from sqlalchemy.orm import Session
 
 from netraven.db import models
 from netraven.services.device_credential import get_matching_credentials_for_device
+from netraven.services.credential_utils import get_device_password
+from netraven.utils.unified_logger import get_unified_logger
 
-# Setup logging
-log = logging.getLogger(__name__)
+# Setup unified logger
+logger = get_unified_logger()
 
 class DeviceWithCredentials:
     """Wrapper for a device object that includes credential attributes."""
@@ -64,6 +66,8 @@ def resolve_device_credential(
     job_id: Optional[int] = None,
     skip_if_has_credentials: bool = True
 ) -> Any:
+    print(f"Have entered [resolve_device_credential]...")
+    logger.log(f"ENTERED resolve_device_credential ...", level="DEBUG", destinations=["stdout", "file", "db"], job_id=job_id, device_id=getattr(device, 'id', None), source="device_credential_resolver", log_type="job")
     """Resolve credentials for a device based on tag matching.
     
     Args:
@@ -87,39 +91,60 @@ def resolve_device_credential(
     has_password = hasattr(device, 'password') and getattr(device, 'password')
     
     if has_username and has_password and skip_if_has_credentials:
-        log.debug(f"[Job: {job_id}] Device {device_name} already has credentials, skipping resolution")
+        logger.log(f"[Job: {job_id}] Device {device_name} already has credentials, skipping resolution", level="DEBUG", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job")
         return device
+    else:
+        print(f"[Does not have credentials, proceeding with resolution")
+        logger.log(f"[Job: {job_id}] Device {device_name} does not have credentials, proceeding with resolution", level="DEBUG", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job")
     
     # Get matching credentials for the device
     matching_credentials = get_matching_credentials_for_device(db, device_id)
-    
+    logger.log(f"[Job: {job_id}] Found {len(matching_credentials)} matching credentials for device {device_name}", level="INFO", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job")
+
     if not matching_credentials:
-        log.warning(f"[Job: {job_id}] No matching credentials found for device {device_name}")
+        logger.log(f"[Job: {job_id}] No matching credentials found for device {device_name}", level="WARNING", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job")
         
         # If device already has credentials, return as is
         if has_username and has_password:
-            log.info(f"[Job: {job_id}] Using existing credentials for device {device_name}")
+            logger.log(f"[Job: {job_id}] Using existing credentials for device {device_name}", level="INFO", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job")
             return device
             
         # Otherwise, raise an error
+        logger.log(f"[Job: {job_id}] About to raise ValueError for no matching credentials for device {device_name}", level="ERROR", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job")
         raise ValueError(f"No matching credentials found for device {device_name} (ID: {device_id})")
     
     # Select the highest priority credential (lowest priority value)
     selected_credential = matching_credentials[0]
-    
-    log.info(
-        f"[Job: {job_id}] Selected credential '{selected_credential.username}' (ID: {selected_credential.id}) "
-        f"with priority {selected_credential.priority} for device {device_name}"
+
+    # DEBUG: Log raw credential password before decryption
+    try:
+        print(f"[Job: {job_id}] Raw password value for selected credential '{selected_credential.username}' (ID: {selected_credential.id}): '{selected_credential.password}'")
+    except Exception as e:
+        print(f"[Job: {job_id}] Error accessing raw password for selected credential...{e}")
+
+    logger.log(
+        f"[Job: {job_id}] Raw password value for selected credential '{selected_credential.username}' (ID: {selected_credential.id}): '{selected_credential.password}'",
+        level="DEBUG", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job"
     )
-    
+    # DEBUG: Log credential details and decrypted password
+    try:
+        decrypted_pw = get_device_password(selected_credential)
+    except Exception as e:
+        decrypted_pw = f"[ERROR decrypting: {e}]"
+    logger.log(
+        f"[Job: {job_id}] Selected credential '{selected_credential.username}' (ID: {selected_credential.id}) "
+        f"with priority {selected_credential.priority} for device {device_name}. Decrypted password: '{decrypted_pw}'",
+        level="INFO", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job"
+    )
+
     # Track credential selection
     track_credential_selection(db, device_id, selected_credential.id, job_id)
-    
+
     # Create wrapper with credentials
     return DeviceWithCredentials(
         device=device,
         username=selected_credential.username,
-        password=selected_credential.password  # Using the password property
+        password=get_device_password(selected_credential)  # Always use decrypted password
     )
 
 
@@ -145,6 +170,9 @@ def resolve_device_credentials_batch(
     
     for device in devices:
         try:
+            print(f"About to call [resolve_device_credential]...")
+            #device_name = getattr(device, 'hostname', 'unknown')
+            #logger.log(f"About to call [resolve_device_credential] for device {device_name}", level="DEBUG", destinations=["stdout", "file", "db"], job_id=job_id, device_id=getattr(device, 'id', None), source="device_credential_resolver", log_type="system")
             resolved_device = resolve_device_credential(
                 device, db, job_id, skip_if_has_credentials
             )
@@ -152,7 +180,7 @@ def resolve_device_credentials_batch(
         except ValueError as e:
             device_id = getattr(device, 'id', 0)
             device_name = getattr(device, 'hostname', f"Device_{device_id}")
-            log.error(f"[Job: {job_id}] Could not resolve credentials for device {device_name}: {e}")
+            logger.log(f"[Job: {job_id}] Could not resolve credentials for device {device_name}: {e}", level="ERROR", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job")
             # Skip this device
     
     return resolved_devices
@@ -178,8 +206,9 @@ def track_credential_selection(
     # or both depending on requirements
     
     # Example log entry
-    log.info(
-        f"[Job: {job_id}] Selected credential ID {credential_id} for device ID {device_id}"
+    logger.log(
+        f"[Job: {job_id}] Selected credential ID {credential_id} for device ID {device_id}",
+        level="INFO", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job"
     )
     
     # Update last_used timestamp for the credential
@@ -189,7 +218,7 @@ def track_credential_selection(
             credential.last_used = datetime.utcnow()
             db.commit()
     except Exception as e:
-        log.error(f"[Job: {job_id}] Failed to update last_used timestamp for credential {credential_id}: {e}")
+        logger.log(f"[Job: {job_id}] Failed to update last_used timestamp for credential {credential_id}: {e}", level="ERROR", destinations=["stdout", "file", "db"], job_id=job_id, device_id=device_id, source="device_credential_resolver", log_type="job")
         # Don't raise - this is non-critical functionality
     
     # Future enhancement: Implement a selection tracking table
@@ -199,4 +228,4 @@ def track_credential_selection(
     #     job_id=job_id,
     #     selected_at=datetime.utcnow()
     # ))
-    # db.commit() 
+    # db.commit()

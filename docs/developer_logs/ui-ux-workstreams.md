@@ -171,30 +171,146 @@ Develop the slide-over panel that shows the version timeline for a selected devi
 
 ---
 
-## Workstream 4: Diff Modal Component
+## Workstream 4: Config Diff Page & Modal Implementation
 
-**Title:** Create Diff Modal with Version Selectors
+**Title:** Implement Unified Config Diff Page and Modal
 
 **Description:**
-Build the diff modal dialog that enables comparing two snapshots.
+Create a **dedicated full-page Config Diff** view and a **modal variant** to support both consolidated (unified) and side-by-side diff comparisons. All behaviors are fully specified; no optional features.
 
-**Tasks:**
+**Access Patterns:**
 
-* Create `components/DiffModal.vue` with `<Dialog>` from @headlessui/vue.
-* Include two `<Listbox>` components populated with passed `versions` prop.
-* On Confirm, call API `/configs/{device}/{v1}/diff/{v2}` and display response in `<pre>` with monospace styling.
-* Style additions/removals via CSS classes (`bg-green-100` for additions, `bg-red-100` for deletions).
-* Write unit tests for modal open/close, selector binding, and diff rendering.
+* **Full-Page Diff:** Available via direct URL `/backups/configurations/:device/:snapshotA/diff/:snapshotB` and through an “Open Full Diff” button in the Snapshots Table and Timeline panel.
+* **Modal Diff:** Launch via “Quick Diff” action in Snapshots Table row or Timeline panel; opens in a `<Dialog>` overlay without changing routes.
+
+**Design Specifications:**
+
+1. **Routing & Navigation**
+
+   * Add Vue Router entry:
+
+     ```js
+     {
+       path: '/backups/configurations/:device/:snapshotA/diff/:snapshotB',
+       name: 'ConfigDiffPage',
+       component: () => import('@/views/ConfigDiffPage.vue')
+     }
+     ```
+   * Include a `<RouterLink>` button labeled “Open Full Diff” in each snapshot row’s action menu, linking to the above route.
+   * In `TimelinePanel.vue`, include a `<Button>` labeled “Full Diff” next to each version entry, navigating to the diff page.
+
+2. **Full-Page Diff View (`ConfigDiffPage.vue`)**
+
+   * **Layout:**
+
+     ```html
+     <div class="p-6">
+       <h1 class="text-2xl font-semibold mb-4">Config Diff: {{ device }}</h1>
+       <Tab.Group>
+         <Tab.List class="flex space-x-4 border-b">
+           <Tab class="px-4 py-2">Unified</Tab>
+           <Tab class="px-4 py-2">Side‑by‑Side</Tab>
+         </Tab.List>
+         <Tab.Panels class="mt-4">
+           <Tab.Panel>
+             <pre class="font-mono text-sm overflow-auto whitespace-pre-wrap"><code>{{ unifiedDiff }}</code></pre>
+           </Tab.Panel>
+           <Tab.Panel>
+             <div class="grid grid-cols-2 gap-4">
+               <CodeBlock :content="snapshotAData" />
+               <CodeBlock :content="snapshotBData" />
+             </div>
+           </Tab.Panel>
+         </Tab.Panels>
+       </Tab.Group>
+     </div>
+     ```
+
+   * **Unified Diff Rendering:**
+
+     * Generate diff via `diff.createPatch(device, snapshotAData, snapshotBData)`.
+     * Wrap each line in `<span>`; apply `bg-green-100` for lines starting with `+` and `bg-red-100` for `-`.
+     * Prepend line numbers via a CSS grid gutter or inline counter.
+
+   * **Side‑by‑Side Rendering:**
+
+     * Compute `diff.diffLines(snapshotAData, snapshotBData)`.
+     * Highlight added lines in the right pane with `bg-green-100`; removed lines in left pane with `bg-red-100`.
+
+3. **Modal Variant (`ConfigDiffModal.vue`)**
+
+   * **Structure:**
+
+     ```html
+     <Dialog as="div" class="fixed inset-0 z-50 flex items-center justify-center">
+       <Dialog.Overlay class="fixed inset-0 bg-black opacity-30" />
+       <div class="bg-card rounded-2xl shadow-lg max-w-4xl w-full p-6">
+         <div class="flex justify-between items-center mb-4">
+           <Dialog.Title class="text-xl font-semibold">Quick Config Diff</Dialog.Title>
+           <Button icon="X" @click="close()" />
+         </div>
+         <Tab.Group>
+           <Tab.List class="flex space-x-4 border-b">
+             <Tab class="px-3 py-1">Unified</Tab>
+             <Tab class="px-3 py-1">Side‑by‑Side</Tab>
+           </Tab.List>
+           <Tab.Panels class="mt-4">
+             <Tab.Panel>
+               <pre class="font-mono text-xs overflow-auto"><code>{{ unifiedDiff }}</code></pre>
+             </Tab.Panel>
+             <Tab.Panel>
+               <div class="grid grid-cols-2 gap-2">
+                 <CodeBlock :content="snapshotAData" class="h-64 overflow-auto" />
+                 <CodeBlock :content="snapshotBData" class="h-64 overflow-auto" />
+               </div>
+             </Tab.Panel>
+           </Tab.Panels>
+         </Tab.Group>
+       </div>
+     </Dialog>
+     ```
+   * **Behavior:**
+
+     * Modal opens with backdrop; width constrained to `max-w-4xl`.
+     * Always available on the Snapshots Table and Timeline panel.
+     * Closes on backdrop click or close button.
+
+4. **Data & Methods**
+
+   * In both page and modal, use:
+
+     ```js
+     onMounted(async () => {
+       const [aRes, bRes] = await Promise.all([
+         axios.get(`/configs/${device}/${snapshotA}`),
+         axios.get(`/configs/${device}/${snapshotB}`)
+       ]);
+       snapshotAData.value = aRes.data.config;
+       snapshotBData.value = bRes.data.config;
+       unifiedDiff.value = diff.createPatch(device, snapshotAData.value, snapshotBData.value);
+     });
+     ```
+
+5. **Responsive & Accessibility**
+
+   * **Breakpoint `<sm`:** switch the side‑by‑side grid to `grid-cols-1`.
+   * Use `<Dialog>` ARIA roles and ensure `<Tab>` has `aria-selected` attributes.
+   * Ensure `<CodeBlock>` can scroll vertically with `overflow-auto`.
+
+6. **Testing**
+
+   * Write Jest tests for `diff.createPatch` and `diff.diffLines` integration in both components.
+   * Cypress E2E: verify page load, mode toggle, and modal open/close.
 
 **Acceptance Criteria:**
 
-* DiffModal displays two dropdowns, a Generate button, and diff output area.
-* Correct API call is made and results render properly.
+* Full-page diff page and modal render identical unified and side‑by‑side views.
+* Actions “Open Full Diff” and “Quick Diff” both work consistently.
+* No discretionary decisions remain; the design is fully specified.
 
 ---
 
-## Workstream 5: Raw Config Viewer and Download
-
+## Workstream 5: Raw Config Viewer and Download---## Workstream 5: Raw Config Viewer and Download
 **Title:** Implement Raw Config View and Download Functionality
 
 **Description:**

@@ -1,5 +1,14 @@
 #!/bin/bash
 set -e
+
+# Fernet key setup (moved from entrypoint_with_fernet.sh)
+FERNET_KEY_FILE="/app/docker/fernet_key/fernet.key"
+if [ ! -f "$FERNET_KEY_FILE" ]; then
+    echo "Fernet key file not found: $FERNET_KEY_FILE" >&2
+    exit 1
+fi
+export NETRAVEN_SECURITY__ENCRYPTION_KEY=$(cat "$FERNET_KEY_FILE")
+
 set -x
 
 echo "Waiting for postgres..."

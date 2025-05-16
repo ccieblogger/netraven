@@ -41,10 +41,11 @@ services:
   api:
     build:
       context: .
-      dockerfile: docker/api/Dockerfile
+      dockerfile: docker/api/Dockerfile.dev
     container_name: netraven-api-dev
     ports:
       - "8000:8000"
+    entrypoint: ["/app/docker/api/entrypoint.sh"]
     volumes:
       - ./host-logs/netraven/api:/data/logs/api
     env_file:
@@ -53,7 +54,6 @@ services:
       - NETRAVEN_ENV=dev
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
-      - NETRAVEN_SECURITY__ENCRYPTION_KEY=dev_encryption_key_replace_in_production
       - NETRAVEN_SECURITY__ENCRYPTION_SALT=dev_encryption_salt_replace_in_production
     depends_on:
       postgres:
@@ -106,21 +106,21 @@ services:
   worker:
     build:
       context: .
-      dockerfile: docker/worker/Dockerfile
+      dockerfile: docker/worker/Dockerfile.dev
     container_name: netraven-worker-dev
     entrypoint: ["/app/docker/worker/entrypoint.sh"]
     depends_on:
       - redis
       - postgres
     environment:
-      - NETRAVEN_ENV=prod
+      - NETRAVEN_ENV=dev
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
-      - NETRAVEN_SECURITY__ENCRYPTION_KEY=prod_encryption_key_replace_in_production
-      - NETRAVEN_SECURITY__ENCRYPTION_SALT=prod_encryption_salt_replace_in_production
+      - NETRAVEN_SECURITY__ENCRYPTION_SALT=dev_encryption_salt_replace_in_production
       - NETRAVEN_LOGGING__FILE__PATH=/data/logs/worker/worker.log
     volumes:
       - ./host-logs/netraven/worker:/data/logs/worker
+      - ./docker/fernet_key/fernet.key:/app/docker/fernet_key/fernet.key:ro
     healthcheck:
       test: ["CMD", "/app/worker_healthcheck.sh"]
       interval: 30s
@@ -132,14 +132,14 @@ services:
   scheduler:
     build:
       context: .
-      dockerfile: docker/scheduler/Dockerfile
+      dockerfile: docker/scheduler/Dockerfile.dev
     container_name: netraven-scheduler-dev
     entrypoint: ["/app/docker/scheduler/entrypoint.sh"]
     depends_on:
       - redis
       - postgres
     environment:
-      - NETRAVEN_ENV=prod
+      - NETRAVEN_ENV=dev
       - NETRAVEN_DATABASE__URL=postgresql+psycopg2://netraven:netraven@postgres:5432/netraven
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
       - NETRAVEN_LOGGING__FILE__PATH=/data/logs/scheduler/scheduler.log
@@ -163,7 +163,7 @@ services:
       - redis
       - postgres
     environment:
-      - NETRAVEN_ENV=prod
+      - NETRAVEN_ENV=dev
       - NETRAVEN_SCHEDULER__REDIS_URL=redis://redis:6379/0
       - NETRAVEN_LOGGING__FILE__PATH=/data/logs/rq_scheduler/rq_scheduler.log
     volumes:
@@ -178,4 +178,4 @@ services:
 
 volumes:
   postgres-data:
-  redis-data: 
+  redis-data:

@@ -37,8 +37,5 @@ COPY . .
 # Make the entrypoint script executable
 RUN chmod +x /app/docker/rq_scheduler/entrypoint.sh
 
-# Make the rq-scheduler entrypoint script executable
-RUN chmod +x /app/docker/rq_scheduler/entrypoint.sh
-
 # Set the default entrypoint for rq-scheduler
-ENTRYPOINT ["/app/docker/rq_scheduler/entrypoint.sh"] 
+ENTRYPOINT ["/app/docker/rq_scheduler/entrypoint.sh"]
