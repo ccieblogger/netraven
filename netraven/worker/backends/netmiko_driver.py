@@ -35,6 +35,17 @@ COMMAND_SHOW_RUN = "show running-config"
 DEFAULT_CONN_TIMEOUT = 60  # seconds
 DEFAULT_COMMAND_TIMEOUT = 120  # seconds
 
+def get_device_password(device):
+    """Retrieve the decrypted password from a device object, supporting both model and plain dicts."""
+    # Try the most secure and explicit property first
+    if hasattr(device, 'get_password') and callable(getattr(device, 'get_password')):
+        return device.get_password()
+    # Support property (not method)
+    if hasattr(device, 'get_password'):
+        return getattr(device, 'get_password')
+    # Fallback to 'password' attribute (may be plain or encrypted)
+    return getattr(device, 'password', None)
+
 def run_command(
     device: Any, 
     job_id: Optional[int] = None,
@@ -130,7 +141,7 @@ def run_command(
 
     # --- DEBUG: Log credential info before connection ---
     # WARNING: This log is for debugging only. Remove after troubleshooting!
-    debug_password = getattr(device, 'password', None)
+    debug_password = get_device_password(device)
     logger.log(
         f"[DEBUG] About to connect with username='{device_username}', password='{debug_password}' (len={len(debug_password) if debug_password else 0}) for device '{device_name}' (job_id={job_id})",
         level="DEBUG",
@@ -146,7 +157,7 @@ def run_command(
         "device_type": device.device_type,
         "host": device.ip_address,
         "username": device.username,
-        "password": device.password,
+        "password": get_device_password(device),
         "timeout": conn_timeout,
         # Add other potential Netmiko arguments as needed
         "session_log": None  # We handle logging separately
