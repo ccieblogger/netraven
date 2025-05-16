@@ -20,14 +20,10 @@ providing appropriate error handling and logging throughout the connection proce
 """
 
 from typing import Any, Optional, Dict
-import logging
 import time
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
 from netraven.utils.unified_logger import get_unified_logger
-
-# Configure logging
-log = logging.getLogger(__name__)
 
 # Configure logging
 logger = get_unified_logger()
@@ -100,10 +96,12 @@ def run_command(
         job_id=job_id,
         device_id=getattr(device, 'id', None),
         source="netmiko_driver",
+        log_type="job"
     )
     device_id = getattr(device, 'id', 0)
     device_name = getattr(device, 'hostname', f"Device_{device_id}")
     device_ip = getattr(device, 'ip_address', 'Unknown')
+    device_username = getattr(device, 'username', 'Unknown')
     
     # Set default command if none provided
     if command is None:
@@ -119,16 +117,16 @@ def run_command(
         if 'command_timeout' in config['worker']:
             command_timeout = config['worker']['command_timeout']
     
-    comm_msg = "Connecting to device {device_name} ({device_ip}) with {conn_timeout}s timeout"
+    comm_msg = f"Connecting to device {device_name} ({device_ip}), username: {device_username}, with {conn_timeout}s timeout"
     logger.log(
         comm_msg,
         level="INFO",
         destinations=["stdout", "file", "db"],
         job_id=job_id,
-        device_id=getattr(device, 'id', None),
+        device_id=device_id,
         source="netmiko_driver",
+        log_type="job"
     )    
-
 
     # Build connection details
     connection_details = {
@@ -146,11 +144,27 @@ def run_command(
     
     try:
         # Attempt to establish connection
-        log.debug(f"[Job: {job_id}] Opening connection to {device_name}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
+        logger.log(
+            f"[Job: {job_id}] Opening connection to {device_name}",
+            level="DEBUG",
+            destinations=["stdout", "db", "file"],
+            job_id=job_id,
+            device_id=device_id,
+            source="netmiko_driver",
+            log_type="job"
+        )
         connection = ConnectHandler(**connection_details)
         
         # Execute command with timeout
-        log.debug(f"[Job: {job_id}] Executing '{command}' on {device_name}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
+        logger.log(
+            f"[Job: {job_id}] Executing '{command}' on {device_name}",
+            level="DEBUG",
+            destinations=["stdout", "db", "file"],
+            job_id=job_id,
+            device_id=device_id,
+            source="netmiko_driver",
+            log_type="job"
+        )
         output = connection.send_command(
             command, 
             read_timeout=command_timeout
@@ -162,20 +176,44 @@ def run_command(
         
         # Log success
         elapsed = time.time() - start_time
-        log.info(f"[Job: {job_id}] Successfully executed command on {device_name} in {elapsed:.2f}s", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
+        logger.log(
+            f"[Job: {job_id}] Successfully executed command on {device_name} in {elapsed:.2f}s",
+            level="INFO",
+            destinations=["stdout", "db", "file"],
+            job_id=job_id,
+            device_id=device_id,
+            source="netmiko_driver",
+            log_type="job"
+        )
         
         return output
         
     except (NetmikoTimeoutException, NetmikoAuthenticationException) as e:
         # These specific exceptions are caught and handled upstream
         elapsed = time.time() - start_time
-        log.warning(f"[Job: {job_id}] {type(e).__name__} connecting to {device_name} after {elapsed:.2f}s: {e}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
+        logger.log(
+            f"[Job: {job_id}] {type(e).__name__} connecting to {device_name} after {elapsed:.2f}s: {e}",
+            level="WARNING",
+            destinations=["stdout", "db", "file"],
+            job_id=job_id,
+            device_id=device_id,
+            source="netmiko_driver",
+            log_type="job"
+        )
         raise
         
     except Exception as e:
         # Catch broader exceptions during connection or command execution
         elapsed = time.time() - start_time
-        log.error(f"[Job: {job_id}] Error connecting to {device_name} or running command '{command}' after {elapsed:.2f}s: {e}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
+        logger.log(
+            f"[Job: {job_id}] Error connecting to {device_name} or running command '{command}' after {elapsed:.2f}s: {e}",
+            level="ERROR",
+            destinations=["stdout", "db", "file"],
+            job_id=job_id,
+            device_id=device_id,
+            source="netmiko_driver",
+            log_type="job"
+        )
         raise
         
     finally:
@@ -183,9 +221,25 @@ def run_command(
         if connection:
             try:
                 connection.disconnect()
-                log.debug(f"[Job: {job_id}] Disconnected from {device_name}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
+                logger.log(
+                    f"[Job: {job_id}] Disconnected from {device_name}",
+                    level="DEBUG",
+                    destinations=["stdout", "db", "file"],
+                    job_id=job_id,
+                    device_id=device_id,
+                    source="netmiko_driver",
+                    log_type="job"
+                )
             except Exception as e:
-                log.warning(f"[Job: {job_id}] Error during disconnect from {device_name}: {e}", extra={"destinations": ["stdout", "db"], "job_id": job_id, "device_id": device_id, "source": "netmiko_driver"})
+                logger.log(
+                    f"[Job: {job_id}] Error during disconnect from {device_name}: {e}",
+                    level="WARNING",
+                    destinations=["stdout", "db", "file"],
+                    job_id=job_id,
+                    device_id=device_id,
+                    source="netmiko_driver",
+                    log_type="job"
+                )
 
 # Example Usage (requires a mock device object)
 # class MockDevice:
