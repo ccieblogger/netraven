@@ -299,8 +299,9 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
             # 1.5 Resolve credentials for devices
             try:
                 logger.log(f"[Job: {job_id}] Resolving credentials for {len(devices_to_process)} device(s)...", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
+                logger.log(f"[Job: {job_id}] About to call resolve_device_credentials_batch with devices: {[getattr(d, 'hostname', d) for d in devices_to_process]}", level="DEBUG", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
                 devices_with_credentials = resolve_device_credentials_batch(
-                    devices_to_process, db_to_use, job_id
+                    devices_to_process, db_to_use, job_id, skip_if_has_credentials=False
                 )
                 
                 # Record metrics about credential resolution

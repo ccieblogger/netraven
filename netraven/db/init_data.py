@@ -156,6 +156,7 @@ def create_default_tags(db):
 
 def create_default_credentials(db):
     """Create default system credentials if they don't exist."""
+    from netraven.services.crypto import encrypt_password
     created_credentials = []
     
     for cred_data in DEFAULT_CREDENTIALS:
@@ -174,14 +175,12 @@ def create_default_credentials(db):
                 )
                 # Skip to next credential
                 continue
-                
-            # Create with basic fields that are guaranteed to exist
-            hashed_password = get_password_hash(cred_data["password"])
             
-            # Create the credential with only the basic fields
+            # Use encrypted password for device credentials
+            encrypted_password = encrypt_password(cred_data["password"])
             new_cred = Credential(
                 username=cred_data["username"],
-                password=hashed_password,
+                password=encrypted_password,
                 priority=cred_data.get("priority", 100)
             )
             
@@ -204,13 +203,11 @@ def create_default_credentials(db):
             
         except Exception as e:
             logger.log(
-                f"Error creating credential: {e}",
+                f"Failed to create system credential '{cred_data['username']}': {e}",
                 level="ERROR",
                 destinations=["stdout", "file"],
                 source="db_init_data",
             )
-            # Continue with other credentials
-            db.rollback()
     
     return created_credentials
 
@@ -409,4 +406,4 @@ def init_database():
         return 1
 
 if __name__ == "__main__":
-    sys.exit(init_database()) 
+    sys.exit(init_database())
