@@ -26,7 +26,7 @@ export async function listSnapshots(filters) {
     start,
     limit
   };
-  return api.get('/configs', { params });
+  return api.get('/configs/list', { params });
 }
 
 /**
