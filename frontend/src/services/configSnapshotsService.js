@@ -4,20 +4,29 @@ import api from './api';
 
 /**
  * Search configuration snapshots
- * @param {Object} filters - { query, deviceId, startDate, endDate, page, perPage, sort }
- * @returns {Promise<Object>} Paginated snapshot results
+ * @param {Object} filters - { query }
+ * @returns {Promise<Object>} Array of snapshot results
  */
 export async function searchSnapshots(filters) {
+  // Always send a non-empty q param for /configs/search
+  const q = filters.query && filters.query.trim() ? filters.query : '*';
+  return api.get('/configs/search', { params: { q } });
+}
+
+/**
+ * List all config snapshots (paginated)
+ * @param {Object} filters - { deviceId, page, perPage }
+ * @returns {Promise<Object>} Array of snapshot results
+ */
+export async function listSnapshots(filters) {
+  const start = ((filters.page || 1) - 1) * (filters.perPage || 10);
+  const limit = filters.perPage || 10;
   const params = {
-    query: filters.query || '',
     device_id: filters.deviceId || undefined,
-    start_date: filters.startDate || undefined,
-    end_date: filters.endDate || undefined,
-    page: filters.page || 1,
-    per_page: filters.perPage || 10,
-    sort: filters.sort || undefined
+    start,
+    limit
   };
-  return api.get('/configs/search', { params });
+  return api.get('/configs', { params });
 }
 
 /**

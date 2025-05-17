@@ -144,12 +144,28 @@ onMounted(() => {
 async function loadSnapshots() {
   isLoading.value = true;
   try {
-    const { data } = await configSnapshotsService.searchSnapshots({
-      ...filters,
-      page: pagination.currentPage,
-      perPage: pagination.perPage,
-      sort: sorting.sort
-    });
+    // If a search query is present, use /configs/search, else use /configs (paginated)
+    const hasQuery = filters.query && filters.query.trim();
+    let data;
+    if (hasQuery) {
+      // Always send a non-empty q param for /configs/search
+      const resp = await configSnapshotsService.searchSnapshots({ query: filters.query });
+      // /configs/search returns an array, not paginated
+      data = { items: resp.data, total: resp.data.length, total_pages: 1 };
+    } else {
+      // Use paginated list endpoint
+      const resp = await configSnapshotsService.listSnapshots({
+        deviceId: filters.deviceId,
+        page: pagination.currentPage,
+        perPage: pagination.perPage
+      });
+      // /configs returns paginated data (array)
+      data = {
+        items: resp.data,
+        total: resp.data.length,
+        total_pages: 1
+      };
+    }
     snapshots.value = data.items || [];
     pagination.total = data.total || 0;
     pagination.totalPages = data.total_pages || 1;
@@ -163,8 +179,9 @@ async function loadSnapshots() {
 
 async function fetchDevices() {
   try {
-    const response = await api.get('/devices');
-    devices.value = response.data.devices || response.data || [];
+    // Use trailing slash and expect paginated response
+    const response = await api.get('/devices/', { params: { page: 1, size: 100 } });
+    devices.value = response.data.items || [];
   } catch (error) {
     console.error('Failed to fetch devices:', error);
     errorMsg.value = 'Failed to fetch devices.';
