@@ -123,13 +123,13 @@ const routes = [
     meta: { requiresAuth: true, roles: ['admin', 'user'] },
     children: [
       { 
-        path: 'configurations', 
-        name: 'ConfigSnapshots', 
+        path: 'snapshots', 
+        name: 'Snapshots', 
         component: () => import('../pages/ConfigSnapshots.vue'),
         meta: { requiresAuth: true, roles: ['admin', 'user'] }
       },
       { 
-        path: 'configurations/:device/:snapshotId',
+        path: 'snapshots/:device/:snapshotId',
         name: 'ConfigRawView',
         component: () => import('../pages/ConfigRawView.vue'),
         meta: { requiresAuth: true, roles: ['admin', 'user'] }
@@ -146,8 +146,8 @@ const routes = [
         component: () => import('../pages/AuditLogs.vue'),
         meta: { requiresAuth: true, roles: ['admin', 'user'] }
       },
-      // Redirect /backups to /backups/configurations by default
-      { path: '', redirect: 'configurations' }
+      // Redirect /backups to /backups/snapshots by default
+      { path: '', redirect: 'snapshots' }
     ]
   },
   // Catch-all route (optional)
