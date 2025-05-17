@@ -9,5 +9,5 @@
 
 <script setup>
 // Placeholder script setup
-import TestListbox from '../components/TestListbox.vue'
+import DeviceListBox from '../components/DeviceListBox.vue'
 </script>
