@@ -78,7 +78,7 @@ import { ArrowPathIcon } from '@heroicons/vue/24/solid';
 import BaseModal from '../components/BaseModal.vue';
 import SearchBar from '../components/backups/SearchBar.vue';
 import SnapshotsTable from '../components/backups/SnapshotsTable.vue';
-import { configSnapshotsService } from '../services/configSnapshots';
+import * as configSnapshotsService from '../services/configSnapshotsService';
 import api from '../services/api'; // Add this import for direct API calls
 
 // State
@@ -98,37 +98,31 @@ const pagination = reactive({
   totalPages: 1
 });
 const sorting = reactive({
-  key: 'retrieved_at',
-  order: 'desc'
+  sort: null
 });
-const viewModalOpen = ref(false);
-const selectedSnapshot = ref(null);
 
 // Lifecycle hooks
 onMounted(() => {
+  loadSnapshots();
   fetchDevices();
-  fetchSnapshots();
 });
 
 // Methods
-async function fetchSnapshots() {
+async function loadSnapshots() {
   isLoading.value = true;
   try {
-    // Call real API
-    const response = await configSnapshotsService.search(
-      filters,
-      pagination.currentPage,
-      pagination.perPage,
-      sorting
-    );
-    // API returns data in response.data
-    const data = response.data;
-    snapshots.value = data.snapshots || [];
-    pagination.total = data.pagination?.total || 0;
-    pagination.totalPages = data.pagination?.total_pages || 1;
-  } catch (error) {
-    console.error('Failed to fetch snapshots:', error);
-    // TODO: Use notification store if available
+    const { data } = await configSnapshotsService.searchSnapshots({
+      ...filters,
+      page: pagination.currentPage,
+      perPage: pagination.perPage,
+      sort: sorting.sort
+    });
+    snapshots.value = data.items || [];
+    pagination.total = data.total || 0;
+    pagination.totalPages = data.total_pages || 1;
+  } catch (err) {
+    console.error('Failed to load snapshots', err);
+    // TODO: Add user feedback for error
   } finally {
     isLoading.value = false;
   }
@@ -136,7 +130,6 @@ async function fetchSnapshots() {
 
 async function fetchDevices() {
   try {
-    // Use the same pattern as Dashboard.vue: root-relative path
     const response = await api.get('/devices');
     devices.value = response.data.devices || response.data || [];
   } catch (error) {
@@ -145,26 +138,24 @@ async function fetchDevices() {
   }
 }
 
-function handleSearch(searchParams) {
-  // Update filters from search event
-  Object.assign(filters, searchParams);
-  pagination.currentPage = 1; // Reset to first page on new search
-  fetchSnapshots();
+function handleSearch(newFilters) {
+  Object.assign(filters, newFilters);
+  pagination.currentPage = 1;
+  loadSnapshots();
 }
 
-function handleSort(sortParams) {
-  sorting.key = sortParams.key;
-  sorting.order = sortParams.order;
-  fetchSnapshots();
+function handleSort(sort) {
+  sorting.sort = sort;
+  loadSnapshots();
 }
 
 function handlePageChange(page) {
   pagination.currentPage = page;
-  fetchSnapshots();
+  loadSnapshots();
 }
 
 function refreshData() {
-  fetchSnapshots();
+  loadSnapshots();
 }
 
 function formatDate(timestamp) {
@@ -192,30 +183,10 @@ function closeViewModal() {
 }
 
 function handleDiffSnapshot(snapshot) {
-  // This would be implemented in a future workstream
   console.log('Diff snapshot:', snapshot);
-  // In a real implementation, we would navigate to a diff view
-  // router.push(`/backups/configurations/${snapshot.device_id}/${snapshot.id}/diff`);
 }
 
 function handleDownloadSnapshot(snapshot) {
-  // This would be implemented in a future workstream
   console.log('Download snapshot:', snapshot);
-  // In a real implementation, we would call the API to download the snapshot
-  // configSnapshotsService.downloadSnapshot(snapshot.device_id, snapshot.id)
-  //   .then(response => {
-  //     // Create a download link and trigger it
-  //     const url = window.URL.createObjectURL(new Blob([response.data]));
-  //     const link = document.createElement('a');
-  //     link.href = url;
-  //     link.setAttribute('download', `config_${snapshot.device_name}_${snapshot.id}.txt`);
-  //     document.body.appendChild(link);
-  //     link.click();
-  //     document.body.removeChild(link);
-  //   })
-  //   .catch(error => {
-  //     console.error('Failed to download snapshot:', error);
-  //     notificationStore.showError('Failed to download configuration snapshot');
-  //   });
 }
 </script>
