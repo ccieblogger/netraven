@@ -69,6 +69,32 @@
         </button>
       </template>
     </BaseModal>
+
+    <!-- Diff Modal -->
+    <BaseModal 
+      :is-open="diffModalOpen" 
+      :title="'Configuration Diff'"
+      @close="closeDiffModal"
+    >
+      <template #content>
+        <div v-if="diffResult" class="max-h-96 overflow-y-auto">
+          <pre class="bg-card-secondary p-4 rounded font-mono text-sm whitespace-pre-wrap overflow-x-auto">{{ diffResult }}</pre>
+        </div>
+        <p v-else class="text-text-secondary">No diff data available.</p>
+      </template>
+      
+      <template #actions>
+        <button
+          @click="closeDiffModal"
+          class="px-4 py-2 border border-divider text-text-secondary rounded hover:bg-card-secondary focus:outline-none"
+        >
+          Close
+        </button>
+      </template>
+    </BaseModal>
+
+    <!-- Error Feedback -->
+    <div v-if="errorMsg" class="text-red-600">{{ errorMsg }}</div>
   </div>
 </template>
 
@@ -100,6 +126,13 @@ const pagination = reactive({
 const sorting = reactive({
   sort: null
 });
+const viewModalOpen = ref(false);
+const selectedSnapshot = ref(null);
+const diffModalOpen = ref(false);
+const diffResult = ref(null);
+const diffParams = reactive({ deviceId: '', v1: '', v2: '' });
+const downloadLoading = ref(false);
+const errorMsg = ref('');
 
 // Lifecycle hooks
 onMounted(() => {
@@ -122,7 +155,7 @@ async function loadSnapshots() {
     pagination.totalPages = data.total_pages || 1;
   } catch (err) {
     console.error('Failed to load snapshots', err);
-    // TODO: Add user feedback for error
+    errorMsg.value = 'Failed to load snapshots.';
   } finally {
     isLoading.value = false;
   }
@@ -134,7 +167,7 @@ async function fetchDevices() {
     devices.value = response.data.devices || response.data || [];
   } catch (error) {
     console.error('Failed to fetch devices:', error);
-    // TODO: Use notification store if available
+    errorMsg.value = 'Failed to fetch devices.';
   }
 }
 
@@ -172,9 +205,18 @@ function formatDate(timestamp) {
 }
 
 // Modal handlers
-function handleViewSnapshot(snapshot) {
-  selectedSnapshot.value = snapshot;
-  viewModalOpen.value = true;
+async function handleViewSnapshot(snapshot) {
+  try {
+    isLoading.value = true;
+    const { data } = await configSnapshotsService.getSnapshot(snapshot.id);
+    selectedSnapshot.value = data;
+    viewModalOpen.value = true;
+  } catch (err) {
+    errorMsg.value = 'Failed to load snapshot.';
+    console.error(err);
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 function closeViewModal() {
@@ -182,11 +224,45 @@ function closeViewModal() {
   selectedSnapshot.value = null;
 }
 
-function handleDiffSnapshot(snapshot) {
-  console.log('Diff snapshot:', snapshot);
+async function handleDiffSnapshot({ device_id, v1, v2 }) {
+  try {
+    isLoading.value = true;
+    diffParams.deviceId = device_id;
+    diffParams.v1 = v1;
+    diffParams.v2 = v2;
+    const { data } = await configSnapshotsService.diffSnapshots(device_id, v1, v2);
+    diffResult.value = data;
+    diffModalOpen.value = true;
+  } catch (err) {
+    errorMsg.value = 'Failed to load diff.';
+    console.error(err);
+  } finally {
+    isLoading.value = false;
+  }
 }
 
-function handleDownloadSnapshot(snapshot) {
-  console.log('Download snapshot:', snapshot);
+function closeDiffModal() {
+  diffModalOpen.value = false;
+  diffResult.value = null;
+}
+
+async function handleDownloadSnapshot(snapshot) {
+  try {
+    downloadLoading.value = true;
+    const response = await configSnapshotsService.downloadSnapshot(snapshot.id);
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `config_snapshot_${snapshot.id}.txt`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    errorMsg.value = 'Failed to download snapshot.';
+    console.error(err);
+  } finally {
+    downloadLoading.value = false;
+  }
 }
 </script>
