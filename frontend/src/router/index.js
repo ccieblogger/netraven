@@ -129,6 +129,12 @@ const routes = [
         meta: { requiresAuth: true, roles: ['admin', 'user'] }
       },
       { 
+        path: 'configurations/:device/:snapshotId',
+        name: 'ConfigRawView',
+        component: () => import('../pages/ConfigRawView.vue'),
+        meta: { requiresAuth: true, roles: ['admin', 'user'] }
+      },
+      { 
         path: 'schedules', 
         name: 'BackupSchedules', 
         component: () => import('../pages/BackupSchedules.vue'),
