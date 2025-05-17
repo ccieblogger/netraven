@@ -197,6 +197,17 @@ const endDate = ref(props.initialEndDate)
 const appliedStartDate = ref(props.initialStartDate)
 const appliedEndDate = ref(props.initialEndDate)
 
+// Watch for changes to devices and update selectedDevice if needed
+watch(
+  () => props.devices,
+  (newDevices) => {
+    if (props.initialDeviceId) {
+      selectedDevice.value = newDevices.find(d => d.id === props.initialDeviceId) || null;
+    }
+  },
+  { immediate: true }
+)
+
 // Computed
 const dateRangeText = computed(() => {
   if (!appliedStartDate.value && !appliedEndDate.value) {

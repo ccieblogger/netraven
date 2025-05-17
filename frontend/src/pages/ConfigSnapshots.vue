@@ -79,11 +79,12 @@ import BaseModal from '../components/BaseModal.vue';
 import SearchBar from '../components/backups/SearchBar.vue';
 import SnapshotsTable from '../components/backups/SnapshotsTable.vue';
 import { configSnapshotsService } from '../services/configSnapshots';
+import api from '../services/api'; // Add this import for direct API calls
 
 // State
 const isLoading = ref(false);
 const snapshots = ref([]);
-const devices = ref([]); // Will be loaded from API in future, keep as empty for now
+const devices = ref([]); // Will be loaded from API
 const filters = reactive({
   query: '',
   deviceId: null,
@@ -105,6 +106,7 @@ const selectedSnapshot = ref(null);
 
 // Lifecycle hooks
 onMounted(() => {
+  fetchDevices();
   fetchSnapshots();
 });
 
@@ -129,6 +131,17 @@ async function fetchSnapshots() {
     // TODO: Use notification store if available
   } finally {
     isLoading.value = false;
+  }
+}
+
+async function fetchDevices() {
+  try {
+    // Use the same pattern as Dashboard.vue: root-relative path
+    const response = await api.get('/devices');
+    devices.value = response.data.devices || response.data || [];
+  } catch (error) {
+    console.error('Failed to fetch devices:', error);
+    // TODO: Use notification store if available
   }
 }
 
