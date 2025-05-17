@@ -154,7 +154,7 @@ const pageTitleMap = {
   '/config-diff': 'Config Diff',
   '/logs': 'Logs',
   '/backups': 'Backups',
-  '/backups/configurations': 'Configuration Snapshots',
+  '/backups/snapshots': 'Configuration Snapshots',
   '/backups/schedules': 'Backup Schedules',
   '/backups/audit-logs': 'Audit Logs',
 };
@@ -179,4 +179,4 @@ const breadcrumbs = computed(() => {
 
 <style>
 /* Removing global styles in favor of inline Tailwind classes */
-</style> 
+</style>

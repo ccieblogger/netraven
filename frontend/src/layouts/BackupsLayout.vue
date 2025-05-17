@@ -5,10 +5,10 @@
     <div class="mb-4 border-b border-divider">
       <nav class="-mb-px flex space-x-6" aria-label="Backups navigation">
         <router-link
-          to="/backups/configurations"
+          to="/backups/snapshots"
           class="py-2 px-1 border-b-2 font-medium text-sm"
           :class="[
-            route.path.includes('/configurations') 
+            route.path.includes('/snapshots') 
               ? 'border-primary text-primary' 
               : 'border-transparent text-text-secondary hover:border-gray-300 hover:text-text-primary'
           ]"
