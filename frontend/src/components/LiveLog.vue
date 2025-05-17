@@ -41,7 +41,7 @@ function connectSSE() {
   logs.value = []
   controller.value = new AbortController()
   const token = authStore.token
-  fetchEventSource(`/api/logs/stream?job_id=${props.jobId}`, {
+  fetchEventSource(`/logs/stream?job_id=${props.jobId}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
@@ -109,4 +109,4 @@ onBeforeUnmount(() => {
 .bg-black {
   background: #18181b;
 }
-</style> 
+</style>

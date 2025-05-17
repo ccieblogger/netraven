@@ -533,9 +533,9 @@ Authorization: Bearer <access_token>
 
 ---
 
-## Config Snapshots API (`/api/configs`)
+## Config Snapshots API (`/configs`)
 
-### `GET /api/configs/search` — Full-text search device configurations
+### `GET /configs/search` — Full-text search device configurations
 **Description:** Search device configuration snapshots using a query string. Returns a list of matching snapshots with metadata and highlighted snippets.
 
 **Authentication:** Bearer token required.
@@ -545,7 +545,7 @@ Authorization: Bearer <access_token>
 
 **Request Example:**
 ```http
-GET /api/configs/search?q=interface HTTP/1.1
+GET /configs/search?q=interface HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
@@ -563,14 +563,14 @@ Authorization: Bearer <access_token>
 
 ---
 
-### `GET /api/configs/{device_id}/history` — Get version history for a device
+### `GET /configs/{device_id}/history` — Get version history for a device
 **Description:** List all configuration snapshots for a device, ordered by retrieval time (descending).
 
 **Authentication:** Bearer token required.
 
 **Request Example:**
 ```http
-GET /api/configs/2/history HTTP/1.1
+GET /configs/2/history HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
@@ -587,14 +587,14 @@ Authorization: Bearer <access_token>
 
 ---
 
-### `GET /api/configs/{config_id}` — Get a specific config snapshot by ID
+### `GET /configs/{config_id}` — Get a specific config snapshot by ID
 **Description:** Retrieve a specific configuration snapshot (raw config and metadata).
 
 **Authentication:** Bearer token required.
 
 **Request Example:**
 ```http
-GET /api/configs/101 HTTP/1.1
+GET /configs/101 HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
@@ -610,7 +610,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-### `GET /api/configs/diff` — Get unified diff between two config snapshots
+### `GET /configs/diff` — Get unified diff between two config snapshots
 **Description:** Return a unified diff between two config snapshots' config_data fields.
 
 **Authentication:** Bearer token required.
@@ -621,7 +621,7 @@ Authorization: Bearer <access_token>
 
 **Request Example:**
 ```http
-GET /api/configs/diff?config_id_a=101&config_id_b=102 HTTP/1.1
+GET /configs/diff?config_id_a=101&config_id_b=102 HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
@@ -641,7 +641,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-### `GET /api/configs/list` and `GET /api/configs` — List all config snapshots
+### `GET /configs/list` and `GET /configs` — List all config snapshots
 **Description:** List all configuration snapshots, optionally filtered by device_id, paginated.
 
 **Authentication:** Bearer token required.
@@ -653,7 +653,7 @@ Authorization: Bearer <access_token>
 
 **Request Example:**
 ```http
-GET /api/configs/list?device_id=2&start=0&limit=10 HTTP/1.1
+GET /configs/list?device_id=2&start=0&limit=10 HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
@@ -670,14 +670,14 @@ Authorization: Bearer <access_token>
 
 ---
 
-### `DELETE /api/configs/{config_id}` — Delete a config snapshot by ID
+### `DELETE /configs/{config_id}` — Delete a config snapshot by ID
 **Description:** Delete a specific configuration snapshot by ID.
 
 **Authentication:** Bearer token required.
 
 **Request Example:**
 ```http
-DELETE /api/configs/101 HTTP/1.1
+DELETE /configs/101 HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
@@ -687,14 +687,14 @@ Authorization: Bearer <access_token>
 
 ---
 
-### `POST /api/configs/{config_id}/restore` — Restore a config snapshot (mark as restored)
+### `POST /configs/{config_id}/restore` — Restore a config snapshot (mark as restored)
 **Description:** Mark a config as restored (optionally, create a new snapshot or update device state). For now, just logs/returns the action.
 
 **Authentication:** Bearer token required.
 
 **Request Example:**
 ```http
-POST /api/configs/101/restore HTTP/1.1
+POST /configs/101/restore HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
@@ -797,7 +797,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-## Notes on `/api/` Prefix Usage
-- Endpoints for configs and backups use the `/api/` prefix (e.g., `/api/configs`, `/api/backups`).
-- Most other endpoints (users, devices, jobs, tags, credentials, logs, scheduler, job-results) do **not** use the `/api/` prefix and are mounted at the root.
+## Notes on `/configs` Prefix Usage
+- Endpoints for configs and backups use the `/configs` prefix (e.g., `/configs`, `/backups`).
+- Most other endpoints (users, devices, jobs, tags, credentials, logs, scheduler, job-results) do **not** use the `/configs` prefix and are mounted at the root.
 - This is due to legacy and migration reasons. The frontend should use the documented paths as shown above.

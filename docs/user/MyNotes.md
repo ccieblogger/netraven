@@ -8,7 +8,7 @@ curl -s http://localhost:8000/openapi.json | jq '.paths | keys'
 curl -s http://localhost:8000/openapi.json | jq .
 
 
-Get user access token:
+# Get user access token:
 curl -s -X POST http://localhost/api/auth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'username=admin&password=admin123'
@@ -20,7 +20,7 @@ TOKEN=$(curl -s -X POST http://localhost/api/auth/token \
   -d 'username=admin&password=admin123' | jq -r .access_token)
 
 # Use token to query device configs.
-curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8000/api/configs?device_id=1" | jq .
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8000/configs?device_id=1" | jq .
 
 # Use the token to query the endpoint
 curl -s http://localhost:8000/jobs/status \

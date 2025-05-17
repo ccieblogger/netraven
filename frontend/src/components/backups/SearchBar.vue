@@ -20,6 +20,7 @@
               <ListboxOptions
                 class="absolute z-10 mt-1 w-full bg-card shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
               >
+                <!-- Always use v-slot for ListboxOption to avoid Vue warnings -->
                 <ListboxOption
                   v-slot="{ active, selected }"
                   :key="'all'"

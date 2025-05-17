@@ -44,18 +44,19 @@ export async function getSnapshot(snapshotId) {
  * @returns {Promise<Blob>}
  */
 export async function downloadSnapshot(snapshotId) {
-  return api.get(`/configs/${snapshotId}/download`, { responseType: 'blob' });
+  // The backend does not support a download endpoint. Use getSnapshot and let the UI handle download if needed.
+  return getSnapshot(snapshotId);
 }
 
 /**
  * Get diff between two snapshots
- * @param {string} deviceId
- * @param {string} v1
- * @param {string} v2
+ * @param {string|number} v1
+ * @param {string|number} v2
  * @returns {Promise<Object>}
  */
-export async function diffSnapshots(deviceId, v1, v2) {
-  return api.get(`/configs/${deviceId}/diff/${v1}/${v2}`);
+export async function diffSnapshots(v1, v2) {
+  // The backend expects /configs/diff?config_id_a=...&config_id_b=...
+  return api.get(`/configs/diff`, { params: { config_id_a: v1, config_id_b: v2 } });
 }
 
 // Add more as needed (timeline, etc.)

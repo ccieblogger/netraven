@@ -247,7 +247,7 @@ async function handleDiffSnapshot({ device_id, v1, v2 }) {
     diffParams.deviceId = device_id;
     diffParams.v1 = v1;
     diffParams.v2 = v2;
-    const { data } = await configSnapshotsService.diffSnapshots(device_id, v1, v2);
+    const { data } = await configSnapshotsService.diffSnapshots(v1, v2);
     diffResult.value = data;
     diffModalOpen.value = true;
   } catch (err) {
@@ -267,7 +267,9 @@ async function handleDownloadSnapshot(snapshot) {
   try {
     downloadLoading.value = true;
     const response = await configSnapshotsService.downloadSnapshot(snapshot.id);
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+    // If response.data is an object, extract config_data
+    const configText = response.data.config_data || response.data;
+    const url = window.URL.createObjectURL(new Blob([configText], { type: 'text/plain' }));
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', `config_snapshot_${snapshot.id}.txt`);

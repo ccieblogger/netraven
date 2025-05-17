@@ -161,7 +161,7 @@ async function fetchDeviceConfigurations() {
   
   try {
     // API call to fetch configurations
-    const response = await axios.get(`/api/devices/${selectedDeviceId.value}/configurations`, {
+    const response = await axios.get(`/devices/${selectedDeviceId.value}/configurations`, {
       params: { job_id: jobFilter.value || undefined }
     });
     
@@ -205,11 +205,11 @@ async function loadDiff() {
     versionBDetails.value = configVersions.value.find(v => v.id === selectedVersionB.value);
     
     // Fetch version A (old)
-    const responseA = await axios.get(`/api/devices/${selectedDeviceId.value}/configurations/${selectedVersionA.value}`);
+    const responseA = await axios.get(`/devices/${selectedDeviceId.value}/configurations/${selectedVersionA.value}`);
     configA.value = responseA.data.config_data;
     
     // Fetch version B (new)
-    const responseB = await axios.get(`/api/devices/${selectedDeviceId.value}/configurations/${selectedVersionB.value}`);
+    const responseB = await axios.get(`/devices/${selectedDeviceId.value}/configurations/${selectedVersionB.value}`);
     configB.value = responseB.data.config_data;
   } catch (error) {
     console.error('Error loading configuration diff:', error);
@@ -240,4 +240,4 @@ onMounted(async () => {
     await jobStore.fetchJobs();
   }
 });
-</script> 
+</script>
