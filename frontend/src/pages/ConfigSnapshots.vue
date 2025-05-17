@@ -79,12 +79,11 @@ import BaseModal from '../components/BaseModal.vue';
 import SearchBar from '../components/backups/SearchBar.vue';
 import SnapshotsTable from '../components/backups/SnapshotsTable.vue';
 import { configSnapshotsService } from '../services/configSnapshots';
-import { mockDevices, getPaginatedSnapshots } from '../mock/configSnapshots';
 
 // State
 const isLoading = ref(false);
 const snapshots = ref([]);
-const devices = ref(mockDevices);
+const devices = ref([]); // Will be loaded from API in future, keep as empty for now
 const filters = reactive({
   query: '',
   deviceId: null,
@@ -112,38 +111,22 @@ onMounted(() => {
 // Methods
 async function fetchSnapshots() {
   isLoading.value = true;
-  
   try {
-    // In a real implementation, this would call the API
-    // const response = await configSnapshotsService.search(
-    //   filters,
-    //   pagination.currentPage,
-    //   pagination.perPage,
-    //   sorting
-    // );
-    
-    // Using mock data instead
-    const response = getPaginatedSnapshots({
-      query: filters.query,
-      deviceId: filters.deviceId,
-      startDate: filters.startDate,
-      endDate: filters.endDate,
-      page: pagination.currentPage,
-      perPage: pagination.perPage,
-      sortBy: sorting.key,
-      sortOrder: sorting.order
-    });
-    
-    snapshots.value = response.snapshots;
-    pagination.total = response.pagination.total;
-    pagination.totalPages = response.pagination.total_pages;
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Call real API
+    const response = await configSnapshotsService.search(
+      filters,
+      pagination.currentPage,
+      pagination.perPage,
+      sorting
+    );
+    // API returns data in response.data
+    const data = response.data;
+    snapshots.value = data.snapshots || [];
+    pagination.total = data.pagination?.total || 0;
+    pagination.totalPages = data.pagination?.total_pages || 1;
   } catch (error) {
     console.error('Failed to fetch snapshots:', error);
-    // In a real implementation, we would use the notification store
-    // notificationStore.showError('Failed to load configuration snapshots');
+    // TODO: Use notification store if available
   } finally {
     isLoading.value = false;
   }
