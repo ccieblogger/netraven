@@ -56,6 +56,25 @@ def run(device, job_id, config, db):
             )
             return {"success": False, "device_id": device_id, "details": {"error": str(e)}}
         except Exception as e:
+            # Detect legacy SSH KEX error and report clearly
+            err_msg = str(e)
+            if "no matching key exchange method found" in err_msg or "no matching key exchange algorithm" in err_msg:
+                user_hint = (
+                    "Device only supports legacy SSH key exchange algorithms (e.g., diffie-hellman-group14-sha1). "
+                    "Modern SSH clients disable these for security. "
+                    "You can enable legacy KEX in your SSH config or update the device's SSH settings. "
+                    "See NetRaven docs for details."
+                )
+                logger.log(
+                    f"Legacy SSH KEX error: {err_msg}",
+                    level="ERROR",
+                    destinations=["stdout", "file", "db"],
+                    log_type="job",
+                    source=f"worker.job.{job_type}",
+                    job_id=job_id,
+                    device_id=device_id
+                )
+                return {"success": False, "device_id": device_id, "details": {"error": user_hint, "raw_error": err_msg, "error_type": "legacy_ssh_kex"}}
             logger.log(
                 f"Error retrieving config: {e}",
                 level="ERROR",
