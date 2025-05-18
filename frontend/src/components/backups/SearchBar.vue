@@ -9,7 +9,7 @@
             <ListboxButton
               class="w-full px-3 py-2 bg-input border border-divider rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-primary flex items-center justify-between"
             >
-              <span class="truncate">{{ selectedDevice ? selectedDevice.name : 'All Devices' }}</span>
+              <span class="truncate">{{ selectedDevice ? (selectedDevice.hostname || selectedDevice.name) : 'All Devices' }}</span>
               <ChevronDownIcon class="h-4 w-4 text-text-secondary" aria-hidden="true" />
             </ListboxButton>
             <transition
@@ -25,7 +25,6 @@
                   v-slot="{ active, selected }"
                   :key="'all'"
                   :value="null"
-                  v-bind="{ active, selected }"
                 >
                   <div
                     :class="[
@@ -44,7 +43,6 @@
                   v-slot="{ active, selected }"
                   :key="device.id"
                   :value="device"
-                  v-bind="{ active, selected }"
                 >
                   <div
                     :class="[
@@ -52,7 +50,7 @@
                       'cursor-pointer select-none relative py-2 pl-3 pr-9'
                     ]"
                   >
-                    <span :class="['block truncate', selected && 'font-medium']">{{ device.name }}</span>
+                    <span :class="['block truncate', selected && 'font-medium']">{{ device.hostname || device.name }}</span>
                     <span v-if="selected" class="absolute inset-y-0 right-0 flex items-center pr-4">
                       <CheckIcon class="h-5 w-5 text-primary" aria-hidden="true" />
                     </span>
