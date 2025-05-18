@@ -25,6 +25,7 @@ from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
 from netraven.utils.unified_logger import get_unified_logger
 from netraven.services.credential_utils import get_device_password
+from netraven.worker.backends.ssh_compat import enable_legacy_kex
 
 # Configure logging
 logger = get_unified_logger()
@@ -141,6 +142,22 @@ def run_command(
         source="netmiko_driver",
         log_type="job"
     )
+
+    # Legacy SSH KEX/MAC patching (global for all SSH jobs)
+    allow_legacy = False
+    kex_list = None
+    mac_list = None
+    if config and isinstance(config, dict):
+        allow_legacy = (
+            config.get('allow_legacy_ssh_kex') or
+            (config.get('ssh', {}).get('allow_legacy_kex') if isinstance(config.get('ssh'), dict) else False)
+        )
+        if allow_legacy:
+            ssh_cfg = config.get('ssh', {}) if isinstance(config.get('ssh'), dict) else {}
+            kex_list = ssh_cfg.get('legacy_kex')
+            mac_list = ssh_cfg.get('legacy_macs')
+    if allow_legacy:
+        enable_legacy_kex(kex_list=kex_list, mac_list=mac_list, logger=logger, job_id=job_id, device_id=device_id)
 
     # Build connection details
     connection_details = {

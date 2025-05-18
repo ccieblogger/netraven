@@ -15,42 +15,6 @@ JOB_META = {
 
 logger = get_unified_logger()
 
-def enable_legacy_kex(kex_list=None, mac_list=None):
-    """
-    Patch Paramiko's preferred KEX and MACs at runtime to allow legacy algorithms.
-    Args:
-        kex_list: List of KEX algorithms to add (or None for default legacy set)
-        mac_list: List of MAC algorithms to add (or None for default legacy set)
-    """
-    try:
-        import paramiko
-        # Default legacy KEX and MACs if not provided
-        default_kex = [
-            'diffie-hellman-group14-sha1',
-            'diffie-hellman-group1-sha1',
-            'diffie-hellman-group-exchange-sha1'
-        ]
-        default_macs = [
-            'hmac-sha1',
-            'hmac-md5'
-        ]
-        kex_to_add = kex_list if kex_list else default_kex
-        macs_to_add = mac_list if mac_list else default_macs
-        # Patch KEX
-        for kex in kex_to_add:
-            if kex not in paramiko.transport.Transport._preferred_kex:
-                paramiko.transport.Transport._preferred_kex = (
-                    paramiko.transport.Transport._preferred_kex + (kex,)
-                )
-        # Patch MACs
-        for mac in macs_to_add:
-            if mac not in paramiko.transport.Transport._preferred_macs:
-                paramiko.transport.Transport._preferred_macs = (
-                    paramiko.transport.Transport._preferred_macs + (mac,)
-                )
-    except Exception:
-        pass  # If paramiko is not available or patch fails, ignore
-
 def run(device, job_id, config, db):
     """
     Job contract: Must return a dict with at least 'success' (bool) and 'device_id' (int) in all code paths.
@@ -67,23 +31,6 @@ def run(device, job_id, config, db):
         job_id=job_id,
         device_id=device_id
     )
-
-    # Check config for legacy KEX option (support both nested and flat)
-    allow_legacy = False
-    kex_list = None
-    mac_list = None
-    if isinstance(config, dict):
-        allow_legacy = (
-            config.get('allow_legacy_ssh_kex') or
-            (config.get('ssh', {}).get('allow_legacy_kex') if isinstance(config.get('ssh'), dict) else False)
-        )
-        # If enabled, get user-specified KEX and MACs if present
-        if allow_legacy:
-            ssh_cfg = config.get('ssh', {}) if isinstance(config.get('ssh'), dict) else {}
-            kex_list = ssh_cfg.get('legacy_kex')
-            mac_list = ssh_cfg.get('legacy_macs')
-    if allow_legacy:
-        enable_legacy_kex(kex_list=kex_list, mac_list=mac_list)
 
     try:
         # 1. Retrieve running config
