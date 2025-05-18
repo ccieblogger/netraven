@@ -55,7 +55,7 @@
               <span class="text-text-primary ml-1">{{ selectedSnapshot.id }}</span>
             </div>
           </div>
-          <pre class="bg-card-secondary p-4 rounded font-mono text-sm whitespace-pre-wrap overflow-x-auto">{{ selectedSnapshot.snippet }}</pre>
+          <pre class="bg-card-secondary p-4 rounded font-mono text-sm whitespace-pre-wrap overflow-x-auto">{{ selectedSnapshot.config_data || selectedSnapshot.snippet }}</pre>
         </div>
         <p v-else class="text-text-secondary">No configuration data available.</p>
       </template>
