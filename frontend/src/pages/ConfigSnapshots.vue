@@ -166,7 +166,11 @@ async function loadSnapshots() {
         total_pages: 1
       };
     }
-    snapshots.value = data.items || [];
+    // Map device_name for table display
+    snapshots.value = (data.items || []).map(snap => ({
+      ...snap,
+      device_name: snap.config_metadata?.hostname || snap.device_name || snap.device_id
+    }));
     pagination.total = data.total || 0;
     pagination.totalPages = data.total_pages || 1;
   } catch (err) {
