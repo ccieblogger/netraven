@@ -110,7 +110,10 @@ def run(device, job_id, config, db):
                 device_id=device_id,
                 config_data=redacted_config,
                 data_hash=config_hash,
-                config_metadata={"job_id": job_id}
+                config_metadata={
+                    "job_id": job_id,
+                    "hostname": getattr(device, 'hostname', None)  # Always include device hostname
+                }
             )
             session.add(new_snapshot)
             session.commit()
