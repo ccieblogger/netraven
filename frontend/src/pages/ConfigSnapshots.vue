@@ -166,11 +166,27 @@ async function loadSnapshots() {
         total_pages: 1
       };
     }
-    // Map device_name for table display
-    snapshots.value = (data.items || []).map(snap => ({
-      ...snap,
-      device_name: snap.config_metadata?.hostname || snap.device_name || snap.device_id
-    }));
+    // Map device_name and snippet for table display
+    snapshots.value = (data.items || []).map(snap => {
+      // Try config_metadata.hostname, else lookup from devices list, else fallback
+      let deviceName = snap.config_metadata?.hostname;
+      if (!deviceName && devices.value.length && snap.device_id) {
+        const found = devices.value.find(d => d.id === snap.device_id);
+        deviceName = found ? found.name || found.hostname : undefined;
+      }
+      if (!deviceName) deviceName = snap.device_name || snap.device_id;
+      // Snippet: use API snippet, else generate from config_data
+      let snippet = snap.snippet;
+      if (!snippet && snap.config_data) {
+        const lines = snap.config_data.split('\n').slice(0, 2).join(' ');
+        snippet = lines.length > 0 ? lines + (snap.config_data.split('\n').length > 2 ? ' ...' : '') : '';
+      }
+      return {
+        ...snap,
+        device_name: deviceName,
+        snippet
+      };
+    });
     pagination.total = data.total || 0;
     pagination.totalPages = data.total_pages || 1;
   } catch (err) {
