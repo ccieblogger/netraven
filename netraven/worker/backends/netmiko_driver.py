@@ -132,10 +132,10 @@ def run_command(
 
     # --- DEBUG: Log credential info before connection ---
     # WARNING: This log is for debugging only. Remove after troubleshooting!
-    debug_password = get_device_password(device)
+    #debug_password = get_device_password(device)
     logger.log(
-        f"[DEBUG] About to connect with username='{device_username}', password='{debug_password}' (len={len(debug_password) if debug_password else 0}) for device '{device_name}' (job_id={job_id})",
-        level="DEBUG",
+        f"[INFO] Connect to device '{device_name}, with username='{device_username}', for ' (job_id={job_id})",
+        level="INFO",
         destinations=["stdout", "file", "db"],
         job_id=job_id,
         device_id=device_id,
@@ -158,6 +158,15 @@ def run_command(
             mac_list = ssh_cfg.get('legacy_macs')
     if allow_legacy:
         enable_legacy_kex(kex_list=kex_list, mac_list=mac_list, logger=logger, job_id=job_id, device_id=device_id)
+        logger.log(
+            f"Legacy SSH security algorithms have been enabled! See NetRaven docs for details.",
+            level="WARNING",
+            destinations=["stdout", "db", "file"],
+            job_id=job_id,
+            device_id=device_id,
+            source="netmiko_driver",
+            log_type="job"
+        )
 
     # Build connection details
     connection_details = {

@@ -42,20 +42,23 @@
       :is-open="viewModalOpen" 
       :title="`Configuration: ${selectedSnapshot?.device_name || ''}`"
       @close="closeViewModal"
+      :style="'min-width:600px; max-width:900px;'"
     >
       <template #content>
         <div v-if="selectedSnapshot" class="max-h-96 overflow-y-auto">
           <div class="flex justify-between items-center mb-2">
             <div>
-              <span class="text-text-secondary">Retrieved:</span> 
-              <span class="text-text-primary ml-1">{{ formatDate(selectedSnapshot.retrieved_at) }}</span>
+              <span class="text-text-secondary" style="color:#111;">Retrieved:</span> 
+              <span class="text-text-primary ml-1" style="color:#111;">{{ formatDate(selectedSnapshot.retrieved_at) }}</span>
             </div>
             <div>
-              <span class="text-text-secondary">Snapshot ID:</span> 
-              <span class="text-text-primary ml-1">{{ selectedSnapshot.id }}</span>
+              <span class="text-text-secondary" style="color:#111;">Snapshot ID:</span> 
+              <span class="text-text-primary ml-1" style="color:#111;">{{ selectedSnapshot.id }}</span>
             </div>
           </div>
-          <pre class="bg-card-secondary p-4 rounded font-mono text-sm whitespace-pre-wrap overflow-x-auto">{{ selectedSnapshot.config_data || selectedSnapshot.snippet }}</pre>
+          <pre class="p-4 rounded font-mono text-sm whitespace-pre-wrap overflow-x-auto" style="background: #111; color: #fff;">
+            {{ selectedSnapshot.config_data || selectedSnapshot.snippet }}
+          </pre>
         </div>
         <p v-else class="text-text-secondary">No configuration data available.</p>
       </template>
