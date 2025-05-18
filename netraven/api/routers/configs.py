@@ -77,7 +77,7 @@ def list_configs(
     List all configuration snapshots, optionally filtered by device_id, paginated.
     """
     sql = text("""
-        SELECT id, device_id, retrieved_at, config_metadata
+        SELECT id, device_id, retrieved_at, config_metadata, config_data
         FROM device_configurations
         WHERE (:device_id IS NULL OR device_id = :device_id)
         ORDER BY retrieved_at DESC
@@ -89,7 +89,8 @@ def list_configs(
             "id": row.id,
             "device_id": row.device_id,
             "retrieved_at": row.retrieved_at,
-            "config_metadata": row.config_metadata
+            "config_metadata": row.config_metadata,
+            "config_data": row.config_data
         }
         for row in results
     ]
