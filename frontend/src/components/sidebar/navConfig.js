@@ -51,7 +51,7 @@ export default [
       { name: 'Snapshots', path: '/backups/snapshots', icon: DocumentTextIcon },
       { name: 'Schedules', path: '/backups/schedules', icon: ClipboardDocumentListIcon },
       { name: 'Audit Logs', path: '/backups/audit-logs', icon: DocumentTextIcon },
-      { name: 'Diff', path: '/backups/diff', icon: AdjustmentsHorizontalIcon }
+      { name: 'Diff Viewer', path: '/backups/diff', icon: AdjustmentsHorizontalIcon }
     ]
   },
   {
