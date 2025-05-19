@@ -25,6 +25,7 @@ from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
 from netraven.utils.unified_logger import get_unified_logger
 from netraven.services.credential_utils import get_device_password
+from netraven.worker.backends.ssh_compat import enable_legacy_kex
 
 # Configure logging
 logger = get_unified_logger()
@@ -131,16 +132,41 @@ def run_command(
 
     # --- DEBUG: Log credential info before connection ---
     # WARNING: This log is for debugging only. Remove after troubleshooting!
-    debug_password = get_device_password(device)
+    #debug_password = get_device_password(device)
     logger.log(
-        f"[DEBUG] About to connect with username='{device_username}', password='{debug_password}' (len={len(debug_password) if debug_password else 0}) for device '{device_name}' (job_id={job_id})",
-        level="DEBUG",
+        f"[INFO] Connect to device '{device_name}, with username='{device_username}', for ' (job_id={job_id})",
+        level="INFO",
         destinations=["stdout", "file", "db"],
         job_id=job_id,
         device_id=device_id,
         source="netmiko_driver",
         log_type="job"
     )
+
+    # Legacy SSH KEX/MAC patching (global for all SSH jobs)
+    allow_legacy = False
+    kex_list = None
+    mac_list = None
+    if config and isinstance(config, dict):
+        allow_legacy = (
+            config.get('allow_legacy_ssh_kex') or
+            (config.get('ssh', {}).get('allow_legacy_kex') if isinstance(config.get('ssh'), dict) else False)
+        )
+        if allow_legacy:
+            ssh_cfg = config.get('ssh', {}) if isinstance(config.get('ssh'), dict) else {}
+            kex_list = ssh_cfg.get('legacy_kex')
+            mac_list = ssh_cfg.get('legacy_macs')
+    if allow_legacy:
+        enable_legacy_kex(kex_list=kex_list, mac_list=mac_list, logger=logger, job_id=job_id, device_id=device_id)
+        logger.log(
+            f"Legacy SSH security algorithms have been enabled! See NetRaven docs for details.",
+            level="WARNING",
+            destinations=["stdout", "db", "file"],
+            job_id=job_id,
+            device_id=device_id,
+            source="netmiko_driver",
+            log_type="job"
+        )
 
     # Build connection details
     connection_details = {
@@ -160,7 +186,7 @@ def run_command(
         # Attempt to establish connection
         logger.log(
             f"[Job: {job_id}] Opening connection to {device_name}",
-            level="DEBUG",
+            level="INFO",
             destinations=["stdout", "db", "file"],
             job_id=job_id,
             device_id=device_id,
@@ -168,17 +194,27 @@ def run_command(
             log_type="job"
         )
         connection = ConnectHandler(**connection_details)
+
+        if not connection.check_enable_mode():
+            logger.log(f"[Job: {job_id}] Netmiko setting exec mode {device_name}",level="INFO",destinations=["stdout", "db", "file"],job_id=job_id,device_id=device_id,source="netmiko_driver",log_type="job")
+            try:
+                connection.enable()
+            except ValueError as err:
+                logger.log(f"[ERROR] Failed to set enable mode for {device_name} '{err}'",level="ERROR",destinations=["stdout", "db", "file"],job_id=job_id,device_id=device_id,source="netmiko_driver",log_type="job")
+        
         
         # Execute command with timeout
         logger.log(
             f"[Job: {job_id}] Executing '{command}' on {device_name}",
-            level="DEBUG",
+            level="INFO",
             destinations=["stdout", "db", "file"],
             job_id=job_id,
             device_id=device_id,
             source="netmiko_driver",
             log_type="job"
         )
+
+        # Send command and wait for output
         output = connection.send_command(
             command, 
             read_timeout=command_timeout
@@ -186,12 +222,21 @@ def run_command(
         
         # Validate output
         if output is None:
+            logger.log(
+                f"[Job: {job_id}] No output received for command '{command}' from {device_name} ({device_ip})",
+                level="ERROR",
+                destinations=["stdout", "db", "file"],
+                job_id=job_id,
+                device_id=device_id,
+                source="netmiko_driver",
+                log_type="job"
+            )
             raise ValueError(f"Received no output for command '{command}' from {device_ip}")
         
         # Log success
         elapsed = time.time() - start_time
         logger.log(
-            f"[Job: {job_id}] Successfully executed command on {device_name} in {elapsed:.2f}s",
+            f"[Job: {job_id}] Successfully executed command '{command}' on {device_name} in {elapsed:.2f}s",
             level="INFO",
             destinations=["stdout", "db", "file"],
             job_id=job_id,

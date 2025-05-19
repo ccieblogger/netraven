@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 import difflib
 
 router = APIRouter(
-    prefix="/api/configs",
+    prefix="/configs",
     tags=["Configs"]
 )
 
@@ -66,6 +66,35 @@ def get_device_config_history(
         for row in results
     ]
 
+@router.get("/list", summary="List all config snapshots")
+def list_configs(
+    device_id: int = Query(None, description="Filter by device ID"),
+    start: int = Query(0, description="Offset for pagination"),
+    limit: int = Query(50, description="Max results to return"),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    List all configuration snapshots, optionally filtered by device_id, paginated.
+    """
+    sql = text("""
+        SELECT id, device_id, retrieved_at, config_metadata, config_data
+        FROM device_configurations
+        WHERE (:device_id IS NULL OR device_id = :device_id)
+        ORDER BY retrieved_at DESC
+        OFFSET :start LIMIT :limit
+    """)
+    results = db.execute(sql, {"device_id": device_id, "start": start, "limit": limit}).fetchall()
+    return [
+        {
+            "id": row.id,
+            "device_id": row.device_id,
+            "retrieved_at": row.retrieved_at,
+            "config_metadata": row.config_metadata,
+            "config_data": row.config_data
+        }
+        for row in results
+    ]
+
 @router.get("/{config_id}", summary="Get a specific config snapshot by ID")
 def get_config_snapshot(
     config_id: int,
@@ -120,34 +149,6 @@ def diff_config_snapshots(
         "config_id_b": row_b.id,
         "diff": diff
     }
-
-@router.get("/list", summary="List all config snapshots")
-def list_configs(
-    device_id: int = Query(None, description="Filter by device ID"),
-    start: int = Query(0, description="Offset for pagination"),
-    limit: int = Query(50, description="Max results to return"),
-    db: Session = Depends(get_db)
-) -> List[Dict[str, Any]]:
-    """
-    List all configuration snapshots, optionally filtered by device_id, paginated.
-    """
-    sql = text("""
-        SELECT id, device_id, retrieved_at, config_metadata
-        FROM device_configurations
-        WHERE (:device_id IS NULL OR device_id = :device_id)
-        ORDER BY retrieved_at DESC
-        OFFSET :start LIMIT :limit
-    """)
-    results = db.execute(sql, {"device_id": device_id, "start": start, "limit": limit}).fetchall()
-    return [
-        {
-            "id": row.id,
-            "device_id": row.device_id,
-            "retrieved_at": row.retrieved_at,
-            "config_metadata": row.config_metadata
-        }
-        for row in results
-    ]
 
 @router.get("", summary="List all config snapshots (root endpoint)")
 def list_configs_root(

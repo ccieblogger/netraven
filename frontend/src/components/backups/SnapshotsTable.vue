@@ -66,62 +66,22 @@
               {{ snapshot.snippet }}
             </code>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
-            <Menu as="div" class="relative inline-block text-left">
-              <div>
-                <MenuButton class="inline-flex justify-center w-full rounded-md border border-divider shadow-sm px-2 py-1 bg-card text-sm font-medium text-text-primary hover:bg-card-secondary focus:outline-none focus:ring-1 focus:ring-primary">
-                  Actions
-                  <ChevronDownIcon class="w-4 h-4 ml-1 -mr-1" aria-hidden="true" />
-                </MenuButton>
-              </div>
-
-              <transition
-                leave-active-class="transition ease-in duration-100"
-                leave-from-class="opacity-100"
-                leave-to-class="opacity-0"
-              >
-                <MenuItems class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
-                  <div class="py-1">
-                    <MenuItem v-slot="{ active }">
-                      <button
-                        @click="viewSnapshot(snapshot)"
-                        :class="[
-                          active ? 'bg-primary-light text-text-primary' : 'text-text-secondary',
-                          'group flex items-center px-4 py-2 text-sm w-full text-left'
-                        ]"
-                      >
-                        <EyeIcon class="mr-3 h-5 w-5 text-text-tertiary group-hover:text-text-primary" />
-                        View
-                      </button>
-                    </MenuItem>
-                    <MenuItem v-slot="{ active }">
-                      <button
-                        @click="diffSnapshot(snapshot)"
-                        :class="[
-                          active ? 'bg-primary-light text-text-primary' : 'text-text-secondary',
-                          'group flex items-center px-4 py-2 text-sm w-full text-left'
-                        ]"
-                      >
-                        <ArrowsRightLeftIcon class="mr-3 h-5 w-5 text-text-tertiary group-hover:text-text-primary" />
-                        Diff
-                      </button>
-                    </MenuItem>
-                    <MenuItem v-slot="{ active }">
-                      <button
-                        @click="downloadSnapshot(snapshot)"
-                        :class="[
-                          active ? 'bg-primary-light text-text-primary' : 'text-text-secondary',
-                          'group flex items-center px-4 py-2 text-sm w-full text-left'
-                        ]"
-                      >
-                        <ArrowDownTrayIcon class="mr-3 h-5 w-5 text-text-tertiary group-hover:text-text-primary" />
-                        Download
-                      </button>
-                    </MenuItem>
-                  </div>
-                </MenuItems>
-              </transition>
-            </Menu>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary flex gap-2">
+            <button @click="viewSnapshot(snapshot)" class="text-primary underline bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none">View</button>
+            <router-link
+              v-if="getPreviousSnapshotId(snapshot)"
+              :to="{
+                path: '/backups/diff',
+                query: {
+                  deviceId: snapshot.device_id,
+                  v1: getPreviousSnapshotId(snapshot),
+                  v2: snapshot.id
+                }
+              }"
+              class="text-primary underline bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none"
+              >Diff</router-link>
+            <button v-else disabled class="text-text-tertiary underline bg-transparent border-0 p-0 m-0 cursor-not-allowed">Diff</button>
+            <button @click="downloadSnapshot(snapshot)" class="text-primary underline bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none">Download</button>
           </td>
         </tr>
       </tbody>
@@ -189,6 +149,7 @@ import {
   ArrowsRightLeftIcon,
   ArrowDownTrayIcon
 } from '@heroicons/vue/24/solid';
+import { useRouter } from 'vue-router';
 
 // Props
 const props = defineProps({
@@ -290,5 +251,14 @@ function nextPage() {
   if (props.page < totalPages.value) {
     emit('page-change', props.page + 1);
   }
+}
+
+// Helper to get previous snapshot id for diffing
+function getPreviousSnapshotId(current) {
+  const idx = props.snapshots.findIndex(s => s.id === current.id);
+  if (idx > 0) {
+    return props.snapshots[idx - 1].id;
+  }
+  return null;
 }
 </script>

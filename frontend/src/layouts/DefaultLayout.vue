@@ -115,13 +115,6 @@ const navigation = [
     }
   },
   {
-    name: 'Config Diff',
-    path: '/config-diff',
-    icon: {
-      template: `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 6h4m-2 4h2m14-4h4m-2 4h2M2 14h2m-2 4h4M18 14h2m-2 4h4" /></svg>`
-    }
-  },
-  {
     name: 'Logs',
     path: '/logs',
     icon: {
@@ -154,7 +147,7 @@ const pageTitleMap = {
   '/config-diff': 'Config Diff',
   '/logs': 'Logs',
   '/backups': 'Backups',
-  '/backups/configurations': 'Configuration Snapshots',
+  '/backups/snapshots': 'Configuration Snapshots',
   '/backups/schedules': 'Backup Schedules',
   '/backups/audit-logs': 'Audit Logs',
 };
@@ -179,4 +172,4 @@ const breadcrumbs = computed(() => {
 
 <style>
 /* Removing global styles in favor of inline Tailwind classes */
-</style> 
+</style>

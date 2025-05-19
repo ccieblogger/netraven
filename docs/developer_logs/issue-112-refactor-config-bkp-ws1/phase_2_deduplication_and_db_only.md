@@ -16,14 +16,14 @@
     - The job is scheduled to run at a configurable interval (default: daily) and is registered only once.
     - Logging is performed for job registration and execution.
 - No changes required in `job_registration.py` as the scheduling logic is handled in `scheduler_runner.py`.
-- Next: Expand `/api/configs` endpoints and add/expand tests as per the plan.
+- Next: Expand `/configs` endpoints and add/expand tests as per the plan.
 
 ## Phase 2: API Endpoint Expansion
 
-- Added new endpoints to `/api/configs`:
-    - `GET /api/configs/list`: List all config snapshots, with optional device filter and pagination.
-    - `DELETE /api/configs/{config_id}`: Delete a config snapshot by ID.
-    - `POST /api/configs/{config_id}/restore`: Mark a config as restored (no device push performed; logs action).
+- Added new endpoints to `/configs`:
+    - `GET /configs/list`: List all config snapshots, with optional device filter and pagination.
+    - `DELETE /configs/{config_id}`: Delete a config snapshot by ID.
+    - `POST /configs/{config_id}/restore`: Mark a config as restored (no device push performed; logs action).
 - All endpoints use existing DB session and models, with error handling and concise logic.
 - Next: Add/expand tests for these endpoints and retention logic.
 

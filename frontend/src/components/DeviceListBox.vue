@@ -13,10 +13,17 @@ const themes = ['dark', 'light', 'blue']
         {{ selected }}
       </Listbox.Button>
       <Listbox.Options class="mt-1 w-full rounded bg-card border border-divider shadow-lg">
-        <Listbox.Option v-for="theme in themes" :key="theme" :value="theme" class="cursor-pointer select-none py-1 px-3 text-sm text-white hover:bg-primary/20">
-          {{ theme }}
+        <Listbox.Option
+          v-for="theme in themes"
+          :key="theme"
+          :value="theme"
+          v-slot="{ selected, active }"
+          class="cursor-pointer select-none py-1 px-3 text-sm text-white hover:bg-primary/20"
+        >
+          <span :class="{ 'font-bold': selected }">{{ theme }}</span>
+          <span v-if="selected">✔︎</span>
         </Listbox.Option>
       </Listbox.Options>
     </Listbox>
   </div>
-</template> 
+</template>

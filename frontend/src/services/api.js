@@ -28,14 +28,11 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   
-  // Ensure proper URL formatting with '/api' prefix
+  // Restore /api prefix logic: prepend /api to all non-absolute URLs
   if (config.url && !config.url.startsWith('/api') && !config.url.match(/^https?:\/\//)) {
-    // If URL doesn't have /api prefix and isn't absolute, prepend /api
     config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
   }
   
-  // Set the baseURL directly in the config to ensure it's used
-  // This fixes issues where the baseURL wasn't being applied correctly
   config.baseURL = '';
   
   // Optional debug logging in development

@@ -85,6 +85,10 @@ All services must be run as containers. Local, bare-metal, or non-containerized 
 All developer and production workflows must use the provided Docker Compose setup.  
 **Do not attempt to run any service outside of Docker.**
 
+**All frontend–backend API communication must go through the NGINX container using the `/api` prefix. Direct calls to the backend service are not supported or permitted.**
+
+For integration and troubleshooting details, see [`frontend_backend_integration.md`](./frontend_backend_integration.md).
+
 ---
 
 ### Directory Layout (as of this release)
@@ -163,6 +167,8 @@ All developer and production workflows must use the provided Docker Compose setu
 #### 5. Frontend UI
 - Directory: `/frontend/` (Vue 3 + Vite + Pinia + TailwindCSS)
 - Integrates via REST API
+- **All frontend API calls must use the `/api` prefix and be routed through the NGINX reverse proxy.**
+- For details and best practices on wiring up frontend to backend, see [`frontend_backend_integration.md`](./frontend_backend_integration.md).
 - For UI component and workflow details, see [`/docs/source_of_truth/frontend_sot.md`](../source_of_truth/frontend_sot.md)
 
 #### 6. Configuration Loader

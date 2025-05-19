@@ -31,6 +31,7 @@ Obtain a token via the `/auth/token` endpoint using username and password.
 - **Logs**
 - **Scheduler**
 - **Backups**
+- **Config Snapshots**
 
 ---
 
@@ -530,646 +531,213 @@ Authorization: Bearer <access_token>
 - Passwords are never returned in responses.
 - If device not found, response is HTTP 404.
 
-### Tags
-#### `GET /tags/` — List tags
-**Description:** List all tags with pagination and optional filtering.
+---
+
+## Config Snapshots API (`/configs`)
+
+### `GET /configs/search` — Full-text search device configurations
+**Description:** Search device configuration snapshots using a query string. Returns a list of matching snapshots with metadata and highlighted snippets.
 
 **Authentication:** Bearer token required.
 
 **Query Parameters:**
-- `page` (int, default 1): Page number.
-- `size` (int, default 20): Items per page.
-- `name` (str, optional): Filter by partial tag name match.
-- `type` (str, optional): Filter by tag type (exact match).
+- `q` (str, required): Search query for configuration text
 
 **Request Example:**
 ```http
-GET /tags/?page=1&size=2 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response Example:**
-```json
-{
-  "items": [
-    { "id": 1, "name": "core-network", "type": "location" },
-    { "id": 2, "name": "datacenter", "type": "location" }
-  ],
-  "total": 2,
-  "page": 1,
-  "size": 2,
-  "pages": 1
-}
-```
-**Frontend Notes:**
-- Use for tag management tables and tag selectors.
-
----
-
-#### `POST /tags/` — Create tag
-**Description:** Create a new tag.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```json
-{
-  "name": "edge-router",
-  "type": "role"
-}
-```
-**Response Example:**
-```json
-{
-  "id": 3,
-  "name": "edge-router",
-  "type": "role"
-}
-```
-**Frontend Notes:**
-- If tag name already exists, response is HTTP 400:
-  ```json
-  { "detail": "Tag name already exists" }
-  ```
-
----
-
-#### `GET /tags/{tag_id}` — Get tag by ID
-**Description:** Get a tag by its ID.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```http
-GET /tags/1 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response Example:**
-```json
-{
-  "id": 1,
-  "name": "core-network",
-  "type": "location"
-}
-```
-**Frontend Notes:**
-- Use for tag detail views or edit forms.
-- If tag not found, response is HTTP 404:
-  ```json
-  { "detail": "Tag not found" }
-  ```
-
----
-
-#### `PUT /tags/{tag_id}` — Update tag
-**Description:** Update an existing tag.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```json
-{
-  "name": "core-switch",
-  "type": "role"
-}
-```
-**Response Example:**
-```json
-{
-  "id": 1,
-  "name": "core-switch",
-  "type": "role"
-}
-```
-**Frontend Notes:**
-- Only fields provided in the request are updated.
-- If tag name already exists, response is HTTP 400.
-- If tag not found, response is HTTP 404.
-
----
-
-#### `DELETE /tags/{tag_id}` — Delete tag
-**Description:** Delete a tag by ID.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```http
-DELETE /tags/1 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response:**
-- HTTP 204 No Content (no body).
-
-**Frontend Notes:**
-- Use for tag management delete actions.
-- If tag not found, response is HTTP 404:
-  ```json
-  { "detail": "Tag not found" }
-  ```
-
-### Credentials
-#### `GET /credentials/` — List credentials
-**Description:** List all credentials with pagination and optional filtering. Passwords are never returned.
-
-**Authentication:** Bearer token required.
-
-**Query Parameters:**
-- `page` (int, default 1): Page number.
-- `size` (int, default 20): Items per page.
-- `username` (str, optional): Filter by partial username match.
-- `priority` (int, optional): Filter by exact priority value.
-- `tag_id` (list[int], optional): Filter by tag IDs (credentials with ANY of the specified tags).
-
-**Request Example:**
-```http
-GET /credentials/?page=1&size=2 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response Example:**
-```json
-{
-  "items": [
-    {
-      "id": 1,
-      "username": "admin",
-      "priority": 100,
-      "description": "Admin credentials for core network devices",
-      "is_system": false,
-      "tags": [
-        { "id": 1, "name": "core-network", "type": "location" }
-      ]
-    }
-  ],
-  "total": 1,
-  "page": 1,
-  "size": 2,
-  "pages": 1
-}
-```
-**Frontend Notes:**
-- Use for credential management tables.
-- Passwords are never included in responses.
-
----
-
-#### `POST /credentials/` — Create credential
-**Description:** Create a new credential. Password is only sent in the request, never returned.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```json
-{
-  "username": "admin",
-  "password": "secureP@ssw0rd",
-  "priority": 100,
-  "description": "Admin credentials for core network devices",
-  "tags": [1]
-}
-```
-**Response Example:**
-```json
-{
-  "id": 2,
-  "username": "admin",
-  "priority": 100,
-  "description": "Admin credentials for core network devices",
-  "is_system": false,
-  "tags": [
-    { "id": 1, "name": "core-network", "type": "location" }
-  ]
-}
-```
-**Frontend Notes:**
-- Password is only sent in the request, never returned in the response.
-- If tag IDs are invalid, response is HTTP 404:
-  ```json
-  { "detail": "Tag(s) not found: [99]" }
-  ```
-
----
-
-#### `GET /credentials/{credential_id}` — Get credential by ID
-**Description:** Get a credential by its ID. Password is never returned.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```http
-GET /credentials/2 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response Example:**
-```json
-{
-  "id": 2,
-  "username": "admin",
-  "priority": 100,
-  "description": "Admin credentials for core network devices",
-  "is_system": false,
-  "tags": [
-    { "id": 1, "name": "core-network", "type": "location" }
-  ]
-}
-```
-**Frontend Notes:**
-- Use for credential detail views or edit forms.
-- If credential not found, response is HTTP 404:
-  ```json
-  { "detail": "Credential not found" }
-  ```
-
----
-
-#### `PUT /credentials/{credential_id}` — Update credential
-**Description:** Update an existing credential. Password can be updated by including it in the request.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```json
-{
-  "priority": 200,
-  "description": "Updated description"
-}
-```
-**Response Example:**
-```json
-{
-  "id": 2,
-  "username": "admin",
-  "priority": 200,
-  "description": "Updated description",
-  "is_system": false,
-  "tags": [
-    { "id": 1, "name": "core-network", "type": "location" }
-  ]
-}
-```
-**Frontend Notes:**
-- Only fields provided in the request are updated.
-- If credential not found, response is HTTP 404.
-
----
-
-#### `DELETE /credentials/{credential_id}` — Delete credential
-**Description:** Delete a credential by ID. System credentials cannot be deleted.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```http
-DELETE /credentials/2 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response:**
-- HTTP 204 No Content (no body).
-
-**Frontend Notes:**
-- Use for credential management delete actions.
-- If credential not found, response is HTTP 404:
-  ```json
-  { "detail": "Credential not found" }
-  ```
-- If credential is a system credential, response is HTTP 403:
-  ```json
-  { "detail": "System credentials cannot be deleted" }
-  ```
-
-### Jobs
-#### `GET /jobs/` — List jobs
-**Description:** List all jobs with pagination and optional filtering.
-
-**Authentication:** Bearer token required.
-
-**Query Parameters:**
-- `page` (int, default 1): Page number.
-- `size` (int, default 20): Items per page.
-- `name` (str, optional): Filter by partial job name match.
-- `status` (str, optional): Filter by job status (e.g., "pending", "running").
-- `is_enabled` (bool, optional): Filter by enabled/disabled state.
-- `schedule_type` (str, optional): Filter by schedule type (interval, cron, onetime).
-- `tag_id` (list[int], optional): Filter by tag IDs (jobs with ANY of the specified tags).
-
-**Request Example:**
-```http
-GET /jobs/?page=1&size=2 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response Example:**
-```json
-{
-  "items": [
-    {
-      "id": 1,
-      "name": "Backup Core Routers Daily",
-      "description": "Daily backup of all core routers at 2am",
-      "is_enabled": true,
-      "schedule_type": "cron",
-      "interval_seconds": null,
-      "cron_string": "0 2 * * *",
-      "scheduled_for": null,
-      "job_type": "backup",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tags": [
-        { "id": 1, "name": "core-network", "type": "location" }
-      ],
-      "device_id": null,
-      "is_system_job": false
-    }
-  ],
-  "total": 1,
-  "page": 1,
-  "size": 2,
-  "pages": 1
-}
-```
-**Frontend Notes:**
-- Use for job management tables.
-- `tags` is a list of tag objects.
-- `status` can be `pending`, `running`, `completed`, `failed`.
-
----
-
-#### `POST /jobs/` — Create job
-**Description:** Create a new job.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```json
-{
-  "name": "Backup Core Routers Daily",
-  "description": "Daily backup of all core routers at 2am",
-  "is_enabled": true,
-  "schedule_type": "cron",
-  "cron_string": "0 2 * * *",
-  "job_type": "backup",
-  "tags": [1]
-}
-```
-**Response Example:**
-```json
-{
-  "id": 2,
-  "name": "Backup Core Routers Daily",
-  "description": "Daily backup of all core routers at 2am",
-  "is_enabled": true,
-  "schedule_type": "cron",
-  "interval_seconds": null,
-  "cron_string": "0 2 * * *",
-  "scheduled_for": null,
-  "job_type": "backup",
-  "status": "pending",
-  "started_at": null,
-  "completed_at": null,
-  "tags": [
-    { "id": 1, "name": "core-network", "type": "location" }
-  ],
-  "device_id": null,
-  "is_system_job": false
-}
-```
-**Frontend Notes:**
-- If job name already exists, response is HTTP 400:
-  ```json
-  { "detail": "Job name already exists" }
-  ```
-- Either `tags` or `device_id` must be provided (not both).
-
----
-
-#### `GET /jobs/{job_id}` — Get job by ID
-**Description:** Get a job by its ID.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```http
-GET /jobs/2 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response Example:**
-```json
-{
-  "id": 2,
-  "name": "Backup Core Routers Daily",
-  "description": "Daily backup of all core routers at 2am",
-  "is_enabled": true,
-  "schedule_type": "cron",
-  "interval_seconds": null,
-  "cron_string": "0 2 * * *",
-  "scheduled_for": null,
-  "job_type": "backup",
-  "status": "pending",
-  "started_at": null,
-  "completed_at": null,
-  "tags": [
-    { "id": 1, "name": "core-network", "type": "location" }
-  ],
-  "device_id": null,
-  "is_system_job": false
-}
-```
-**Frontend Notes:**
-- Use for job detail views or edit forms.
-- If job not found, response is HTTP 404:
-  ```json
-  { "detail": "Job not found" }
-  ```
-
----
-
-#### `PUT /jobs/{job_id}` — Update job
-**Description:** Update an existing job.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```json
-{
-  "description": "Updated description",
-  "is_enabled": false
-}
-```
-**Response Example:**
-```json
-{
-  "id": 2,
-  "name": "Backup Core Routers Daily",
-  "description": "Updated description",
-  "is_enabled": false,
-  "schedule_type": "cron",
-  "interval_seconds": null,
-  "cron_string": "0 2 * * *",
-  "scheduled_for": null,
-  "job_type": "backup",
-  "status": "pending",
-  "started_at": null,
-  "completed_at": null,
-  "tags": [
-    { "id": 1, "name": "core-network", "type": "location" }
-  ],
-  "device_id": null,
-  "is_system_job": false
-}
-```
-**Frontend Notes:**
-- Only fields provided in the request are updated.
-- If job not found, response is HTTP 404.
-- System jobs cannot be updated (HTTP 403).
-
----
-
-#### `DELETE /jobs/{job_id}` — Delete job
-**Description:** Delete a job by ID. System jobs cannot be deleted.
-
-**Authentication:** Bearer token (admin role required).
-
-**Request Example:**
-```http
-DELETE /jobs/2 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response:**
-- HTTP 204 No Content (no body).
-
-**Frontend Notes:**
-- Use for job management delete actions.
-- If job not found, response is HTTP 404:
-  ```json
-  { "detail": "Job not found" }
-  ```
-- If job is a system job, response is HTTP 403:
-  ```json
-  { "detail": "System jobs cannot be deleted." }
-  ```
-
----
-
-#### `POST /jobs/run/{job_id}` — Trigger job run
-**Description:** Trigger immediate execution of a job. Returns immediately with acceptance message and queue info.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```http
-POST /jobs/run/2 HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response Example:**
-```json
-{
-  "message": "Job triggered successfully",
-  "job_id": 2,
-  "job_name": "Backup Core Routers Daily",
-  "queue_job_id": "rq:job:1234567890abcdef"
-}
-```
-**Frontend Notes:**
-- Use for manual job execution from the UI.
-- If job not found, response is HTTP 404.
-- If Redis queue is unavailable, response is HTTP 503.
-
----
-
-#### `GET /jobs/status` — Get job/queue/worker status
-**Description:** Get status of Redis, RQ queues, and workers for dashboard cards. Does NOT include system-wide health.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```http
-GET /jobs/status HTTP/1.1
-Authorization: Bearer <access_token>
-```
-**Response Example:**
-```json
-{
-  "redis_uptime": 12345,
-  "redis_memory": 10485760,
-  "redis_last_heartbeat": null,
-  "rq_queues": [
-    {
-      "name": "default",
-      "job_count": 1,
-      "oldest_job_ts": "2024-06-09T14:00:00.000Z",
-      "jobs": [
-        {
-          "job_id": "rq:job:1234567890abcdef",
-          "enqueued_at": "2024-06-09T14:00:00.000Z",
-          "func_name": "run_worker_job",
-          "args": [2],
-          "meta": {}
-        }
-      ]
-    }
-  ],
-  "workers": [
-    {
-      "id": "worker-1",
-      "status": "idle",
-      "jobs_in_progress": 0
-    }
-  ]
-}
-```
-**Frontend Notes:**
-- Use for job/queue/worker dashboard widgets.
-- `rq_queues` and `workers` are lists of objects with detailed status.
-
----
-
-#### `GET /jobs/{job_id}/devices` — Get per-device job results
-
-> **DEPRECATED**: This endpoint is deprecated and will be removed in a future release. Use `/job-results/?job_id=...` for canonical per-device job status. This endpoint currently returns per-device job logs (from the `logs` table, not `job_results`) and is maintained for legacy UI compatibility only.
-
-**Description:** Get job results for each device targeted by a job.
-
-**Authentication:** Bearer token required.
-
-**Request Example:**
-```http
-GET /jobs/2/devices HTTP/1.1
+GET /configs/search?q=interface HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
 ```json
 [
   {
-    "device_id": 1,
-    "device_name": "core-switch-01",
-    "device_ip": "192.168.1.1",
-    "log": {
-      "id": 123,
-      "timestamp": "2024-06-09T14:05:00.000Z",
-      "log_type": "job",
-      "level": "info",
-      "job_id": 2,
-      "device_id": 1,
-      "source": "worker.executor",
-      "message": "Job completed successfully",
-      "meta": {}
-    }
+    "id": 101,
+    "device_id": 2,
+    "retrieved_at": "2024-06-09T12:34:56.789Z",
+    "snippet": "...interface GigabitEthernet0/1...",
+    "config_metadata": {"hostname": "core-switch-02"}
   }
 ]
 ```
-**Frontend Notes:**
-- Use for job result tables and device status displays.
-- Each entry includes device info and the associated log.
 
 ---
 
-#### `GET /jobs/scheduled` — List scheduled jobs
-**Description:** List all enabled jobs with a schedule (interval/cron/onetime), including next run time.
+### `GET /configs/{device_id}/history` — Get version history for a device
+**Description:** List all configuration snapshots for a device, ordered by retrieval time (descending).
 
 **Authentication:** Bearer token required.
 
 **Request Example:**
 ```http
-GET /jobs/scheduled HTTP/1.1
+GET /configs/2/history HTTP/1.1
+Authorization: Bearer <access_token>
+```
+**Response Example:**
+```json
+[
+  {
+    "id": 101,
+    "device_id": 2,
+    "retrieved_at": "2024-06-09T12:34:56.789Z",
+    "config_metadata": {"hostname": "core-switch-02"}
+  }
+]
+```
+
+---
+
+### `GET /configs/{config_id}` — Get a specific config snapshot by ID
+**Description:** Retrieve a specific configuration snapshot (raw config and metadata).
+
+**Authentication:** Bearer token required.
+
+**Request Example:**
+```http
+GET /configs/101 HTTP/1.1
+Authorization: Bearer <access_token>
+```
+**Response Example:**
+```json
+{
+  "id": 101,
+  "device_id": 2,
+  "retrieved_at": "2024-06-09T12:34:56.789Z",
+  "config_metadata": {"hostname": "core-switch-02"},
+  "config_data": "interface GigabitEthernet0/1\n description Uplink\n ..."
+}
+```
+
+---
+
+### `GET /configs/diff` — Get unified diff between two config snapshots
+**Description:** Return a unified diff between two config snapshots' config_data fields.
+
+**Authentication:** Bearer token required.
+
+**Query Parameters:**
+- `config_id_a` (int, required): ID of the first config snapshot
+- `config_id_b` (int, required): ID of the second config snapshot
+
+**Request Example:**
+```http
+GET /configs/diff?config_id_a=101&config_id_b=102 HTTP/1.1
+Authorization: Bearer <access_token>
+```
+**Response Example:**
+```json
+{
+  "config_id_a": 101,
+  "config_id_b": 102,
+  "diff": [
+    "--- config_101",
+    "+++ config_102",
+    "@@ -1,3 +1,3 @@",
+    "-interface GigabitEthernet0/1",
+    "+interface GigabitEthernet0/2"
+  ]
+}
+```
+
+---
+
+### `GET /configs/list` and `GET /configs` — List all config snapshots
+**Description:** List all configuration snapshots, optionally filtered by device_id, paginated.
+
+**Authentication:** Bearer token required.
+
+**Query Parameters:**
+- `device_id` (int, optional): Filter by device ID
+- `start` (int, default 0): Offset for pagination
+- `limit` (int, default 50): Max results to return
+
+**Request Example:**
+```http
+GET /configs/list?device_id=2&start=0&limit=10 HTTP/1.1
+Authorization: Bearer <access_token>
+```
+**Response Example:**
+```json
+[
+  {
+    "id": 101,
+    "device_id": 2,
+    "retrieved_at": "2024-06-09T12:34:56.789Z",
+    "config_metadata": {"hostname": "core-switch-02"}
+  }
+]
+```
+
+---
+
+### `DELETE /configs/{config_id}` — Delete a config snapshot by ID
+**Description:** Delete a specific configuration snapshot by ID.
+
+**Authentication:** Bearer token required.
+
+**Request Example:**
+```http
+DELETE /configs/101 HTTP/1.1
+Authorization: Bearer <access_token>
+```
+**Response Example:**
+```json
+{ "deleted_id": 101 }
+```
+
+---
+
+### `POST /configs/{config_id}/restore` — Restore a config snapshot (mark as restored)
+**Description:** Mark a config as restored (optionally, create a new snapshot or update device state). For now, just logs/returns the action.
+
+**Authentication:** Bearer token required.
+
+**Request Example:**
+```http
+POST /configs/101/restore HTTP/1.1
+Authorization: Bearer <access_token>
+```
+**Response Example:**
+```json
+{
+  "restored_id": 101,
+  "device_id": 2,
+  "restored_at": "2024-06-09T12:34:56.789Z",
+  "message": "Config marked as restored (no device push performed)"
+}
+```
+
+---
+
+## Backups API (`/api/backups`)
+
+### `GET /api/backups/count` — Get the count of backup configuration files
+**Description:** Retrieve the total number of backup configuration files.
+
+**Authentication:** Bearer token required.
+
+**Request Example:**
+```http
+GET /api/backups/count HTTP/1.1
+Authorization: Bearer <access_token>
+```
+**Response Example:**
+```json
+{ "count": 123 }
+```
+
+---
+
+## Scheduler API (`/scheduler`)
+
+### `GET /scheduler/jobs` — List all jobs currently scheduled in RQ Scheduler
+**Description:** List all jobs currently scheduled in RQ Scheduler.
+
+**Authentication:** Bearer token required.
+
+**Request Example:**
+```http
+GET /scheduler/jobs HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
@@ -1183,103 +751,53 @@ Authorization: Bearer <access_token>
     "schedule_type": "cron",
     "interval_seconds": null,
     "cron_string": "0 2 * * *",
-    "scheduled_for": null,
+    "scheduled_for": "2024-06-10T02:00:00.000Z",
     "next_run": "2024-06-10T02:00:00.000Z",
-    "tags": [
-      { "id": 1, "name": "core-network", "type": "location" }
-    ],
+    "repeat": null,
+    "args": [],
+    "meta": {},
+    "tags": [],
     "is_enabled": true,
     "is_system_job": false
   }
 ]
 ```
-**Frontend Notes:**
-- Use for job scheduling dashboards and next-run indicators.
-- `next_run` is the calculated next scheduled execution time.
-
-# ---
-
-## Job Results, Logs, and Per-Device Status: Canonical Sources and Redundancy
-
-NetRaven stores per-device job status and logs in two places:
-- **Job Results Table (`job_results`)**: Canonical, structured per-device job outcome (status, details, timestamps). Exposed via `/job-results/`.
-- **Unified Logs Table (`logs`)**: Canonical, unstructured event log (job, connection, system, etc.). Exposed via `/logs/`.
-
-### Endpoint Relationships
-- `/job-results/`: Canonical for per-device job outcomes. Use for reporting, analytics, and device/job status dashboards.
-- `/jobs/{job_id}/devices`: **DEPRECATED**. Use `/job-results/?job_id=...` for canonical per-device job status. This endpoint is maintained for legacy UI compatibility only and will be removed after migration.
-- `/logs/`: Canonical for all log events, including job, connection, and system logs. Use for log tables, filtering, and streaming.
-- `/job-logs/`: **REMOVED**. This endpoint is not implemented in the backend and should not be referenced in frontend or documentation. Use `/logs/` for all log/event queries.
-
-### Data Flow Diagram
-
-```
-[Job Execution]
-   ├─► [job_results] (per-device outcome)
-   └─► [logs] (event log: job, connection, etc.)
-
-[API Endpoints]
-   ├─► /job-results/ (from job_results)
-   ├─► /logs/ (from logs)
-   └─► /jobs/{job_id}/devices (from logs, legacy)
-```
-
-### Migration Notes
-- `/jobs/{job_id}/devices` is deprecated. All consumers should migrate to `/job-results/?job_id=...` for per-device job status.
-- `/job-logs/` is not implemented and should be removed from all documentation and frontend code. Use `/logs/` for all log/event queries.
-- **Canonical Data Sources:**
-    - `/job-results/` is the only source for per-device job status.
-    - `/logs/` is the canonical source for event/audit logs.
 
 ---
 
-#### `GET /job-results/` — List job results (per-device)
-**Description:** Retrieve a paginated list of job results, including human-readable job and device names for each result. Each result now includes `job_name` (from the jobs table) and `device_name` (from the devices table) as top-level fields, in addition to `job_id` and `device_id`.
+### `GET /scheduler/queue/status` — Show queue length and details of jobs currently in the queue
+**Description:** Show queue length and details of jobs currently in the queue.
 
 **Authentication:** Bearer token required.
 
-**Query Parameters:**
-- `device_id` (int, optional): Filter by device ID
-- `job_id` (int, optional): Filter by job ID
-- `tag_id` (int, optional): Filter by tag ID
-- `job_type` (str, optional): Filter by job type
-- `status` (str, optional): Filter by job result status
-- `start_time` (datetime, optional): Filter by result time (start)
-- `end_time` (datetime, optional): Filter by result time (end)
-- `page` (int, default 1): Page number
-- `size` (int, default 20): Items per page
-
 **Request Example:**
 ```http
-GET /job-results/?job_id=2&page=1&size=2 HTTP/1.1
+GET /scheduler/queue/status HTTP/1.1
 Authorization: Bearer <access_token>
 ```
 **Response Example:**
 ```json
-{
-  "items": [
-    {
-      "id": 4,
-      "job_id": 2,
-      "job_name": "Backup Core Routers Daily",
-      "device_id": 1,
-      "device_name": "core-switch-01",
-      "job_type": "backup",
-      "status": "success",
-      "result_time": "2024-06-09T14:05:00.000Z",
-      "details": { "output": "ok" },
-      "created_at": "2024-06-09T14:05:01.000Z"
-    }
-  ],
-  "total": 1,
-  "page": 1,
-  "size": 2,
-  "pages": 1
-}
+[
+  {
+    "name": "default",
+    "job_count": 1,
+    "oldest_job_ts": "2024-06-09T14:00:00.000Z",
+    "jobs": [
+      {
+        "job_id": "rq:job:1234567890abcdef",
+        "enqueued_at": "2024-06-09T14:00:00.000Z",
+        "func_name": "run_worker_job",
+        "args": [2],
+        "meta": {}
+      }
+    ]
+  }
+]
 ```
-**Frontend Notes:**
-- Use for per-device job status tables and dashboards.
-- `job_name` and `device_name` are always present for each result.
-- Pagination fields: `total`, `page`, `size`, `pages`.
 
-# Credentials, and Jobs will be documented next in the same detailed format. 
+---
+
+## Notes on `/configs` Prefix Usage
+- Endpoints for configs and backups use the `/configs` prefix (e.g., `/configs`, `/backups`).
+- Most other endpoints (users, devices, jobs, tags, credentials, logs, scheduler, job-results) do **not** use the `/configs` prefix and are mounted at the root.
+- This is due to legacy and migration reasons. The frontend should use the documented paths as shown above.

@@ -30,7 +30,6 @@
         :per-page="pagination.perPage"
         :total-snapshots="pagination.total"
         @view="handleViewSnapshot"
-        @diff="handleDiffSnapshot"
         @download="handleDownloadSnapshot"
         @sort="handleSort"
         @page-change="handlePageChange"
@@ -42,20 +41,23 @@
       :is-open="viewModalOpen" 
       :title="`Configuration: ${selectedSnapshot?.device_name || ''}`"
       @close="closeViewModal"
+      :style="'min-width:600px; max-width:900px;'"
     >
       <template #content>
         <div v-if="selectedSnapshot" class="max-h-96 overflow-y-auto">
           <div class="flex justify-between items-center mb-2">
             <div>
-              <span class="text-text-secondary">Retrieved:</span> 
-              <span class="text-text-primary ml-1">{{ formatDate(selectedSnapshot.retrieved_at) }}</span>
+              <span class="text-text-secondary" style="color:#111;">Retrieved:</span> 
+              <span class="text-text-primary ml-1" style="color:#111;">{{ formatDate(selectedSnapshot.retrieved_at) }}</span>
             </div>
             <div>
-              <span class="text-text-secondary">Snapshot ID:</span> 
-              <span class="text-text-primary ml-1">{{ selectedSnapshot.id }}</span>
+              <span class="text-text-secondary" style="color:#111;">Snapshot ID:</span> 
+              <span class="text-text-primary ml-1" style="color:#111;">{{ selectedSnapshot.id }}</span>
             </div>
           </div>
-          <pre class="bg-card-secondary p-4 rounded font-mono text-sm whitespace-pre-wrap overflow-x-auto">{{ selectedSnapshot.snippet }}</pre>
+          <pre class="p-4 rounded font-mono text-sm whitespace-pre-wrap overflow-x-auto" style="background: #111; color: #fff;">
+            {{ selectedSnapshot.config_data || selectedSnapshot.snippet }}
+          </pre>
         </div>
         <p v-else class="text-text-secondary">No configuration data available.</p>
       </template>
@@ -69,6 +71,9 @@
         </button>
       </template>
     </BaseModal>
+
+    <!-- Error Feedback -->
+    <div v-if="errorMsg" class="text-red-600">{{ errorMsg }}</div>
   </div>
 </template>
 
@@ -78,13 +83,13 @@ import { ArrowPathIcon } from '@heroicons/vue/24/solid';
 import BaseModal from '../components/BaseModal.vue';
 import SearchBar from '../components/backups/SearchBar.vue';
 import SnapshotsTable from '../components/backups/SnapshotsTable.vue';
-import { configSnapshotsService } from '../services/configSnapshots';
-import { mockDevices, getPaginatedSnapshots } from '../mock/configSnapshots';
+import * as configSnapshotsService from '../services/configSnapshotsService';
+import api from '../services/api'; // Add this import for direct API calls
 
 // State
 const isLoading = ref(false);
 const snapshots = ref([]);
-const devices = ref(mockDevices);
+const devices = ref([]); // Will be loaded from API
 const filters = reactive({
   query: '',
   deviceId: null,
@@ -98,77 +103,105 @@ const pagination = reactive({
   totalPages: 1
 });
 const sorting = reactive({
-  key: 'retrieved_at',
-  order: 'desc'
+  sort: null
 });
 const viewModalOpen = ref(false);
 const selectedSnapshot = ref(null);
+const downloadLoading = ref(false);
+const errorMsg = ref('');
 
 // Lifecycle hooks
 onMounted(() => {
-  fetchSnapshots();
+  loadSnapshots();
+  fetchDevices();
 });
 
 // Methods
-async function fetchSnapshots() {
+async function loadSnapshots() {
   isLoading.value = true;
-  
   try {
-    // In a real implementation, this would call the API
-    // const response = await configSnapshotsService.search(
-    //   filters,
-    //   pagination.currentPage,
-    //   pagination.perPage,
-    //   sorting
-    // );
-    
-    // Using mock data instead
-    const response = getPaginatedSnapshots({
-      query: filters.query,
-      deviceId: filters.deviceId,
-      startDate: filters.startDate,
-      endDate: filters.endDate,
-      page: pagination.currentPage,
-      perPage: pagination.perPage,
-      sortBy: sorting.key,
-      sortOrder: sorting.order
+    // If a search query is present, use /configs/search, else use /configs (paginated)
+    const hasQuery = filters.query && filters.query.trim();
+    let data;
+    if (hasQuery) {
+      // Always send a non-empty q param for /configs/search
+      const resp = await configSnapshotsService.searchSnapshots({ query: filters.query });
+      // /configs/search returns an array, not paginated
+      data = { items: resp.data, total: resp.data.length, total_pages: 1 };
+    } else {
+      // Use paginated list endpoint
+      const resp = await configSnapshotsService.listSnapshots({
+        deviceId: filters.deviceId,
+        page: pagination.currentPage,
+        perPage: pagination.perPage
+      });
+      // /configs returns paginated data (array)
+      data = {
+        items: resp.data,
+        total: resp.data.length,
+        total_pages: 1
+      };
+    }
+    // Map device_name and snippet for table display
+    snapshots.value = (data.items || []).map(snap => {
+      // Try config_metadata.hostname, else lookup from devices list, else fallback
+      let deviceName = snap.config_metadata?.hostname;
+      if (!deviceName && devices.value.length && snap.device_id) {
+        const found = devices.value.find(d => d.id === snap.device_id);
+        deviceName = found ? found.name || found.hostname : undefined;
+      }
+      if (!deviceName) deviceName = snap.device_name || snap.device_id;
+      // Snippet: use API snippet, else generate from config_data
+      let snippet = snap.snippet;
+      if (!snippet && snap.config_data) {
+        const lines = snap.config_data.split('\n').slice(0, 2).join(' ');
+        snippet = lines.length > 0 ? lines + (snap.config_data.split('\n').length > 2 ? ' ...' : '') : '';
+      }
+      return {
+        ...snap,
+        device_name: deviceName,
+        snippet
+      };
     });
-    
-    snapshots.value = response.snapshots;
-    pagination.total = response.pagination.total;
-    pagination.totalPages = response.pagination.total_pages;
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-  } catch (error) {
-    console.error('Failed to fetch snapshots:', error);
-    // In a real implementation, we would use the notification store
-    // notificationStore.showError('Failed to load configuration snapshots');
+    pagination.total = data.total || 0;
+    pagination.totalPages = data.total_pages || 1;
+  } catch (err) {
+    console.error('Failed to load snapshots', err);
+    errorMsg.value = 'Failed to load snapshots.';
   } finally {
     isLoading.value = false;
   }
 }
 
-function handleSearch(searchParams) {
-  // Update filters from search event
-  Object.assign(filters, searchParams);
-  pagination.currentPage = 1; // Reset to first page on new search
-  fetchSnapshots();
+async function fetchDevices() {
+  try {
+    // Use trailing slash and expect paginated response
+    const response = await api.get('/devices/', { params: { page: 1, size: 100 } });
+    devices.value = response.data.items || [];
+  } catch (error) {
+    console.error('Failed to fetch devices:', error);
+    errorMsg.value = 'Failed to fetch devices.';
+  }
 }
 
-function handleSort(sortParams) {
-  sorting.key = sortParams.key;
-  sorting.order = sortParams.order;
-  fetchSnapshots();
+function handleSearch(newFilters) {
+  Object.assign(filters, newFilters);
+  pagination.currentPage = 1;
+  loadSnapshots();
+}
+
+function handleSort(sort) {
+  sorting.sort = sort;
+  loadSnapshots();
 }
 
 function handlePageChange(page) {
   pagination.currentPage = page;
-  fetchSnapshots();
+  loadSnapshots();
 }
 
 function refreshData() {
-  fetchSnapshots();
+  loadSnapshots();
 }
 
 function formatDate(timestamp) {
@@ -185,9 +218,18 @@ function formatDate(timestamp) {
 }
 
 // Modal handlers
-function handleViewSnapshot(snapshot) {
-  selectedSnapshot.value = snapshot;
-  viewModalOpen.value = true;
+async function handleViewSnapshot(snapshot) {
+  try {
+    isLoading.value = true;
+    const { data } = await configSnapshotsService.getSnapshot(snapshot.id);
+    selectedSnapshot.value = data;
+    viewModalOpen.value = true;
+  } catch (err) {
+    errorMsg.value = 'Failed to load snapshot.';
+    console.error(err);
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 function closeViewModal() {
@@ -195,31 +237,25 @@ function closeViewModal() {
   selectedSnapshot.value = null;
 }
 
-function handleDiffSnapshot(snapshot) {
-  // This would be implemented in a future workstream
-  console.log('Diff snapshot:', snapshot);
-  // In a real implementation, we would navigate to a diff view
-  // router.push(`/backups/configurations/${snapshot.device_id}/${snapshot.id}/diff`);
-}
-
-function handleDownloadSnapshot(snapshot) {
-  // This would be implemented in a future workstream
-  console.log('Download snapshot:', snapshot);
-  // In a real implementation, we would call the API to download the snapshot
-  // configSnapshotsService.downloadSnapshot(snapshot.device_id, snapshot.id)
-  //   .then(response => {
-  //     // Create a download link and trigger it
-  //     const url = window.URL.createObjectURL(new Blob([response.data]));
-  //     const link = document.createElement('a');
-  //     link.href = url;
-  //     link.setAttribute('download', `config_${snapshot.device_name}_${snapshot.id}.txt`);
-  //     document.body.appendChild(link);
-  //     link.click();
-  //     document.body.removeChild(link);
-  //   })
-  //   .catch(error => {
-  //     console.error('Failed to download snapshot:', error);
-  //     notificationStore.showError('Failed to download configuration snapshot');
-  //   });
+async function handleDownloadSnapshot(snapshot) {
+  try {
+    downloadLoading.value = true;
+    const response = await configSnapshotsService.downloadSnapshot(snapshot.id);
+    // If response.data is an object, extract config_data
+    const configText = response.data.config_data || response.data;
+    const url = window.URL.createObjectURL(new Blob([configText], { type: 'text/plain' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `config_snapshot_${snapshot.id}.txt`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    errorMsg.value = 'Failed to download snapshot.';
+    console.error(err);
+  } finally {
+    downloadLoading.value = false;
+  }
 }
 </script>

@@ -16,7 +16,7 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoading.value = true
     error.value = null
     try {
-      const response = await api.get('/api/devices/', { params })
+      const response = await api.get('/devices/', { params })
       if (response.data && response.data.items) {
         devices.value = response.data.items
       } else {
@@ -40,7 +40,7 @@ export const useDeviceStore = defineStore('devices', () => {
       return deviceCredentialsCache.value[deviceId]
     }
     try {
-      const response = await api.get(`/api/devices/${deviceId}/credentials`)
+      const response = await api.get(`/devices/${deviceId}/credentials`)
       const deduped = Array.isArray(response.data)
         ? response.data.filter((cred, idx, arr) => arr.findIndex(c => c.id === cred.id) === idx)
         : []
@@ -67,7 +67,7 @@ export const useDeviceStore = defineStore('devices', () => {
         tags: deviceData.tag_ids || []
       }
       delete apiData.tag_ids
-      const response = await api.post('/api/devices/', apiData);
+      const response = await api.post('/devices/', apiData);
       devices.value.push(response.data)
       return true
     } catch (err) {
@@ -87,7 +87,7 @@ export const useDeviceStore = defineStore('devices', () => {
         tags: deviceData.tag_ids || []
       }
       delete apiData.tag_ids
-      const response = await api.put(`/api/devices/${deviceId}`, apiData);
+      const response = await api.put(`/devices/${deviceId}`, apiData);
       const index = devices.value.findIndex(d => d.id === deviceId)
       if (index !== -1) {
         devices.value[index] = response.data
@@ -105,7 +105,7 @@ export const useDeviceStore = defineStore('devices', () => {
     isLoading.value = true
     error.value = null
     try {
-      await api.delete(`/api/devices/${deviceId}`);
+      await api.delete(`/devices/${deviceId}`);
       devices.value = devices.value.filter(d => d.id !== deviceId)
       return true
     } catch (err) {
@@ -154,4 +154,4 @@ export const useDeviceStore = defineStore('devices', () => {
     deviceCredentialsCache,
     fetchDevicesWithReachabilityStatus
   }
-}) 
+})
