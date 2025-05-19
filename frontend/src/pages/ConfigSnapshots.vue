@@ -86,6 +86,7 @@
           :newContent="diffNewSnapshot?.config_data || ''"
           :oldVersion="diffOldSnapshot"
           :newVersion="diffNewSnapshot"
+          :diff="diffResult"
           :isLoading="diffLoading"
           :error="diffError"
         />
@@ -143,6 +144,7 @@ const diffOldSnapshot = ref(null);
 const diffNewSnapshot = ref(null);
 const diffLoading = ref(false);
 const diffError = ref('');
+const diffResult = ref('');
 const diffParams = reactive({ deviceId: '', v1: '', v2: '' });
 const downloadLoading = ref(false);
 const errorMsg = ref('');
@@ -274,23 +276,26 @@ function closeViewModal() {
   selectedSnapshot.value = null;
 }
 
-async function handleDiffSnapshot({ v1, v2 }) {
+async function handleDiffSnapshot({ deviceId, v1, v2 }) {
+  diffModalOpen.value = true;
   diffLoading.value = true;
   diffError.value = '';
-  diffOldSnapshot.value = null;
-  diffNewSnapshot.value = null;
+  diffResult.value = '';
+  diffParams.deviceId = deviceId;
+  diffParams.v1 = v1;
+  diffParams.v2 = v2;
   try {
-    // Fetch both snapshots in parallel
-    const [oldResp, newResp] = await Promise.all([
-      configSnapshotsService.getSnapshot(v1),
-      configSnapshotsService.getSnapshot(v2)
+    // Fetch both snapshots for context (for version info)
+    const [oldSnap, newSnap, diffResp] = await Promise.all([
+      configSnapshotsService.getSnapshot(deviceId, v1),
+      configSnapshotsService.getSnapshot(deviceId, v2),
+      configSnapshotsService.getDiff(deviceId, v1, v2)
     ]);
-    diffOldSnapshot.value = oldResp.data;
-    diffNewSnapshot.value = newResp.data;
-    diffModalOpen.value = true;
+    diffOldSnapshot.value = oldSnap.data;
+    diffNewSnapshot.value = newSnap.data;
+    diffResult.value = diffResp.data;
   } catch (err) {
-    diffError.value = 'Failed to load diff snapshots.';
-    console.error(err);
+    diffError.value = 'Failed to load diff data.';
   } finally {
     diffLoading.value = false;
   }
@@ -300,6 +305,7 @@ function closeDiffModal() {
   diffModalOpen.value = false;
   diffOldSnapshot.value = null;
   diffNewSnapshot.value = null;
+  diffResult.value = '';
   diffError.value = '';
 }
 
