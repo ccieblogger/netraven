@@ -1,12 +1,12 @@
 <template>
-  <div class="diff-viewer">
+  <div class="diff-viewer" role="region" aria-label="Configuration Diff Viewer">
     <!-- Header with commit information -->
     <div class="bg-gray-100 p-4 mb-4 rounded-md">
       <div class="flex justify-between items-center">
         <div>
           <h3 class="text-lg font-semibold">Configuration Diff</h3>
-          <div v-if="isLoading" class="text-sm text-gray-500">Loading...</div>
-          <div v-else-if="error" class="text-sm text-red-500">{{ error }}</div>
+          <div v-if="isLoading" class="text-sm text-gray-500" aria-live="polite">Loading...</div>
+          <div v-else-if="error" class="text-sm text-red-500" aria-live="assertive">{{ error }}</div>
           <div v-else class="text-sm text-gray-500">
             <span v-if="oldVersion">{{ formatDate(oldVersion.timestamp) }} ({{ oldVersion.job_id ? `Job #${oldVersion.job_id}` : 'Unknown' }})</span>
             <span v-if="oldVersion && newVersion"> → </span>
@@ -18,6 +18,8 @@
           <button 
             @click="toggleViewType" 
             class="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Toggle diff view type"
+            tabindex="0"
           >
             {{ viewType === 'side-by-side' ? 'Unified View' : 'Side-by-Side View' }}
           </button>
@@ -25,6 +27,8 @@
           <button 
             @click="copyToClipboard" 
             class="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Copy diff to clipboard"
+            tabindex="0"
           >
             <span v-if="copied">Copied!</span>
             <span v-else>Copy</span>
@@ -34,7 +38,7 @@
     </div>
 
     <!-- Diff content container -->
-    <div class="bg-white border border-gray-200 rounded-md overflow-auto">
+    <div class="bg-white border border-gray-200 rounded-md overflow-auto" role="region" aria-label="Diff content">
       <div id="diff-container" ref="diffContainer"></div>
     </div>
   </div>
@@ -234,4 +238,4 @@ onMounted(() => {
 :deep(.d2h-ins) {
   background-color: #d1fae5;
 }
-</style> 
+</style>
