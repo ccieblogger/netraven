@@ -285,7 +285,7 @@ async function handleDiffSnapshot({ deviceId, v1, v2 }) {
   diffParams.v1 = v1;
   diffParams.v2 = v2;
   try {
-    // Fetch both snapshots for context (for version info)
+    // Use correct service methods for deviceId/snapshotId
     const [oldSnap, newSnap, diffResp] = await Promise.all([
       configSnapshotsService.getSnapshot(deviceId, v1),
       configSnapshotsService.getSnapshot(deviceId, v2),
