@@ -220,7 +220,7 @@ onMounted(() => {
 
 :deep(.d2h-info) {
   background-color: #f9fafb;
-  color: #6b7280;
+  color: #010714;
 }
 
 :deep(.d2h-file-list-wrapper) {
@@ -237,5 +237,16 @@ onMounted(() => {
 
 :deep(.d2h-ins) {
   background-color: #d1fae5;
+}
+
+:deep(.d2h-code-line),
+:deep(.d2h-code-side-line),
+:deep(.d2h-code-line-ctn) {
+  color: #1a1a1a !important;
+}
+
+:deep(.d2h-del),
+:deep(.d2h-ins) {
+  color: #1a1a1a !important;
 }
 </style>
