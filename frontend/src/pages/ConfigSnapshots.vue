@@ -30,7 +30,6 @@
         :per-page="pagination.perPage"
         :total-snapshots="pagination.total"
         @view="handleViewSnapshot"
-        @diff="handleDiffSnapshot"
         @download="handleDownloadSnapshot"
         @sort="handleSort"
         @page-change="handlePageChange"
@@ -73,36 +72,6 @@
       </template>
     </BaseModal>
 
-    <!-- Diff Modal -->
-    <BaseModal 
-      :is-open="diffModalOpen" 
-      :title="'Configuration Diff'"
-      @close="closeDiffModal"
-    >
-      <template #content>
-        <DiffViewer
-          v-if="diffModalOpen"
-          :oldContent="diffOldSnapshot?.config_data || ''"
-          :newContent="diffNewSnapshot?.config_data || ''"
-          :oldVersion="diffOldSnapshot"
-          :newVersion="diffNewSnapshot"
-          :diff="diffResult"
-          :isLoading="diffLoading"
-          :error="diffError"
-        />
-        <p v-else class="text-text-secondary">No diff data available.</p>
-      </template>
-      
-      <template #actions>
-        <button
-          @click="closeDiffModal"
-          class="px-4 py-2 border border-divider text-text-secondary rounded hover:bg-card-secondary focus:outline-none"
-        >
-          Close
-        </button>
-      </template>
-    </BaseModal>
-
     <!-- Error Feedback -->
     <div v-if="errorMsg" class="text-red-600">{{ errorMsg }}</div>
   </div>
@@ -114,7 +83,6 @@ import { ArrowPathIcon } from '@heroicons/vue/24/solid';
 import BaseModal from '../components/BaseModal.vue';
 import SearchBar from '../components/backups/SearchBar.vue';
 import SnapshotsTable from '../components/backups/SnapshotsTable.vue';
-import DiffViewer from '../components/DiffViewer.vue';
 import * as configSnapshotsService from '../services/configSnapshotsService';
 import api from '../services/api'; // Add this import for direct API calls
 
@@ -139,13 +107,6 @@ const sorting = reactive({
 });
 const viewModalOpen = ref(false);
 const selectedSnapshot = ref(null);
-const diffModalOpen = ref(false);
-const diffOldSnapshot = ref(null);
-const diffNewSnapshot = ref(null);
-const diffLoading = ref(false);
-const diffError = ref('');
-const diffResult = ref('');
-const diffParams = reactive({ deviceId: '', v1: '', v2: '' });
 const downloadLoading = ref(false);
 const errorMsg = ref('');
 
@@ -274,39 +235,6 @@ async function handleViewSnapshot(snapshot) {
 function closeViewModal() {
   viewModalOpen.value = false;
   selectedSnapshot.value = null;
-}
-
-async function handleDiffSnapshot({ deviceId, v1, v2 }) {
-  diffModalOpen.value = true;
-  diffLoading.value = true;
-  diffError.value = '';
-  diffResult.value = '';
-  diffParams.deviceId = deviceId;
-  diffParams.v1 = v1;
-  diffParams.v2 = v2;
-  try {
-    // Use correct service methods for deviceId/snapshotId
-    const [oldSnap, newSnap, diffResp] = await Promise.all([
-      configSnapshotsService.getSnapshot(deviceId, v1),
-      configSnapshotsService.getSnapshot(deviceId, v2),
-      configSnapshotsService.getDiff(deviceId, v1, v2)
-    ]);
-    diffOldSnapshot.value = oldSnap.data;
-    diffNewSnapshot.value = newSnap.data;
-    diffResult.value = diffResp.data;
-  } catch (err) {
-    diffError.value = 'Failed to load diff data.';
-  } finally {
-    diffLoading.value = false;
-  }
-}
-
-function closeDiffModal() {
-  diffModalOpen.value = false;
-  diffOldSnapshot.value = null;
-  diffNewSnapshot.value = null;
-  diffResult.value = '';
-  diffError.value = '';
 }
 
 async function handleDownloadSnapshot(snapshot) {

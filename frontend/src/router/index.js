@@ -9,7 +9,6 @@ import JobsDashboard from '../pages/JobsDashboard.vue';
 import Logs from '../pages/Logs.vue';
 import Users from '../pages/Users.vue';
 import Unauthorized from '../pages/Unauthorized.vue';
-import ConfigDiff from '../pages/ConfigDiff.vue'; // Import the ConfigDiff component
 import JobMonitor from '../pages/JobMonitor.vue'; // Import the JobMonitor component
 import Tags from '../pages/Tags.vue'; // Import the Tags component
 import Credentials from '../pages/Credentials.vue'; // Import the Credentials component
@@ -105,12 +104,6 @@ const routes = [
     meta: { requiresAuth: true, roles: ['admin'] } // Example: Admin only
   },
   {
-    path: '/config-diff',
-    name: 'ConfigDiff',
-    component: ConfigDiff, // Use the ConfigDiff component
-    meta: { requiresAuth: true, roles: ['admin', 'user'] }
-  },
-  {
     path: '/unauthorized',
     name: 'Unauthorized',
     component: Unauthorized, // Use actual Unauthorized component
@@ -132,6 +125,13 @@ const routes = [
         path: 'snapshots/:device/:snapshotId',
         name: 'ConfigRawView',
         component: () => import('../pages/ConfigRawView.vue'),
+        meta: { requiresAuth: true, roles: ['admin', 'user'] }
+      },
+      // Add config diff as a child route
+      {
+        path: 'diff',
+        name: 'ConfigDiff',
+        component: () => import('../pages/ConfigDiff.vue'),
         meta: { requiresAuth: true, roles: ['admin', 'user'] }
       },
       { 

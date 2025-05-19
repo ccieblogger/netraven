@@ -68,7 +68,19 @@
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary flex gap-2">
             <button @click="viewSnapshot(snapshot)" class="text-primary underline bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none">View</button>
-            <button @click="diffSnapshot(snapshot)" class="text-primary underline bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none">Diff</button>
+            <router-link
+              v-if="getPreviousSnapshotId(snapshot)"
+              :to="{
+                path: '/backups/diff',
+                query: {
+                  deviceId: snapshot.device_id,
+                  v1: getPreviousSnapshotId(snapshot),
+                  v2: snapshot.id
+                }
+              }"
+              class="text-primary underline bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none"
+              >Diff</router-link>
+            <button v-else disabled class="text-text-tertiary underline bg-transparent border-0 p-0 m-0 cursor-not-allowed">Diff</button>
             <button @click="downloadSnapshot(snapshot)" class="text-primary underline bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none">Download</button>
           </td>
         </tr>
@@ -137,6 +149,7 @@ import {
   ArrowsRightLeftIcon,
   ArrowDownTrayIcon
 } from '@heroicons/vue/24/solid';
+import { useRouter } from 'vue-router';
 
 // Props
 const props = defineProps({
@@ -238,5 +251,14 @@ function nextPage() {
   if (props.page < totalPages.value) {
     emit('page-change', props.page + 1);
   }
+}
+
+// Helper to get previous snapshot id for diffing
+function getPreviousSnapshotId(current) {
+  const idx = props.snapshots.findIndex(s => s.id === current.id);
+  if (idx > 0) {
+    return props.snapshots[idx - 1].id;
+  }
+  return null;
 }
 </script>

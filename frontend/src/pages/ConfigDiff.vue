@@ -111,6 +111,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import DiffViewer from '../components/DiffViewer.vue';
 import { useDeviceStore } from '../store/device';
 import { useJobStore } from '../store/job';
@@ -121,6 +122,8 @@ import axios from 'axios';
 const deviceStore = useDeviceStore();
 const jobStore = useJobStore();
 const notificationStore = useNotificationStore();
+const route = useRoute();
+const router = useRouter();
 
 // State
 const selectedDeviceId = ref('');
@@ -154,22 +157,18 @@ function formatDate(timestamp) {
 // Fetch device configurations
 async function fetchDeviceConfigurations() {
   if (!selectedDeviceId.value) return;
-  
   isLoading.value = true;
   configVersions.value = [];
   diffError.value = '';
-  
   try {
     // API call to fetch configurations
     const response = await axios.get(`/devices/${selectedDeviceId.value}/configurations`, {
       params: { job_id: jobFilter.value || undefined }
     });
-    
     // Sort by timestamp (newest first)
     configVersions.value = response.data.sort((a, b) => 
       new Date(b.timestamp) - new Date(a.timestamp)
     );
-    
     // Auto-select newest and second newest if available
     if (configVersions.value.length >= 2) {
       selectedVersionB.value = configVersions.value[0].id; // Newest
@@ -193,21 +192,17 @@ async function fetchDeviceConfigurations() {
 // Load diff between two versions
 async function loadDiff() {
   if (!canCompare.value) return;
-  
   isLoadingDiff.value = true;
   configA.value = '';
   configB.value = '';
   diffError.value = '';
-  
   try {
     // Get the selected version objects
     versionADetails.value = configVersions.value.find(v => v.id === selectedVersionA.value);
     versionBDetails.value = configVersions.value.find(v => v.id === selectedVersionB.value);
-    
     // Fetch version A (old)
     const responseA = await axios.get(`/devices/${selectedDeviceId.value}/configurations/${selectedVersionA.value}`);
     configA.value = responseA.data.config_data;
-    
     // Fetch version B (new)
     const responseB = await axios.get(`/devices/${selectedDeviceId.value}/configurations/${selectedVersionB.value}`);
     configB.value = responseB.data.config_data;
@@ -230,14 +225,25 @@ watch(jobFilter, () => {
   fetchDeviceConfigurations();
 });
 
-// Load devices on component mount
+// On mount: check for route query params and auto-load diff if present
 onMounted(async () => {
   if (devices.value.length === 0) {
     await deviceStore.fetchDevices();
   }
-  
   if (jobs.value.length === 0) {
     await jobStore.fetchJobs();
+  }
+  // Always allow manual selection: if a device is already selected (from query or user), fetch its configs
+  const { deviceId, v1, v2 } = route.query;
+  if (deviceId) {
+    selectedDeviceId.value = deviceId;
+    await fetchDeviceConfigurations();
+  }
+  // If both versions are present, auto-select and load diff
+  if (deviceId && v1 && v2) {
+    selectedVersionA.value = v1;
+    selectedVersionB.value = v2;
+    await loadDiff();
   }
 });
 </script>
