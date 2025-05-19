@@ -74,3 +74,16 @@ api:
 git:
   # Path to the local directory where device configurations will be stored as a Git repo
   repo_path: "/data/git-config-repo" # Ensure this path exists and is writable
+
+ssh:
+  # Allow legacy SSH key exchange algorithms for devices with outdated SSH implementations.
+  # Set to true ONLY if you have devices that require legacy KEX. Default is false for security.
+  allow_legacy_kex: false
+  # List of legacy KEX algorithms to allow if 'allow_legacy_kex' is true.
+  legacy_kex:
+    - diffie-hellman-group14-sha1
+    - diffie-hellman-group1-sha1
+  # List of legacy MAC algorithms to allow if 'allow_legacy_kex' is true.
+  legacy_macs:
+    - hmac-sha1
+    - hmac-md5

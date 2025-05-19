@@ -186,7 +186,7 @@ def run_command(
         # Attempt to establish connection
         logger.log(
             f"[Job: {job_id}] Opening connection to {device_name}",
-            level="DEBUG",
+            level="INFO",
             destinations=["stdout", "db", "file"],
             job_id=job_id,
             device_id=device_id,
@@ -194,17 +194,27 @@ def run_command(
             log_type="job"
         )
         connection = ConnectHandler(**connection_details)
+
+        if not connection.check_enable_mode():
+            logger.log(f"[Job: {job_id}] Netmiko setting exec mode {device_name}",level="INFO",destinations=["stdout", "db", "file"],job_id=job_id,device_id=device_id,source="netmiko_driver",log_type="job")
+            try:
+                connection.enable()
+            except ValueError as err:
+                logger.log(f"[ERROR] Failed to set enable mode for {device_name} '{err}'",level="ERROR",destinations=["stdout", "db", "file"],job_id=job_id,device_id=device_id,source="netmiko_driver",log_type="job")
+        
         
         # Execute command with timeout
         logger.log(
             f"[Job: {job_id}] Executing '{command}' on {device_name}",
-            level="DEBUG",
+            level="INFO",
             destinations=["stdout", "db", "file"],
             job_id=job_id,
             device_id=device_id,
             source="netmiko_driver",
             log_type="job"
         )
+
+        # Send command and wait for output
         output = connection.send_command(
             command, 
             read_timeout=command_timeout
@@ -212,12 +222,21 @@ def run_command(
         
         # Validate output
         if output is None:
+            logger.log(
+                f"[Job: {job_id}] No output received for command '{command}' from {device_name} ({device_ip})",
+                level="ERROR",
+                destinations=["stdout", "db", "file"],
+                job_id=job_id,
+                device_id=device_id,
+                source="netmiko_driver",
+                log_type="job"
+            )
             raise ValueError(f"Received no output for command '{command}' from {device_ip}")
         
         # Log success
         elapsed = time.time() - start_time
         logger.log(
-            f"[Job: {job_id}] Successfully executed command on {device_name} in {elapsed:.2f}s",
+            f"[Job: {job_id}] Successfully executed command '{command}' on {device_name} in {elapsed:.2f}s",
             level="INFO",
             destinations=["stdout", "db", "file"],
             job_id=job_id,
