@@ -38,7 +38,7 @@
     </div>
 
     <!-- Diff content container -->
-    <div class="bg-white border border-gray-200 rounded-md overflow-auto" role="region" aria-label="Diff content">
+    <div class="bg-white border border-gray-200 rounded-md overflow-auto max-h-[70vh]" role="region" aria-label="Diff content">
       <div id="diff-container" ref="diffContainer"></div>
     </div>
   </div>
@@ -234,5 +234,17 @@ onMounted(() => {
 :deep(.d2h-del),
 :deep(.d2h-ins) {
   color: #1a1a1a !important;
+}
+
+:deep(.d2h-emptyplaceholder) {
+  display: none !important;
+}
+
+:deep(.d2h-code-side-emptyplaceholder) {
+  display: none !important;
+}
+
+:deep(.d2h-code-line-empty) {
+  display: none !important;
 }
 </style>
