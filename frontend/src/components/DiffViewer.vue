@@ -206,7 +206,11 @@ onMounted(() => {
 }
 
 :deep(.d2h-file-list-wrapper) {
-  display: none;
+  display: none !important;
+}
+
+:deep(.d2h-file-header) {
+  display: none !important;
 }
 
 :deep(.d2h-tag) {
