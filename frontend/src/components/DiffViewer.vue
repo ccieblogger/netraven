@@ -98,7 +98,7 @@ const diffText = computed(() => {
     props.newContent || '',
     '',
     '',
-    { context: 3 }
+    { context: Number.MAX_SAFE_INTEGER }
   );
 });
 
