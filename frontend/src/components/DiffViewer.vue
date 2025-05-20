@@ -14,16 +14,7 @@
           </div>
         </div>
         <div class="flex space-x-2">
-          <!-- View type toggle -->
-          <button 
-            @click="toggleViewType" 
-            class="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            aria-label="Toggle diff view type"
-            tabindex="0"
-          >
-            {{ viewType === 'side-by-side' ? 'Unified View' : 'Side-by-Side View' }}
-          </button>
-          <!-- Copy to clipboard button -->
+          <!-- Copy to clipboard button only -->
           <button 
             @click="copyToClipboard" 
             class="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -36,19 +27,31 @@
         </div>
       </div>
     </div>
-
-    <!-- Diff content container -->
+    <!-- Monaco Diff Editor -->
     <div class="bg-white border border-gray-200 rounded-md overflow-auto max-h-[70vh]" role="region" aria-label="Diff content">
-      <div id="diff-container" ref="diffContainer"></div>
+      <template v-if="!isLoading && !error">
+        <div v-if="!oldContent?.trim() && !newContent?.trim()" class="p-4 text-gray-500 text-center">No configuration data available</div>
+        <div v-else-if="oldContent === newContent" class="p-4 text-gray-500 text-center">No differences found between selected versions.</div>
+        <vue-monaco-diff-editor
+          v-else
+          :original="sanitizeContent(oldContent)"
+          :modified="sanitizeContent(newContent)"
+          :key="diffKey"
+          language="plaintext"
+          :options="monacoOptions"
+          theme="netraven-dark"
+          style="height: 70vh; width: 100%;"
+        />
+      </template>
+      <div v-else-if="isLoading" class="p-4 text-gray-500 text-center">Loading diff...</div>
+      <div v-else-if="error" class="p-4 text-red-500 text-center">{{ error }}</div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue';
-import * as Diff2Html from 'diff2html';
-import 'diff2html/bundles/css/diff2html.min.css';
-import { createTwoFilesPatch } from 'diff';
+import { VueMonacoDiffEditor } from '@guolao/vue-monaco-editor';
 
 // Props
 const props = defineProps({
@@ -75,86 +78,36 @@ const props = defineProps({
   error: {
     type: String,
     default: ''
-  },
-  initialViewType: {
-    type: String,
-    default: 'side-by-side',
-    validator: (value) => ['side-by-side', 'line-by-line'].includes(value)
   }
 });
 
-// Reactive state
-const diffContainer = ref(null);
-const viewType = ref(props.initialViewType);
 const copied = ref(false);
 
-// Generate unified diff from old and new content
-const diffText = computed(() => {
-  if (!props.oldContent && !props.newContent) return '';
-  return createTwoFilesPatch(
-    'old_config.txt',
-    'new_config.txt',
-    props.oldContent || '',
-    props.newContent || '',
-    '',
-    '',
-    { context: Number.MAX_SAFE_INTEGER }
-  );
-});
+// Monaco options
+const monacoOptions = computed(() => ({
+  renderSideBySide: true,
+  readOnly: true,
+  lineNumbers: 'on',
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false
+}));
 
-// Watch changes to render diff
-watch([() => props.oldContent, () => props.newContent, viewType], renderDiff, { immediate: true });
+const sanitizeContent = (content) => {
+  if (typeof content !== 'string' || !content.trim()) return ' ';
+  return content;
+};
 
-// Format date for display
+const diffKey = computed(() => `${Date.now()}-${(props.oldContent || '').slice(0, 32)}-${(props.newContent || '').slice(0, 32)}`);
+
 function formatDate(timestamp) {
   if (!timestamp) return 'Unknown';
   return new Date(timestamp).toLocaleString();
 }
 
-// Render the diff using diff2html
-function renderDiff() {
-  if (!diffContainer.value) return;
-  
-  // Clear previous content
-  diffContainer.value.innerHTML = '';
-  
-  // If no content, show message
-  if (!props.oldContent && !props.newContent) {
-    diffContainer.value.innerHTML = '<div class="p-4 text-gray-500 text-center">No configuration data available</div>';
-    return;
-  }
-  
-  // Configure diff2html options
-  const configuration = {
-    drawFileList: false,
-    matching: 'lines',
-    outputFormat: viewType.value,
-    renderNothingWhenEmpty: true,
-    matchWordsThreshold: 0.25,
-    matchingMaxComparisons: 2500
-  };
-  
-  // Render diff to container
-  try {
-    const diffHtml = Diff2Html.html(diffText.value, configuration);
-    diffContainer.value.innerHTML = diffHtml;
-  } catch (e) {
-    console.error('Error rendering diff:', e);
-    diffContainer.value.innerHTML = '<div class="p-4 text-red-500 text-center">Error rendering diff</div>';
-  }
-}
-
-// Toggle between side-by-side and line-by-line (unified) views
-function toggleViewType() {
-  viewType.value = viewType.value === 'side-by-side' ? 'line-by-line' : 'side-by-side';
-}
-
-// Copy diff to clipboard
 function copyToClipboard() {
   const textToCopy = props.oldContent && props.newContent 
     ? `Old Configuration:\n${props.oldContent}\n\nNew Configuration:\n${props.newContent}`
     : props.oldContent || props.newContent || '';
-  
   navigator.clipboard.writeText(textToCopy)
     .then(() => {
       copied.value = true;
@@ -165,86 +118,27 @@ function copyToClipboard() {
     });
 }
 
-// Initialize component
+import * as monaco from 'monaco-editor';
 onMounted(() => {
-  renderDiff();
+  monaco.editor.defineTheme('netraven-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: '', background: '181F2A', foreground: 'E5E7EB' },
+      { token: 'deleted', background: 'fee2e2' },
+      { token: 'inserted', background: 'd1fae5' }
+    ],
+    colors: {
+      'editor.background': '#181F2A',
+      'editor.foreground': '#E5E7EB',
+      'editor.lineHighlightBackground': '#232B3A'
+    }
+  });
 });
 </script>
 
 <style scoped>
 .diff-viewer {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
-/* Override diff2html styles for better integration with our UI */
-:deep(.d2h-file-header) {
-  background-color: #f3f4f6;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 8px 10px;
-}
-
-:deep(.d2h-file-name) {
-  font-weight: 600;
-  color: #374151;
-}
-
-:deep(.d2h-code-line) {
-  padding: 0 8px;
-}
-
-:deep(.d2h-code-side-line) {
-  padding: 0 8px;
-}
-
-:deep(.d2h-code-line-ctn) {
-  white-space: pre-wrap;
-}
-
-:deep(.d2h-info) {
-  background-color: #f9fafb;
-  color: #010714;
-}
-
-:deep(.d2h-file-list-wrapper) {
-  display: none !important;
-}
-
-:deep(.d2h-file-header) {
-  display: none !important;
-}
-
-:deep(.d2h-tag) {
-  display: none;
-}
-
-:deep(.d2h-del) {
-  background-color: #fee2e2;
-}
-
-:deep(.d2h-ins) {
-  background-color: #d1fae5;
-}
-
-:deep(.d2h-code-line),
-:deep(.d2h-code-side-line),
-:deep(.d2h-code-line-ctn) {
-  color: #1a1a1a !important;
-}
-
-:deep(.d2h-del),
-:deep(.d2h-ins) {
-  color: #1a1a1a !important;
-}
-
-:deep(.d2h-emptyplaceholder) {
-  display: none !important;
-}
-
-:deep(.d2h-code-side-emptyplaceholder) {
-  display: none !important;
-}
-
-:deep(.d2h-code-line-empty) {
-  display: none !important;
 }
 </style>
