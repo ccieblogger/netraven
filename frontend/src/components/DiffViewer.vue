@@ -48,6 +48,7 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import * as Diff2Html from 'diff2html';
 import 'diff2html/bundles/css/diff2html.min.css';
+import { createTwoFilesPatch } from 'diff';
 
 // Props
 const props = defineProps({
@@ -90,34 +91,15 @@ const copied = ref(false);
 // Generate unified diff from old and new content
 const diffText = computed(() => {
   if (!props.oldContent && !props.newContent) return '';
-  
-  const oldLines = (props.oldContent || '').split('\n');
-  const newLines = (props.newContent || '').split('\n');
-  
-  // Create a unified diff format
-  let diffLines = [];
-  diffLines.push('diff --git a/old_config.txt b/new_config.txt');
-  diffLines.push('--- a/old_config.txt');
-  diffLines.push('+++ b/new_config.txt');
-  
-  // Simple diff algorithm (for more complex diffs, consider using a library like jsdiff)
-  const oldLineCount = oldLines.length;
-  const newLineCount = newLines.length;
-  
-  // Add unified diff header (showing line numbers)
-  diffLines.push(`@@ -1,${oldLineCount} +1,${newLineCount} @@`);
-  
-  // Add old lines (with minus prefix)
-  for (const line of oldLines) {
-    diffLines.push(`-${line}`);
-  }
-  
-  // Add new lines (with plus prefix)
-  for (const line of newLines) {
-    diffLines.push(`+${line}`);
-  }
-  
-  return diffLines.join('\n');
+  return createTwoFilesPatch(
+    'old_config.txt',
+    'new_config.txt',
+    props.oldContent || '',
+    props.newContent || '',
+    '',
+    '',
+    { context: 3 }
+  );
 });
 
 // Watch changes to render diff
