@@ -24,6 +24,7 @@ Relationships:
 """
 
 from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, and_, func
@@ -113,6 +114,9 @@ def create_device(
     # Create a dict with device data and explicitly convert IP to string
     device_data = device.model_dump(exclude={'tags'})
     device_data['ip_address'] = str(device_data['ip_address'])
+    # Ensure source defaults to 'local' if not provided
+    if not device_data.get('source'):
+        device_data['source'] = 'local'
     
     # Create the device instance with the updated data
     db_device = models.Device(**device_data)
@@ -186,6 +190,10 @@ def list_devices(
     hostname: Optional[str] = None,
     ip_address: Optional[str] = None,
     device_type: Optional[str] = None,
+    serial_number: Optional[str] = None,
+    model: Optional[str] = None,
+    source: Optional[str] = None,
+    notes: Optional[str] = None,
     tag_id: Optional[List[int]] = Query(None, description="Filter by tag IDs"),
     db: Session = Depends(get_db_session)
 ):
@@ -197,6 +205,10 @@ def list_devices(
         hostname (Optional[str]): Filter devices by partial hostname match
         ip_address (Optional[str]): Filter devices by partial IP address match
         device_type (Optional[str]): Filter devices by exact device type match
+        serial_number (Optional[str]): Filter devices by partial serial number match
+        model (Optional[str]): Filter devices by partial model match
+        source (Optional[str]): Filter devices by exact source match
+        notes (Optional[str]): Filter devices by partial notes match
         tag_id (Optional[List[int]]): Filter devices that have any of the specified tag IDs
         db (Session): Database session for executing queries
         
@@ -223,6 +235,14 @@ def list_devices(
         filters.append(models.Device.ip_address.ilike(f"%{ip_address}%"))
     if device_type:
         filters.append(models.Device.device_type == device_type)
+    if serial_number:
+        filters.append(models.Device.serial_number.ilike(f"%{serial_number}%"))
+    if model:
+        filters.append(models.Device.model.ilike(f"%{model}%"))
+    if source:
+        filters.append(models.Device.source == source)
+    if notes:
+        filters.append(models.Device.notes.ilike(f"%{notes}%"))
     
     # Apply all filters
     if filters:
@@ -397,6 +417,11 @@ def update_device(
     for key, value in update_data.items():
         if key != "tags": # Handle tags separately
             setattr(db_device, key, value)
+
+    # Set last_updated and updated_by
+    db_device.last_updated = datetime.utcnow()
+    if request and hasattr(request, 'user') and getattr(request.user, 'username', None):
+        db_device.updated_by = request.user.username
 
     # Handle tags update
     if "tags" in update_data:
