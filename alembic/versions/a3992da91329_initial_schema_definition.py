@@ -47,8 +47,14 @@ def upgrade() -> None:
     sa.Column('device_type', sa.String(), nullable=False),
     sa.Column('description', sa.String(), nullable=True),
     sa.Column('port', sa.Integer(), nullable=True, server_default='22'),
+    sa.Column('serial_number', sa.String(), nullable=True),
+    sa.Column('model', sa.String(), nullable=True),
+    sa.Column('source', sa.Enum('local', 'imported', name='device_source'), nullable=False, server_default='local'),
+    sa.Column('notes', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('last_seen', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('last_updated', sa.DateTime(timezone=True), server_default=sa.text('now()'), onupdate=sa.text('now()'), nullable=True),
+    sa.Column('updated_by', sa.String(), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('ip_address')
     )
@@ -205,6 +211,7 @@ def downgrade() -> None:
     op.drop_table('system_settings')
     op.drop_index(op.f('ix_devices_hostname'), table_name='devices')
     op.drop_table('devices')
+    op.execute("DROP TYPE IF EXISTS device_source;")
     op.drop_table('credentials')
     op.drop_table('users')
     # ### end Alembic commands ###
