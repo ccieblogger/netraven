@@ -248,10 +248,28 @@ def bulk_import_devices(
             device_dict = schema.model_dump(exclude={'tags'})
             device_dict['ip_address'] = str(schema.ip_address)
             db_device = models.Device(**device_dict)
-            # Always assign default tag
+
+            # --- Tag association logic (robust, always enforce default tag) ---
+            tag_ids = []
+            # Accept tags from input if present (CSV: 'tags' column, JSON: 'tags' field)
+            input_tags = entry.get("tags")
+            if input_tags:
+                if isinstance(input_tags, str):
+                    # CSV: tags as pipe-separated string (e.g., '1|2')
+                    tag_ids = [int(tid) for tid in input_tags.split("|") if tid.strip().isdigit()]
+                elif isinstance(input_tags, list):
+                    tag_ids = [int(tid) for tid in input_tags if isinstance(tid, int) or (isinstance(tid, str) and tid.isdigit())]
+            # Always append default tag ID if not present
             default_tag = db.query(models.Tag).filter(models.Tag.name == DEFAULT_TAG_NAME).first()
-            if default_tag:
-                db_device.tags = [default_tag]
+            if not default_tag:
+                raise Exception("Default tag does not exist in the database.")
+            if default_tag.id not in tag_ids:
+                tag_ids.append(default_tag.id)
+            # Fetch tag objects
+            tags = get_tags_by_ids(db, tag_ids) if tag_ids else [default_tag]
+            db_device.tags = tags
+            # --- End tag association logic ---
+
             db.add(db_device)
             db.commit()
             db.refresh(db_device)
