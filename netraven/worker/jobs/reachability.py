@@ -1,6 +1,14 @@
 from netraven.utils.unified_logger import get_unified_logger
+from netraven.worker.jobs.base import ParamsModel
 import subprocess
 import socket
+
+class Params(ParamsModel):
+    """
+    Example Params for reachability job. Extend as needed for real parameters.
+    """
+    # Example: timeout: int = 2
+    pass
 
 JOB_META = {
     "label": "Reachability Check",
@@ -109,4 +117,4 @@ def run(device, job_id, config, db):
             job_id=job_id,
             device_id=device_id
         )
-    return result 
+    return result

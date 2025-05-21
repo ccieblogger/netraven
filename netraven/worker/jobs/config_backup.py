@@ -5,6 +5,14 @@ from netraven.utils.hash_utils import sha256_hex
 from netraven.db.models.device_config import DeviceConfiguration
 from sqlalchemy.orm import Session
 from netmiko.exceptions import NetmikoTimeoutException, NetmikoAuthenticationException
+from netraven.worker.jobs.base import ParamsModel
+
+class Params(ParamsModel):
+    """
+    Example Params for config_backup job. Extend as needed for real parameters.
+    """
+    # Example: device_filter: str = "all"
+    pass
 
 JOB_META = {
     "label": "Configuration Backup",
