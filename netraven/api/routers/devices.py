@@ -234,7 +234,8 @@ def bulk_import_devices(
         try:
             device_data = {
                 "hostname": hostname,
-                "ip_address": ip_address,
+                # Always convert ip_address to string for DB compatibility
+                "ip_address": str(ip_address),
                 "device_type": device_type,
                 "description": entry.get("description"),
                 "port": int(entry["port"]) if entry.get("port") else 22,
