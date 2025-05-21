@@ -28,6 +28,9 @@ All frontend API requests are routed through an NGINX reverse proxy, which is re
 - **All API requests are routed through Nginx and must use the `/api` prefix.**
 - **JWT authentication is required for all protected endpoints.**
 - **Pinia stores and service modules encapsulate most API logic.**
+- **Device objects now include the following fields (added 2025):**
+  - `serial_number`, `model`, `source`, `notes`, `last_updated`, `updated_by`
+  - See the [API spec](./netraven_api_spec.md#devices) for details and usage.
 
 ---
 

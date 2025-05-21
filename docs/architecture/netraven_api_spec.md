@@ -1,3 +1,7 @@
+> **Changelog (2025-05-20):**
+> Device model and API extended to include: `serial_number`, `model`, `source`, `notes`, `last_updated`, `updated_by`.
+> See [GitHub issue #134](https://github.com/ccieblogger/netraven/issues/134) (workstream 3).
+
 # NetRaven API Specification
 
 ## Introduction
