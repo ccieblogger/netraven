@@ -1,7 +1,10 @@
 # BaseJob and metaclass for NetRaven job plugins
 from abc import ABC, abstractmethod, ABCMeta
-from typing import Dict, Type, Any
+from typing import Dict, Type, Any, TYPE_CHECKING
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from .context import PluginContext
 
 class ParamsModel(BaseModel):
     class Config:
@@ -24,10 +27,19 @@ class BaseJob(ABC, metaclass=JobMeta):
     __abstract__ = True
     name: str = "BaseJob"
     description: str = ""
+    plugin_context: 'PluginContext' = None
 
     @abstractmethod
     def run(self, device, job_id, config, db) -> Any:
         pass
+
+    @classmethod
+    def create(cls, user):
+        from .context import PluginContext
+        context = PluginContext(user)
+        instance = cls()
+        instance.plugin_context = context
+        return instance
 
     @classmethod
     def get_metadata(cls) -> Dict[str, Any]:

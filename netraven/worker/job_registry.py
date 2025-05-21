@@ -52,5 +52,14 @@ class JobRegistry:
                 dev_log(f"ERROR: Failed to import plugin module '{module_name}': {e}")
                 continue
 
+    @classmethod
+    def execute_job(cls, name, user, params):
+        job_cls = cls.get_job(name)
+        job = job_cls.create(user)
+        try:
+            return job.run(**params, db=job.plugin_context.db)
+        finally:
+            job.plugin_context.close()
+
 # Discover plugins in the plugins directory
 JobRegistry.discover_plugins(PLUGINS_PATH)
