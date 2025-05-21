@@ -29,6 +29,10 @@ class DeviceBase(BaseSchema):
         device_type: Type of device, corresponding to Netmiko device types
         description: Optional descriptive text about the device
         port: SSH port number for connecting to the device (defaults to 22)
+        serial_number: Optional serial number of the device
+        model: Optional model of the device
+        source: Source of the device information (local or imported)
+        notes: Optional additional notes about the device
     """
     hostname: str = Field(
         ..., 
@@ -63,6 +67,29 @@ class DeviceBase(BaseSchema):
         le=65535,
         example=22,
         description="SSH port number (default: 22)"
+    )
+    serial_number: Optional[str] = Field(
+        None,
+        max_length=128,
+        example="FTX1234A1B2",
+        description="Serial number of the device (optional)"
+    )
+    model: Optional[str] = Field(
+        None,
+        max_length=128,
+        example="Catalyst 9300",
+        description="Model of the device (optional)"
+    )
+    source: str = Field(
+        default="local",
+        pattern=r"^(local|imported)$",
+        example="local",
+        description="Source of the device information (local or imported)"
+    )
+    notes: Optional[str] = Field(
+        None,
+        description="Additional notes about the device (supports markdown)",
+        example="This device is in the main rack.\n\n*Check quarterly*."
     )
 
     @field_validator('hostname')
@@ -241,6 +268,8 @@ class Device(DeviceBase, BaseSchemaWithId):
         last_seen: When the device was last successfully contacted
         tags: List of Tag objects associated with this device
         matching_credentials_count: Number of credentials that match this device's tags
+        last_updated: When the device was last updated
+        updated_by: Identifier of the user who last updated the device information
     """
     created_at: Optional[datetime] = Field(
         None,
@@ -260,6 +289,16 @@ class Device(DeviceBase, BaseSchemaWithId):
         0,
         description="Number of credentials matching this device's tags",
         example=2
+    )
+    last_updated: Optional[datetime] = Field(
+        None,
+        description="Timestamp when the device was last updated",
+        example="2025-04-09T12:34:56.789Z"
+    )
+    updated_by: Optional[str] = Field(
+        None,
+        description="Identifier of the user who last updated the device information",
+        example="admin"
     )
     # configurations: List[...] # TBD: Add DeviceConfiguration schema later if needed
 

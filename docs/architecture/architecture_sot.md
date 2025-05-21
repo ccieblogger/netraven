@@ -131,6 +131,29 @@ For integration and troubleshooting details, see [`frontend_backend_integration.
 - Status endpoints for job monitoring.
 - Log endpoints for querying and streaming logs (see Logging section).
 
+##### Device Model (DB Schema, as of 2025-05)
+
+| Field           | Type        | Description                                 |
+|-----------------|-------------|---------------------------------------------|
+| id              | int         | Primary key                                 |
+| hostname        | str         | Device hostname (unique)                    |
+| ip_address      | str         | Device IP address (unique)                  |
+| device_type     | str         | Device type (e.g., cisco_ios)               |
+| port            | int         | SSH port (default: 22)                      |
+| description     | str         | Description                                 |
+| serial_number   | str         | Device serial number                        |
+| model           | str         | Device model                                |
+| source          | str         | Source of device record (e.g., imported)    |
+| notes           | str         | Freeform notes (Markdown supported)         |
+| created_at      | datetime    | Creation timestamp                          |
+| last_seen       | datetime    | Last seen timestamp                         |
+| last_updated    | datetime    | Last updated timestamp                      |
+| updated_by      | str         | Username of last updater                    |
+| tags            | [Tag]       | List of associated tags                     |
+
+- All new fields (`serial_number`, `model`, `source`, `notes`, `last_updated`, `updated_by`) are persisted and exposed via the API.
+- Filtering and updates are supported for all new fields.
+
 #### 2. Device Communication Worker (Dedicated Container)
 - Executes device jobs triggered by scheduler or on demand.
 - Runs as a dedicated container using RQ Worker.
@@ -315,3 +338,6 @@ NetRaven now exposes dedicated API endpoints for real-time visibility into sched
 - **Intended Usage**: These endpoints power the UI's scheduled jobs and queue status dashboard, enabling real-time and on-demand monitoring for NetOps and admin users.
 
 ---
+
+### Changelog
+- **2025-05-20:** Device model and API extended with new fields (`serial_number`, `model`, `source`, `notes`, `last_updated`, `updated_by`) per Issue #134. All documentation, API specs, and DB schema updated accordingly.

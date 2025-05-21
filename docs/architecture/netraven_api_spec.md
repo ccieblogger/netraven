@@ -1,3 +1,7 @@
+> **Changelog (2025-05-20):**
+> Device model and API extended to include: `serial_number`, `model`, `source`, `notes`, `last_updated`, `updated_by`.
+> See [GitHub issue #134](https://github.com/ccieblogger/netraven/issues/134) (workstream 3).
+
 # NetRaven API Specification
 
 ## Introduction
@@ -323,6 +327,10 @@ Authorization: Bearer <access_token>
 - `ip_address` (str, optional): Filter by partial IP address match.
 - `device_type` (str, optional): Filter by device type (exact match).
 - `tag_id` (list[int], optional): Filter by tag IDs (devices with ANY of the specified tags).
+- `serial_number` (str, optional): Filter by serial number (exact match or partial).
+- `model` (str, optional): Filter by model (exact match or partial).
+- `source` (str, optional): Filter by source (exact match or partial).
+- `notes` (str, optional): Filter by notes (partial match).
 
 **Request Example:**
 ```http
@@ -340,8 +348,14 @@ Authorization: Bearer <access_token>
       "device_type": "cisco_ios",
       "description": "Core Switch in Data Center 1",
       "port": 22,
+      "serial_number": "SN-123456",
+      "model": "Nexus 9000",
+      "source": "imported",
+      "notes": "This is a test note.",
       "created_at": "2024-06-09T12:34:56.789Z",
       "last_seen": "2024-06-09T13:00:00.000Z",
+      "last_updated": "2024-06-09T13:05:00.000Z",
+      "updated_by": "admin",
       "tags": [
         { "id": 1, "name": "core-network", "type": "location" }
       ],
@@ -361,6 +375,7 @@ Authorization: Bearer <access_token>
 - `tags` is a list of tag objects.
 - `matching_credentials_count` is the number of credentials matching this device's tags.
 - `last_reachability_status` can be `success`, `failure`, or `never_checked`.
+- New fields: `serial_number`, `model`, `source`, `notes`, `last_updated`, `updated_by` are present in all device responses.
 
 ---
 
@@ -377,6 +392,10 @@ Authorization: Bearer <access_token>
   "device_type": "cisco_ios",
   "description": "Second core switch",
   "port": 22,
+  "serial_number": "SN-NEW-12345",
+  "model": "Nexus 9000",
+  "source": "imported",
+  "notes": "This is a test note.\n\n*Markdown supported*.",
   "tags": [1]
 }
 ```
@@ -389,8 +408,14 @@ Authorization: Bearer <access_token>
   "device_type": "cisco_ios",
   "description": "Second core switch",
   "port": 22,
+  "serial_number": "SN-NEW-12345",
+  "model": "Nexus 9000",
+  "source": "imported",
+  "notes": "This is a test note.\n\n*Markdown supported*.",
   "created_at": "2024-06-09T12:40:00.000Z",
   "last_seen": null,
+  "last_updated": "2024-06-09T12:40:00.000Z",
+  "updated_by": "admin",
   "tags": [
     { "id": 1, "name": "core-network", "type": "location" }
   ],
@@ -398,11 +423,63 @@ Authorization: Bearer <access_token>
 }
 ```
 **Frontend Notes:**
+- All new fields are accepted in the request and returned in the response.
 - If hostname or IP already exists, response is HTTP 400:
   ```json
   { "detail": "hostname already registered: core-switch-02" }
   ```
 - Tags are optional; if omitted, the default tag is added.
+
+---
+
+#### `POST /devices/bulk_import` — Bulk import devices
+**Description:** Import multiple devices in bulk via CSV or JSON file upload. This endpoint enforces that every imported device is always associated with the "default" tag, regardless of input. Deduplication, validation, and error reporting are handled in the backend.
+
+**Authentication:** Bearer token required.
+
+**Request:**
+- `file` (multipart/form-data): CSV or JSON file containing device records.
+
+**CSV Example:**
+```csv
+hostname,ip_address,device_type,port,description
+test-bulk-1,10.10.10.1,cisco_ios,22,Bulk import test
+```
+
+**JSON Example:**
+```json
+[
+  {
+    "hostname": "test-bulk-2",
+    "ip_address": "10.10.10.2",
+    "device_type": "cisco_ios",
+    "tags": []
+  }
+]
+```
+
+**Response Example:**
+```json
+{
+  "success_count": 2,
+  "errors": [],
+  "duplicates": []
+}
+```
+
+**Key Behaviors:**
+- All imported devices are always associated with the "default" tag (enforced in backend, not exposed in UI).
+- Deduplication: Devices with duplicate hostname or IP are reported as duplicates and not imported.
+- Validation: Missing required fields or invalid data are reported as errors.
+- Tag assignment: Any tags provided in input are honored, but the default tag is always added if not present.
+- Credentials: Devices with the default tag will automatically match the default credential (if configured).
+
+**Test Coverage:**
+- Automated tests ensure that devices imported via this endpoint always have the default tag, regardless of input (see `tests/api/test_devices_bulk_import.py`).
+
+**Frontend Notes:**
+- The UI does not expose tag selection for bulk import; the backend handles all tag logic.
+- Import results (success, errors, duplicates) are displayed to the user after upload.
 
 ---
 
@@ -425,8 +502,14 @@ Authorization: Bearer <access_token>
   "device_type": "cisco_ios",
   "description": "Second core switch",
   "port": 22,
+  "serial_number": "SN-NEW-12345",
+  "model": "Nexus 9000",
+  "source": "imported",
+  "notes": "This is a test note.\n\n*Markdown supported*.",
   "created_at": "2024-06-09T12:40:00.000Z",
   "last_seen": null,
+  "last_updated": "2024-06-09T12:40:00.000Z",
+  "updated_by": "admin",
   "tags": [
     { "id": 1, "name": "core-network", "type": "location" }
   ],
@@ -435,6 +518,7 @@ Authorization: Bearer <access_token>
 ```
 **Frontend Notes:**
 - Use for device detail views or edit forms.
+- All new fields are present in the response.
 - If device not found, response is HTTP 404:
   ```json
   { "detail": "Device not found" }
@@ -451,6 +535,10 @@ Authorization: Bearer <access_token>
 ```json
 {
   "description": "Updated description",
+  "serial_number": "SN-UPDATED-999",
+  "model": "Catalyst 9500",
+  "source": "local",
+  "notes": "Updated notes.",
   "tags": [1, 2]
 }
 ```
@@ -463,8 +551,14 @@ Authorization: Bearer <access_token>
   "device_type": "cisco_ios",
   "description": "Updated description",
   "port": 22,
+  "serial_number": "SN-UPDATED-999",
+  "model": "Catalyst 9500",
+  "source": "local",
+  "notes": "Updated notes.",
   "created_at": "2024-06-09T12:40:00.000Z",
   "last_seen": null,
+  "last_updated": "2024-06-09T13:10:00.000Z",
+  "updated_by": "admin",
   "tags": [
     { "id": 1, "name": "core-network", "type": "location" },
     { "id": 2, "name": "datacenter", "type": "location" }
@@ -474,6 +568,7 @@ Authorization: Bearer <access_token>
 ```
 **Frontend Notes:**
 - Only fields provided in the request are updated.
+- All new fields are accepted and returned.
 - If tags are set to null or empty, only the default tag is kept.
 - If device not found, response is HTTP 404.
 

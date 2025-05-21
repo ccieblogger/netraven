@@ -357,4 +357,120 @@ class TestDevicesAPI(BaseAPITest):
             "tags": []
         }
         response = client.post("/devices/", json=device_data, headers=admin_headers)
-        self.assert_error_response(response, 400, "No credentials match this device") 
+        self.assert_error_response(response, 400, "No credentials match this device")
+
+    def test_create_device_with_new_fields(self, client: TestClient, admin_headers: Dict, db_session: Session):
+        """Test creating a device with all new fields set."""
+        device_data = {
+            "hostname": "test-device-new-fields",
+            "ip_address": "192.168.101.1",
+            "device_type": "cisco_ios",
+            "port": 2222,
+            "description": "Device with all new fields",
+            "serial_number": "SN-NEW-12345",
+            "model": "Nexus 9000",
+            "source": "imported",
+            "notes": "This is a test note.\n\n*Markdown supported*.",
+            "tags": []
+        }
+        # Ensure default tag and credential exist
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if not default_tag:
+            default_tag = models.Tag(name="default", type="device")
+            db_session.add(default_tag)
+            db_session.commit()
+            db_session.refresh(default_tag)
+        cred = db_session.query(models.Credential).filter(models.Credential.username == "default-user").first()
+        if not cred:
+            cred = models.Credential(username="default-user", password="default-pass", priority=1)
+            cred.tags.append(default_tag)
+            db_session.add(cred)
+            db_session.commit()
+        response = client.post("/devices/", json=device_data, headers=admin_headers)
+        self.assert_successful_response(response, 201)
+        data = response.json()
+        assert data["serial_number"] == device_data["serial_number"]
+        assert data["model"] == device_data["model"]
+        assert data["source"] == device_data["source"]
+        assert data["notes"] == device_data["notes"]
+        assert "last_updated" in data
+        assert data["hostname"] == device_data["hostname"]
+
+    def test_update_device_new_fields(self, client: TestClient, admin_headers: Dict, create_test_device):
+        """Test updating a device's new fields and check last_updated/updated_by."""
+        device = create_test_device(hostname="update-new-fields", ip_address="192.168.102.1")
+        update_data = {
+            "serial_number": "SN-UPDATED-999",
+            "model": "Catalyst 9500",
+            "source": "local",
+            "notes": "Updated notes."
+        }
+        response = client.put(f"/devices/{device.id}", json=update_data, headers=admin_headers)
+        self.assert_successful_response(response)
+        data = response.json()
+        assert data["serial_number"] == update_data["serial_number"]
+        assert data["model"] == update_data["model"]
+        assert data["source"] == update_data["source"]
+        assert data["notes"] == update_data["notes"]
+        assert "last_updated" in data
+        # updated_by may be None if not set by the API, but should exist
+        assert "updated_by" in data
+
+    def test_get_device_with_new_fields(self, client: TestClient, admin_headers: Dict, create_test_device):
+        """Test retrieving a device and checking new fields are present."""
+        device = create_test_device(hostname="get-new-fields", ip_address="192.168.103.1", serial_number="SN-GET-1", model="ISR 4000", source="imported", notes="Get notes.")
+        response = client.get(f"/devices/{device.id}", headers=admin_headers)
+        self.assert_successful_response(response)
+        data = response.json()
+        assert data["serial_number"] == "SN-GET-1"
+        assert data["model"] == "ISR 4000"
+        assert data["source"] == "imported"
+        assert data["notes"] == "Get notes."
+        assert "last_updated" in data
+        assert "updated_by" in data
+
+    def test_filter_devices_by_new_fields(self, client: TestClient, admin_headers: Dict, create_test_device):
+        """Test filtering devices by serial_number, model, source, and notes."""
+        d1 = create_test_device(hostname="filter-serial-1", ip_address="192.168.104.1", serial_number="SN-FILTER-1", model="ModelA", source="local", notes="Alpha")
+        d2 = create_test_device(hostname="filter-serial-2", ip_address="192.168.104.2", serial_number="SN-FILTER-2", model="ModelB", source="imported", notes="Beta")
+        # Filter by serial_number
+        response = client.get(f"/devices/?serial_number=SN-FILTER-1", headers=admin_headers)
+        self.assert_pagination_response(response, item_count=1)
+        assert response.json()["items"][0]["serial_number"] == "SN-FILTER-1"
+        # Filter by model
+        response = client.get(f"/devices/?model=ModelB", headers=admin_headers)
+        self.assert_pagination_response(response, item_count=1)
+        assert response.json()["items"][0]["model"] == "ModelB"
+        # Filter by source
+        response = client.get(f"/devices/?source=imported", headers=admin_headers)
+        self.assert_pagination_response(response, item_count=1)
+        assert response.json()["items"][0]["source"] == "imported"
+        # Filter by notes
+        response = client.get(f"/devices/?notes=Alpha", headers=admin_headers)
+        self.assert_pagination_response(response, item_count=1)
+        assert response.json()["items"][0]["notes"] == "Alpha"
+
+    def test_bulk_import_enforces_default_tag(self, client: TestClient, admin_headers: dict, db_session: Session):
+        """Test that bulk import always associates the default tag with imported devices."""
+        # Ensure default tag exists
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if not default_tag:
+            default_tag = models.Tag(name="default", type="device")
+            db_session.add(default_tag)
+            db_session.commit()
+            db_session.refresh(default_tag)
+        # Prepare CSV content for bulk import (no tags specified)
+        csv_content = (
+            "hostname,ip_address,device_type,port,description,serial_number,model,source,notes\n"
+            "bulk-test-1,10.10.10.1,cisco_ios,22,Test device 1,SN-BULK-1,ModelX,imported,Note1\n"
+            "bulk-test-2,10.10.10.2,arista_eos,22,Test device 2,SN-BULK-2,ModelY,imported,Note2\n"
+        )
+        files = {"file": ("devices.csv", csv_content, "text/csv")}
+        response = client.post("/devices/bulk_import", files=files, headers=admin_headers)
+        self.assert_successful_response(response, 201)
+        # Check that both devices exist and have the default tag
+        for hostname in ["bulk-test-1", "bulk-test-2"]:
+            device = db_session.query(models.Device).filter(models.Device.hostname == hostname).first()
+            assert device is not None, f"Device {hostname} not found in DB"
+            tag_ids = {tag.id for tag in device.tags}
+            assert default_tag.id in tag_ids, f"Device {hostname} missing default tag after bulk import"

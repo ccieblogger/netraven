@@ -24,9 +24,13 @@ Relationships:
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, File, UploadFile, Form
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, and_, func
+import csv
+import io
+import json
 
 from netraven.api import schemas # Import schemas module
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role # Import dependencies
@@ -113,6 +117,9 @@ def create_device(
     # Create a dict with device data and explicitly convert IP to string
     device_data = device.model_dump(exclude={'tags'})
     device_data['ip_address'] = str(device_data['ip_address'])
+    # Ensure source defaults to 'local' if not provided
+    if not device_data.get('source'):
+        device_data['source'] = 'local'
     
     # Create the device instance with the updated data
     db_device = models.Device(**device_data)
@@ -179,6 +186,104 @@ def create_device(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     return db_device
 
+@router.post("/bulk_import", status_code=201)
+def bulk_import_devices(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db_session),
+    request: Request = None
+):
+    """Bulk import devices from a CSV or JSON file. Returns summary of successes, errors, and duplicates."""
+    logger = get_unified_logger()
+    content = file.file.read()
+    filename = file.filename.lower()
+    results = {"success": [], "errors": [], "duplicates": []}
+    # Determine file type
+    if filename.endswith(".csv"):
+        try:
+            decoded = content.decode("utf-8")
+            reader = csv.DictReader(io.StringIO(decoded))
+            entries = list(reader)
+        except Exception as e:
+            return {"success": [], "errors": [f"CSV parse error: {str(e)}"], "duplicates": []}
+    elif filename.endswith(".json"):
+        try:
+            entries = json.loads(content)
+            if isinstance(entries, dict):
+                entries = [entries]
+        except Exception as e:
+            return {"success": [], "errors": [f"JSON parse error: {str(e)}"], "duplicates": []}
+    else:
+        return {"success": [], "errors": ["Unsupported file type. Use .csv or .json."], "duplicates": []}
+
+    for idx, entry in enumerate(entries):
+        # Required fields
+        hostname = entry.get("hostname")
+        ip_address = entry.get("ip_address")
+        device_type = entry.get("device_type")
+        if not hostname or not ip_address or not device_type:
+            results["errors"].append({"row": idx+1, "error": "Missing required field(s): hostname, ip_address, device_type"})
+            continue
+        # Deduplication
+        exists = db.query(models.Device).filter(
+            (models.Device.hostname == hostname) | (models.Device.ip_address == str(ip_address))
+        ).first()
+        if exists:
+            results["duplicates"].append({"row": idx+1, "reason": f"Device with hostname or IP already exists: {hostname} / {ip_address}"})
+            continue
+        # Prepare device data
+        try:
+            device_data = {
+                "hostname": hostname,
+                # Always convert ip_address to string for DB compatibility
+                "ip_address": str(ip_address),
+                "device_type": device_type,
+                "description": entry.get("description"),
+                "port": int(entry["port"]) if entry.get("port") else 22,
+                "serial_number": entry.get("serial_number"),
+                "model": entry.get("model"),
+                "source": entry.get("source", "imported"),
+                "notes": entry.get("notes"),
+            }
+            schema = schemas.device.DeviceCreate(**device_data)
+            device_dict = schema.model_dump(exclude={'tags'})
+            device_dict['ip_address'] = str(schema.ip_address)
+            db_device = models.Device(**device_dict)
+
+            # --- Tag association logic (robust, always enforce default tag) ---
+            tag_ids = []
+            # Accept tags from input if present (CSV: 'tags' column, JSON: 'tags' field)
+            input_tags = entry.get("tags")
+            if input_tags:
+                if isinstance(input_tags, str):
+                    # CSV: tags as pipe-separated string (e.g., '1|2')
+                    tag_ids = [int(tid) for tid in input_tags.split("|") if tid.strip().isdigit()]
+                elif isinstance(input_tags, list):
+                    tag_ids = [int(tid) for tid in input_tags if isinstance(tid, int) or (isinstance(tid, str) and tid.isdigit())]
+            # Always append default tag ID if not present
+            default_tag = db.query(models.Tag).filter(models.Tag.name == DEFAULT_TAG_NAME).first()
+            if not default_tag:
+                raise Exception("Default tag does not exist in the database.")
+            if default_tag.id not in tag_ids:
+                tag_ids.append(default_tag.id)
+            # Fetch tag objects
+            tags = get_tags_by_ids(db, tag_ids) if tag_ids else [default_tag]
+            db_device.tags = tags
+            # --- End tag association logic ---
+
+            db.add(db_device)
+            db.commit()
+            db.refresh(db_device)
+            results["success"].append({"row": idx+1, "hostname": hostname, "ip_address": ip_address})
+        except Exception as e:
+            db.rollback()
+            results["errors"].append({"row": idx+1, "error": str(e)})
+    logger.log(f"Bulk import completed: {len(results['success'])} success, {len(results['errors'])} errors, {len(results['duplicates'])} duplicates", level="INFO", destinations=["stdout", "file", "db"], source="devices_router")
+    return {
+        "success_count": len(results["success"]),
+        "errors": results["errors"],
+        "duplicates": results["duplicates"]
+    }
+
 @router.get("/", response_model=schemas.device.PaginatedDeviceResponse)
 def list_devices(
     page: int = Query(1, ge=1, description="Page number"),
@@ -186,6 +291,10 @@ def list_devices(
     hostname: Optional[str] = None,
     ip_address: Optional[str] = None,
     device_type: Optional[str] = None,
+    serial_number: Optional[str] = None,
+    model: Optional[str] = None,
+    source: Optional[str] = None,
+    notes: Optional[str] = None,
     tag_id: Optional[List[int]] = Query(None, description="Filter by tag IDs"),
     db: Session = Depends(get_db_session)
 ):
@@ -197,6 +306,10 @@ def list_devices(
         hostname (Optional[str]): Filter devices by partial hostname match
         ip_address (Optional[str]): Filter devices by partial IP address match
         device_type (Optional[str]): Filter devices by exact device type match
+        serial_number (Optional[str]): Filter devices by partial serial number match
+        model (Optional[str]): Filter devices by partial model match
+        source (Optional[str]): Filter devices by exact source match
+        notes (Optional[str]): Filter devices by partial notes match
         tag_id (Optional[List[int]]): Filter devices that have any of the specified tag IDs
         db (Session): Database session for executing queries
         
@@ -223,6 +336,14 @@ def list_devices(
         filters.append(models.Device.ip_address.ilike(f"%{ip_address}%"))
     if device_type:
         filters.append(models.Device.device_type == device_type)
+    if serial_number:
+        filters.append(models.Device.serial_number.ilike(f"%{serial_number}%"))
+    if model:
+        filters.append(models.Device.model.ilike(f"%{model}%"))
+    if source:
+        filters.append(models.Device.source == source)
+    if notes:
+        filters.append(models.Device.notes.ilike(f"%{notes}%"))
     
     # Apply all filters
     if filters:
@@ -397,6 +518,11 @@ def update_device(
     for key, value in update_data.items():
         if key != "tags": # Handle tags separately
             setattr(db_device, key, value)
+
+    # Set last_updated and updated_by
+    db_device.last_updated = datetime.utcnow()
+    if request and hasattr(request, 'user') and getattr(request.user, 'username', None):
+        db_device.updated_by = request.user.username
 
     # Handle tags update
     if "tags" in update_data:

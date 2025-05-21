@@ -12,6 +12,9 @@
             <span v-if="sortField === 'ip_address'">{{ sortOrder === 1 ? '▲' : '▼' }}</span>
           </th>
           <th class="py-2 px-4 text-left">Serial</th>
+          <th class="py-2 px-4 text-left">Model</th>
+          <th class="py-2 px-4 text-left">Type</th>
+          <th class="py-2 px-4 text-left">Source</th>
           <th class="py-2 px-4 text-left">Reachable</th>
           <th class="py-2 px-4 text-left cursor-pointer select-none" @click="changeSort('last_backup')">
             Last Backup
@@ -19,15 +22,25 @@
           </th>
           <th class="py-2 px-4 text-left">Tags</th>
           <th class="py-2 px-4 text-left">Credential</th>
+          <th class="py-2 px-4 text-left">Notes</th>
+          <th class="py-2 px-4 text-left">Last Updated</th>
+          <th class="py-2 px-4 text-left">Updated By</th>
           <th class="py-2 px-4 text-left">Actions</th>
           <th class="py-2 px-4 text-left">Other</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="device in devices" :key="device.id" class="border-b text-text-primary">
-          <td class="py-2 px-4">{{ device.hostname }}</td>
+          <td class="py-2 px-4">
+            <router-link :to="`/devices/${device.id}`" class="text-blue-600 hover:underline">
+              {{ device.hostname }}
+            </router-link>
+          </td>
           <td class="py-2 px-4">{{ device.ip_address }}</td>
-          <td class="py-2 px-4">{{ device.serial }}</td>
+          <td class="py-2 px-4">{{ device.serial_number }}</td>
+          <td class="py-2 px-4">{{ device.model }}</td>
+          <td class="py-2 px-4">{{ device.device_type }}</td>
+          <td class="py-2 px-4">{{ device.source }}</td>
           <td class="py-2 px-4">
             <StatusIcon :status="mapReachabilityStatus(device.last_reachability_status)" :tooltip="reachabilityTooltip(device)" />
           </td>
@@ -43,6 +56,17 @@
             </span>
             <span v-else class="text-red-400 font-semibold">No credentials found.</span>
           </td>
+          <td class="py-2 px-4 max-w-xs">
+            <span v-if="device.notes" class="block truncate cursor-pointer" @mouseenter="showNotes = device.id" @mouseleave="showNotes = null">
+              {{ notesSnippet(device.notes) }}
+              <div v-if="showNotes === device.id" class="absolute z-50 bg-white border border-gray-300 rounded shadow-lg p-3 max-w-md max-h-60 overflow-auto mt-2" style="min-width: 250px;">
+                <MarkdownRenderer :content="device.notes" />
+              </div>
+            </span>
+            <span v-else class="text-text-secondary">-</span>
+          </td>
+          <td class="py-2 px-4">{{ formatDate(device.last_updated) }}</td>
+          <td class="py-2 px-4">{{ device.updated_by || '-' }}</td>
           <td class="py-2 px-4">
             <div class="flex flex-row space-x-1">
               <button class="btn btn-xs btn-ghost" @click="$emit('edit', device)" title="Edit Device">
@@ -68,10 +92,10 @@
           </td>
         </tr>
         <tr v-if="!loading && devices.length === 0">
-          <td colspan="9" class="text-center text-text-secondary py-4">No devices found.</td>
+          <td :colspan="15" class="text-center text-text-secondary py-4">No devices found.</td>
         </tr>
         <tr v-if="loading">
-          <td colspan="9" class="text-center text-text-secondary py-4">Loading devices...</td>
+          <td :colspan="15" class="text-center text-text-secondary py-4">Loading devices...</td>
         </tr>
       </tbody>
     </table>
@@ -80,6 +104,8 @@
 
 <script setup>
 import StatusIcon from '../ui/StatusIcon.vue';
+import { ref } from 'vue';
+import MarkdownRenderer from '../ui/MarkdownRenderer.vue';
 const props = defineProps({
   devices: { type: Array, required: true },
   loading: { type: Boolean, default: false },
@@ -87,6 +113,7 @@ const props = defineProps({
   sortOrder: { type: Number, default: 1 }
 });
 const emit = defineEmits(['edit', 'delete', 'check-reachability', 'credential-check', 'view-configs', 'sort']);
+const showNotes = ref(null);
 function reachabilityTooltip(device) {
   if (device.last_reachability_status === 'success') return 'Reachable';
   if (device.last_reachability_status === 'failure') return 'Unreachable';
@@ -113,4 +140,9 @@ function formatDate(dateStr) {
   if (isNaN(d)) return '-';
   return d.toLocaleString();
 }
-</script> 
+function notesSnippet(notes) {
+  if (!notes) return '';
+  if (notes.length < 40) return notes;
+  return notes.slice(0, 40) + '...';
+}
+</script>
