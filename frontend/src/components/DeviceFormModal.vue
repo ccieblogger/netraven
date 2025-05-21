@@ -7,39 +7,14 @@
           {{ generalError }}
         </div>
         <div class="bg-card-secondary rounded-lg p-4 shadow-sm">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Hostname -->
-            <FormField
-              id="hostname"
-              v-model="form.hostname"
-              label="Hostname"
-              type="text"
-              required
-              :error="validationErrors.hostname"
-              placeholder="e.g., core-switch-01"
-            />
-            <!-- IP Address -->
-            <FormField
-              id="ip_address"
-              v-model="form.ip_address"
-              label="IP Address"
-              type="text"
-              required
-              :error="validationErrors.ip_address"
-              placeholder="e.g., 192.168.1.1"
-              pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
-              help-text="IPv4 address of the device"
-            />
-            <!-- Device Type -->
-            <FormField
-              id="device_type"
-              v-model="form.device_type"
-              label="Device Type"
-              type="select"
-              required
-              :error="validationErrors.device_type"
-              help-text="Netmiko device type"
-            >
+          <div class="mb-4">
+            <h3 class="text-base font-semibold text-text-primary mb-2">Device Details</h3>
+            <hr class="mb-4 border-divider" />
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+            <div><FormField id="hostname" v-model="form.hostname" label="Hostname" type="text" required :error="validationErrors.hostname" placeholder="e.g., core-switch-01" /></div>
+            <div><FormField id="ip_address" v-model="form.ip_address" label="IP Address" type="text" required :error="validationErrors.ip_address" placeholder="e.g., 192.168.1.1" pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" help-text="IPv4 address of the device" /></div>
+            <div><FormField id="device_type" v-model="form.device_type" label="Device Type" type="select" required :error="validationErrors.device_type" help-text="Netmiko device type">
               <option value="">Select a device type</option>
               <option value="cisco_ios">cisco_ios</option>
               <option value="cisco_xe">cisco_xe</option>
@@ -58,83 +33,22 @@
               <option value="dell_os10">dell_os10</option>
               <option value="dell_os6">dell_os6</option>
               <option value="dell_os9">dell_os9</option>
-            </FormField>
-            <!-- Port -->
-            <FormField
-              id="port"
-              v-model.number="form.port"
-              label="Port"
-              type="number"
-              :min="1"
-              :max="65535"
-              :error="validationErrors.port"
-              help-text="SSH port (default: 22)"
-            />
-            <!-- Serial Number -->
-            <FormField
-              id="serial_number"
-              v-model="form.serial_number"
-              label="Serial Number"
-              type="text"
-              :error="validationErrors.serial_number"
-              placeholder="e.g., SN-123456789"
-              help-text="Device serial number (optional)"
-            />
-            <!-- Model -->
-            <FormField
-              id="model"
-              v-model="form.model"
-              label="Model"
-              type="text"
-              :error="validationErrors.model"
-              placeholder="e.g., Catalyst 9500"
-              help-text="Device model (optional)"
-            />
-            <!-- Source -->
-            <FormField
-              id="source"
-              v-model="form.source"
-              label="Source"
-              type="select"
-              :error="validationErrors.source"
-              help-text="How this device was added"
-            >
+            </FormField></div>
+            <div><FormField id="port" v-model.number="form.port" label="Port" type="number" :min="1" :max="65535" :error="validationErrors.port" help-text="SSH port (default: 22)" /></div>
+            <div><FormField id="serial_number" v-model="form.serial_number" label="Serial Number" type="text" :error="validationErrors.serial_number" placeholder="e.g., SN-123456789" help-text="Device serial number (optional)" /></div>
+            <div><FormField id="model" v-model="form.model" label="Model" type="text" :error="validationErrors.model" placeholder="e.g., Catalyst 9500" help-text="Device model (optional)" /></div>
+            <div><FormField id="source" v-model="form.source" label="Source" type="select" :error="validationErrors.source" help-text="How this device was added">
               <option value="local">Local</option>
               <option value="imported">Imported</option>
-            </FormField>
-            <!-- Tags (multi-select) -->
-            <TagSelector
-              id="tags"
-              v-model="form.tag_ids"
-              label="Tags"
-              :error="validationErrors.tag_ids"
-              help-text="Associate tags with this device"
-            />
+            </FormField></div>
+            <div><TagSelector id="tags" v-model="form.tag_ids" label="Tags" :error="validationErrors.tag_ids" help-text="Associate tags with this device" /></div>
           </div>
-          <!-- Description and Notes in full width -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mt-6">
             <div>
-              <FormField
-                id="description"
-                v-model="form.description"
-                label="Description"
-                type="text"
-                :error="validationErrors.description"
-                placeholder="e.g., Core Switch in Data Center 1"
-                help-text="Optional description of this device"
-              />
+              <FormField id="description" v-model="form.description" label="Description" type="text" :error="validationErrors.description" placeholder="e.g., Core Switch in Data Center 1" help-text="Optional description of this device" />
             </div>
             <div>
-              <FormField
-                id="notes"
-                v-model="form.notes"
-                label="Notes"
-                type="textarea"
-                :error="validationErrors.notes"
-                placeholder="Add notes or comments (markdown supported)"
-                help-text="Supports markdown formatting."
-                :rows="4"
-              />
+              <FormField id="notes" v-model="form.notes" label="Notes" type="textarea" :error="validationErrors.notes" placeholder="Add notes or comments (markdown supported)" help-text="Supports markdown formatting." :rows="4" />
               <div class="text-xs text-gray-500 mb-2">You can use <a href='https://www.markdownguide.org/cheat-sheet/' target='_blank' class='underline'>Markdown</a> for formatting.</div>
               <div v-if="form.notes" class="mb-2">
                 <span class="text-xs text-text-secondary">Preview:</span>
@@ -144,12 +58,10 @@
               </div>
             </div>
           </div>
-          <!-- Credentials Info -->
           <div class="mt-4 bg-blue-50 p-3 rounded text-sm text-blue-800">
             <h4 class="font-medium">About Credentials</h4>
             <p>Device credentials are assigned automatically through tags. Select appropriate tags above to associate credentials with this device.</p>
           </div>
-          <!-- Read-only last_updated and updated_by -->
           <div v-if="form.last_updated || form.updated_by" class="flex flex-row gap-4 mt-4 text-xs text-gray-500">
             <div v-if="form.last_updated">Last Updated: {{ formatDate(form.last_updated) }}</div>
             <div v-if="form.updated_by">Updated By: {{ form.updated_by }}</div>
