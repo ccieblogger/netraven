@@ -3,11 +3,14 @@
     <h1 class="text-2xl font-semibold mb-4">Manage Devices</h1>
     <DeviceFiltersBar :filters="filters" @updateFilters="updateFilters" />
 
-    <!-- Add Device Button -->
-    <div class="mb-4 text-right">
+    <!-- Add Device & Bulk Import Buttons -->
+    <div class="mb-4 text-right flex flex-row gap-2 justify-end">
       <button @click="openCreateModal" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
         + Add Device
       </button>
+      <router-link to="/devices/bulk-import" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+        Bulk Import
+      </router-link>
     </div>
 
     <!-- Loading/Error Indicators -->

@@ -1,0 +1,3 @@
+hostname,ip_address,device_type,port,description,serial_number,model,source,notes,tags
+core-sw-01,10.0.0.2,cisco_ios,22,Core switch,FTX1234A1B2,Catalyst 9300,imported,"Main rack",1|2
+edge-ap-17,10.0.5.17,arista_eos,22,Edge AP,9A2C0183GHK,Arista 720XP,imported,,2

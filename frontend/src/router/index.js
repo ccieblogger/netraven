@@ -16,6 +16,7 @@ import ConnectionLogs from '../pages/Logs.vue';
 import JobLogs from '../pages/JobLogs.vue';
 import DeviceDetail from '../pages/DeviceDetail.vue';
 import Jobs from '../pages/Jobs.vue';
+import BulkDeviceImport from '../pages/BulkDeviceImport.vue'; // Import the BulkDeviceImport component
 
 // Placeholder components for routes to work initially
 // const PlaceholderComponent = { template: '<div>Placeholder Page</div>' }; // No longer needed
@@ -47,6 +48,12 @@ const routes = [
     path: '/devices/:id',
     name: 'DeviceDetail',
     component: DeviceDetail,
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
+  },
+  {
+    path: '/devices/bulk-import',
+    name: 'BulkDeviceImport',
+    component: BulkDeviceImport,
     meta: { requiresAuth: true, roles: ['admin', 'user'] }
   },
   {

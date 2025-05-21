@@ -1,0 +1,24 @@
+[
+  {
+    "hostname": "core-sw-01",
+    "ip_address": "10.0.0.2",
+    "device_type": "cisco_ios",
+    "port": 22,
+    "description": "Core switch",
+    "serial_number": "FTX1234A1B2",
+    "model": "Catalyst 9300",
+    "source": "imported",
+    "notes": "Main rack",
+    "tags": [1,2]
+  },
+  {
+    "hostname": "edge-ap-17",
+    "ip_address": "10.0.5.17",
+    "device_type": "arista_eos",
+    "port": 22,
+    "serial_number": "9A2C0183GHK",
+    "model": "Arista 720XP",
+    "source": "imported",
+    "tags": [2]
+  }
+]
