@@ -11,6 +11,7 @@
             <h3 class="text-base font-semibold text-text-primary mb-2">Device Details</h3>
             <hr class="mb-4 border-divider" />
           </div>
+          <!-- Main device fields in a single grid -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
             <div><FormField id="hostname" v-model="form.hostname" label="Hostname" type="text" required :error="validationErrors.hostname" placeholder="e.g., core-switch-01" /></div>
             <div><FormField id="ip_address" v-model="form.ip_address" label="IP Address" type="text" required :error="validationErrors.ip_address" placeholder="e.g., 192.168.1.1" pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" help-text="IPv4 address of the device" /></div>
@@ -43,11 +44,12 @@
             </FormField></div>
             <div><TagSelector id="tags" v-model="form.tag_ids" label="Tags" :error="validationErrors.tag_ids" help-text="Associate tags with this device" /></div>
           </div>
+          <!-- Description and notes in a full-width row below -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mt-6">
-            <div>
+            <div class="col-span-1 md:col-span-2">
               <FormField id="description" v-model="form.description" label="Description" type="text" :error="validationErrors.description" placeholder="e.g., Core Switch in Data Center 1" help-text="Optional description of this device" />
             </div>
-            <div>
+            <div class="col-span-1 md:col-span-2">
               <FormField id="notes" v-model="form.notes" label="Notes" type="textarea" :error="validationErrors.notes" placeholder="Add notes or comments (markdown supported)" help-text="Supports markdown formatting." :rows="4" />
               <div class="text-xs text-gray-500 mb-2">You can use <a href='https://www.markdownguide.org/cheat-sheet/' target='_blank' class='underline'>Markdown</a> for formatting.</div>
               <div v-if="form.notes" class="mb-2">
@@ -58,6 +60,7 @@
               </div>
             </div>
           </div>
+          <!-- Credentials info and read-only fields -->
           <div class="mt-4 bg-blue-50 p-3 rounded text-sm text-blue-800">
             <h4 class="font-medium">About Credentials</h4>
             <p>Device credentials are assigned automatically through tags. Select appropriate tags above to associate credentials with this device.</p>
@@ -318,10 +321,5 @@ onMounted(() => {
 <style scoped>
 .bg-card-secondary {
   background: var(--nr-bg-card-secondary, #f7fafc);
-}
-@media (max-width: 768px) {
-  .grid-cols-2 {
-    grid-template-columns: 1fr !important;
-  }
 }
 </style>
