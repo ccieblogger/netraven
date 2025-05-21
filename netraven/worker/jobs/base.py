@@ -35,3 +35,12 @@ class BaseJob(ABC, metaclass=JobMeta):
             "name": cls.name,
             "description": cls.description
         }
+
+    @classmethod
+    def get_params_schema(cls):
+        """
+        Return the JSON schema for the Params class if defined, else None.
+        """
+        if hasattr(cls, 'Params') and issubclass(cls.Params, ParamsModel):
+            return cls.Params.schema_json()
+        return None

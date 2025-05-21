@@ -29,7 +29,7 @@ from netraven.api.schemas.tag import Tag as TagSchema
 # Potentially move to utils?
 from .devices import get_tags_by_ids # Reuse tag helper from device router for now
 
-from netraven.worker.job_registry import JOB_TYPE_META
+from netraven.worker.job_registry import JOB_TYPE_META, JobRegistry
 
 router = APIRouter(
     prefix="/jobs",
@@ -553,4 +553,19 @@ def get_job_device_results(
     return {
         "deprecation_notice": "/jobs/{job_id}/devices is deprecated and will be removed. Use /job-results/?job_id=... instead.",
         "results": results
+    }
+
+@router.get("/metadata/{job_type}")
+async def get_job_metadata(job_type: str):
+    """
+    Return job metadata and Params JSON schema for a given job type/plugin.
+    """
+    try:
+        job_cls = JobRegistry.get_job(job_type)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Job type '{job_type}' not found")
+    return {
+        "name": getattr(job_cls, 'name', job_type),
+        "description": getattr(job_cls, 'description', ""),
+        "schema": job_cls.get_params_schema() or "{}"
     }
