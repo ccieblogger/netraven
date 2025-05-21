@@ -432,6 +432,57 @@ Authorization: Bearer <access_token>
 
 ---
 
+#### `POST /devices/bulk_import` — Bulk import devices
+**Description:** Import multiple devices in bulk via CSV or JSON file upload. This endpoint enforces that every imported device is always associated with the "default" tag, regardless of input. Deduplication, validation, and error reporting are handled in the backend.
+
+**Authentication:** Bearer token required.
+
+**Request:**
+- `file` (multipart/form-data): CSV or JSON file containing device records.
+
+**CSV Example:**
+```csv
+hostname,ip_address,device_type,port,description
+test-bulk-1,10.10.10.1,cisco_ios,22,Bulk import test
+```
+
+**JSON Example:**
+```json
+[
+  {
+    "hostname": "test-bulk-2",
+    "ip_address": "10.10.10.2",
+    "device_type": "cisco_ios",
+    "tags": []
+  }
+]
+```
+
+**Response Example:**
+```json
+{
+  "success_count": 2,
+  "errors": [],
+  "duplicates": []
+}
+```
+
+**Key Behaviors:**
+- All imported devices are always associated with the "default" tag (enforced in backend, not exposed in UI).
+- Deduplication: Devices with duplicate hostname or IP are reported as duplicates and not imported.
+- Validation: Missing required fields or invalid data are reported as errors.
+- Tag assignment: Any tags provided in input are honored, but the default tag is always added if not present.
+- Credentials: Devices with the default tag will automatically match the default credential (if configured).
+
+**Test Coverage:**
+- Automated tests ensure that devices imported via this endpoint always have the default tag, regardless of input (see `tests/api/test_devices_bulk_import.py`).
+
+**Frontend Notes:**
+- The UI does not expose tag selection for bulk import; the backend handles all tag logic.
+- Import results (success, errors, duplicates) are displayed to the user after upload.
+
+---
+
 #### `GET /devices/{device_id}` — Get device by ID
 **Description:** Get a device by its ID.
 

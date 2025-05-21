@@ -449,3 +449,28 @@ class TestDevicesAPI(BaseAPITest):
         response = client.get(f"/devices/?notes=Alpha", headers=admin_headers)
         self.assert_pagination_response(response, item_count=1)
         assert response.json()["items"][0]["notes"] == "Alpha"
+
+    def test_bulk_import_enforces_default_tag(self, client: TestClient, admin_headers: dict, db_session: Session):
+        """Test that bulk import always associates the default tag with imported devices."""
+        # Ensure default tag exists
+        default_tag = db_session.query(models.Tag).filter(models.Tag.name == "default").first()
+        if not default_tag:
+            default_tag = models.Tag(name="default", type="device")
+            db_session.add(default_tag)
+            db_session.commit()
+            db_session.refresh(default_tag)
+        # Prepare CSV content for bulk import (no tags specified)
+        csv_content = (
+            "hostname,ip_address,device_type,port,description,serial_number,model,source,notes\n"
+            "bulk-test-1,10.10.10.1,cisco_ios,22,Test device 1,SN-BULK-1,ModelX,imported,Note1\n"
+            "bulk-test-2,10.10.10.2,arista_eos,22,Test device 2,SN-BULK-2,ModelY,imported,Note2\n"
+        )
+        files = {"file": ("devices.csv", csv_content, "text/csv")}
+        response = client.post("/devices/bulk_import", files=files, headers=admin_headers)
+        self.assert_successful_response(response, 201)
+        # Check that both devices exist and have the default tag
+        for hostname in ["bulk-test-1", "bulk-test-2"]:
+            device = db_session.query(models.Device).filter(models.Device.hostname == hostname).first()
+            assert device is not None, f"Device {hostname} not found in DB"
+            tag_ids = {tag.id for tag in device.tags}
+            assert default_tag.id in tag_ids, f"Device {hostname} missing default tag after bulk import"

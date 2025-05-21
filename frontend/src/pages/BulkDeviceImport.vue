@@ -58,8 +58,7 @@ const schemaExample = `[
     "serial_number": "FTX1234A1B2",
     "model": "Catalyst 9300",
     "source": "imported",
-    "notes": "Main rack",
-    "tags": [1,2]
+    "notes": "Main rack"
   }
 ]`
 
