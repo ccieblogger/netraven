@@ -1,6 +1,7 @@
 <template>
   <div class="container mx-auto p-4">
     <h1 class="text-2xl font-semibold mb-4">Manage Devices</h1>
+    <DeviceFiltersBar :filters="filters" @updateFilters="updateFilters" />
 
     <!-- Add Device Button -->
     <div class="mb-4 text-right">
@@ -10,19 +11,19 @@
     </div>
 
     <!-- Loading/Error Indicators -->
-    <div v-if="deviceStore.isLoading && devices.length === 0" class="text-center py-4">Loading devices...</div>
+    <div v-if="deviceStore.isLoading && filteredDevices.length === 0" class="text-center py-4">Loading devices...</div>
     <div v-if="deviceStore.error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
        Error fetching devices: {{ deviceStore.error }}
     </div>
 
     <!-- Devices Table -->
     <!-- Show skeleton or previous data while loading updates -->
-    <div v-if="devices.length > 0" class="bg-white shadow-md rounded my-6" :class="{ 'opacity-50': deviceStore.isLoading }">
+    <div v-if="filteredDevices.length > 0" class="bg-white shadow-md rounded my-6" :class="{ 'opacity-50': deviceStore.isLoading }">
       <DeviceTable
-        :devices="devices"
+        :devices="filteredDevices"
         :loading="deviceStore.isLoading"
         :page-size="10"
-        :filters="{}"
+        :filters="filters"
         @timeline="openTimelinePanel"
         @edit="openEditModal"
         @delete="openDeleteModal"
@@ -33,7 +34,7 @@
     </div>
 
     <!-- No Devices Message -->
-    <div v-if="!deviceStore.isLoading && devices.length === 0" class="text-center py-12">
+    <div v-if="!deviceStore.isLoading && filteredDevices.length === 0" class="text-center py-12">
       <div class="text-gray-500 mb-4">
         <h3 class="text-lg font-medium">No devices found</h3>
         <p>Get started by adding your first network device</p>
@@ -80,6 +81,7 @@ import DeviceFormModal from '../components/DeviceFormModal.vue'
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal.vue'
 import TimelinePanel from '../components/TimelinePanel.vue'
 import DeviceTable from '../components/DeviceTable.vue'
+import DeviceFiltersBar from '../components/dashboard/DeviceFiltersBar.vue'
 import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline' // Using outline icons
 import api from '../services/api' // assumed API service
 import { useRouter } from 'vue-router'
@@ -89,6 +91,39 @@ import { configSnapshotsService } from '../services/configSnapshots';
 
 const deviceStore = useDeviceStore()
 const devices = computed(() => deviceStore.devices)
+
+const filters = ref({
+  hostname: '',
+  ip_address: '',
+  serial: '',
+  model: '',
+  source: '',
+  notes: '',
+  last_updated: '',
+  updated_by: '',
+  global: ''
+});
+
+const filteredDevices = computed(() => {
+  // Simple local filtering; replace with backend query if needed
+  return devices.value.filter(device => {
+    return (
+      (!filters.value.hostname || device.hostname?.toLowerCase().includes(filters.value.hostname.toLowerCase())) &&
+      (!filters.value.ip_address || device.ip_address?.toLowerCase().includes(filters.value.ip_address.toLowerCase())) &&
+      (!filters.value.serial || device.serial_number?.toLowerCase().includes(filters.value.serial.toLowerCase())) &&
+      (!filters.value.model || device.model?.toLowerCase().includes(filters.value.model.toLowerCase())) &&
+      (!filters.value.source || device.source === filters.value.source) &&
+      (!filters.value.notes || device.notes?.toLowerCase().includes(filters.value.notes.toLowerCase())) &&
+      (!filters.value.last_updated || (device.last_updated && device.last_updated.includes(filters.value.last_updated))) &&
+      (!filters.value.updated_by || device.updated_by?.toLowerCase().includes(filters.value.updated_by.toLowerCase())) &&
+      (!filters.value.global || Object.values(device).some(v => String(v).toLowerCase().includes(filters.value.global.toLowerCase())))
+    );
+  });
+});
+
+function updateFilters(newFilters) {
+  Object.assign(filters.value, newFilters);
+}
 
 // Modal States
 const isFormModalOpen = ref(false)
