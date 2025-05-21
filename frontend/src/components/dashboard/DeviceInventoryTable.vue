@@ -31,7 +31,11 @@
       </thead>
       <tbody>
         <tr v-for="device in devices" :key="device.id" class="border-b text-text-primary">
-          <td class="py-2 px-4">{{ device.hostname }}</td>
+          <td class="py-2 px-4">
+            <router-link :to="`/devices/${device.id}`" class="text-blue-600 hover:underline">
+              {{ device.hostname }}
+            </router-link>
+          </td>
           <td class="py-2 px-4">{{ device.ip_address }}</td>
           <td class="py-2 px-4">{{ device.serial_number }}</td>
           <td class="py-2 px-4">{{ device.model }}</td>
