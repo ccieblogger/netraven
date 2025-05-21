@@ -1,6 +1,12 @@
 # BaseJob and metaclass for NetRaven job plugins
 from abc import ABC, abstractmethod, ABCMeta
 from typing import Dict, Type, Any
+from pydantic import BaseModel
+
+class ParamsModel(BaseModel):
+    class Config:
+        extra = 'forbid'
+        orm_mode = True
 
 class JobMeta(ABCMeta):
     """Metaclass that registers all subclasses of BaseJob."""
