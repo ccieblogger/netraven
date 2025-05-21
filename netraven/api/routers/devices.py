@@ -243,15 +243,15 @@ def bulk_import_devices(
                 "model": entry.get("model"),
                 "source": entry.get("source", "imported"),
                 "notes": entry.get("notes"),
-                "tags": entry.get("tags") if entry.get("tags") else [],
             }
             schema = schemas.device.DeviceCreate(**device_data)
-            # Use existing create_device logic
-            db_device = models.Device(**schema.model_dump(exclude={'tags'}))
-            tag_ids = schema.tags or []
-            if tag_ids:
-                tags = get_tags_by_ids(db, tag_ids)
-                db_device.tags = tags
+            device_dict = schema.model_dump(exclude={'tags'})
+            device_dict['ip_address'] = str(schema.ip_address)
+            db_device = models.Device(**device_dict)
+            # Always assign default tag
+            default_tag = db.query(models.Tag).filter(models.Tag.name == DEFAULT_TAG_NAME).first()
+            if default_tag:
+                db_device.tags = [default_tag]
             db.add(db_device)
             db.commit()
             db.refresh(db_device)
