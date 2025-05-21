@@ -25,9 +25,12 @@ Relationships:
 
 from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, File, UploadFile, Form
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, and_, func
+import csv
+import io
+import json
 
 from netraven.api import schemas # Import schemas module
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role # Import dependencies
@@ -182,6 +185,85 @@ def create_device(
             )
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     return db_device
+
+@router.post("/bulk_import", status_code=201)
+def bulk_import_devices(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db_session),
+    request: Request = None
+):
+    """Bulk import devices from a CSV or JSON file. Returns summary of successes, errors, and duplicates."""
+    logger = get_unified_logger()
+    content = file.file.read()
+    filename = file.filename.lower()
+    results = {"success": [], "errors": [], "duplicates": []}
+    # Determine file type
+    if filename.endswith(".csv"):
+        try:
+            decoded = content.decode("utf-8")
+            reader = csv.DictReader(io.StringIO(decoded))
+            entries = list(reader)
+        except Exception as e:
+            return {"success": [], "errors": [f"CSV parse error: {str(e)}"], "duplicates": []}
+    elif filename.endswith(".json"):
+        try:
+            entries = json.loads(content)
+            if isinstance(entries, dict):
+                entries = [entries]
+        except Exception as e:
+            return {"success": [], "errors": [f"JSON parse error: {str(e)}"], "duplicates": []}
+    else:
+        return {"success": [], "errors": ["Unsupported file type. Use .csv or .json."], "duplicates": []}
+
+    for idx, entry in enumerate(entries):
+        # Required fields
+        hostname = entry.get("hostname")
+        ip_address = entry.get("ip_address")
+        device_type = entry.get("device_type")
+        if not hostname or not ip_address or not device_type:
+            results["errors"].append({"row": idx+1, "error": "Missing required field(s): hostname, ip_address, device_type"})
+            continue
+        # Deduplication
+        exists = db.query(models.Device).filter(
+            (models.Device.hostname == hostname) | (models.Device.ip_address == str(ip_address))
+        ).first()
+        if exists:
+            results["duplicates"].append({"row": idx+1, "reason": f"Device with hostname or IP already exists: {hostname} / {ip_address}"})
+            continue
+        # Prepare device data
+        try:
+            device_data = {
+                "hostname": hostname,
+                "ip_address": ip_address,
+                "device_type": device_type,
+                "description": entry.get("description"),
+                "port": int(entry["port"]) if entry.get("port") else 22,
+                "serial_number": entry.get("serial_number"),
+                "model": entry.get("model"),
+                "source": entry.get("source", "imported"),
+                "notes": entry.get("notes"),
+                "tags": entry.get("tags") if entry.get("tags") else [],
+            }
+            schema = schemas.device.DeviceCreate(**device_data)
+            # Use existing create_device logic
+            db_device = models.Device(**schema.model_dump(exclude={'tags'}))
+            tag_ids = schema.tags or []
+            if tag_ids:
+                tags = get_tags_by_ids(db, tag_ids)
+                db_device.tags = tags
+            db.add(db_device)
+            db.commit()
+            db.refresh(db_device)
+            results["success"].append({"row": idx+1, "hostname": hostname, "ip_address": ip_address})
+        except Exception as e:
+            db.rollback()
+            results["errors"].append({"row": idx+1, "error": str(e)})
+    logger.log(f"Bulk import completed: {len(results['success'])} success, {len(results['errors'])} errors, {len(results['duplicates'])} duplicates", level="INFO", destinations=["stdout", "file", "db"], source="devices_router")
+    return {
+        "success_count": len(results["success"]),
+        "errors": results["errors"],
+        "duplicates": results["duplicates"]
+    }
 
 @router.get("/", response_model=schemas.device.PaginatedDeviceResponse)
 def list_devices(
