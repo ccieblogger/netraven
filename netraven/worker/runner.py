@@ -436,16 +436,36 @@ def run_job(job_id: int, db: Optional[Session] = None) -> None:
     # Final logging
     execution_time = end_time - start_time
     success_msg = "completed" if not job_failed else "failed"
-    logger.log(f"[Job: {job_id}] Job {success_msg} with status '{final_status}' in {execution_time:.2f}s", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id)
+    logger.log(f"[Job: {job_id}] Job {success_msg} with status '{final_status}' in {execution_time:.2f}s", level="INFO", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
 
-# Example of how this might be called (e.g., from setup/dev_runner.py)
-# if __name__ == "__main__":
-#     import sys
-#     if len(sys.argv) > 1:
-#         try:
-#             job_id_to_run = int(sys.argv[1])
-#             run_job(job_id_to_run) # Call without db session, it will create its own
-#         except ValueError:
-#             print("Please provide a valid integer Job ID.")
-#     else:
-#         print("Usage: python runner.py <job_id>")
+    # --- WS-07: Persist JobRun record ---
+    try:
+        from netraven.db.models.job_run import JobRun
+        from datetime import datetime
+        # Fetch job object for name and parameters
+        job_obj = db_to_use.query(Job).filter(Job.id == job_id).first()
+        job_name = job_obj.name if job_obj else str(job_id)
+        # Try to get user_id if available (else None)
+        user_id = getattr(job_obj, 'user_id', None)
+        # Try to get parameters if available (else empty dict)
+        params = getattr(job_obj, 'parameters', None)
+        if params is None:
+            params = {}
+        # Try to get output/summary if available (else empty string)
+        output = ""
+        if hasattr(job_obj, 'output') and job_obj.output:
+            output = job_obj.output
+        # Use final_status as status
+        jr = JobRun(
+            job_name=job_name,
+            user_id=user_id,
+            timestamp=datetime.utcnow(),
+            status=str(final_status),
+            parameters=params,
+            output=output
+        )
+        db_to_use.add(jr)
+        if session_managed:
+            db_to_use.commit()
+    except Exception as e:
+        logger.log(f"[Job: {job_id}] Failed to persist JobRun record: {e}", level="ERROR", destinations=["stdout", "file", "db"], source="runner", job_id=job_id, log_type="job")
