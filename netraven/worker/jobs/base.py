@@ -56,3 +56,15 @@ class BaseJob(ABC, metaclass=JobMeta):
         if hasattr(cls, 'Params') and issubclass(cls.Params, ParamsModel):
             return cls.Params.schema_json()
         return None
+
+class ExampleJob(BaseJob):
+    __abstract__ = False
+    name = "ExampleJob"
+    description = "A sample job to demonstrate PluginContext injection."
+
+    def run(self, device, job_id, config, db):
+        # Use the injected plugin_context
+        assert self.plugin_context is not None
+        # Example: log something and return a result
+        self.plugin_context.logger.info(f"Running ExampleJob for device {device}, job_id {job_id}")
+        return {"success": True, "job_id": job_id}

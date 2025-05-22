@@ -1,11 +1,11 @@
 # Context factory for NetRaven job plugins
-from netraven.services.device import DeviceService
-from netraven.services.inventory import InventoryClient
-from netraven.db import SessionLocal
-from netraven.utils.logging import get_logger
-
 class PluginContext:
     def __init__(self, user):
+        # Import dependencies here for easier mocking/testing and to avoid import errors if modules are missing
+        from netraven.services.device import DeviceService
+        from netraven.services.inventory import InventoryClient
+        from netraven.db import SessionLocal
+        from netraven.utils.logging import get_logger
         self.user = user
         self.device_service = DeviceService(user)
         self.inventory_client = InventoryClient(user)
