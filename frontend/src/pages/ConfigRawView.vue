@@ -1,10 +1,10 @@
 <template>
-  <div class="h-full flex flex-col bg-card text-text-primary p-4">
+  <div class="h-full flex flex-col bg-gray-100 text-text-primary p-4">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-xl font-semibold">Raw Configuration</h2>
       <div class="flex gap-2">
-        <button @click="copyConfig" class="btn btn-primary" :disabled="loading">Copy</button>
-        <button @click="downloadConfig" class="btn btn-secondary" :disabled="loading">Download</button>
+        <button @click="copyConfig" class="px-3 py-1 rounded font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700" :disabled="loading">Copy</button>
+        <button @click="downloadConfig" class="px-3 py-1 rounded font-medium transition-colors bg-gray-100 text-white hover:bg-gray-200" :disabled="loading">Download</button>
       </div>
     </div>
     <div v-if="error" class="text-red-500 mb-2">{{ error }}</div>
@@ -93,13 +93,4 @@ async function downloadConfig() {
 </script>
 
 <style scoped>
-.btn {
-  @apply px-3 py-1 rounded font-medium transition-colors;
-}
-.btn-primary {
-  @apply bg-primary text-white hover:bg-primary-dark;
-}
-.btn-secondary {
-  @apply bg-secondary text-white hover:bg-secondary-dark;
-}
 </style>

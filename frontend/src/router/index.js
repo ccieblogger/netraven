@@ -17,9 +17,7 @@ import JobLogs from '../pages/JobLogs.vue';
 import DeviceDetail from '../pages/DeviceDetail.vue';
 import Jobs from '../pages/Jobs.vue';
 import BulkDeviceImport from '../pages/BulkDeviceImport.vue'; // Import the BulkDeviceImport component
-
-// Placeholder components for routes to work initially
-// const PlaceholderComponent = { template: '<div>Placeholder Page</div>' }; // No longer needed
+import JobRun from '../pages/JobRun.vue'; // Import the JobRun component
 
 const routes = [
   { 
@@ -84,6 +82,12 @@ const routes = [
     path: '/jobs/:id',
     name: 'JobMonitor',
     component: JobMonitor, // Use JobMonitor component
+    meta: { requiresAuth: true, roles: ['admin', 'user'] }
+  },
+  {
+    path: '/jobs/:name',
+    name: 'JobRun',
+    component: JobRun, // Use JobRun component
     meta: { requiresAuth: true, roles: ['admin', 'user'] }
   },
   {

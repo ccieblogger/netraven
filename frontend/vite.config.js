@@ -49,5 +49,8 @@ export default defineConfig({
       usePolling: true, // Needed for some environments
       interval: 1000
     }
+  },
+  optimizeDeps: {
+    // Cleaned up: no ajv-related packages needed
   }
 })
