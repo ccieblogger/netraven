@@ -10,7 +10,7 @@ Redis Queue (RQ) for job execution.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, Body
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import and_
 from datetime import datetime, timedelta
@@ -30,6 +30,9 @@ from netraven.api.schemas.tag import Tag as TagSchema
 from .devices import get_tags_by_ids # Reuse tag helper from device router for now
 
 from netraven.worker.job_registry import JOB_TYPE_META, JobRegistry
+
+import json
+from json import JSONDecodeError
 
 router = APIRouter(
     prefix="/jobs",
@@ -578,36 +581,55 @@ def get_schedule_schema() -> dict:
 @router.get("/metadata/{job_type}")
 async def get_job_metadata(job_type: str):
     """
-    Return job metadata and Params JSON schema for a given job type/plugin.
-    Now also returns a schedule_schema JSON schema for scheduling controls.
+    Return minimal job metadata for a given job type/plugin.
     """
     try:
         job_cls = JobRegistry.get_job(job_type)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Job type '{job_type}' not found")
 
-    # Get job parameter schema
-    param_schema = job_cls.get_params_schema() or "{}"
-
-    # Build schedule_schema from JobCreate, filtering only schedule fields
-    from netraven.api.schemas.job import JobCreate
-    schedule_fields = [
-        "schedule_type", "interval_seconds", "cron_string", "scheduled_for", "is_enabled"
-    ]
-    full_schema = JobCreate.model_json_schema()
-    schedule_schema = {
-        k: v for k, v in full_schema["properties"].items() if k in schedule_fields
-    }
-    # Compose as a JSON Schema object
-    schedule_schema_obj = {
-        "type": "object",
-        "properties": schedule_schema,
-        "required": [f for f in full_schema.get("required", []) if f in schedule_fields]
-    }
+    # Determine if the job has parameters
+    has_parameters = hasattr(job_cls, 'Params')
 
     return {
         "name": getattr(job_cls, 'name', job_type),
         "description": getattr(job_cls, 'description', ""),
-        "schema": param_schema,
-        "schedule_schema": schedule_schema_obj
+        "has_parameters": has_parameters
     }
+
+@router.post("/execute")
+async def execute_job(
+    name: str = Body(...),
+    raw_parameters: str = Body(""),
+    schedule: str = Body(None),
+    user=Depends(get_current_active_user)
+):
+    """
+    Execute a job immediately or schedule it, accepting raw_parameters as string (JSON or markdown).
+    """
+    try:
+        job_cls = JobRegistry.get_job(name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Job type '{name}' not found")
+
+    has_parameters = hasattr(job_cls, 'Params')
+    if has_parameters:
+        try:
+            params = json.loads(raw_parameters) if raw_parameters else {}
+            # Call the normal run method with parsed params
+            job = job_cls.create(user)
+            result = job.run(**params, db=job.plugin_context.db)
+            return {"result": result}
+        except JSONDecodeError:
+            # Fallback: treat as markdown
+            job = job_cls.create(user)
+            if hasattr(job, 'execute_with_markdown'):
+                result = job.execute_with_markdown(raw_parameters)
+            else:
+                result = raw_parameters
+            return {"result": result}
+    else:
+        # No parameters needed
+        job = job_cls.create(user)
+        result = job.run(db=job.plugin_context.db)
+        return {"result": result}

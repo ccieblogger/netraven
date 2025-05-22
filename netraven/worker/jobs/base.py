@@ -33,6 +33,12 @@ class BaseJob(ABC, metaclass=JobMeta):
     def run(self, device, job_id, config, db) -> Any:
         pass
 
+    def execute_with_markdown(self, markdown_str: str):
+        """
+        Default implementation: echo the markdown string. Override in plugin if needed.
+        """
+        return markdown_str
+
     @classmethod
     def create(cls, user):
         from .context import PluginContext
