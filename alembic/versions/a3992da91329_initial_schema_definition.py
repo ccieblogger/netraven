@@ -177,6 +177,15 @@ def upgrade() -> None:
     op.create_index('idx_job_results_job_type', 'job_results', ['job_type'])
     op.create_index('idx_job_results_status', 'job_results', ['status'])
     op.create_index('idx_job_results_result_time', 'job_results', ['result_time'])
+    op.create_table('job_runs',
+        sa.Column('id', sa.Integer(), primary_key=True),
+        sa.Column('job_name', sa.String(), nullable=False),
+        sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id'), nullable=True),
+        sa.Column('timestamp', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('status', sa.String(), nullable=False),
+        sa.Column('parameters', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column('output', sa.Text(), nullable=True),
+    )
     # ### end Alembic commands ###
 
 
@@ -214,4 +223,5 @@ def downgrade() -> None:
     op.execute("DROP TYPE IF EXISTS device_source;")
     op.drop_table('credentials')
     op.drop_table('users')
+    op.drop_table('job_runs')
     # ### end Alembic commands ###

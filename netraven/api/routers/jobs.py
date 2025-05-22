@@ -21,6 +21,7 @@ from netraven.api import schemas
 from netraven.api.dependencies import get_db_session, get_current_active_user, require_admin_role
 from netraven.db import models
 from netraven.db.models import Job, Device, Log
+from netraven.db.models.job_run import JobRun
 from netraven.api.schemas.job import (
     ScheduledJobSummary, RecentJobExecution, JobTypeSummary, JobDashboardStatus, RQQueueStatus, WorkerStatus, JobBase
 )
@@ -557,6 +558,11 @@ def get_job_device_results(
         "deprecation_notice": "/jobs/{job_id}/devices is deprecated and will be removed. Use /job-results/?job_id=... instead.",
         "results": results
     }
+
+@router.get('/history/{name}')
+def get_history(name: str, db: Session = Depends(get_db_session)):
+    runs = db.query(JobRun).filter_by(job_name=name).order_by(JobRun.timestamp.desc()).all()
+    return [r.as_dict() for r in runs]
 
 def get_schedule_schema() -> dict:
     """
