@@ -8,6 +8,32 @@ from redis import Redis
 from rq import Worker
 from rq_scheduler import Scheduler
 from datetime import datetime, timezone
+import importlib.util
+import importlib
+import os
+import sys
+from netraven.worker.job_registry import JobRegistry
+
+# --- Dynamic Job Plugin Registration ---
+print("[DEBUG] Starting dynamic job plugin registration...")
+jobs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../worker/jobs'))
+plugins_dir = os.path.join(jobs_dir, 'plugins')
+print(f"[DEBUG] jobs_dir: {jobs_dir}")
+print(f"[DEBUG] plugins_dir: {plugins_dir}")
+
+for directory in [jobs_dir, plugins_dir]:
+    if not os.path.isdir(directory):
+        print(f"[DEBUG] Directory does not exist: {directory}")
+        continue
+    for filename in os.listdir(directory):
+        if filename.endswith('.py') and filename != '__init__.py':
+            module_name = f"netraven.worker.jobs{'.plugins' if directory == plugins_dir else ''}.{filename[:-3]}"
+            print(f"[DEBUG] Importing module: {module_name}")
+            if module_name not in sys.modules:
+                importlib.import_module(module_name)
+print("[DEBUG] Dynamic job plugin registration complete.")
+print(f"[DEBUG] Registered job types: {list(JobRegistry.get_all_jobs().keys())}")
+# --- End Dynamic Job Plugin Registration ---
 
 # Import routers
 from .routers import devices, jobs, users, auth_router, tags, credentials, backups, logs, scheduler, job_results_router, configs  # Import the new logs router, the new scheduler router, the new job results router, and the new configs router

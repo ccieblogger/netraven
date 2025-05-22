@@ -7,6 +7,8 @@ from unittest.mock import patch, MagicMock
 from netraven.api.main import app
 from netraven.db import models
 from tests.api.base import BaseAPITest
+# Ensure reachability job is registered for metadata tests
+from netraven.worker.jobs import reachability
 
 class TestJobsAPI(BaseAPITest):
     """Test suite for the Jobs API endpoints."""
@@ -601,4 +603,48 @@ class TestJobsAPI(BaseAPITest):
                 assert item["job_name"] == job.name
                 assert item["device_name"] == device.hostname
                 found = True
-        assert found, "Expected job result with job_name and device_name not found." 
+        assert found, "Expected job result with job_name and device_name not found."
+
+    def test_get_job_metadata_includes_schedule_schema(self, client: TestClient, admin_headers: Dict):
+        """Test that /jobs/metadata/{job_type} includes schedule_schema with correct fields."""
+        # Dynamically get a job_type from the registry
+        from netraven.worker.job_registry import JobRegistry
+        job_types = list(JobRegistry.registry.keys())
+        if not job_types:
+            import pytest
+            pytest.skip("No job types registered in JobRegistry")
+        job_type = job_types[0]
+        response = client.get(f"/jobs/metadata/{job_type}", headers=admin_headers)
+        self.assert_successful_response(response, 200)
+        data = response.json()
+        assert "schedule_schema" in data
+        schedule_schema = data["schedule_schema"]
+        # Check that required scheduling fields are present
+        for field in ["schedule_type", "interval_seconds", "cron_string", "scheduled_for", "is_enabled"]:
+            assert field in schedule_schema["properties"]
+        # Should not include unrelated fields
+        unrelated = set(schedule_schema["properties"]).difference({"schedule_type", "interval_seconds", "cron_string", "scheduled_for", "is_enabled"})
+        assert not unrelated
+
+    def test_get_job_metadata_includes_schedule_schema(self, client: TestClient, admin_headers: dict):
+        """Test that /jobs/metadata/reachability includes schedule_schema in the response."""
+        response = client.get("/jobs/metadata/reachability", headers=admin_headers)
+        self.assert_successful_response(response, 200)
+        data = response.json()
+        assert "schedule_schema" in data
+        schedule_schema = data["schedule_schema"]
+        assert schedule_schema["type"] == "object"
+        assert "properties" in schedule_schema
+        # Check for expected schedule fields
+        for field in ["schedule_type", "interval_seconds", "cron_string", "scheduled_for", "is_enabled"]:
+            assert field in schedule_schema["properties"]
+
+    def test_builtin_jobs_metadata_available(self, client: TestClient, admin_headers: dict):
+        """Test that built-in jobs (reachability, config_backup) are registered and metadata is available."""
+        for job_type in ["reachability", "config_backup"]:
+            response = client.get(f"/jobs/metadata/{job_type}", headers=admin_headers)
+            assert response.status_code == 200, f"{job_type} metadata endpoint should return 200"
+            data = response.json()
+            assert "name" in data and data["name"].lower().startswith(job_type.split('_')[0]), f"{job_type} should have a name field"
+            assert "schema" in data, f"{job_type} should have a schema field"
+            assert data["schema"], f"{job_type} schema should not be empty"

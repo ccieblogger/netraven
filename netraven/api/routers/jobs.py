@@ -22,7 +22,7 @@ from netraven.api.dependencies import get_db_session, get_current_active_user, r
 from netraven.db import models
 from netraven.db.models import Job, Device, Log
 from netraven.api.schemas.job import (
-    ScheduledJobSummary, RecentJobExecution, JobTypeSummary, JobDashboardStatus, RQQueueStatus, WorkerStatus
+    ScheduledJobSummary, RecentJobExecution, JobTypeSummary, JobDashboardStatus, RQQueueStatus, WorkerStatus, JobBase
 )
 from netraven.api.schemas.tag import Tag as TagSchema
 
@@ -555,17 +555,59 @@ def get_job_device_results(
         "results": results
     }
 
+def get_schedule_schema() -> dict:
+    """
+    Return a JSON Schema for the scheduling fields of JobBase.
+    Only include schedule_type, interval_seconds, cron_string, scheduled_for.
+    """
+    full_schema = JobBase.model_json_schema()
+    # Only keep relevant scheduling properties
+    schedule_fields = [
+        "schedule_type", "interval_seconds", "cron_string", "scheduled_for"
+    ]
+    properties = {k: v for k, v in full_schema["properties"].items() if k in schedule_fields}
+    required = [k for k in full_schema.get("required", []) if k in schedule_fields]
+    return {
+        "title": "Job Schedule",
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "description": "Scheduling controls for job creation."
+    }
+
 @router.get("/metadata/{job_type}")
 async def get_job_metadata(job_type: str):
     """
     Return job metadata and Params JSON schema for a given job type/plugin.
+    Now also returns a schedule_schema JSON schema for scheduling controls.
     """
     try:
         job_cls = JobRegistry.get_job(job_type)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Job type '{job_type}' not found")
+
+    # Get job parameter schema
+    param_schema = job_cls.get_params_schema() or "{}"
+
+    # Build schedule_schema from JobCreate, filtering only schedule fields
+    from netraven.api.schemas.job import JobCreate
+    schedule_fields = [
+        "schedule_type", "interval_seconds", "cron_string", "scheduled_for", "is_enabled"
+    ]
+    full_schema = JobCreate.model_json_schema()
+    schedule_schema = {
+        k: v for k, v in full_schema["properties"].items() if k in schedule_fields
+    }
+    # Compose as a JSON Schema object
+    schedule_schema_obj = {
+        "type": "object",
+        "properties": schedule_schema,
+        "required": [f for f in full_schema.get("required", []) if f in schedule_fields]
+    }
+
     return {
         "name": getattr(job_cls, 'name', job_type),
         "description": getattr(job_cls, 'description', ""),
-        "schema": job_cls.get_params_schema() or "{}"
+        "schema": param_schema,
+        "schedule_schema": schedule_schema_obj
     }
