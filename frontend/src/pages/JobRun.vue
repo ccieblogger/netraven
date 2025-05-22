@@ -38,10 +38,10 @@ async function fetchMetadata() {
   }
 }
 
-function onRunNow({ params, schedule }) {
+function onRunNow({ rawParams, schedule }) {
   axios.post('/jobs/execute', {
     name: jobType,
-    parameters: params,
+    raw_parameters: rawParams,
     schedule
   })
     .then(() => {
@@ -52,10 +52,10 @@ function onRunNow({ params, schedule }) {
     });
 }
 
-function onScheduleJob({ params, schedule }) {
+function onScheduleJob({ rawParams, schedule }) {
   axios.post('/jobs/execute', {
     name: jobType,
-    parameters: params,
+    raw_parameters: rawParams,
     schedule
   })
     .then(() => {

@@ -1,19 +1,17 @@
 <template>
-  <div class="job-form-grid grid grid-cols-2 gap-6">
-    <div>
-      <h2 class="text-xl font-semibold mb-2">Job Parameters</h2>
-      <p class="text-gray-700 italic">No dynamic form available. Please see the job description for details.</p>
+  <div class="p-4">
+    <h2 class="text-xl font-semibold">{{ metadata.description }}</h2>
+    <div v-if="metadata.has_parameters" class="mt-4">
+      <label class="block mb-1 font-medium">Parameters (JSON or Markdown)</label>
+      <textarea v-model="rawParams" class="w-full h-32 p-2 border rounded" placeholder="Enter parameters..."></textarea>
     </div>
-    <div>
-      <div class="mt-4 flex gap-2">
-        <button class="btn btn-primary" @click="runNow">Run Now</button>
-        <button class="btn btn-secondary" @click="scheduleJob">Schedule</button>
-      </div>
-      <div class="mt-6 p-4 bg-gray-50 rounded">
-        <h3 class="font-semibold">Description</h3>
-        <p class="text-gray-700">{{ metadata.description }}</p>
-        <!-- If you want markdown support, replace the above line with a markdown renderer later -->
-      </div>
+    <div class="mt-4">
+      <label class="block mb-1 font-medium">Schedule</label>
+      <input v-model="schedule" class="w-full p-2 border rounded" placeholder="e.g. @daily or cron expression" />
+    </div>
+    <div class="mt-4 flex space-x-2">
+      <button class="btn btn-primary" @click="runNow">Run Now</button>
+      <button class="btn btn-secondary" @click="scheduleJob">Schedule</button>
     </div>
   </div>
 </template>
@@ -26,18 +24,18 @@ const props = defineProps({
 });
 const emit = defineEmits(['run-now', 'schedule-job']);
 
+const rawParams = ref('');
+const schedule = ref('');
+
 function runNow() {
-  emit('run-now', {});
+  emit('run-now', { rawParams: rawParams.value, schedule: schedule.value });
 }
 function scheduleJob() {
-  emit('schedule-job', {});
+  emit('schedule-job', { rawParams: rawParams.value, schedule: schedule.value });
 }
 </script>
 
 <style scoped>
-.job-form-grid {
-  min-height: 400px;
-}
 .btn {
   padding: 0.5rem 1rem;
   border-radius: 0.375rem;
